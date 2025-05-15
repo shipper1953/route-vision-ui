@@ -99,3 +99,23 @@
     @apply text-lg font-semibold text-tms-blue mb-4;
   }
 }
+
+/* Tornado Animation Keyframes */
+@keyframes tornado-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes tornado-move {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(180deg); }
+  100% { transform: translateY(0) rotate(360deg); }
+}
+
+.tornado-spin {
+  animation: tornado-spin 2s linear infinite;
+}
+
+.tornado-move {
+  animation: tornado-move 3s ease-in-out infinite;
+}

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 
 interface NavItemProps {
   to: string;
@@ -59,8 +60,12 @@ export function TmsSidebar() {
       isCollapsed ? "w-16" : "w-64"
     )}>
       <div className="flex items-center justify-between p-4">
-        {!isCollapsed && (
-          <div className="text-sidebar-foreground font-bold text-xl">TMS App</div>
+        {!isCollapsed ? (
+          <ShipTornadoLogo className="text-sidebar-foreground" />
+        ) : (
+          <div className="mx-auto">
+            <ShipTornadoLogo className="text-sidebar-foreground" size={20} spin={false} />
+          </div>
         )}
         <Button 
           variant="ghost" 
