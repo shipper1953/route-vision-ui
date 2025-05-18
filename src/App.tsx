@@ -11,6 +11,8 @@ import Shipments from "./pages/Shipments";
 import CreateShipment from "./pages/CreateShipment";
 import Users from "./pages/Users";
 import CreateUser from "./pages/CreateUser";
+import Settings from "./pages/Settings";
+import { LoadingPage } from "./components/transitions/LoadingPage";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +29,8 @@ const App = () => (
           <Route path="/create-shipment" element={<CreateShipment />} />
           <Route path="/users" element={<Users />} />
           <Route path="/create-user" element={<CreateUser />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/loading" element={<LoadingPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
