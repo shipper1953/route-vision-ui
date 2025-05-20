@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ShipmentForm } from "@/types/shipment";
+import { AddressLookup } from "./AddressLookup";
 
 interface AddressFormSectionProps {
   type: "from" | "to";
@@ -41,6 +42,8 @@ export const AddressFormSection = ({ type, title, description }: AddressFormSect
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <AddressLookup type={prefix} />
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}

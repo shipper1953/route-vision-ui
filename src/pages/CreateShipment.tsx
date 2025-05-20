@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { TmsLayout } from "@/components/layout/TmsLayout";
@@ -23,20 +23,29 @@ const CreateShipment = () => {
   const [orderLookupComplete, setOrderLookupComplete] = useState(false);
   const [recommendedRate, setRecommendedRate] = useState<SmartRate | null>(null);
   
+  // Load default shipping address from localStorage
+  const getDefaultShippingAddress = () => {
+    return {
+      fromName: localStorage.getItem("fromName") || "John Doe",
+      fromCompany: localStorage.getItem("fromCompany") || "Ship Tornado",
+      fromStreet1: localStorage.getItem("fromStreet1") || "123 Main St",
+      fromStreet2: localStorage.getItem("fromStreet2") || "",
+      fromCity: localStorage.getItem("fromCity") || "Boston",
+      fromState: localStorage.getItem("fromState") || "MA",
+      fromZip: localStorage.getItem("fromZip") || "02108",
+      fromCountry: localStorage.getItem("fromCountry") || "US",
+      fromPhone: localStorage.getItem("fromPhone") || "555-123-4567",
+      fromEmail: localStorage.getItem("fromEmail") || "john@shiptornado.com",
+    };
+  };
+  
   const form = useForm<ShipmentForm>({
     resolver: zodResolver(shipmentSchema),
     defaultValues: {
-      // Default values for development
-      fromName: "John Doe",
-      fromCompany: "Ship Tornado",
-      fromStreet1: "123 Main St",
-      fromCity: "Boston",
-      fromState: "MA",
-      fromZip: "02108",
-      fromCountry: "US",
-      fromPhone: "555-123-4567",
-      fromEmail: "john@shiptornado.com",
+      // Load default shipping address from profile settings
+      ...getDefaultShippingAddress(),
       
+      // Default values for recipient
       toName: "",
       toStreet1: "",
       toCity: "",
