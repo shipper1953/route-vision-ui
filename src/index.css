@@ -62,16 +62,58 @@
   /* ... keep existing code */
 }
 
-/* Simple tornado animation */
-@keyframes tornado-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+/* Tornado side-to-side animations */
+@keyframes tornado-move-1 {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(2px); }
+  100% { transform: translateX(0); }
 }
 
-.tornado-spin {
-  animation: tornado-spin 3s linear infinite;
+@keyframes tornado-move-2 {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(-3px); }
+  100% { transform: translateX(0); }
 }
 
+@keyframes tornado-move-3 {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(1.5px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes tornado-move-4 {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(-1px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes tornado-move-5 {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(0.5px); }
+  100% { transform: translateX(0); }
+}
+
+.tornado-line-1 {
+  animation: tornado-move-1 1.7s ease-in-out infinite;
+}
+
+.tornado-line-2 {
+  animation: tornado-move-2 2s ease-in-out infinite;
+}
+
+.tornado-line-3 {
+  animation: tornado-move-3 1.9s ease-in-out infinite;
+}
+
+.tornado-line-4 {
+  animation: tornado-move-4 2.2s ease-in-out infinite;
+}
+
+.tornado-line-5 {
+  animation: tornado-move-5 1.8s ease-in-out infinite;
+}
+
+/* Keep the vertical movement for LoadingPage */
 .tornado-move {
   animation: tornado-move 3s ease-in-out infinite;
 }
@@ -80,4 +122,9 @@
   0% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
   100% { transform: translateY(0); }
+}
+
+/* Keep this for backwards compatibility */
+.tornado-spin {
+  animation: tornado-move-2 2s ease-in-out infinite;
 }
