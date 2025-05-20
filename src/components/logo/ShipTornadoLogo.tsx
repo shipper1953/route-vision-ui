@@ -12,7 +12,7 @@ export function ShipTornadoLogo({ className, size = 24, spin = false }: ShipTorn
   const baseSize = size;
 
   return (
-    <div className={cn("flex items-center gap-3", className)}>
+    <div className={cn("flex items-center", className)}>
       <div className="relative">
         {/* Package icon stylized as tornado */}
         <svg 
@@ -36,14 +36,6 @@ export function ShipTornadoLogo({ className, size = 24, spin = false }: ShipTorn
           <path d="M15 13H9" className="tornado-line-4" />      {/* narrower */}
           <path d="M13 16H11" className="tornado-line-5" />     {/* narrowest */}
         </svg>
-      </div>
-      
-      {/* Vertical divider line */}
-      <div className="w-px h-10 bg-white/70"></div>
-      
-      <div className="flex flex-col leading-tight font-bold whitespace-nowrap text-white">
-        <span className="text-lg tracking-wide">Parcel</span>
-        <span className="text-lg tracking-wide">Express</span>
       </div>
     </div>
   );

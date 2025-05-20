@@ -2,6 +2,7 @@
 import { useLocation, NavLink } from "react-router-dom";
 import { 
   ChevronLeft, 
+  ChevronRight,
   Home, 
   Package, 
   Truck, 
@@ -63,19 +64,22 @@ export function TmsSidebar() {
     >
       <div className="flex items-center justify-between p-4">
         {!isCollapsed ? (
-          <ShipTornadoLogo className="text-white" />
+          <ShipTornadoLogo className="text-white" size={32} />
         ) : (
-          <div className="mx-auto">
-            <ShipTornadoLogo className="text-white" size={20} spin={false} />
+          <div className="w-full flex justify-center">
+            <ShipTornadoLogo className="text-white" size={28} spin={false} />
           </div>
         )}
         <Button 
           variant="ghost" 
           size="icon" 
           onClick={toggleSidebar}
-          className="text-sidebar-foreground ml-auto hover:bg-sidebar-accent"
+          className={cn(
+            "text-sidebar-foreground hover:bg-sidebar-accent",
+            isCollapsed ? "absolute right-0 top-16" : "ml-auto"
+          )}
         >
-          {isCollapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
+          {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </Button>
       </div>
 
