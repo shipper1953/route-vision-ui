@@ -49,6 +49,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   const onSubmit = async (data: ShipmentFormType) => {
     try {
       setLoading(true);
+      toast.info("Getting shipping rates...");
       
       const shipmentData = {
         from_address: {
@@ -82,6 +83,8 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
           weight: data.weight
         }
       };
+      
+      console.log("Creating shipment with data:", shipmentData);
       
       const response = await easyPostService.createShipment(shipmentData);
       
@@ -119,7 +122,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       onShipmentCreated(response, recommendedRate);
     } catch (error) {
       console.error("Error creating shipment:", error);
-      toast.error("Failed to retrieve shipment rates");
+      toast.error("Failed to retrieve shipment rates. Please try again.");
     } finally {
       setLoading(false);
     }
