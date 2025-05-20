@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -32,12 +32,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Package, Truck, ArrowRight } from "lucide-react";
+import { Package, Truck, ArrowRight, Barcode, Search } from "lucide-react";
 import easyPostService, { ShipmentResponse, SmartRate } from "@/services/easypostService";
+import { fetchOrderById } from "@/services/orderService";
 
 const shipmentSchema = z.object({
+  // Barcode field for order lookup
+  orderBarcode: z.string().optional(),
+  
   // From address fields
   fromName: z.string().min(1, "Name is required"),
   fromCompany: z.string().optional(),
@@ -67,6 +71,10 @@ const shipmentSchema = z.object({
   width: z.coerce.number().min(0.1, "Width must be greater than 0"),
   height: z.coerce.number().min(0.1, "Height must be greater than 0"),
   weight: z.coerce.number().min(0.1, "Weight must be greater than 0"),
+
+  // Order details
+  orderId: z.string().optional(),
+  requiredDeliveryDate: z.string().optional(),
 });
 
 type ShipmentForm = z.infer<typeof shipmentSchema>;
@@ -75,6 +83,9 @@ const CreateShipment = () => {
   const [shipmentResponse, setShipmentResponse] = useState<ShipmentResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedRate, setSelectedRate] = useState<SmartRate | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [orderLookupComplete, setOrderLookupComplete] = useState(false);
+  const [recommendedRate, setRecommendedRate] = useState<SmartRate | null>(null);
   
   const form = useForm<ShipmentForm>({
     resolver: zodResolver(shipmentSchema),
@@ -90,19 +101,75 @@ const CreateShipment = () => {
       fromPhone: "555-123-4567",
       fromEmail: "john@shiptornado.com",
       
-      toName: "Jane Smith",
-      toStreet1: "456 Market St",
-      toCity: "San Francisco",
-      toState: "CA",
-      toZip: "94103",
+      toName: "",
+      toStreet1: "",
+      toCity: "",
+      toState: "",
+      toZip: "",
       toCountry: "US",
       
-      length: 10,
-      width: 8,
-      height: 6,
-      weight: 16,
+      length: 0,
+      width: 0,
+      height: 0,
+      weight: 0,
+      
+      orderBarcode: "",
+      orderId: "",
+      requiredDeliveryDate: "",
     }
   });
+  
+  const handleLookupOrder = async () => {
+    const orderBarcode = form.getValues("orderBarcode");
+    
+    if (!orderBarcode) {
+      toast.error("Please enter a valid order barcode");
+      return;
+    }
+    
+    try {
+      setLookupLoading(true);
+      const order = await fetchOrderById(orderBarcode);
+      
+      if (!order) {
+        toast.error("Order not found");
+        return;
+      }
+      
+      // Update form with order data
+      form.setValue("toName", order.customerName);
+      form.setValue("toCompany", order.customerCompany || "");
+      form.setValue("toStreet1", order.shippingAddress.street1);
+      form.setValue("toStreet2", order.shippingAddress.street2 || "");
+      form.setValue("toCity", order.shippingAddress.city);
+      form.setValue("toState", order.shippingAddress.state);
+      form.setValue("toZip", order.shippingAddress.zip);
+      form.setValue("toCountry", order.shippingAddress.country);
+      form.setValue("toPhone", order.customerPhone || "");
+      form.setValue("toEmail", order.customerEmail || "");
+      
+      // Set parcel dimensions and weight if available from Qboid system
+      if (order.parcelInfo) {
+        form.setValue("length", order.parcelInfo.length);
+        form.setValue("width", order.parcelInfo.width);
+        form.setValue("height", order.parcelInfo.height);
+        form.setValue("weight", order.parcelInfo.weight);
+      }
+      
+      // Set order details
+      form.setValue("orderId", order.id);
+      form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
+      
+      toast.success("Order information loaded");
+      setOrderLookupComplete(true);
+      
+    } catch (error) {
+      console.error("Error looking up order:", error);
+      toast.error("Failed to retrieve order information");
+    } finally {
+      setLookupLoading(false);
+    }
+  };
   
   const onSubmit = async (data: ShipmentForm) => {
     try {
@@ -143,6 +210,35 @@ const CreateShipment = () => {
       
       const response = await easyPostService.createShipment(shipmentData);
       setShipmentResponse(response);
+      
+      // Find recommended rate based on required delivery date
+      if (data.requiredDeliveryDate) {
+        const requiredDate = new Date(data.requiredDeliveryDate);
+        
+        // Find a rate that can deliver by the required date
+        if (response.smartrates) {
+          const recommendedOptions = response.smartrates.filter(rate => {
+            if (!rate.delivery_date) return false;
+            const deliveryDate = new Date(rate.delivery_date);
+            return deliveryDate <= requiredDate;
+          });
+          
+          if (recommendedOptions.length > 0) {
+            // Sort by price (lowest first) from rates that meet the deadline
+            const bestRate = recommendedOptions.sort((a, b) => 
+              parseFloat(a.rate) - parseFloat(b.rate)
+            )[0];
+            
+            setRecommendedRate(bestRate);
+            setSelectedRate(bestRate);
+            
+            toast.success("Recommended shipping option selected based on required delivery date");
+          } else {
+            toast.warning("No shipping options available to meet the required delivery date");
+          }
+        }
+      }
+      
       toast.success("Shipment rates retrieved successfully");
     } catch (error) {
       console.error("Error creating shipment:", error);
@@ -158,8 +254,18 @@ const CreateShipment = () => {
       return;
     }
     
+    const orderId = form.getValues("orderId");
+    
     toast.success("Shipping label purchased successfully!");
-    // In a real implementation, we would call the EasyPost API to purchase the label
+    // In a production implementation:
+    // 1. Call the EasyPost API to purchase the label
+    // 2. Update the order status
+    // 3. Associate the shipment with the order
+    
+    // Navigate back to Orders page after short delay
+    setTimeout(() => {
+      window.location.href = orderId ? `/orders?highlight=${orderId}` : "/orders";
+    }, 2000);
   };
   
   const getDeliveryAccuracyLabel = (accuracy?: string) => {
@@ -191,6 +297,82 @@ const CreateShipment = () => {
           <p className="text-muted-foreground">Create a new shipment with SmartRate</p>
         </div>
       </div>
+      
+      {/* Barcode Scan Input */}
+      <Card className="mb-8">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Barcode className="h-5 w-5 text-tms-blue" />
+            Order Lookup
+          </CardTitle>
+          <CardDescription>
+            Scan or enter order barcode to automatically populate shipment details
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-4">
+            <div className="flex-1">
+              <FormField
+                control={form.control}
+                name="orderBarcode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Order Barcode or ID</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Barcode className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                        <Input
+                          placeholder="Scan or enter order barcode"
+                          className="pl-10"
+                          {...field}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleLookupOrder();
+                            }
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormDescription>
+                      Hit enter or click lookup to retrieve order details
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <Button
+              type="button"
+              onClick={handleLookupOrder}
+              className="bg-tms-blue hover:bg-tms-blue-400 mb-6"
+              disabled={lookupLoading}
+            >
+              {lookupLoading ? (
+                <>
+                  <LoadingSpinner size={16} className="mr-2" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <Search className="mr-2 h-4 w-4" />
+                  Lookup Order
+                </>
+              )}
+            </Button>
+          </div>
+          
+          {orderLookupComplete && form.getValues("requiredDeliveryDate") && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <div className="flex items-center gap-2 text-amber-800">
+                <Truck className="h-4 w-4" />
+                <span className="font-medium">Required Delivery:</span>
+                <span>{new Date(form.getValues("requiredDeliveryDate")).toLocaleDateString()}</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       
       {!shipmentResponse ? (
         <Form {...form}>
@@ -616,6 +798,14 @@ const CreateShipment = () => {
                         />
                       </div>
                     </div>
+                    
+                    {form.getValues("orderId") && (
+                      <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-800">
+                          Package data populated from Qboid scanning system for order #{form.getValues("orderId")}
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -664,6 +854,11 @@ const CreateShipment = () => {
               <CardTitle>Shipping Rates</CardTitle>
               <CardDescription>
                 Select a shipping rate to continue. SmartRate provides estimated transit times and delivery accuracy.
+                {form.getValues("requiredDeliveryDate") && (
+                  <span className="block mt-1 font-medium">
+                    Required delivery date: {new Date(form.getValues("requiredDeliveryDate")).toLocaleDateString()}
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -674,6 +869,8 @@ const CreateShipment = () => {
                     className={`p-4 border rounded-md flex flex-col md:flex-row justify-between items-start md:items-center transition-colors cursor-pointer ${
                       selectedRate?.id === rate.id 
                         ? 'border-tms-blue bg-blue-50' 
+                        : recommendedRate?.id === rate.id
+                        ? 'border-green-400 bg-green-50'
                         : 'border-border hover:bg-muted/50'
                     }`}
                     onClick={() => setSelectedRate(rate)}
@@ -695,6 +892,11 @@ const CreateShipment = () => {
                         <div className="font-medium flex items-center gap-2">
                           <Truck className="h-4 w-4 text-muted-foreground" />
                           {rate.carrier} {rate.service}
+                          {recommendedRate?.id === rate.id && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                              Recommended
+                            </span>
+                          )}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           Delivery in {rate.delivery_days} business day{rate.delivery_days !== 1 && 's'} 

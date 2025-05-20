@@ -1,5 +1,6 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { 
   Table,
@@ -19,51 +20,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Package, Search, FileDown } from "lucide-react";
-
-// Sample data - would be fetched from API in production
-const orders = [
-  { 
-    id: "ORD-1234", 
-    customer: "ABC Company", 
-    date: "May 15, 2025", 
-    items: 3, 
-    status: "ready_to_ship", 
-    value: "$529.99"
-  },
-  { 
-    id: "ORD-1235", 
-    customer: "XYZ Corp", 
-    date: "May 14, 2025", 
-    items: 1, 
-    status: "processing", 
-    value: "$129.50"
-  },
-  { 
-    id: "ORD-1236", 
-    customer: "Tech Solutions Inc", 
-    date: "May 13, 2025", 
-    items: 5, 
-    status: "ready_to_ship", 
-    value: "$1,245.00"
-  },
-  { 
-    id: "ORD-1237", 
-    customer: "Global Traders", 
-    date: "May 13, 2025", 
-    items: 2, 
-    status: "shipped", 
-    value: "$349.95"
-  },
-  { 
-    id: "ORD-1238", 
-    customer: "City Logistics", 
-    date: "May 12, 2025", 
-    items: 4, 
-    status: "delivered", 
-    value: "$789.40"
-  }
-];
+import { Package, Search, FileDown, Truck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { fetchOrders, OrderData } from "@/services/orderService";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 const OrderStatus = ({ status }: { status: string }) => {
   const getStatusDetails = (status: string) => {
@@ -87,11 +47,36 @@ const OrderStatus = ({ status }: { status: string }) => {
 
 const Orders = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [orders, setOrders] = useState<OrderData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchParams] = useSearchParams();
+  const highlightedOrderId = searchParams.get('highlight');
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        const orderData = await fetchOrders();
+        setOrders(orderData);
+      } catch (error) {
+        console.error("Error loading orders:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadOrders();
+  }, []);
   
   const filteredOrders = orders.filter(order => 
     order.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    order.customer.toLowerCase().includes(searchTerm.toLowerCase())
+    order.customerName.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleCreateShipmentForOrder = (orderId: string) => {
+    // Navigate to create shipment page with the order ID
+    navigate(`/create-shipment?orderId=${orderId}`);
+  };
 
   return (
     <TmsLayout>
@@ -101,7 +86,7 @@ const Orders = () => {
           <p className="text-muted-foreground">Manage your customer orders</p>
         </div>
         <div className="mt-4 md:mt-0 flex gap-3">
-          <Button className="bg-tms-blue hover:bg-tms-blue-400" onClick={() => {}}>
+          <Button className="bg-tms-blue hover:bg-tms-blue-400" onClick={() => navigate('/create-shipment')}>
             <Package className="mr-2 h-4 w-4" />
             Create Shipment
           </Button>
@@ -127,40 +112,72 @@ const Orders = () => {
             </div>
           </div>
           <CardDescription>
-            Showing {filteredOrders.length} of {orders.length} orders
+            {loading ? "Loading orders..." : `Showing ${filteredOrders.length} of ${orders.length} orders`}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.id}</TableCell>
-                  <TableCell>{order.customer}</TableCell>
-                  <TableCell>{order.date}</TableCell>
-                  <TableCell>{order.items}</TableCell>
-                  <TableCell>
-                    <OrderStatus status={order.status} />
-                  </TableCell>
-                  <TableCell className="text-right">{order.value}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm">Details</Button>
-                  </TableCell>
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <LoadingSpinner size={24} />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Required Delivery</TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Value</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.map((order) => (
+                  <TableRow 
+                    key={order.id} 
+                    className={highlightedOrderId === order.id ? "bg-blue-50" : ""}
+                  >
+                    <TableCell className="font-medium">{order.id}</TableCell>
+                    <TableCell>{order.customerName}</TableCell>
+                    <TableCell>{new Date(order.orderDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(order.requiredDeliveryDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{order.items}</TableCell>
+                    <TableCell>
+                      <OrderStatus status={order.status} />
+                    </TableCell>
+                    <TableCell className="text-right">{order.value}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">Details</Button>
+                        {order.status === 'ready_to_ship' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleCreateShipmentForOrder(order.id)}
+                            className="flex items-center gap-1"
+                          >
+                            <Truck className="h-3.5 w-3.5" />
+                            Ship
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                
+                {filteredOrders.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center">
+                      No orders found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </TmsLayout>
