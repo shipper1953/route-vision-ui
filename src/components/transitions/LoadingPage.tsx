@@ -1,5 +1,5 @@
 
-import { Tornado } from "lucide-react";
+import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 import { cn } from "@/lib/utils";
 
 interface LoadingPageProps {
@@ -13,8 +13,7 @@ export function LoadingPage({ className }: LoadingPageProps) {
       className
     )}>
       <div className="flex flex-col items-center gap-4">
-        <Tornado size={48} className="tornado-move text-tms-blue" />
-        <h1 className="text-2xl font-bold text-tms-blue">Ship Tornado</h1>
+        <ShipTornadoLogo size={48} className="text-tms-blue" />
         <p className="text-muted-foreground">Loading your experience...</p>
       </div>
     </div>

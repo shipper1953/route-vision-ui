@@ -63,54 +63,33 @@
 }
 
 /* Tornado side-to-side animations */
-@keyframes tornado-move-1 {
-  0% { transform: translateX(0); }
+@keyframes tornadoSway {
+  0%, 100% { transform: translateX(0); }
   50% { transform: translateX(2px); }
-  100% { transform: translateX(0); }
-}
-
-@keyframes tornado-move-2 {
-  0% { transform: translateX(0); }
-  50% { transform: translateX(-3px); }
-  100% { transform: translateX(0); }
-}
-
-@keyframes tornado-move-3 {
-  0% { transform: translateX(0); }
-  50% { transform: translateX(1.5px); }
-  100% { transform: translateX(0); }
-}
-
-@keyframes tornado-move-4 {
-  0% { transform: translateX(0); }
-  50% { transform: translateX(-1px); }
-  100% { transform: translateX(0); }
-}
-
-@keyframes tornado-move-5 {
-  0% { transform: translateX(0); }
-  50% { transform: translateX(0.5px); }
-  100% { transform: translateX(0); }
 }
 
 .tornado-line-1 {
-  animation: tornado-move-1 1.7s ease-in-out infinite;
+  animation: tornadoSway 1.7s ease-in-out infinite;
 }
 
 .tornado-line-2 {
-  animation: tornado-move-2 2s ease-in-out infinite;
+  animation: tornadoSway 2s ease-in-out infinite;
+  animation-delay: 0.1s;
 }
 
 .tornado-line-3 {
-  animation: tornado-move-3 1.9s ease-in-out infinite;
+  animation: tornadoSway 1.9s ease-in-out infinite;
+  animation-delay: 0.2s;
 }
 
 .tornado-line-4 {
-  animation: tornado-move-4 2.2s ease-in-out infinite;
+  animation: tornadoSway 2.2s ease-in-out infinite;
+  animation-delay: 0.3s;
 }
 
 .tornado-line-5 {
-  animation: tornado-move-5 1.8s ease-in-out infinite;
+  animation: tornadoSway 1.8s ease-in-out infinite;
+  animation-delay: 0.4s;
 }
 
 /* Keep the vertical movement for LoadingPage */
@@ -126,5 +105,5 @@
 
 /* Keep this for backwards compatibility */
 .tornado-spin {
-  animation: tornado-move-2 2s ease-in-out infinite;
+  animation: tornadoSway 2s ease-in-out infinite;
 }

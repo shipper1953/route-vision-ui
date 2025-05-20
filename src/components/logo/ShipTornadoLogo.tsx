@@ -29,12 +29,12 @@ export function ShipTornadoLogo({ className, size = 24, spin = false }: ShipTorn
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          {/* Staggered tornado lines with individual animations */}
-          <path d="M21 4H3" className="tornado-line-1" />
-          <path d="M18 8H6" className="tornado-line-2" />
-          <path d="M15 12H9" className="tornado-line-3" />
-          <path d="M13 16H11" className="tornado-line-4" />
-          <path d="M13.5 20H10.5" className="tornado-line-5" />
+          {/* Clean funnel-shaped tornado */}
+          <path d="M21 4H3" className="tornado-line-1" />       {/* top widest */}
+          <path d="M19 7H5" className="tornado-line-2" />       {/* slightly shorter */}
+          <path d="M17 10H7" className="tornado-line-3" />      {/* medium */}
+          <path d="M15 13H9" className="tornado-line-4" />      {/* narrower */}
+          <path d="M13 16H11" className="tornado-line-5" />     {/* narrowest */}
         </svg>
       </div>
       <span className={cn(
