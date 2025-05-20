@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { ShipmentForm } from "@/types/shipment";
 import { cn } from "@/lib/utils";
 import easyPostService, { Address } from "@/services/easypost";
 import { toast } from "sonner";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 interface AddressLookupProps {
   type: "from" | "to";
@@ -28,13 +30,20 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   const prefix = type;
 
   const handleSearch = async () => {
-    if (searchQuery.length < 3) return;
+    if (searchQuery.length < 3) {
+      toast.warning("Please enter at least 3 characters to search");
+      return;
+    }
     
     setIsLoading(true);
     setResults([]);
+    
     try {
+      console.log('Starting address lookup with query:', searchQuery);
       // Use EasyPost service for address lookup
       const addresses = await easyPostService.verifyAddresses(searchQuery);
+      
+      console.log('Address lookup results:', addresses);
       setResults(addresses);
       
       if (addresses.length === 0) {
@@ -52,8 +61,12 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     try {
       setIsLoading(true);
       
+      console.log('Selected address for verification:', address);
+      
       // Verify the selected address
       const verificationResult = await easyPostService.verifyAddress(address);
+      console.log('Verification result:', verificationResult);
+      
       const verifiedAddress = verificationResult.address;
       
       // Check if the address was verified successfully
@@ -130,7 +143,11 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
                 onClick={handleSearch} 
                 disabled={searchQuery.length < 3 || isLoading}
               >
-                {isLoading ? "..." : "Search"}
+                {isLoading ? (
+                  <LoadingSpinner size={16} />
+                ) : (
+                  "Search"
+                )}
               </Button>
             </div>
             

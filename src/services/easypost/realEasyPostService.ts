@@ -71,58 +71,55 @@ export class RealEasyPostService {
     try {
       console.log('Looking up addresses with query:', query);
       
-      // EasyPost doesn't have a direct address lookup by text query
-      // We'd typically use a different service here like Google Places API
-      // But for demonstration, we'll use a fuzzy address verification approach
+      // For better search results, try to parse the query into components
+      // This is a simple approach - in a real app you might use a more sophisticated parser
+      const parts = query.split(',').map(part => part.trim());
       
-      // Create a dummy address with the query
-      const dummyAddress = {
-        street1: query,
-        city: '',
-        state: '',
-        zip: '',
-        country: 'US'
+      // Create a search-friendly address object
+      const searchAddress: Partial<Address> = {
+        street1: parts[0] || query, // Use first part as street or full query if no comma
+        city: parts[1] || '',        // Use second part as city if available
+        country: 'US'                // Default to US
       };
       
-      // Try to verify it to get suggestions
+      // If a part looks like a zip code, use it as zip
+      for (const part of parts) {
+        if (/^\d{5}(-\d{4})?$/.test(part)) {
+          searchAddress.zip = part;
+          break;
+        }
+      }
+      
+      console.log('Searching with parsed address:', searchAddress);
+      
+      // Use the EasyPost address verification endpoint
       const response = await fetch(`${this.baseUrl}/addresses`, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({ address: dummyAddress })
+        body: JSON.stringify({ 
+          address: searchAddress,
+          verify: [] // Don't verify during search to get more results
+        })
       });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
-        console.error('EasyPost API error response:', errorData);
-        
-        // Extract meaningful error message if possible
-        const errorMessage = errorData.error?.message || 
-                            `EasyPost API error: ${response.status} - ${response.statusText}`;
-        
-        // Log detailed error information
-        console.error(`EasyPost API error: ${response.status}`, errorData);
-        
-        // For address lookup, we might want to return an empty array rather than throwing
-        if (response.status === 422) {
-          console.warn('Address validation failed, returning empty results');
-          return [];
-        }
-        
-        throw new Error(errorMessage);
+        console.error('EasyPost API error during address lookup:', errorData);
+        return []; // Return empty array on error to avoid breaking UI
       }
       
       const result = await response.json();
+      console.log('Address lookup result:', result);
       
-      // Return the verified address as a result (may only be one)
-      return [result.address];
-    } catch (error) {
-      // Handle network errors or JSON parsing errors
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error looking up addresses';
-      console.error('Error looking up addresses:', error);
+      // If we have a result and it's a valid address, return it
+      if (result && result.address) {
+        return [result.address];
+      }
       
-      // For lookup functionality, return empty array to avoid breaking the UI
-      console.warn('Returning empty results due to error');
       return [];
+    } catch (error) {
+      console.error('Error during address lookup:', error);
+      return []; // Return empty array on error
     }
   }
   
@@ -192,6 +189,42 @@ export class RealEasyPostService {
           }
         }
       };
+    }
+  }
+  
+  /**
+   * Purchase a shipping label using EasyPost API
+   * @param shipmentId The ID of the shipment to purchase a label for
+   * @param rateId The ID of the rate to purchase
+   * @returns A promise resolving to the purchase response
+   */
+  async purchaseLabel(shipmentId: string, rateId: string): Promise<any> {
+    try {
+      console.log('Purchasing label for shipment:', shipmentId, 'with rate:', rateId);
+      
+      const response = await fetch(`${this.baseUrl}/shipments/${shipmentId}/buy`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ rate: { id: rateId } })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
+        console.error('EasyPost API error response:', errorData);
+        
+        const errorMessage = errorData.error?.message || 
+                            `EasyPost API error: ${response.status} - ${response.statusText}`;
+        
+        throw new Error(errorMessage);
+      }
+      
+      const data = await response.json();
+      console.log('Label purchased successfully:', data);
+      return data;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error purchasing label';
+      console.error('Error purchasing label:', error);
+      throw new Error(`EasyPost label purchase failed: ${errorMessage}`);
     }
   }
 }

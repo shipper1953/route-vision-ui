@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { useState } from "react";
+import easyPostService from "@/services/easypost";
 
 interface ShippingRatesCardFooterProps {
   selectedRate: SmartRate | null;
@@ -31,26 +32,14 @@ export const ShippingRatesCardFooter = ({
     const shipmentId = form.getValues("shipmentId");
     
     try {
-      // Call the serverless function to purchase the label
-      const response = await fetch('/api/purchase-label', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Include auth header if using Supabase auth
-          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`
-        },
-        body: JSON.stringify({
-          shipmentId,
-          rateId: selectedRate.id
-        })
-      });
+      console.log('Purchasing label for shipment:', shipmentId, 'with rate:', selectedRate.id);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to purchase shipping label');
+      if (!shipmentId) {
+        throw new Error("No shipment ID found. Please create a shipment first.");
       }
       
-      const labelData = await response.json();
+      // Use the EasyPost service directly to purchase the label
+      const labelData = await easyPostService.purchaseLabel(shipmentId, selectedRate.id);
       
       toast.success("Shipping label purchased successfully!");
       
