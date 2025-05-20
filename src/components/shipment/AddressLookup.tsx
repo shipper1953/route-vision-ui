@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,7 @@ import {
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { cn } from "@/lib/utils";
-import easyPostService, { Address } from "@/services/easypostService";
+import easyPostService, { Address } from "@/services/easypost";
 import { toast } from "sonner";
 
 interface AddressLookupProps {

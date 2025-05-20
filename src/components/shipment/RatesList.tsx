@@ -1,5 +1,4 @@
-
-import { SmartRate } from "@/services/easypostService";
+import { SmartRate } from "@/services/easypost";
 import { RateOptionCard } from "./RateOptionCard";
 
 interface RatesListProps {

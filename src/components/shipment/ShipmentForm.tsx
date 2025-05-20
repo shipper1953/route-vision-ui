@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,7 +6,7 @@ import { toast } from "sonner";
 import { OrderLookupCard } from "@/components/shipment/OrderLookupCard";
 import { ShipmentFormTabs } from "@/components/shipment/ShipmentFormTabs";
 import { RatesActionButton } from "@/components/shipment/RatesActionButton";
-import easyPostService, { ShipmentResponse } from "@/services/easypostService";
+import easyPostService, { ShipmentResponse } from "@/services/easypost";
 import { shipmentSchema, ShipmentForm as ShipmentFormType } from "@/types/shipment";
 import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
 

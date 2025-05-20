@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import { Truck } from "lucide-react";
-import { SmartRate } from "@/services/easypostService";
+import { SmartRate } from "@/services/easypost";
 
 interface RateOptionCardProps {
   rate: SmartRate;

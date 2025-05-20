@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { SmartRate, ShipmentResponse } from "@/services/easypostService";
+import { SmartRate, ShipmentResponse } from "@/services/easypost";
 
 export function useShipment() {
   const [shipmentResponse, setShipmentResponse] = useState<ShipmentResponse | null>(null);

@@ -1,9 +1,8 @@
-
 import { 
   Card, 
   CardContent
 } from "@/components/ui/card";
-import { ShipmentResponse, SmartRate } from "@/services/easypostService";
+import { ShipmentResponse, SmartRate } from "@/services/easypost";
 import { ShippingRatesCardHeader } from "./ShippingRatesCardHeader";
 import { RatesList } from "./RatesList";
 import { ShippingRatesCardFooter } from "./ShippingRatesCardFooter";
