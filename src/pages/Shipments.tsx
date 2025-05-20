@@ -19,19 +19,22 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Box, Search, Plus, Package } from "lucide-react";
+import { Box, Search, Plus, Package, CalendarDays, FileDown, Link as LinkIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-// Sample data focused on parcel shipments via EasyPost
+// Sample data focused on parcel shipments via EasyPost with expanded date fields
 const shipments = [
   { 
     id: "SHP-1234", 
     tracking: "EZ1234567890", 
     carrier: "USPS",
+    carrierUrl: "https://tools.usps.com/go/TrackConfirmAction?tLabels=EZ1234567890",
     service: "Priority Mail",
     origin: "Boston, MA",
     destination: "New York, NY",
-    date: "May 15, 2025", 
+    shipDate: "May 15, 2025",
+    estimatedDelivery: "May 17, 2025", 
+    actualDelivery: null,
     status: "in_transit",
     weight: "1.2 lbs"
   },
@@ -39,10 +42,13 @@ const shipments = [
     id: "SHP-1235", 
     tracking: "EZ2345678901", 
     carrier: "UPS",
+    carrierUrl: "https://www.ups.com/track?tracknum=EZ2345678901",
     service: "Ground",
     origin: "Chicago, IL",
     destination: "Milwaukee, WI",
-    date: "May 14, 2025", 
+    shipDate: "May 14, 2025",
+    estimatedDelivery: "May 17, 2025", 
+    actualDelivery: "May 16, 2025",
     status: "delivered",
     weight: "3.5 lbs"
   },
@@ -50,10 +56,13 @@ const shipments = [
     id: "SHP-1236", 
     tracking: "EZ3456789012", 
     carrier: "FedEx",
+    carrierUrl: "https://www.fedex.com/fedextrack/?trknbr=EZ3456789012",
     service: "Express",
     origin: "Los Angeles, CA",
     destination: "San Francisco, CA",
-    date: "May 14, 2025", 
+    shipDate: "May 14, 2025",
+    estimatedDelivery: "May 15, 2025", 
+    actualDelivery: null,
     status: "created",
     weight: "2.1 lbs"
   },
@@ -61,10 +70,13 @@ const shipments = [
     id: "SHP-1237", 
     tracking: "EZ4567890123", 
     carrier: "DHL",
+    carrierUrl: "https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=EZ4567890123",
     service: "International",
     origin: "New York, NY",
     destination: "London, UK",
-    date: "May 13, 2025", 
+    shipDate: "May 13, 2025",
+    estimatedDelivery: "May 18, 2025", 
+    actualDelivery: null,
     status: "in_transit",
     weight: "4.2 lbs"
   }
@@ -147,16 +159,28 @@ const Shipments = () => {
                 <TableHead>Carrier</TableHead>
                 <TableHead>Weight</TableHead>
                 <TableHead>Route</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>Ship Date</TableHead>
+                <TableHead>Est. Delivery</TableHead>
+                <TableHead>Actual Delivery</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead></TableHead>
+                <TableHead>Documents</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredShipments.map((shipment) => (
                 <TableRow key={shipment.id}>
                   <TableCell className="font-medium">{shipment.id}</TableCell>
-                  <TableCell>{shipment.tracking}</TableCell>
+                  <TableCell>
+                    <a 
+                      href={shipment.carrierUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center text-tms-blue hover:underline"
+                    >
+                      {shipment.tracking}
+                      <LinkIcon className="ml-1 h-3 w-3" />
+                    </a>
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-muted-foreground" />
@@ -170,12 +194,34 @@ const Shipments = () => {
                       <div className="text-muted-foreground">to {shipment.destination}</div>
                     </div>
                   </TableCell>
-                  <TableCell>{shipment.date}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <CalendarDays className="mr-1 h-3 w-3 text-muted-foreground" />
+                      {shipment.shipDate}
+                    </div>
+                  </TableCell>
+                  <TableCell>{shipment.estimatedDelivery}</TableCell>
+                  <TableCell>
+                    {shipment.actualDelivery ? (
+                      shipment.actualDelivery
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Pending</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <ShipmentStatus status={shipment.status} />
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm">Details</Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="h-8 px-2">
+                        <FileDown className="h-4 w-4" />
+                        <span className="sr-only md:not-sr-only md:ml-1">Label</span>
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-8 px-2">
+                        <FileDown className="h-4 w-4" />
+                        <span className="sr-only md:not-sr-only md:ml-1">Packing Slip</span>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
