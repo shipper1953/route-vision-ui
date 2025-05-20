@@ -14,7 +14,7 @@ export function ShipTornadoLogo({ className, size = 24, spin = false }: ShipTorn
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <div className="relative">
-        {/* Tornado SVG with side-to-side animation */}
+        {/* Clean funnel-shaped tornado */}
         <svg 
           width={baseSize} 
           height={baseSize} 
@@ -37,10 +37,13 @@ export function ShipTornadoLogo({ className, size = 24, spin = false }: ShipTorn
           <path d="M13 16H11" className="tornado-line-5" />     {/* narrowest */}
         </svg>
       </div>
-      <span className={cn(
-        "font-bold text-lg whitespace-nowrap",
+      <div className={cn(
+        "flex flex-col leading-tight font-bold whitespace-nowrap",
         className?.includes("text-white") ? "text-white" : "text-tms-navy"
-      )}>Ship Tornado</span>
+      )}>
+        <span className="text-lg">Ship</span>
+        <span className="text-lg">Tornado</span>
+      </div>
     </div>
   );
 }
