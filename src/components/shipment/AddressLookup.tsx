@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { Search } from "lucide-react";
+import { useState, useRef } from "react";
+import { Search, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,9 +11,11 @@ import {
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { cn } from "@/lib/utils";
-import easyPostService, { Address } from "@/services/easypost";
+import { Address } from "@/types/easypost";
 import { toast } from "sonner";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import geoapifyService from "@/services/geoapify/geoapifyService";
+import easyPostService from "@/services/easypost";
 
 interface AddressLookupProps {
   type: "from" | "to";
@@ -26,6 +28,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const form = useFormContext<ShipmentForm>();
   const prefix = type;
 
@@ -40,8 +43,8 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     
     try {
       console.log('Starting address lookup with query:', searchQuery);
-      // Use EasyPost service for address lookup
-      const addresses = await easyPostService.verifyAddresses(searchQuery);
+      // Use Geoapify service for address lookup
+      const addresses = await geoapifyService.searchAddresses(searchQuery);
       
       console.log('Address lookup results:', addresses);
       setResults(addresses);
@@ -63,49 +66,40 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
       
       console.log('Selected address for verification:', address);
       
-      // Verify the selected address
-      const verificationResult = await easyPostService.verifyAddress(address);
-      console.log('Verification result:', verificationResult);
-      
-      const verifiedAddress = verificationResult.address;
-      
-      // Check if the address was verified successfully
-      if (verificationResult.verifications?.delivery.success) {
-        // Fill in the form with the verified address
-        form.setValue(`${prefix}Street1`, verifiedAddress.street1);
-        form.setValue(`${prefix}Street2`, verifiedAddress.street2 || "");
-        form.setValue(`${prefix}City`, verifiedAddress.city);
-        form.setValue(`${prefix}State`, verifiedAddress.state);
-        form.setValue(`${prefix}Zip`, verifiedAddress.zip);
-        form.setValue(`${prefix}Country`, verifiedAddress.country);
-        
-        toast.success("Address verified and populated successfully");
-      } else {
-        // Address verification failed but still populate form
-        form.setValue(`${prefix}Street1`, address.street1);
-        form.setValue(`${prefix}Street2`, address.street2 || "");
-        form.setValue(`${prefix}City`, address.city);
-        form.setValue(`${prefix}State`, address.state);
-        form.setValue(`${prefix}Zip`, address.zip);
-        form.setValue(`${prefix}Country`, address.country);
-        
-        toast.warning("Address populated but could not be fully verified");
+      // Verify the selected address with EasyPost (optional)
+      let verifiedAddress = address;
+      try {
+        const verificationResult = await easyPostService.verifyAddress(address);
+        if (verificationResult.verifications?.delivery.success) {
+          verifiedAddress = verificationResult.address;
+          toast.success("Address verified successfully");
+        } else {
+          toast.warning("Address could not be fully verified, using as provided");
+        }
+      } catch (error) {
+        console.error("Error verifying address with EasyPost:", error);
+        toast.warning("Address validation skipped, using as provided");
       }
+      
+      // Fill in the form with the address
+      form.setValue(`${prefix}Street1`, verifiedAddress.street1);
+      form.setValue(`${prefix}Street2`, verifiedAddress.street2 || "");
+      form.setValue(`${prefix}City`, verifiedAddress.city);
+      form.setValue(`${prefix}State`, verifiedAddress.state);
+      form.setValue(`${prefix}Zip`, verifiedAddress.zip);
+      form.setValue(`${prefix}Country`, verifiedAddress.country);
+      
+      // Clear validation errors for the fields
+      form.clearErrors(`${prefix}Street1`);
+      form.clearErrors(`${prefix}City`);
+      form.clearErrors(`${prefix}State`);
+      form.clearErrors(`${prefix}Zip`);
+      form.clearErrors(`${prefix}Country`);
       
       setIsOpen(false);
     } catch (error) {
-      console.error("Error verifying address:", error);
-      toast.error("Failed to verify address. Using as provided.");
-      
-      // Fill in form with unverified address
-      form.setValue(`${prefix}Street1`, address.street1);
-      form.setValue(`${prefix}Street2`, address.street2 || "");
-      form.setValue(`${prefix}City`, address.city);
-      form.setValue(`${prefix}State`, address.state);
-      form.setValue(`${prefix}Zip`, address.zip);
-      form.setValue(`${prefix}Country`, address.country);
-      
-      setIsOpen(false);
+      console.error("Error processing selected address:", error);
+      toast.error("Failed to process selected address");
     } finally {
       setIsLoading(false);
     }
@@ -128,6 +122,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
           <div className="p-4 space-y-4">
             <div className="flex space-x-2">
               <Input
+                ref={searchInputRef}
                 placeholder="Enter street, city, or zip..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -138,6 +133,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
                   }
                 }}
                 className="flex-1"
+                autoFocus
               />
               <Button 
                 onClick={handleSearch} 
@@ -156,14 +152,17 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
                 {results.map((address, index) => (
                   <div 
                     key={index}
-                    className="p-2 hover:bg-muted rounded cursor-pointer"
+                    className="p-2 hover:bg-muted rounded cursor-pointer flex items-start gap-2"
                     onClick={() => handleSelectAddress(address)}
                   >
-                    <p className="font-medium">{address.street1}</p>
-                    {address.street2 && <p className="text-sm">{address.street2}</p>}
-                    <p className="text-sm text-muted-foreground">
-                      {address.city}, {address.state} {address.zip}
-                    </p>
+                    <Navigation className="h-4 w-4 mt-1 flex-shrink-0 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{address.street1}</p>
+                      {address.street2 && <p className="text-sm">{address.street2}</p>}
+                      <p className="text-sm text-muted-foreground">
+                        {address.city}, {address.state} {address.zip}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
