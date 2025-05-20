@@ -23,7 +23,6 @@ export function TmsHeader() {
   return (
     <header className="h-16 border-b border-border flex items-center px-4 bg-white">
       <div className="flex-1 flex items-center gap-4">
-        <h1 className="text-lg font-semibold text-tms-blue hidden md:block">{pageName}</h1>
         <div className="relative max-w-md w-full">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input 
