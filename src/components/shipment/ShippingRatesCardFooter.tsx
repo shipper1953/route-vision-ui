@@ -2,10 +2,11 @@
 import { CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Package } from "lucide-react";
-import { SmartRate } from "@/services/easypostService";
+import { SmartRate } from "@/services/easypost";
 import { toast } from "sonner";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
+import { useState } from "react";
 
 interface ShippingRatesCardFooterProps {
   selectedRate: SmartRate | null;
@@ -17,25 +18,52 @@ export const ShippingRatesCardFooter = ({
   onBack 
 }: ShippingRatesCardFooterProps) => {
   const form = useFormContext<ShipmentForm>();
+  const [purchasing, setPurchasing] = useState(false);
   
-  const handlePurchaseLabel = () => {
+  const handlePurchaseLabel = async () => {
     if (!selectedRate) {
       toast.error("Please select a shipping rate first");
       return;
     }
     
+    setPurchasing(true);
     const orderId = form.getValues("orderId");
+    const shipmentId = form.getValues("shipmentId");
     
-    toast.success("Shipping label purchased successfully!");
-    // In a production implementation:
-    // 1. Call the EasyPost API to purchase the label
-    // 2. Update the order status
-    // 3. Associate the shipment with the order
-    
-    // Navigate back to Orders page after short delay
-    setTimeout(() => {
-      window.location.href = orderId ? `/orders?highlight=${orderId}` : "/orders";
-    }, 2000);
+    try {
+      // Call the serverless function to purchase the label
+      const response = await fetch('/api/purchase-label', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Include auth header if using Supabase auth
+          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`
+        },
+        body: JSON.stringify({
+          shipmentId,
+          rateId: selectedRate.id
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to purchase shipping label');
+      }
+      
+      const labelData = await response.json();
+      
+      toast.success("Shipping label purchased successfully!");
+      
+      // Navigate back to Orders page after short delay
+      setTimeout(() => {
+        window.location.href = orderId ? `/orders?highlight=${orderId}` : "/orders";
+      }, 2000);
+    } catch (error) {
+      console.error("Error purchasing label:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to purchase shipping label");
+    } finally {
+      setPurchasing(false);
+    }
   };
   
   return (
@@ -49,11 +77,11 @@ export const ShippingRatesCardFooter = ({
       
       <Button 
         className="bg-tms-blue hover:bg-tms-blue-400"
-        disabled={!selectedRate}
+        disabled={!selectedRate || purchasing}
         onClick={handlePurchaseLabel}
       >
         <Package className="mr-2 h-4 w-4" />
-        Purchase Label
+        {purchasing ? "Processing..." : "Purchase Label"}
       </Button>
     </CardFooter>
   );

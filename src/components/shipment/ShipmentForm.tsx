@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,6 +42,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       orderBarcode: "",
       orderId: "",
       requiredDeliveryDate: "",
+      shipmentId: "", // Add shipmentId to store the EasyPost shipment ID
     }
   });
   
@@ -82,6 +84,9 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       };
       
       const response = await easyPostService.createShipment(shipmentData);
+      
+      // Store the shipment ID in the form context
+      form.setValue("shipmentId", response.id);
       
       // Find recommended rate based on required delivery date
       let recommendedRate = null;
