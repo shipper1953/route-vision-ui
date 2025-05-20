@@ -62,34 +62,46 @@
   /* ... keep existing code */
 }
 
-/* Tornado side-to-side animations */
+/* Tornado side-to-side animations with enhanced shading */
 @keyframes tornadoSway {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(2px); }
+  0%, 100% { 
+    transform: translateX(0); 
+    opacity: 0.9;
+  }
+  50% { 
+    transform: translateX(2px); 
+    opacity: 1;
+    filter: drop-shadow(0 0 1px currentColor);
+  }
 }
 
 .tornado-line-1 {
   animation: tornadoSway 1.7s ease-in-out infinite;
+  stroke-width: 2.2;
 }
 
 .tornado-line-2 {
   animation: tornadoSway 2s ease-in-out infinite;
   animation-delay: 0.1s;
+  stroke-width: 2.1;
 }
 
 .tornado-line-3 {
   animation: tornadoSway 1.9s ease-in-out infinite;
   animation-delay: 0.2s;
+  stroke-width: 2;
 }
 
 .tornado-line-4 {
   animation: tornadoSway 2.2s ease-in-out infinite;
   animation-delay: 0.3s;
+  stroke-width: 1.9;
 }
 
 .tornado-line-5 {
   animation: tornadoSway 1.8s ease-in-out infinite;
   animation-delay: 0.4s;
+  stroke-width: 1.8;
 }
 
 /* Keep the vertical movement for LoadingPage */
