@@ -19,10 +19,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Truck, Search, Plus } from "lucide-react";
+import { Box, Search, Plus, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-// Sample data - would be fetched from API in production
+// Sample data focused on parcel shipments via EasyPost
 const shipments = [
   { 
     id: "SHP-1234", 
@@ -32,7 +32,8 @@ const shipments = [
     origin: "Boston, MA",
     destination: "New York, NY",
     date: "May 15, 2025", 
-    status: "in_transit"
+    status: "in_transit",
+    weight: "1.2 lbs"
   },
   { 
     id: "SHP-1235", 
@@ -42,7 +43,8 @@ const shipments = [
     origin: "Chicago, IL",
     destination: "Milwaukee, WI",
     date: "May 14, 2025", 
-    status: "delivered"
+    status: "delivered",
+    weight: "3.5 lbs"
   },
   { 
     id: "SHP-1236", 
@@ -52,7 +54,8 @@ const shipments = [
     origin: "Los Angeles, CA",
     destination: "San Francisco, CA",
     date: "May 14, 2025", 
-    status: "created"
+    status: "created",
+    weight: "2.1 lbs"
   },
   { 
     id: "SHP-1237", 
@@ -62,7 +65,8 @@ const shipments = [
     origin: "New York, NY",
     destination: "London, UK",
     date: "May 13, 2025", 
-    status: "in_transit"
+    status: "in_transit",
+    weight: "4.2 lbs"
   }
 ];
 
@@ -70,7 +74,7 @@ const ShipmentStatus = ({ status }: { status: string }) => {
   const getStatusDetails = (status: string) => {
     switch (status) {
       case 'created':
-        return { label: 'Created', variant: 'outline' };
+        return { label: 'Label Created', variant: 'outline' };
       case 'in_transit':
         return { label: 'In Transit', variant: 'default' };
       case 'out_for_delivery':
@@ -102,8 +106,8 @@ const Shipments = () => {
     <TmsLayout>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-tms-blue">Shipments</h1>
-          <p className="text-muted-foreground">Track and manage your shipments</p>
+          <h1 className="text-2xl font-bold text-tms-blue">Parcel Shipments</h1>
+          <p className="text-muted-foreground">Track and manage your EasyPost shipments</p>
         </div>
         <div className="mt-4 md:mt-0 flex gap-3">
           <Button 
@@ -119,11 +123,11 @@ const Shipments = () => {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex justify-between items-center">
-            <CardTitle>All Shipments</CardTitle>
+            <CardTitle>All Parcels</CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search shipments..."
+                placeholder="Search by tracking or carrier..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -141,6 +145,7 @@ const Shipments = () => {
                 <TableHead>Shipment</TableHead>
                 <TableHead>Tracking</TableHead>
                 <TableHead>Carrier</TableHead>
+                <TableHead>Weight</TableHead>
                 <TableHead>Route</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
@@ -154,10 +159,11 @@ const Shipments = () => {
                   <TableCell>{shipment.tracking}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Truck className="h-4 w-4 text-muted-foreground" />
+                      <Package className="h-4 w-4 text-muted-foreground" />
                       <span>{shipment.carrier}</span>
                     </div>
                   </TableCell>
+                  <TableCell>{shipment.weight}</TableCell>
                   <TableCell>
                     <div className="text-sm">
                       <div>{shipment.origin}</div>
