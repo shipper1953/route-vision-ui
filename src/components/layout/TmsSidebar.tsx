@@ -70,17 +70,16 @@ export function TmsSidebar() {
             <ShipTornadoLogo className="text-white" size={28} spin={false} />
           </div>
         )}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={toggleSidebar}
-          className={cn(
-            "text-sidebar-foreground hover:bg-sidebar-accent",
-            isCollapsed ? "absolute right-0 top-16" : "ml-auto"
-          )}
-        >
-          {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-        </Button>
+        {!isCollapsed && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleSidebar}
+            className="text-sidebar-foreground hover:bg-sidebar-accent ml-auto"
+          >
+            <ChevronLeft size={20} />
+          </Button>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto py-4 px-2 flex flex-col gap-1">
@@ -104,6 +103,19 @@ export function TmsSidebar() {
               <div className="text-sidebar-foreground/70 text-sm">Administrator</div>
             </div>
           </div>
+        </div>
+      )}
+      
+      {isCollapsed && (
+        <div className="p-2 pb-4 flex justify-center">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleSidebar}
+            className="text-sidebar-foreground hover:bg-sidebar-accent"
+          >
+            <ChevronRight size={20} />
+          </Button>
         </div>
       )}
     </div>
