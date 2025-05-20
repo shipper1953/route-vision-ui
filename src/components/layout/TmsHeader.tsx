@@ -2,11 +2,28 @@
 import { Bell, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useLocation } from "react-router-dom";
+import { useMemo } from "react";
 
 export function TmsHeader() {
+  const location = useLocation();
+  
+  const pageName = useMemo(() => {
+    const path = location.pathname;
+    
+    if (path === "/") return "Dashboard";
+    
+    // Convert path to title case (e.g., "/create-shipment" -> "Create Shipment")
+    const name = path.substring(1).replace(/-/g, " ");
+    return name.split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }, [location]);
+
   return (
     <header className="h-16 border-b border-border flex items-center px-4 bg-white">
       <div className="flex-1 flex items-center gap-4">
+        <h1 className="text-lg font-semibold text-tms-blue hidden md:block">{pageName}</h1>
         <div className="relative max-w-md w-full">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input 
