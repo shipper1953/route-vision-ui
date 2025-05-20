@@ -62,43 +62,22 @@
   /* ... keep existing code */
 }
 
-/* Refined Tornado Animation Keyframes */
+/* Simple tornado animation */
 @keyframes tornado-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-@keyframes tornado-gentle-rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(20deg); }
-}
-
-@keyframes tornado-move {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
-  100% { transform: translateY(0); }
-}
-
 .tornado-spin {
-  animation: tornado-spin 8s linear infinite;
+  animation: tornado-spin 3s linear infinite;
 }
 
 .tornado-move {
   animation: tornado-move 3s ease-in-out infinite;
 }
 
-/* More subtle multi-layer tornado animation */
-.tornado-layer {
-  animation: tornado-gentle-rotate 4s ease-in-out infinite alternate;
-  transform-origin: center;
-  opacity: 0.85;
-}
-
-.tornado-layer:nth-child(2) {
-  animation-duration: 6s;
-}
-
-.tornado-layer:nth-child(3) {
-  animation-duration: 5s;
-  animation-direction: alternate-reverse;
+@keyframes tornado-move {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
 }
