@@ -131,8 +131,8 @@ export class GeoapifyService {
   }
 }
 
-// Export an instance with the API key from environment variable
-const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY || '';
+// Export an instance with the provided API key, falling back to environment variable if available
+const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY || '274bcb0749944615912f9997d5c49105';
 const geoapifyService = new GeoapifyService(apiKey);
 
 export default geoapifyService;
