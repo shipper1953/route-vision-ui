@@ -4,14 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShipTornadoLogo } from '@/components/logo/ShipTornadoLogo';
 import { toast } from '@/components/ui/use-toast';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { login, error } = useAuth();
   const navigate = useNavigate();
 
@@ -33,74 +34,104 @@ const Login = () => {
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md">
-        <div className="flex justify-center mb-8">
-          <ShipTornadoLogo size={48} />
+    <div className="flex min-h-screen w-full">
+      {/* Left side (blue section) */}
+      <div className="hidden md:flex md:w-1/2 bg-tms-blue flex-col justify-center items-center p-12">
+        <div className="mb-24">
+          <ShipTornadoLogo size={48} className="text-white" />
         </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Sign In</CardTitle>
-            <CardDescription className="text-center">
-              Enter your credentials to access the dashboard
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm font-medium">
-                    Email
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="admin@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="password" className="text-sm font-medium">
-                    Password
-                  </label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                
-                {error && (
-                  <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
-                    {error}
-                  </div>
-                )}
-              </div>
-              
-              <Button 
-                type="submit" 
-                className="w-full mt-6" 
-                disabled={isLoading}
-              >
-                {isLoading ? "Logging in..." : "Log in"}
-              </Button>
-            </form>
-          </CardContent>
-          <CardFooter className="flex justify-center text-sm text-muted-foreground">
-            <div>
-              <p>Demo accounts:</p>
-              <p>Admin: admin@example.com / password</p>
-              <p>User: user@example.com / password</p>
+        <div className="text-white max-w-md">
+          <h1 className="text-4xl font-bold mb-4">Welcome back</h1>
+          <p className="text-xl opacity-90">To continue, enter your sign in information</p>
+        </div>
+      </div>
+
+      {/* Right side (form) */}
+      <div className="w-full md:w-1/2 flex items-center justify-center p-8">
+        <div className="w-full max-w-md">
+          {/* Only show logo on mobile */}
+          <div className="flex justify-center mb-8 md:hidden">
+            <ShipTornadoLogo size={36} />
+          </div>
+          
+          <h2 className="text-2xl font-bold mb-6 md:hidden">Welcome Back</h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="admin@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full"
+              />
             </div>
-          </CardFooter>
-        </Card>
+            
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
+              </label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full pr-10"
+                />
+                <button 
+                  type="button" 
+                  onClick={togglePasswordVisibility}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+            
+            {error && (
+              <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
+                {error}
+              </div>
+            )}
+            
+            <Button 
+              type="submit" 
+              className="w-full bg-tms-blue hover:bg-tms-blue-400" 
+              disabled={isLoading}
+            >
+              {isLoading ? "Signing in..." : "Sign in"}
+            </Button>
+            
+            <div className="flex flex-col space-y-2 items-center text-sm text-center">
+              <div className="flex space-x-1">
+                <span className="text-muted-foreground">New user?</span>
+                <a href="#" className="text-tms-blue font-medium hover:underline">Apply</a>
+              </div>
+              <a href="#" className="text-tms-blue font-medium hover:underline">
+                Forgot your password?
+              </a>
+            </div>
+          </form>
+          
+          <div className="mt-8 text-center text-xs text-muted-foreground">
+            <p>Demo accounts:</p>
+            <p>Admin: admin@example.com / password</p>
+            <p>User: user@example.com / password</p>
+          </div>
+        </div>
       </div>
     </div>
   );
