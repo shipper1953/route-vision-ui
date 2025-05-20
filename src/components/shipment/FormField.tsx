@@ -28,7 +28,7 @@ export const FormField = ({ name, label, placeholder, required = false }: FormFi
         <FormItem>
           <FormLabel>{label}{!required && " (Optional)"}</FormLabel>
           <FormControl>
-            <Input placeholder={placeholder} {...field} />
+            <Input placeholder={placeholder} {...field} value={field.value?.toString() || ''} />
           </FormControl>
           <FormMessage />
         </FormItem>

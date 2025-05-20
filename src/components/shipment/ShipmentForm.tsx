@@ -2,17 +2,14 @@
 import { useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { OrderLookupCard } from "@/components/shipment/OrderLookupCard";
-import { AddressFormSection } from "@/components/shipment/AddressFormSection";
-import { PackageDetailsSection } from "@/components/shipment/PackageDetailsSection";
-import { ShippingOptionsSection } from "@/components/shipment/ShippingOptionsSection";
+import { ShipmentFormTabs } from "@/components/shipment/ShipmentFormTabs";
+import { RatesActionButton } from "@/components/shipment/RatesActionButton";
 import easyPostService, { ShipmentResponse } from "@/services/easypostService";
 import { shipmentSchema, ShipmentForm as ShipmentFormType } from "@/types/shipment";
+import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
 
 interface ShipmentFormProps {
   onShipmentCreated: (response: ShipmentResponse, selectedRate: any) => void;
@@ -21,22 +18,7 @@ interface ShipmentFormProps {
 export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   const [loading, setLoading] = useState(false);
   const [orderLookupComplete, setOrderLookupComplete] = useState(false);
-  
-  // Load default shipping address from localStorage
-  const getDefaultShippingAddress = () => {
-    return {
-      fromName: localStorage.getItem("fromName") || "John Doe",
-      fromCompany: localStorage.getItem("fromCompany") || "Ship Tornado",
-      fromStreet1: localStorage.getItem("fromStreet1") || "123 Main St",
-      fromStreet2: localStorage.getItem("fromStreet2") || "",
-      fromCity: localStorage.getItem("fromCity") || "Boston",
-      fromState: localStorage.getItem("fromState") || "MA",
-      fromZip: localStorage.getItem("fromZip") || "02108",
-      fromCountry: localStorage.getItem("fromCountry") || "US",
-      fromPhone: localStorage.getItem("fromPhone") || "555-123-4567",
-      fromEmail: localStorage.getItem("fromEmail") || "john@shiptornado.com",
-    };
-  };
+  const { getDefaultShippingAddress } = useDefaultAddressValues();
   
   const form = useForm<ShipmentFormType>({
     resolver: zodResolver(shipmentSchema),
@@ -144,55 +126,10 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       <OrderLookupCard setOrderLookupComplete={setOrderLookupComplete} />
       
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <Tabs defaultValue="addresses" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="addresses">Addresses</TabsTrigger>
-            <TabsTrigger value="package">Package Details</TabsTrigger>
-            <TabsTrigger value="options">Shipping Options</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="addresses" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <AddressFormSection 
-                type="from" 
-                title="From Address" 
-                description="Enter the sender's address information"
-              />
-              <AddressFormSection 
-                type="to" 
-                title="To Address" 
-                description="Enter the recipient's address information"
-              />
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="package" className="mt-6">
-            <PackageDetailsSection />
-          </TabsContent>
-          
-          <TabsContent value="options" className="mt-6">
-            <ShippingOptionsSection />
-          </TabsContent>
-        </Tabs>
+        <ShipmentFormTabs />
         
         <div className="flex justify-end">
-          <Button 
-            type="submit" 
-            className="bg-tms-blue hover:bg-tms-blue-400"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <LoadingSpinner size={16} className="mr-2" /> 
-                Getting Rates...
-              </>
-            ) : (
-              <>
-                Get Shipping Rates
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
-            )}
-          </Button>
+          <RatesActionButton loading={loading} />
         </div>
       </form>
     </FormProvider>
