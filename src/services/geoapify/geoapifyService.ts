@@ -28,7 +28,7 @@ export class GeoapifyService {
       const url = new URL('https://api.geoapify.com/v1/geocode/autocomplete');
       url.searchParams.append('text', query);
       url.searchParams.append('apiKey', this.apiKey);
-      url.searchParams.append('format', 'json');
+      url.searchParams.append('format', 'geojson'); // Requesting GeoJSON format
       url.searchParams.append('limit', '5');
       
       const response = await fetch(url.toString());
@@ -38,35 +38,48 @@ export class GeoapifyService {
       }
       
       const data = await response.json();
-      console.log('Geoapify search response:', data);
+      console.log('Geoapify search response type:', typeof data);
+      console.log('Geoapify search response has features:', data.features && Array.isArray(data.features));
       
-      // Transform Geoapify response to our Address format
-      return this.transformGeoapifyResults(data.results || []);
+      // Transform Geoapify GeoJSON response to our Address format
+      if (!data.features || !Array.isArray(data.features) || data.features.length === 0) {
+        console.log('No results returned from Geoapify');
+        return [];
+      }
+      
+      return this.transformGeoapifyGeoJsonResults(data.features);
     } catch (error) {
       console.error('Error searching addresses with Geoapify:', error);
-      throw error;
+      return [];
     }
   }
   
   /**
-   * Transforms Geoapify results to our Address format
-   * @param results The Geoapify search results
+   * Transforms Geoapify GeoJSON feature results to our Address format
+   * @param features The Geoapify GeoJSON features
    * @returns An array of addresses in our format
    */
-  private transformGeoapifyResults(results: any[]): Address[] {
-    return results.map(result => {
-      // Extract address components
-      const street1 = result.address_line1 || 
-                     [result.street, result.housenumber].filter(Boolean).join(' ') || 
-                     '';
-      const city = result.city || result.county || '';
-      const state = result.state || result.state_code || '';
-      const zip = result.postcode || '';
-      const country = result.country_code?.toUpperCase() || 'US';
+  private transformGeoapifyGeoJsonResults(features: any[]): Address[] {
+    return features.map(feature => {
+      const props = feature.properties;
+      console.log('Transforming Geoapify feature:', props);
+      
+      // Extract address components from GeoJSON properties
+      const street1 = props.address_line1 || '';
+      const city = props.city || props.county || '';
+      const state = props.state || props.state_code || '';
+      const zip = props.postcode || '';
+      const country = props.country_code?.toUpperCase() || 'US';
+      
+      // Create a formatted address string for display if not provided
+      const formattedAddress = props.formatted || 
+        `${street1}, ${city}, ${state} ${zip}, ${props.country || ''}`;
+      
+      console.log('Extracted address:', { street1, city, state, zip, country, formattedAddress });
       
       return {
         street1,
-        street2: result.address_line2 || '',
+        street2: props.address_line2 || '',
         city,
         state,
         zip,
@@ -75,7 +88,9 @@ export class GeoapifyService {
         company: '',
         name: '',
         phone: '',
-        email: ''
+        email: '',
+        // Adding a place_id for potential detailed lookup later
+        place_id: props.place_id || ''
       };
     });
   }
