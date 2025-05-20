@@ -20,8 +20,8 @@ export function ShipTornadoLogo({ className, size = 24, spin = false }: ShipTorn
           height={baseSize} 
           viewBox="0 0 24 24"
           className={cn(
-            "transition-all",
-            className?.includes("text-white") ? "text-white" : "text-tms-navy"
+            "transition-all text-white", // Always use white color for the logo
+            spin && "tornado-spin"
           )}
           fill="none"
           stroke="currentColor"
@@ -39,15 +39,9 @@ export function ShipTornadoLogo({ className, size = 24, spin = false }: ShipTorn
       </div>
       
       {/* Vertical divider line */}
-      <div className={cn(
-        "w-px h-10",
-        className?.includes("text-white") ? "bg-white/70" : "bg-tms-navy/30"
-      )}></div>
+      <div className="w-px h-10 bg-white/70"></div>
       
-      <div className={cn(
-        "flex flex-col leading-tight font-bold whitespace-nowrap",
-        className?.includes("text-white") ? "text-white" : "text-tms-navy"
-      )}>
+      <div className="flex flex-col leading-tight font-bold whitespace-nowrap text-white">
         <span className="text-lg tracking-wide">Parcel</span>
         <span className="text-lg tracking-wide">Express</span>
       </div>

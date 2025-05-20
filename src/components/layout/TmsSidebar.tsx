@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { useLocation, NavLink } from "react-router-dom";
 import { 
   ChevronLeft, 
@@ -14,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
+import { useSidebar } from "@/context/SidebarContext";
 
 interface NavItemProps {
   to: string;
@@ -52,25 +52,27 @@ const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavI
 };
 
 export function TmsSidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isCollapsed, toggleSidebar } = useSidebar();
 
   return (
-    <div className={cn(
-      "h-screen flex flex-col bg-sidebar fixed left-0 top-0 z-40 transition-all duration-300",
-      isCollapsed ? "w-16" : "w-64"
-    )}>
+    <div 
+      className={cn(
+        "h-screen flex flex-col bg-sidebar fixed left-0 top-0 z-40 transition-all duration-300",
+        isCollapsed ? "w-16" : "w-64"
+      )}
+    >
       <div className="flex items-center justify-between p-4">
         {!isCollapsed ? (
-          <ShipTornadoLogo className="text-sidebar-foreground" />
+          <ShipTornadoLogo className="text-white" />
         ) : (
           <div className="mx-auto">
-            <ShipTornadoLogo className="text-sidebar-foreground" size={20} spin={false} />
+            <ShipTornadoLogo className="text-white" size={20} spin={false} />
           </div>
         )}
         <Button 
           variant="ghost" 
           size="icon" 
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={toggleSidebar}
           className="text-sidebar-foreground ml-auto hover:bg-sidebar-accent"
         >
           {isCollapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
