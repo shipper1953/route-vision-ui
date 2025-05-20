@@ -92,7 +92,12 @@ export async function mockApiClient(url: string, options: RequestInit = {}): Pro
 if (process.env.NODE_ENV === 'development') {
   const originalFetch = window.fetch;
   window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
-    const url = typeof input === 'string' ? input : input.url;
+    // Fix: Handle different input types correctly
+    const url = typeof input === 'string' 
+      ? input 
+      : input instanceof Request 
+        ? input.url 
+        : input.toString();
     
     if (url.startsWith('/api/')) {
       return mockApiClient(url, init);

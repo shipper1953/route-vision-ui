@@ -2,8 +2,10 @@
 import { RealEasyPostService } from "./realEasyPostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 
-// Get API key from environment variable
-const apiKey = import.meta.env.VITE_EASYPOST_API_KEY || '';
+// Get API key from environment variable - checking both naming conventions
+const apiKey = import.meta.env.VITE_EASYPOST_API_KEY || 
+               import.meta.env.EASYPOST_API_KEY || 
+               '';
 
 // Create a single instance of the EasyPost service with the real API
 const easyPostService = new RealEasyPostService(apiKey);
