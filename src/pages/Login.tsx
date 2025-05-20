@@ -40,10 +40,10 @@ const Login = () => {
 
   return (
     <div className="flex min-h-screen w-full">
-      {/* Left side (blue section) */}
-      <div className="hidden md:flex md:w-1/2 bg-tms-blue flex-col justify-center items-center p-12">
+      {/* Left side (dark navy section) */}
+      <div className="hidden md:flex md:w-1/2 bg-tms-navy flex-col justify-center items-center p-12">
         <div className="mb-24">
-          <ShipTornadoLogo size={48} className="text-white" />
+          <ShipTornadoLogo size={64} className="text-white" spin={true} />
         </div>
         <div className="text-white max-w-md">
           <h1 className="text-4xl font-bold mb-4">Welcome back</h1>
@@ -56,7 +56,7 @@ const Login = () => {
         <div className="w-full max-w-md">
           {/* Only show logo on mobile */}
           <div className="flex justify-center mb-8 md:hidden">
-            <ShipTornadoLogo size={36} />
+            <ShipTornadoLogo size={48} />
           </div>
           
           <h2 className="text-2xl font-bold mb-6 md:hidden">Welcome Back</h2>
@@ -109,7 +109,7 @@ const Login = () => {
             
             <Button 
               type="submit" 
-              className="w-full bg-tms-blue hover:bg-tms-blue-400" 
+              className="w-full bg-tms-navy hover:bg-opacity-90" 
               disabled={isLoading}
             >
               {isLoading ? "Signing in..." : "Sign in"}
@@ -118,9 +118,9 @@ const Login = () => {
             <div className="flex flex-col space-y-2 items-center text-sm text-center">
               <div className="flex space-x-1">
                 <span className="text-muted-foreground">New user?</span>
-                <a href="#" className="text-tms-blue font-medium hover:underline">Apply</a>
+                <a href="#" className="text-tms-navy font-medium hover:underline">Apply</a>
               </div>
-              <a href="#" className="text-tms-blue font-medium hover:underline">
+              <a href="#" className="text-tms-navy font-medium hover:underline">
                 Forgot your password?
               </a>
             </div>

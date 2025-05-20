@@ -16,14 +16,14 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 215 75% 24%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 215 33% 17%; /* Dark Navy */
+    --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 220 3% 63%; /* Slate Gray */
+    --secondary-foreground: 215 33% 17%; /* Dark Navy */
 
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 220 3% 63%; /* Slate Gray */
 
     --accent: 210 40% 96%;
     --accent-foreground: 222 47% 11%;
@@ -37,14 +37,14 @@
 
     --radius: 0.5rem;
 
-    --sidebar-background: 215 75% 24%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 214 90% 67%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 65% 34%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 215 65% 34%;
-    --sidebar-ring: 214 90% 67%;
+    --sidebar-background: 215 33% 17%; /* Dark Navy */
+    --sidebar-foreground: 0 0% 100%; /* White */
+    --sidebar-primary: 220 3% 63%; /* Slate Gray */
+    --sidebar-primary-foreground: 0 0% 100%; /* White */
+    --sidebar-accent: 215 33% 17%; /* Dark Navy */
+    --sidebar-accent-foreground: 0 0% 100%; /* White */
+    --sidebar-border: 215 33% 17%; /* Dark Navy */
+    --sidebar-ring: 220 3% 63%; /* Slate Gray */
   }
 }
 
@@ -59,45 +59,7 @@
 }
 
 @layer components {
-  .tms-card {
-    @apply bg-white rounded-lg shadow-sm border border-border p-4 transition-all hover:shadow-md;
-  }
-  
-  .tms-stat-card {
-    @apply tms-card flex flex-col;
-  }
-  
-  .tms-stat-value {
-    @apply text-2xl font-bold text-tms-blue;
-  }
-  
-  .tms-stat-label {
-    @apply text-sm text-muted-foreground;
-  }
-  
-  .tms-badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-  
-  .tms-badge-blue {
-    @apply bg-tms-blue-100 text-tms-blue;
-  }
-  
-  .tms-badge-amber {
-    @apply bg-amber-100 text-amber-800;
-  }
-  
-  .tms-badge-green {
-    @apply bg-green-100 text-green-800;
-  }
-  
-  .tms-gradient-bg {
-    @apply bg-gradient-to-r from-tms-blue to-tms-blue-400;
-  }
-  
-  .tms-section-title {
-    @apply text-lg font-semibold text-tms-blue mb-4;
-  }
+  /* ... keep existing code */
 }
 
 /* Tornado Animation Keyframes */
@@ -118,4 +80,20 @@
 
 .tornado-move {
   animation: tornado-move 3s ease-in-out infinite;
+}
+
+/* New multi-layer tornado animation */
+.tornado-layer {
+  animation: tornado-spin 3s linear infinite;
+  transform-origin: center;
+  opacity: 0.85;
+}
+
+.tornado-layer:nth-child(2) {
+  animation-duration: 5s;
+  animation-direction: reverse;
+}
+
+.tornado-layer:nth-child(3) {
+  animation-duration: 7s;
 }

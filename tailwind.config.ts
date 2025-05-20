@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -58,14 +57,16 @@ export default {
 				},
 				tms: {
 					blue: {
-						DEFAULT: '#1a365d',
+						DEFAULT: '#1a2840', // Updated to Dark Navy
 						50: '#f0f4f9',
 						100: '#d0dcea',
 						200: '#9fb3d4',
 						300: '#6889be',
 						400: '#3960a8',
-						500: '#1a365d'
+						500: '#1a2840'  // Updated to Dark Navy
 					},
+					navy: '#1a2840', // Dark Navy
+					slate: '#9F9EA1', // Slate Gray
 					teal: {
 						DEFAULT: '#0d9488',
 						light: '#5eead4'
@@ -76,14 +77,14 @@ export default {
 					},
 				},
 				sidebar: {
-					DEFAULT: 'hsl(var(--sidebar-background))',
-					foreground: 'hsl(var(--sidebar-foreground))',
-					primary: 'hsl(var(--sidebar-primary))',
-					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-					accent: 'hsl(var(--sidebar-accent))',
-					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
+					DEFAULT: '#1a2840', // Updated to Dark Navy
+					foreground: '#FFFFFF', // White
+					primary: '#9F9EA1', // Slate Gray
+					'primary-foreground': '#FFFFFF', // White
+					accent: '#1a2840', // Dark Navy
+					'accent-foreground': '#FFFFFF', // White
+					border: '#1a2840', // Dark Navy
+					ring: '#9F9EA1' // Slate Gray
 				}
 			},
 			borderRadius: {
