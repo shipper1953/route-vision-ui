@@ -1,69 +1,34 @@
 
-import React from "react";
-import { Bell, Search, User } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Bell, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useAuth } from "../../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 export function TmsHeader() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   return (
-    <header className="border-b border-border h-16 px-4 flex items-center justify-between bg-background">
-      <div className="flex-1">
-        <div className="relative max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search..."
-            className="w-full pl-9 md:w-[260px] rounded-full bg-background"
+    <header className="h-16 border-b border-border flex items-center px-4 bg-white">
+      <div className="flex-1 flex items-center gap-4">
+        <div className="relative max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input 
+            placeholder="Search..." 
+            className="pl-9 bg-muted/50 border-none focus-visible:ring-1" 
           />
         </div>
       </div>
-
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
+      <div className="flex items-center gap-3">
+        <Button 
+          variant="ghost" 
+          size="icon"
+          className="relative"
+        >
+          <Bell size={20} />
+          <span className="absolute top-1 right-1 h-2 w-2 bg-tms-amber rounded-full"></span>
         </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
-                <User className="h-5 w-5" />
-              </div>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate('/profile')}>
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/settings')}>
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="h-9 w-px bg-border mx-2"></div>
+        <div className="text-sm">
+          <div className="font-medium">Welcome back</div>
+          <div className="text-muted-foreground text-xs">Thursday, May 15</div>
+        </div>
       </div>
     </header>
   );
