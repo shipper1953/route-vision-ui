@@ -1,4 +1,3 @@
-
 // Types for EasyPost SmartRate
 export interface Address {
   street1: string;
@@ -68,6 +67,17 @@ export interface ShipmentResponse {
   rates: Rate[];
   smartrates?: SmartRate[];
   selected_rate: Rate | null;
+}
+
+export interface AddressVerificationResult {
+  id: string; 
+  address: Address;
+  verifications?: {
+    delivery: {
+      success: boolean;
+      errors: string[];
+    }
+  };
 }
 
 class EasyPostService {
@@ -203,6 +213,156 @@ class EasyPostService {
       smartrates: smartRates,
       selected_rate: null
     };
+  }
+  
+  async verifyAddresses(query: string): Promise<Address[]> {
+    try {
+      console.log('Looking up addresses with query:', query);
+      
+      // This would normally hit the EasyPost API directly
+      // For now, we'll simulate the response for demo purposes
+      
+      /*
+      In a real implementation, this would be:
+      const response = await fetch(`${this.baseUrl}/addresses`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ address: { query } })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`EasyPost API error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result.addresses;
+      */
+      
+      // Return mock addresses for now
+      return this.getMockAddressResults(query);
+    } catch (error) {
+      console.error('Error looking up addresses:', error);
+      throw error;
+    }
+  }
+  
+  async verifyAddress(address: Address): Promise<AddressVerificationResult> {
+    try {
+      console.log('Verifying address:', address);
+      
+      // This would normally hit the EasyPost API directly
+      // For now, we'll simulate the response for demo purposes
+      
+      /*
+      In a real implementation, this would be:
+      const response = await fetch(`${this.baseUrl}/addresses`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ address })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`EasyPost API error: ${response.status}`);
+      }
+      
+      return await response.json();
+      */
+      
+      // Simulate address verification
+      return {
+        id: `addr_${Math.random().toString(36).substring(7)}`,
+        address: {
+          ...address,
+          // Standardize address components
+          street1: address.street1.replace(/\bst\b/i, 'Street').replace(/\bave\b/i, 'Avenue'),
+          city: address.city.charAt(0).toUpperCase() + address.city.slice(1).toLowerCase(),
+          state: address.state.toUpperCase(),
+          zip: this.formatZipCode(address.zip)
+        },
+        verifications: {
+          delivery: {
+            success: Math.random() > 0.1, // 90% success rate for demo
+            errors: []
+          }
+        }
+      };
+    } catch (error) {
+      console.error('Error verifying address:', error);
+      throw error;
+    }
+  }
+  
+  // Format zip code to standard format
+  private formatZipCode(zip: string): string {
+    // Basic formatting for US zip codes
+    if (zip.length === 5 || (zip.length === 10 && zip.charAt(5) === '-')) {
+      return zip;
+    } else if (zip.length === 9) {
+      return `${zip.substring(0, 5)}-${zip.substring(5)}`;
+    }
+    return zip;
+  }
+  
+  // Mock address lookup function
+  private getMockAddressResults(query: string): Address[] {
+    // More comprehensive mock data
+    const addresses = [
+      {
+        street1: "123 Main St",
+        street2: "Suite 100",
+        city: "Boston",
+        state: "MA",
+        zip: "02108",
+        country: "US",
+      },
+      {
+        street1: "123 Main St",
+        street2: "Apt 45",
+        city: "Cambridge",
+        state: "MA",
+        zip: "02142",
+        country: "US",
+      },
+      {
+        street1: "456 Park Ave",
+        street2: "",
+        city: "New York",
+        state: "NY",
+        zip: "10022",
+        country: "US",
+      },
+      {
+        street1: "789 Market St",
+        street2: "",
+        city: "San Francisco",
+        state: "CA",
+        zip: "94103",
+        country: "US",
+      },
+      {
+        street1: "1600 Pennsylvania Ave NW",
+        street2: "",
+        city: "Washington",
+        state: "DC",
+        zip: "20500",
+        country: "US",
+      },
+      {
+        street1: "350 5th Ave",
+        street2: "",
+        city: "New York",
+        state: "NY",
+        zip: "10118",
+        country: "US",
+      },
+    ];
+
+    return addresses.filter((address) => 
+      address.street1.toLowerCase().includes(query.toLowerCase()) || 
+      address.city.toLowerCase().includes(query.toLowerCase()) || 
+      address.state.toLowerCase().includes(query.toLowerCase()) ||
+      address.zip.includes(query)
+    );
   }
   
   private getDeliveryDate(daysToAdd: number): string {

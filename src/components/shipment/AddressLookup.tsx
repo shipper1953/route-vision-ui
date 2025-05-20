@@ -11,42 +11,8 @@ import {
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { cn } from "@/lib/utils";
-
-// Mock address lookup service - in a real app, this would connect to a service like Google Places API
-const mockAddressLookup = async (query: string): Promise<any[]> => {
-  // This is just sample data - in a real implementation, this would call an actual API
-  const addresses = [
-    {
-      street1: "123 Main St",
-      street2: "Suite 100",
-      city: "Boston",
-      state: "MA",
-      zip: "02108",
-      country: "US",
-    },
-    {
-      street1: "456 Park Ave",
-      street2: "",
-      city: "New York",
-      state: "NY",
-      zip: "10022",
-      country: "US",
-    },
-    {
-      street1: "789 Market St",
-      street2: "",
-      city: "San Francisco",
-      state: "CA",
-      zip: "94103",
-      country: "US",
-    },
-  ];
-
-  return addresses.filter((address) => 
-    address.street1.toLowerCase().includes(query.toLowerCase()) || 
-    address.city.toLowerCase().includes(query.toLowerCase())
-  );
-};
+import easyPostService, { Address } from "@/services/easypostService";
+import { toast } from "sonner";
 
 interface AddressLookupProps {
   type: "from" | "to";
@@ -55,7 +21,7 @@ interface AddressLookupProps {
 
 export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   
@@ -67,24 +33,65 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     
     setIsLoading(true);
     try {
-      const addresses = await mockAddressLookup(searchQuery);
+      // Use EasyPost service for address lookup
+      const addresses = await easyPostService.verifyAddresses(searchQuery);
       setResults(addresses);
     } catch (error) {
       console.error("Error looking up address:", error);
+      toast.error("Failed to look up address. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSelectAddress = (address: any) => {
-    form.setValue(`${prefix}Street1`, address.street1);
-    form.setValue(`${prefix}Street2`, address.street2);
-    form.setValue(`${prefix}City`, address.city);
-    form.setValue(`${prefix}State`, address.state);
-    form.setValue(`${prefix}Zip`, address.zip);
-    form.setValue(`${prefix}Country`, address.country);
-    
-    setIsOpen(false);
+  const handleSelectAddress = async (address: Address) => {
+    try {
+      setIsLoading(true);
+      
+      // Verify the selected address
+      const verificationResult = await easyPostService.verifyAddress(address);
+      const verifiedAddress = verificationResult.address;
+      
+      // Check if the address was verified successfully
+      if (verificationResult.verifications?.delivery.success) {
+        // Fill in the form with the verified address
+        form.setValue(`${prefix}Street1`, verifiedAddress.street1);
+        form.setValue(`${prefix}Street2`, verifiedAddress.street2 || "");
+        form.setValue(`${prefix}City`, verifiedAddress.city);
+        form.setValue(`${prefix}State`, verifiedAddress.state);
+        form.setValue(`${prefix}Zip`, verifiedAddress.zip);
+        form.setValue(`${prefix}Country`, verifiedAddress.country);
+        
+        toast.success("Address verified and populated successfully");
+      } else {
+        // Address verification failed but still populate form
+        form.setValue(`${prefix}Street1`, address.street1);
+        form.setValue(`${prefix}Street2`, address.street2 || "");
+        form.setValue(`${prefix}City`, address.city);
+        form.setValue(`${prefix}State`, address.state);
+        form.setValue(`${prefix}Zip`, address.zip);
+        form.setValue(`${prefix}Country`, address.country);
+        
+        toast.warning("Address populated but could not be fully verified");
+      }
+      
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Error verifying address:", error);
+      toast.error("Failed to verify address. Using as provided.");
+      
+      // Fill in form with unverified address
+      form.setValue(`${prefix}Street1`, address.street1);
+      form.setValue(`${prefix}Street2`, address.street2 || "");
+      form.setValue(`${prefix}City`, address.city);
+      form.setValue(`${prefix}State`, address.state);
+      form.setValue(`${prefix}Zip`, address.zip);
+      form.setValue(`${prefix}Country`, address.country);
+      
+      setIsOpen(false);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -104,9 +111,15 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
           <div className="p-4 space-y-4">
             <div className="flex space-x-2">
               <Input
-                placeholder="Enter street or city..."
+                placeholder="Enter street, city, or zip..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
                 className="flex-1"
               />
               <Button 
@@ -118,7 +131,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
             </div>
             
             {results.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-60 overflow-y-auto">
                 {results.map((address, index) => (
                   <div 
                     key={index}
