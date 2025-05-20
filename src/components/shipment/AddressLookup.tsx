@@ -32,10 +32,15 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     if (searchQuery.length < 3) return;
     
     setIsLoading(true);
+    setResults([]);
     try {
       // Use EasyPost service for address lookup
       const addresses = await easyPostService.verifyAddresses(searchQuery);
       setResults(addresses);
+      
+      if (addresses.length === 0) {
+        toast.info("No addresses found. Try a different search term.");
+      }
     } catch (error) {
       console.error("Error looking up address:", error);
       toast.error("Failed to look up address. Please try again.");

@@ -83,10 +83,20 @@ export interface AddressVerificationResult {
 class EasyPostService {
   private apiKey: string;
   private baseUrl: string;
+  private useMock: boolean = true;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
     this.baseUrl = 'https://api.easypost.com/v2';
+    
+    // If we have a real API key that's not the placeholder, use the real service
+    this.useMock = apiKey === 'EASYPOST_API_KEY_PLACEHOLDER';
+    
+    if (!this.useMock) {
+      console.log('Using live EasyPost API');
+    } else {
+      console.log('Using mock EasyPost service');
+    }
   }
 
   private getHeaders() {
@@ -98,27 +108,24 @@ class EasyPostService {
 
   async createShipment(shipmentData: ShipmentRequest): Promise<ShipmentResponse> {
     try {
-      // This would normally hit the EasyPost API directly
-      // For now, we'll simulate the response for demo purposes
-      
-      console.log('Creating shipment with data:', shipmentData);
-      
-      // In a real implementation, this would be:
-      /*
-      const response = await fetch(`${this.baseUrl}/shipments`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ shipment: shipmentData })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`EasyPost API error: ${response.status}`);
+      // Use real API if not in mock mode
+      if (!this.useMock) {
+        const response = await fetch(`${this.baseUrl}/shipments`, {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify({ shipment: shipmentData })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`EasyPost API error: ${response.status} - ${JSON.stringify(errorData)}`);
+        }
+        
+        return await response.json();
       }
       
-      return await response.json();
-      */
-      
-      // Simulated response for frontend development
+      // Otherwise use mock data
+      console.log('Creating shipment with mock data:', shipmentData);
       return this.getMockShipmentResponse(shipmentData);
     } catch (error) {
       console.error('Error creating shipment:', error);
@@ -126,119 +133,44 @@ class EasyPostService {
     }
   }
   
-  // This is a temporary mock function for development
-  private getMockShipmentResponse(data: ShipmentRequest): ShipmentResponse {
-    const isInternational = data.to_address.country !== 'US';
-    const weight = data.parcel.weight;
-    
-    const baseRates = [
-      {
-        id: 'rate_123',
-        carrier: 'USPS',
-        service: 'Priority Mail',
-        rate: ((weight * 0.5) + 7.99).toFixed(2),
-        delivery_days: 2,
-        delivery_date: this.getDeliveryDate(2),
-      },
-      {
-        id: 'rate_124',
-        carrier: 'USPS',
-        service: 'Express Mail',
-        rate: ((weight * 0.7) + 23.99).toFixed(2),
-        delivery_days: 1,
-        delivery_date: this.getDeliveryDate(1),
-      },
-      {
-        id: 'rate_125',
-        carrier: 'UPS',
-        service: 'Ground',
-        rate: ((weight * 0.6) + 8.99).toFixed(2),
-        delivery_days: 3,
-        delivery_date: this.getDeliveryDate(3),
-      },
-      {
-        id: 'rate_126',
-        carrier: 'UPS',
-        service: '2nd Day Air',
-        rate: ((weight * 0.8) + 14.99).toFixed(2),
-        delivery_days: 2,
-        delivery_date: this.getDeliveryDate(2),
-      },
-      {
-        id: 'rate_127',
-        carrier: 'FedEx',
-        service: 'Ground',
-        rate: ((weight * 0.55) + 9.99).toFixed(2),
-        delivery_days: 3,
-        delivery_date: this.getDeliveryDate(3),
-      }
-    ];
-    
-    // Add international options if needed
-    if (isInternational) {
-      baseRates.push(
-        {
-          id: 'rate_128',
-          carrier: 'DHL',
-          service: 'International Express',
-          rate: ((weight * 2.2) + 49.99).toFixed(2),
-          delivery_days: 4,
-          delivery_date: this.getDeliveryDate(4),
-        },
-        {
-          id: 'rate_129',
-          carrier: 'FedEx',
-          service: 'International Priority',
-          rate: ((weight * 2.5) + 59.99).toFixed(2),
-          delivery_days: 3,
-          delivery_date: this.getDeliveryDate(3),
-        }
-      );
-    }
-    
-    // Convert to SmartRates
-    const smartRates = baseRates.map(rate => ({
-      ...rate,
-      time_in_transit: rate.delivery_days,
-      delivery_date_guaranteed: rate.carrier !== 'USPS',
-      delivery_accuracy: this.getRandomDeliveryAccuracy(),
-      est_delivery_days: rate.delivery_days
-    })) as SmartRate[];
-    
-    return {
-      id: `shp_${Math.random().toString(36).substring(7)}`,
-      object: 'Shipment',
-      status: 'created',
-      rates: baseRates as Rate[],
-      smartrates: smartRates,
-      selected_rate: null
-    };
-  }
-  
   async verifyAddresses(query: string): Promise<Address[]> {
     try {
       console.log('Looking up addresses with query:', query);
       
-      // This would normally hit the EasyPost API directly
-      // For now, we'll simulate the response for demo purposes
-      
-      /*
-      In a real implementation, this would be:
-      const response = await fetch(`${this.baseUrl}/addresses`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ address: { query } })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`EasyPost API error: ${response.status}`);
+      // Use real API if not in mock mode
+      if (!this.useMock) {
+        // EasyPost doesn't have a direct address lookup by text query
+        // We'd typically use a different service here like Google Places API
+        // But for demonstration, we'll use a fuzzy address verification approach
+        
+        // Create a dummy address with the query
+        const dummyAddress = {
+          street1: query,
+          city: '',
+          state: '',
+          zip: '',
+          country: 'US'
+        };
+        
+        // Try to verify it to get suggestions
+        const response = await fetch(`${this.baseUrl}/addresses`, {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify({ address: dummyAddress })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`EasyPost API error: ${response.status} - ${JSON.stringify(errorData)}`);
+        }
+        
+        const result = await response.json();
+        
+        // Return the verified address as a result (may only be one)
+        return [result.address];
       }
       
-      const result = await response.json();
-      return result.addresses;
-      */
-      
-      // Return mock addresses for now
+      // Otherwise use mock data
       return this.getMockAddressResults(query);
     } catch (error) {
       console.error('Error looking up addresses:', error);
@@ -250,25 +182,26 @@ class EasyPostService {
     try {
       console.log('Verifying address:', address);
       
-      // This would normally hit the EasyPost API directly
-      // For now, we'll simulate the response for demo purposes
-      
-      /*
-      In a real implementation, this would be:
-      const response = await fetch(`${this.baseUrl}/addresses`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ address })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`EasyPost API error: ${response.status}`);
+      // Use real API if not in mock mode
+      if (!this.useMock) {
+        const response = await fetch(`${this.baseUrl}/addresses`, {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify({ 
+            address,
+            verify: ['delivery'] 
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`EasyPost API error: ${response.status} - ${JSON.stringify(errorData)}`);
+        }
+        
+        return await response.json();
       }
       
-      return await response.json();
-      */
-      
-      // Simulate address verification
+      // Otherwise use mock verification
       return {
         id: `addr_${Math.random().toString(36).substring(7)}`,
         address: {
@@ -377,7 +310,8 @@ class EasyPostService {
   }
 }
 
-// Using a placeholder API key - in production this would come from environment variables
-const easyPostService = new EasyPostService('EASYPOST_API_KEY_PLACEHOLDER');
+// Get API key from Supabase environment variable
+const apiKey = import.meta.env.VITE_EASYPOST_API_KEY || 'EASYPOST_API_KEY_PLACEHOLDER';
+const easyPostService = new EasyPostService(apiKey);
 
 export default easyPostService;
