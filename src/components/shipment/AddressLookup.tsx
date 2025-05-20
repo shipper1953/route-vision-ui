@@ -43,6 +43,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     
     try {
       console.log('Starting address lookup with query:', searchQuery);
+      
       // Use Geoapify service for address lookup
       const addresses = await geoapifyService.searchAddresses(searchQuery);
       
@@ -66,19 +67,25 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
       
       console.log('Selected address for verification:', address);
       
-      // Verify the selected address with EasyPost (optional)
+      // Fill in the form with the selected address
+      // Optionally verify with EasyPost if API key is available
       let verifiedAddress = address;
-      try {
-        const verificationResult = await easyPostService.verifyAddress(address);
-        if (verificationResult.verifications?.delivery.success) {
-          verifiedAddress = verificationResult.address;
-          toast.success("Address verified successfully");
-        } else {
-          toast.warning("Address could not be fully verified, using as provided");
+      
+      if (import.meta.env.VITE_EASYPOST_API_KEY || import.meta.env.EASYPOST_API_KEY) {
+        try {
+          const verificationResult = await easyPostService.verifyAddress(address);
+          if (verificationResult.verifications?.delivery.success) {
+            verifiedAddress = verificationResult.address;
+            toast.success("Address verified successfully");
+          } else {
+            toast.warning("Address could not be fully verified, using as provided");
+          }
+        } catch (error) {
+          console.error("Error verifying address with EasyPost:", error);
+          toast.warning("Address validation skipped, using as provided");
         }
-      } catch (error) {
-        console.error("Error verifying address with EasyPost:", error);
-        toast.warning("Address validation skipped, using as provided");
+      } else {
+        console.log("EasyPost API key not available, skipping verification");
       }
       
       // Fill in the form with the address
@@ -97,6 +104,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
       form.clearErrors(`${prefix}Country`);
       
       setIsOpen(false);
+      toast.success("Address selected successfully");
     } catch (error) {
       console.error("Error processing selected address:", error);
       toast.error("Failed to process selected address");

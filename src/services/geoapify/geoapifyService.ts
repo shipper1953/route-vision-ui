@@ -1,3 +1,4 @@
+
 import { Address } from "@/types/easypost";
 
 /**
@@ -12,7 +13,7 @@ export class GeoapifyService {
    */
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    console.info('Initializing Geoapify service');
+    console.info('Initializing Geoapify service with API key:', apiKey ? 'API key provided' : 'No API key provided');
   }
 
   /**
@@ -40,12 +41,12 @@ export class GeoapifyService {
       console.log('Geoapify search response:', data);
       
       // Transform Geoapify response to our Address format
-      if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
+      if (!data.features || !Array.isArray(data.features) || data.features.length === 0) {
         console.log('No results returned from Geoapify');
         return [];
       }
       
-      return this.transformGeoapifyResults(data.results);
+      return this.transformGeoapifyResults(data.features);
     } catch (error) {
       console.error('Error searching addresses with Geoapify:', error);
       return [];
@@ -57,32 +58,42 @@ export class GeoapifyService {
    * @param results The Geoapify search results
    * @returns An array of addresses in our format
    */
-  private transformGeoapifyResults(results: any[]): Address[] {
-    return results.map(result => {
-      console.log('Transforming Geoapify result:', result);
+  private transformGeoapifyResults(features: any[]): Address[] {
+    return features.map(feature => {
+      const props = feature.properties;
+      console.log('Transforming Geoapify result:', props);
       
-      // Extract address components
-      const street1 = result.address_line1 || 
-                     [result.street, result.housenumber].filter(Boolean).join(' ') || 
-                     '';
-      const city = result.city || result.county || '';
-      const state = result.state || result.state_code || '';
-      const zip = result.postcode || '';
-      const country = result.country_code?.toUpperCase() || 'US';
+      if (!props) {
+        return {
+          street1: '',
+          city: '',
+          state: '',
+          zip: '',
+          country: 'US',
+        };
+      }
+      
+      // Extract address components from the Geoapify response format
+      const street1 = props.address_line1 || '';
+      const street2 = props.address_line2 || '';
+      const city = props.city || props.county || '';
+      const state = props.state || props.state_code || '';
+      const zip = props.postcode || '';
+      const country = props.country_code?.toUpperCase() || 'US';
       
       return {
         street1,
-        street2: result.address_line2 || '',
+        street2,
         city,
         state,
         zip,
         country,
-        // Map other properties as needed
         company: '',
         name: '',
         phone: '',
         email: '',
-        place_id: result.place_id || ''
+        // Store place_id for potential use in getAddressDetails
+        place_id: props.place_id || ''
       };
     });
   }
@@ -110,7 +121,7 @@ export class GeoapifyService {
       console.log('Geoapify address details response:', data);
       
       // Extract address from the response
-      const properties = data.features[0]?.properties;
+      const properties = data.features?.[0]?.properties;
       
       if (!properties) {
         throw new Error('Address details not found');
@@ -141,7 +152,9 @@ export class GeoapifyService {
 // Export an instance with the provided API key, checking both naming conventions
 const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY || 
                import.meta.env.GEOAPIFY_API_KEY || 
-               '274bcb0749944615912f9997d5c49105'; // Fallback to default key
+               '274bcb0749944615912f9997d5c49105'; // Use the API key from your screenshot
+
+console.log('Initializing Geoapify service with API key:', apiKey ? 'Key available' : 'No key available');
 const geoapifyService = new GeoapifyService(apiKey);
 
 export default geoapifyService;
