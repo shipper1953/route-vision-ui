@@ -7,6 +7,7 @@ import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse }
  */
 export class RealEasyPostService implements EasyPostService {
   private apiKey: string;
+  private baseUrl = "https://api.easypost.com/v2";
   
   /**
    * Creates a new instance of the RealEasyPostService
@@ -14,7 +15,7 @@ export class RealEasyPostService implements EasyPostService {
    */
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    console.info('Using live EasyPost API via Edge Functions');
+    console.info('Using live EasyPost API');
   }
   
   /**
@@ -26,17 +27,51 @@ export class RealEasyPostService implements EasyPostService {
     try {
       console.log('Verifying address with EasyPost:', address);
       
-      // TODO: Implement address verification via edge function
-      // For now, return a mock verification success
+      const response = await fetch(`${this.baseUrl}/addresses`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          address: {
+            street1: address.street1,
+            street2: address.street2,
+            city: address.city,
+            state: address.state,
+            zip: address.zip,
+            country: address.country,
+            company: address.company,
+            name: address.name,
+            phone: address.phone,
+            email: address.email
+          },
+          verify: ['delivery']
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('EasyPost API error:', errorData);
+        throw new Error(errorData.error?.message || 'Failed to verify address');
+      }
+      
+      const result = await response.json();
       return {
-        id: "mock_verification",
-        address: address,
-        verifications: {
-          delivery: {
-            success: true,
-            errors: []
-          }
-        }
+        id: result.id,
+        address: {
+          street1: result.street1,
+          street2: result.street2,
+          city: result.city,
+          state: result.state,
+          zip: result.zip,
+          country: result.country,
+          company: result.company,
+          name: result.name,
+          phone: result.phone,
+          email: result.email
+        },
+        verifications: result.verifications
       };
     } catch (error) {
       console.error('Error verifying address:', error);
@@ -45,7 +80,7 @@ export class RealEasyPostService implements EasyPostService {
   }
   
   /**
-   * Creates a new shipment with the EasyPost API via Supabase Edge Function
+   * Creates a new shipment with the EasyPost API
    * @param shipmentData The shipment data to create
    * @returns A promise that resolves to the created shipment
    */
@@ -53,19 +88,28 @@ export class RealEasyPostService implements EasyPostService {
     try {
       console.log('Creating shipment with data:', shipmentData);
       
-      // Use the existing edge function to create the shipment
-      const response = await fetch('/api/create-shipment', {
+      // Add SmartRate options if not already present
+      const options = shipmentData.options || {};
+      options.smartrate_accuracy = options.smartrate_accuracy || 'percentile_95';
+      
+      const response = await fetch(`${this.baseUrl}/shipments`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ shipmentData }),
+        body: JSON.stringify({ 
+          shipment: {
+            ...shipmentData,
+            options
+          }
+        }),
       });
       
       if (!response.ok) {
         const errorData = await response.json();
         console.error('EasyPost API error:', errorData);
-        throw new Error(errorData.error || 'Failed to create shipment');
+        throw new Error(errorData.error?.message || 'Failed to create shipment');
       }
       
       const shipmentResponse = await response.json();
@@ -88,19 +132,21 @@ export class RealEasyPostService implements EasyPostService {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`);
       
-      // Use an edge function to purchase the label
-      const response = await fetch('/api/purchase-label', {
+      const response = await fetch(`${this.baseUrl}/shipments/${shipmentId}/buy`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ shipmentId, rateId }),
+        body: JSON.stringify({ 
+          rate: { id: rateId }
+        }),
       });
       
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Error purchasing label:', errorData);
-        throw new Error(errorData.error || 'Failed to purchase label');
+        throw new Error(errorData.error?.message || 'Failed to purchase label');
       }
       
       const labelData = await response.json();

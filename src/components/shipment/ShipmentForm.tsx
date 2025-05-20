@@ -122,7 +122,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       onShipmentCreated(response, recommendedRate);
     } catch (error) {
       console.error("Error creating shipment:", error);
-      toast.error("Failed to retrieve shipment rates. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to retrieve shipment rates. Please try again.");
     } finally {
       setLoading(false);
     }
