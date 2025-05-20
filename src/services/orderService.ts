@@ -1,4 +1,3 @@
-
 // Types for Order data
 export interface OrderAddress {
   street1: string;
