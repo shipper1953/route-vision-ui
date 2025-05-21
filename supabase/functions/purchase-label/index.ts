@@ -2,8 +2,11 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-// Get EasyPost API key from environment variables - check both naming conventions
-const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY') || Deno.env.get('VITE_EASYPOST_API_KEY')
+// Get EasyPost API key from environment variables - check ALL naming conventions
+const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY') || 
+                      Deno.env.get('VITE_EASYPOST_API_KEY')
+
+console.log('EasyPost API key available in purchase-label function:', easyPostApiKey ? 'YES' : 'NO');
 
 const corsHeaders = {
   'Content-Type': 'application/json',

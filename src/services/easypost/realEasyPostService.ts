@@ -37,7 +37,7 @@ export class RealEasyPostService implements EasyPostService {
       
       if (this.useEdgeFunctions) {
         // Use Edge Function if no API key is available in the client
-        const { data, error } = await supabase.functions.invoke('verify-address', {
+        const { data, error } = await supabase.functions.invoke('address-lookup', {
           body: { address }
         });
         
@@ -121,13 +121,12 @@ export class RealEasyPostService implements EasyPostService {
       if (this.useEdgeFunctions) {
         console.log('Using Edge Function for shipment creation');
         
-        // Important: do not include auth headers to avoid 401 errors
-        // This function has verify_jwt = false in config.toml
+        // CRITICAL FIX: Explicitly pass an object with empty authorization headers to the Edge Function
         const { data, error } = await supabase.functions.invoke('create-shipment', {
           body: { shipmentData },
           headers: {
-            // Explicitly remove authorization headers
-            'Authorization': undefined
+            // Do not include authorization headers to avoid 401 errors
+            Authorization: undefined
           }
         });
         
