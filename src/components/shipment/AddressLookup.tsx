@@ -63,7 +63,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   };
 
   const onSuggestionChange = (suggestions: any) => {
-    console.log('Suggestions changed:', suggestions);
+    console.log('Suggestions changed:', suggestions?.length || 0, 'results found');
   };
 
   // Get Geoapify API key 
@@ -92,11 +92,13 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
             <GeoapifyContext apiKey={apiKey}>
               <GeoapifyGeocoderAutocomplete
                 placeholder="Enter address to search..."
-                type="street"
-                limit={5}
+                type="city"
+                filterByCountryCode={['us', 'ca', 'gb', 'au']} 
+                bias="us"
+                limit={10}
                 placeSelect={onPlaceSelect}
                 suggestionsChange={onSuggestionChange}
-                debounceDelay={500}
+                debounceDelay={300}
               />
             </GeoapifyContext>
             

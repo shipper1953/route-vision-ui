@@ -67,3 +67,9 @@
   text-align: center;
   color: hsl(var(--destructive));
 }
+
+/* Fix for proper display of the autocomplete dropdown */
+.geoapify-autocomplete-container {
+  position: relative;
+  width: 100%;
+}
