@@ -16,7 +16,7 @@ export const useQboidConnection = () => {
       setConfiguring(true);
       setConnectionStatus('connecting');
       
-      // Get the configuration info - await the Promise
+      // Get the configuration info
       const qboidInfo = await listenForQboidData((dimensions) => {
         // This callback would be called when new dimensions are received
         console.log("Received dimensions from Qboid:", dimensions);
@@ -34,7 +34,7 @@ export const useQboidConnection = () => {
         toast.success("Package dimensions updated from Qboid scanner");
       });
       
-      // Now we can safely access endpointUrl since we've awaited the Promise
+      // Display configuration information
       toast.info("Qboid Integration Info", {
         description: (
           <div className="mt-2 text-sm">
