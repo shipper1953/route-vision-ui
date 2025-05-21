@@ -12,7 +12,7 @@ import { QboidButton } from "./package/QboidButton";
 import { PackageStatusMessage } from "./package/PackageStatusMessage";
 import { DimensionsSection } from "./package/DimensionsSection";
 import { WeightSection } from "./package/WeightSection";
-import { useQboidConnection } from "./package/useQboidConnection.tsx";
+import { useQboidConnection } from "./package/useQboidConnection";
 
 export const PackageDetailsSection = () => {
   const {

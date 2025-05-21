@@ -9,56 +9,169 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      orders: {
+      addresses: {
         Row: {
-          created_at: string
-          customer: string | null
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
+          company: string | null
+          country_code: string | null
+          created_at: string | null
+          email: string | null
           id: number
-          items: number | null
-          order_total: number | null
-          payment_status: string | null
-          required_delivery: string | null
-          shipping_address: string | null
-          status: string | null
+          is_default: boolean | null
+          lat: number | null
+          lon: number | null
+          name: string | null
+          phone: string | null
+          postcode: string | null
+          state: string | null
+          user_id: string | null
         }
         Insert: {
-          created_at?: string
-          customer?: string | null
-          id?: number
-          items?: number | null
-          order_total?: number | null
-          payment_status?: string | null
-          required_delivery?: string | null
-          shipping_address?: string | null
-          status?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          company?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: never
+          is_default?: boolean | null
+          lat?: number | null
+          lon?: number | null
+          name?: string | null
+          phone?: string | null
+          postcode?: string | null
+          state?: string | null
+          user_id?: string | null
         }
         Update: {
-          created_at?: string
-          customer?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          company?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: never
+          is_default?: boolean | null
+          lat?: number | null
+          lon?: number | null
+          name?: string | null
+          phone?: string | null
+          postcode?: string | null
+          state?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      orders: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          customer_name: string | null
+          id: number
+          items: number | null
+          order_date: string
+          payment_status: string | null
+          required_delivery_date: string | null
+          shipping_address: string | null
+          status: string | null
+          value: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
           id?: number
           items?: number | null
-          order_total?: number | null
+          order_date: string
           payment_status?: string | null
-          required_delivery?: string | null
+          required_delivery_date?: string | null
           shipping_address?: string | null
           status?: string | null
+          value?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          id?: number
+          items?: number | null
+          order_date?: string
+          payment_status?: string | null
+          required_delivery_date?: string | null
+          shipping_address?: string | null
+          status?: string | null
+          value?: number | null
         }
         Relationships: []
       }
       shipments: {
         Row: {
+          actual_delivery_date: string | null
+          carrier: string | null
+          carrier_service: string | null
           created_at: string
+          destination_address: string | null
+          dimensions: Json | null
+          easypost_id: string | null
+          estimated_delivery_date: string | null
           id: number
+          label_url: string | null
+          order_id: number | null
+          origin_address: string | null
+          ship_date: string | null
+          status: string | null
+          tracking_number: string | null
+          weight: number | null
         }
         Insert: {
+          actual_delivery_date?: string | null
+          carrier?: string | null
+          carrier_service?: string | null
           created_at?: string
+          destination_address?: string | null
+          dimensions?: Json | null
+          easypost_id?: string | null
+          estimated_delivery_date?: string | null
           id?: number
+          label_url?: string | null
+          order_id?: number | null
+          origin_address?: string | null
+          ship_date?: string | null
+          status?: string | null
+          tracking_number?: string | null
+          weight?: number | null
         }
         Update: {
+          actual_delivery_date?: string | null
+          carrier?: string | null
+          carrier_service?: string | null
           created_at?: string
+          destination_address?: string | null
+          dimensions?: Json | null
+          easypost_id?: string | null
+          estimated_delivery_date?: string | null
           id?: number
+          label_url?: string | null
+          order_id?: number | null
+          origin_address?: string | null
+          ship_date?: string | null
+          status?: string | null
+          tracking_number?: string | null
+          weight?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shipping_rates: {
         Row: {
@@ -77,16 +190,34 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          carrier: string | null
           created_at: string
+          delivery_days: number | null
+          easypost_rate_id: string | null
           id: number
+          rate: number | null
+          service: string | null
+          shipment_id: string | null
         }
         Insert: {
+          carrier?: string | null
           created_at?: string
+          delivery_days?: number | null
+          easypost_rate_id?: string | null
           id?: number
+          rate?: number | null
+          service?: string | null
+          shipment_id?: string | null
         }
         Update: {
+          carrier?: string | null
           created_at?: string
+          delivery_days?: number | null
+          easypost_rate_id?: string | null
           id?: number
+          rate?: number | null
+          service?: string | null
+          shipment_id?: string | null
         }
         Relationships: []
       }
