@@ -13,7 +13,7 @@ export class GeoapifyService {
    */
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    console.info('Initializing Geoapify service with API key:', apiKey ? 'API key provided' : 'No API key provided');
+    console.log('Initializing Geoapify service with API key:', apiKey ? 'API key provided' : 'No API key provided');
   }
 
   /**
@@ -23,7 +23,12 @@ export class GeoapifyService {
    */
   async searchAddresses(query: string): Promise<Address[]> {
     try {
-      console.log('Searching addresses with Geoapify:', query);
+      console.log('Searching addresses with Geoapify, query:', query, 'API key available:', !!this.apiKey);
+      
+      if (!this.apiKey) {
+        console.error('Geoapify API key is missing');
+        throw new Error('Geoapify API key is missing');
+      }
       
       const url = new URL('https://api.geoapify.com/v1/geocode/autocomplete');
       url.searchParams.append('text', query);
@@ -31,14 +36,18 @@ export class GeoapifyService {
       url.searchParams.append('format', 'json');
       url.searchParams.append('limit', '5');
       
+      console.log('Geoapify request URL:', url.toString().replace(this.apiKey, '[API_KEY_HIDDEN]'));
+      
       const response = await fetch(url.toString());
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Geoapify API error: ${response.status}`, errorText);
         throw new Error(`Geoapify API error: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('Geoapify search response:', data);
+      console.log('Geoapify search response status:', response.status);
       
       // Transform Geoapify response to our Address format
       if (!data.features || !Array.isArray(data.features) || data.features.length === 0) {
@@ -149,12 +158,16 @@ export class GeoapifyService {
   }
 }
 
-// Export an instance with the provided API key, checking both naming conventions
-const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY || 
-               import.meta.env.GEOAPIFY_API_KEY || 
-               '274bcb0749944615912f9997d5c49105'; // Use the API key from your screenshot
+// Attempt to get the API key from various environment variable formats
+const apiKey = 
+  import.meta.env.VITE_GEOAPIFY_API_KEY || 
+  import.meta.env.REACT_APP_GEOAPIFY_API_KEY || 
+  import.meta.env.GEOAPIFY_API_KEY || 
+  '274bcb0749944615912f9997d5c49105'; // Fallback key
 
-console.log('Initializing Geoapify service with API key:', apiKey ? 'Key available' : 'No key available');
+console.log('Environment variables available:', Object.keys(import.meta.env).filter(key => key.includes('GEOAPIFY')));
+console.log('Initializing Geoapify service with API key available:', !!apiKey);
+
 const geoapifyService = new GeoapifyService(apiKey);
 
 export default geoapifyService;

@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Search, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,10 +27,16 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   const [results, setResults] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const form = useFormContext<ShipmentForm>();
   const prefix = type;
+
+  // Log when component mounts to verify it's working
+  useEffect(() => {
+    console.log(`AddressLookup component mounted for ${type} address`);
+  }, [type]);
 
   const handleSearch = async () => {
     if (searchQuery.length < 3) {
@@ -40,6 +46,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     
     setIsLoading(true);
     setResults([]);
+    setSearchError(null);
     
     try {
       console.log('Starting address lookup with query:', searchQuery);
@@ -51,10 +58,12 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
       setResults(addresses);
       
       if (addresses.length === 0) {
+        setSearchError("No addresses found. Try a different search term.");
         toast.info("No addresses found. Try a different search term.");
       }
     } catch (error) {
       console.error("Error looking up address:", error);
+      setSearchError("Failed to look up address. Please try again.");
       toast.error("Failed to look up address. Please try again.");
     } finally {
       setIsLoading(false);
@@ -155,6 +164,10 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
               </Button>
             </div>
             
+            {searchError && (
+              <p className="text-sm text-destructive text-center">{searchError}</p>
+            )}
+            
             {results.length > 0 ? (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {results.map((address, index) => (
@@ -175,7 +188,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
                 ))}
               </div>
             ) : (
-              searchQuery.length >= 3 && !isLoading && (
+              searchQuery.length >= 3 && !isLoading && !searchError && (
                 <p className="text-sm text-muted-foreground text-center py-2">No results found</p>
               )
             )}
