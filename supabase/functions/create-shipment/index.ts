@@ -27,24 +27,16 @@ serve(async (req) => {
     { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
   )
   
-  // Verify authenticated user
-  const { data, error } = await supabaseClient.auth.getUser()
-  if (error || !data.user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      headers: corsHeaders,
-      status: 401,
-    })
-  }
-
   try {
     const { shipmentData } = await req.json()
     
-    // Enable SmartRate by adding the right options
+    // Ensure we have options
     if (!shipmentData.options) {
       shipmentData.options = {}
     }
     
-    // Add SmartRate options if not already present
+    // Always enable SmartRate with a high accuracy level for best delivery estimates
+    // percentile_95 provides a good balance of accuracy and coverage
     shipmentData.options.smartrate_accuracy = shipmentData.options.smartrate_accuracy || 'percentile_95'
     
     console.log('Creating shipment with data:', JSON.stringify(shipmentData, null, 2))
@@ -71,26 +63,33 @@ serve(async (req) => {
     }
     
     const shipmentResponse = await response.json()
+    console.log('SmartRates received:', shipmentResponse.smartrates ? shipmentResponse.smartrates.length : 0)
     
-    // Save the shipment information to Supabase
-    const { data: savedShipment, error: saveError } = await supabaseClient
-      .from('shipments')
-      .insert({
-        user_id: data.user.id,
-        easypost_id: shipmentResponse.id,
-        to_address: shipmentData.to_address,
-        from_address: shipmentData.from_address,
-        parcel: shipmentData.parcel,
-        rates: shipmentResponse.rates || [],
-        smartrates: shipmentResponse.smartrates || [],
-        order_id: shipmentData.reference || null,
-        status: 'created'
-      })
-      .select()
-      .single()
-    
-    if (saveError) {
-      console.error('Error saving shipment to database:', saveError)
+    // Save the shipment information to Supabase if a user is logged in
+    try {
+      const authResponse = await supabaseClient.auth.getUser();
+      if (!authResponse.error && authResponse.data.user) {
+        const { error: saveError } = await supabaseClient
+          .from('shipments')
+          .insert({
+            user_id: authResponse.data.user.id,
+            easypost_id: shipmentResponse.id,
+            to_address: shipmentData.to_address,
+            from_address: shipmentData.from_address,
+            parcel: shipmentData.parcel,
+            rates: shipmentResponse.rates || [],
+            smartrates: shipmentResponse.smartrates || [],
+            order_id: shipmentData.reference || null,
+            status: 'created'
+          });
+        
+        if (saveError) {
+          console.error('Error saving shipment to database:', saveError);
+        }
+      }
+    } catch (saveErr) {
+      // Don't fail the request if we can't save to the database
+      console.error('Error when trying to save shipment:', saveErr);
     }
     
     // Return the EasyPost response

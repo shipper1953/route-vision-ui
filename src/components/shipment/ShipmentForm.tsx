@@ -7,12 +7,12 @@ import { toast } from "sonner";
 import { OrderLookupCard } from "@/components/shipment/OrderLookupCard";
 import { ShipmentFormTabs } from "@/components/shipment/ShipmentFormTabs";
 import { RatesActionButton } from "@/components/shipment/RatesActionButton";
-import easyPostService, { ShipmentResponse } from "@/services/easypost";
+import easyPostService, { ShipmentResponse, SmartRate } from "@/services/easypost";
 import { shipmentSchema, ShipmentForm as ShipmentFormType } from "@/types/shipment";
 import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
 
 interface ShipmentFormProps {
-  onShipmentCreated: (response: ShipmentResponse, selectedRate: any) => void;
+  onShipmentCreated: (response: ShipmentResponse, selectedRate: SmartRate | null) => void;
 }
 
 export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
@@ -81,6 +81,10 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
           width: data.width,
           height: data.height,
           weight: data.weight
+        },
+        // Add options to ensure SmartRate functionality
+        options: {
+          smartrate_accuracy: 'percentile_95' // Use high accuracy level for delivery estimates
         }
       };
       
@@ -98,24 +102,52 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
         const requiredDate = new Date(data.requiredDeliveryDate);
         
         // Find a rate that can deliver by the required date
-        if (response.smartrates) {
-          const recommendedOptions = response.smartrates.filter(rate => {
+        if (response.smartrates && response.smartrates.length > 0) {
+          // Filter by rates that will deliver by the required date
+          const viableRates = response.smartrates.filter(rate => {
             if (!rate.delivery_date) return false;
             const deliveryDate = new Date(rate.delivery_date);
             return deliveryDate <= requiredDate;
           });
           
-          if (recommendedOptions.length > 0) {
-            // Sort by price (lowest first) from rates that meet the deadline
-            recommendedRate = recommendedOptions.sort((a, b) => 
-              parseFloat(a.rate) - parseFloat(b.rate)
-            )[0];
+          if (viableRates.length > 0) {
+            // First prioritize delivery date guaranteed options
+            const guaranteedRates = viableRates.filter(rate => rate.delivery_date_guaranteed);
             
-            toast.success("Recommended shipping option selected based on required delivery date");
+            if (guaranteedRates.length > 0) {
+              // Sort guaranteed rates by price (lowest first)
+              recommendedRate = guaranteedRates.sort((a, b) => 
+                parseFloat(a.rate) - parseFloat(b.rate)
+              )[0];
+              toast.success("Recommended shipping option with guaranteed delivery selected");
+            } else {
+              // If no guaranteed options, sort by price (lowest first) from rates that meet the deadline
+              recommendedRate = viableRates.sort((a, b) => 
+                parseFloat(a.rate) - parseFloat(b.rate)
+              )[0];
+              toast.success("Recommended shipping option selected based on required delivery date");
+            }
           } else {
             toast.warning("No shipping options available to meet the required delivery date");
+            
+            // If no options meet the required date, find the fastest option
+            if (response.smartrates.length > 0) {
+              const sortedByDelivery = [...response.smartrates].sort((a, b) => {
+                if (!a.delivery_date) return 1;
+                if (!b.delivery_date) return -1;
+                return new Date(a.delivery_date).getTime() - new Date(b.delivery_date).getTime();
+              });
+              recommendedRate = sortedByDelivery[0];
+              toast.info("Selected fastest available shipping option instead");
+            }
           }
         }
+      } else if (response.smartrates && response.smartrates.length > 0) {
+        // If no required date specified, recommend the most economical option
+        recommendedRate = response.smartrates.sort((a, b) => 
+          parseFloat(a.rate) - parseFloat(b.rate)
+        )[0];
+        toast.success("Most economical shipping option selected");
       }
       
       toast.success("Shipment rates retrieved successfully");

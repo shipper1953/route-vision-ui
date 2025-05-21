@@ -110,6 +110,14 @@ export class RealEasyPostService implements EasyPostService {
     try {
       console.log('Creating shipment with data:', shipmentData);
       
+      // Ensure we have options
+      if (!shipmentData.options) {
+        shipmentData.options = {};
+      }
+      
+      // Always enable SmartRate with a high accuracy level for best delivery estimates
+      shipmentData.options.smartrate_accuracy = shipmentData.options.smartrate_accuracy || 'percentile_95';
+      
       if (this.useEdgeFunctions) {
         // Use Edge Function if no API key is available in the client
         const { data, error } = await supabase.functions.invoke('create-shipment', {
@@ -128,10 +136,6 @@ export class RealEasyPostService implements EasyPostService {
         return data;
       }
       
-      // Add SmartRate options if not already present
-      const options = shipmentData.options || {};
-      options.smartrate_accuracy = options.smartrate_accuracy || 'percentile_95';
-      
       const response = await fetch(`${this.baseUrl}/shipments`, {
         method: 'POST',
         headers: {
@@ -141,7 +145,7 @@ export class RealEasyPostService implements EasyPostService {
         body: JSON.stringify({ 
           shipment: {
             ...shipmentData,
-            options
+            options: shipmentData.options
           }
         }),
       });
@@ -153,7 +157,8 @@ export class RealEasyPostService implements EasyPostService {
       }
       
       const shipmentResponse = await response.json();
-      console.log('Shipment created successfully:', shipmentResponse);
+      console.log('Shipment created successfully with SmartRates:', 
+        shipmentResponse.smartrates ? shipmentResponse.smartrates.length : 0);
       
       return shipmentResponse;
     } catch (error) {
