@@ -3,10 +3,18 @@ import { RealEasyPostService } from "./realEasyPostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
 
-// Get API key from environment variable safely without using import.meta 
-const apiKey = process.env.VITE_EASYPOST_API_KEY || 
-               process.env.EASYPOST_API_KEY || 
-               '';
+// Get API key safely using environment variables
+const apiKey = (() => {
+  try {
+    // Safely check for environment variables
+    return process.env.VITE_EASYPOST_API_KEY || 
+           process.env.EASYPOST_API_KEY || 
+           '';
+  } catch (e) {
+    console.warn('Error accessing environment variables:', e);
+    return '';
+  }
+})();
 
 // Check if the API key is available
 if (!apiKey) {
