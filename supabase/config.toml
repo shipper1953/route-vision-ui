@@ -3,3 +3,6 @@ project_id = "gidrlosmhpvdcogrkidj"
 
 [functions.address-lookup]
 verify_jwt = false
+
+[functions.create-shipment]
+verify_jwt = true
