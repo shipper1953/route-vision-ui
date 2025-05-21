@@ -42,6 +42,12 @@ export const useQboidConnection = () => {
             <p className="mt-1 font-mono text-xs bg-slate-100 p-2 rounded overflow-auto">
               {qboidInfo.endpointUrl}
             </p>
+            <p className="mt-2 font-semibold">Required headers:</p>
+            <p className="mt-1 font-mono text-xs bg-slate-100 p-2 rounded overflow-auto">
+              Content-Type: application/json
+              <br />
+              x-qboid-token: [Your Qboid API Token]
+            </p>
             <p className="mt-2">Use POST method with JSON body containing:</p>
             <p className="mt-1 font-mono text-xs bg-slate-100 p-2 rounded overflow-auto">
               {`{ "length": 12, "width": 8, "height": 6, "weight": 32 }`}

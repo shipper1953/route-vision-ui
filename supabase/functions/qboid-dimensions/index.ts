@@ -6,7 +6,7 @@ const corsHeaders = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*', // In production, set this to your specific domain
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qboid-token',
 }
 
 interface QboidData {
@@ -31,6 +31,20 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Only POST requests are supported' }), {
         headers: corsHeaders,
         status: 405,
+      })
+    }
+    
+    // Verify the Qboid API token
+    const qboidToken = req.headers.get('x-qboid-token');
+    const validToken = Deno.env.get('QBOID_API_TOKEN');
+    
+    if (!qboidToken || qboidToken !== validToken) {
+      console.error('Invalid or missing Qboid API token');
+      return new Response(JSON.stringify({ 
+        error: 'Unauthorized - Invalid or missing API token' 
+      }), {
+        headers: corsHeaders,
+        status: 401,
       })
     }
     

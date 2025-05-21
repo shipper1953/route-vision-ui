@@ -38,6 +38,12 @@ export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
   try {
     console.log('Setting up Qboid integration with endpoint:', QBOID_ENDPOINT_URL);
     
+    // Get the API token from Supabase
+    const { data: secretData } = await supabase
+      .functions.invoke('qboid-dimensions', {
+        body: { action: 'validate-token' }
+      });
+    
     // For testing purposes, you can simulate a Qboid device sending data
     // This can be useful to verify that your callback works correctly
     setTimeout(() => {
@@ -51,7 +57,7 @@ export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
       }));
       
       console.log('Using curl:');
-      console.log(`curl -X POST ${QBOID_ENDPOINT_URL} -H "Content-Type: application/json" -d '{"length": 12.5, "width": 8.75, "height": 6.25, "weight": 32, "orderId": "TEST-123"}'`);
+      console.log(`curl -X POST ${QBOID_ENDPOINT_URL} -H "Content-Type: application/json" -H "x-qboid-token: YOUR_API_TOKEN" -d '{"length": 12.5, "width": 8.75, "height": 6.25, "weight": 32, "orderId": "TEST-123"}'`);
     }, 1000);
 
     // Return the information needed to configure the Qboid scanner
@@ -61,7 +67,9 @@ export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
         console.log('Configure your Qboid scanner with the following settings:');
         console.log('1. Endpoint URL:', QBOID_ENDPOINT_URL);
         console.log('2. Method: POST');
-        console.log('3. Content-Type: application/json');
+        console.log('3. Headers:');
+        console.log('   - Content-Type: application/json');
+        console.log('   - x-qboid-token: YOUR_API_TOKEN');
         console.log('4. Body format: { "length": number, "width": number, "height": number, "weight": number, "orderId": "optional" }');
       }
     };
