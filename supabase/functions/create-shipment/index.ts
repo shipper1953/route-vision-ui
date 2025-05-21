@@ -2,7 +2,8 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
+// Get EasyPost API key from environment variables - check both naming conventions
+const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY') || Deno.env.get('VITE_EASYPOST_API_KEY')
 
 const corsHeaders = {
   'Content-Type': 'application/json',
@@ -25,6 +26,7 @@ serve(async (req) => {
 
   try {
     console.log('Processing shipment request')
+    console.log('API Key available:', easyPostApiKey ? 'Yes' : 'No')
     
     // Create Supabase client without requiring authorization
     const supabaseClient = createClient(
@@ -65,7 +67,9 @@ serve(async (req) => {
     if (!easyPostApiKey) {
       console.error('EasyPost API key is not configured in environment variables')
       return new Response(
-        JSON.stringify({ error: 'EasyPost API key is not available. Please configure it in Supabase Secrets.' }), 
+        JSON.stringify({ 
+          error: 'EasyPost API key is not available. Please configure it in Supabase Secrets with name EASYPOST_API_KEY or VITE_EASYPOST_API_KEY.' 
+        }), 
         { headers: corsHeaders, status: 500 }
       )
     }
