@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,6 +41,7 @@ serve(async (req) => {
     url.searchParams.append('apiKey', apiKey);
     url.searchParams.append('format', 'json');
     url.searchParams.append('limit', '5');
+    url.searchParams.append('type', 'amenity,street,address');
     
     const response = await fetch(url.toString());
     
@@ -54,10 +54,28 @@ serve(async (req) => {
       );
     }
     
-    const data = await response.json();
+    const geoapifyData = await response.json();
+    
+    // Transform the response to make it easier to use in the frontend
+    const results = geoapifyData.results || [];
+    const transformedResults = results.map((feature: any) => {
+      const props = feature.properties || {};
+      return {
+        place_id: props.place_id || '',
+        address_line1: props.address_line1 || `${props.housenumber || ''} ${props.street || ''}`.trim(),
+        address_line2: props.address_line2 || '',
+        city: props.city || props.county || '',
+        state: props.state || props.state_code || '',
+        postcode: props.postcode || '',
+        country_code: props.country_code || 'us',
+        formatted: props.formatted || '',
+        lat: props.lat,
+        lon: props.lon
+      };
+    });
     
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify({ results: transformedResults }),
       { headers: corsHeaders }
     );
   } catch (error) {

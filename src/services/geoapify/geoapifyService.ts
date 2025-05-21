@@ -1,3 +1,4 @@
+
 import { Address } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -37,18 +38,18 @@ export class GeoapifyService {
         throw new Error(`Address lookup failed: ${error.message}`);
       }
       
-      console.log('Address lookup response received');
+      console.log('Address lookup response received:', data);
       
       // Transform Geoapify response to our Address format
-      if (!data.features || !Array.isArray(data.features) || data.features.length === 0) {
+      if (!data?.results || !Array.isArray(data.results) || data.results.length === 0) {
         console.log('No results returned from address lookup');
         return [];
       }
       
-      return this.transformGeoapifyResults(data.features);
+      return this.transformGeoapifyResults(data.results);
     } catch (error) {
       console.error('Error searching addresses:', error);
-      return [];
+      throw error;
     }
   }
   
@@ -57,12 +58,11 @@ export class GeoapifyService {
    * @param features The Geoapify search results
    * @returns An array of addresses in our format
    */
-  private transformGeoapifyResults(features: any[]): Address[] {
-    return features.map(feature => {
-      const props = feature.properties;
-      console.log('Transforming Geoapify result:', props);
+  private transformGeoapifyResults(results: any[]): Address[] {
+    return results.map(result => {
+      console.log('Transforming Geoapify result:', result);
       
-      if (!props) {
+      if (!result) {
         return {
           street1: '',
           city: '',
@@ -73,12 +73,12 @@ export class GeoapifyService {
       }
       
       // Extract address components from the Geoapify response format
-      const street1 = props.address_line1 || '';
-      const street2 = props.address_line2 || '';
-      const city = props.city || props.county || '';
-      const state = props.state || props.state_code || '';
-      const zip = props.postcode || '';
-      const country = props.country_code?.toUpperCase() || 'US';
+      const street1 = result.address_line1 || '';
+      const street2 = result.address_line2 || '';
+      const city = result.city || result.county || '';
+      const state = result.state || result.state_code || '';
+      const zip = result.postcode || result.zip || '';
+      const country = result.country_code?.toUpperCase() || 'US';
       
       return {
         street1,
@@ -91,43 +91,8 @@ export class GeoapifyService {
         name: '',
         phone: '',
         email: '',
-        // Store place_id for potential use in getAddressDetails
-        place_id: props.place_id || ''
       };
     });
-  }
-
-  /**
-   * Gets detailed address information - Not used in current implementation
-   * @param placeId The Geoapify place ID
-   * @returns A promise that resolves to an address
-   */
-  async getAddressDetails(placeId: string): Promise<Address> {
-    try {
-      console.log('Getting address details for place ID:', placeId);
-      
-      const url = new URL('https://api.geoapify.com/v2/place-details');
-      url.searchParams.append('id', placeId);
-      
-      // This would need to be updated to use the edge function as well
-      // For now, we'll return a placeholder as this method is not currently used
-      
-      return {
-        street1: '',
-        street2: '',
-        city: '',
-        state: '',
-        zip: '',
-        country: 'US',
-        company: '',
-        name: '',
-        phone: '',
-        email: ''
-      };
-    } catch (error) {
-      console.error('Error getting address details:', error);
-      throw error;
-    }
   }
 }
 
