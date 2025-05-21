@@ -94,7 +94,10 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
                 placeholder="Enter address to search..."
                 type="city"
                 filterByCountryCode={['us', 'ca', 'gb', 'au']} 
-                bias="us"
+                position={{
+                  lat: 37.7749,
+                  lon: -122.4194
+                }}
                 limit={10}
                 placeSelect={onPlaceSelect}
                 suggestionsChange={onSuggestionChange}
