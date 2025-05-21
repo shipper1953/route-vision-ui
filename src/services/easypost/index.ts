@@ -3,9 +3,9 @@ import { RealEasyPostService } from "./realEasyPostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
 
-// Get API key from environment variable - checking both naming conventions
-const apiKey = import.meta.env.VITE_EASYPOST_API_KEY || 
-               import.meta.env.EASYPOST_API_KEY || 
+// Get API key from environment variable safely without using import.meta 
+const apiKey = process.env.VITE_EASYPOST_API_KEY || 
+               process.env.EASYPOST_API_KEY || 
                '';
 
 // Check if the API key is available
