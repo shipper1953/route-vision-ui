@@ -5,4 +5,4 @@ project_id = "gidrlosmhpvdcogrkidj"
 verify_jwt = false
 
 [functions.create-shipment]
-verify_jwt = true
+verify_jwt = false

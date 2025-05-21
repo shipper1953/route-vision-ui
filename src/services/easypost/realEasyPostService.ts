@@ -113,11 +113,16 @@ export class RealEasyPostService implements EasyPostService {
       if (this.useEdgeFunctions) {
         // Use Edge Function if no API key is available in the client
         const { data, error } = await supabase.functions.invoke('create-shipment', {
-          body: { shipmentData }
+          body: { shipmentData },
+          // Ensure auth is forwarded to the Edge Function
+          headers: { 
+            'Content-Type': 'application/json',
+          }
         });
         
         if (error) {
-          throw new Error(error.message);
+          console.error('Edge Function error:', error);
+          throw new Error(error.message || 'Failed to send a request to the Edge Function');
         }
         
         return data;
