@@ -48,8 +48,15 @@ export class GeoapifyService {
       }
       
       return this.transformGeoapifyResults(data.results);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error searching addresses:', error);
+      // Return empty array on error instead of throwing to provide more graceful degradation
+      if (error.message && error.message.includes('400')) {
+        console.log('Bad request error - likely invalid query format or API limitations');
+        // We return an empty array for a 400 error as it's often just a query format issue
+        return [];
+      }
+      // For other errors, still throw so we can show appropriate error messages
       throw error;
     }
   }

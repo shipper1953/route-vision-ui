@@ -36,13 +36,14 @@ export const useAddressLookup = (type: "from" | "to") => {
       setResults(addresses);
       
       if (addresses.length === 0) {
-        setSearchError("No addresses found. Try a different search term.");
-        toast.info("No addresses found. Try a different search term.");
+        // Handle no results more gracefully
+        setSearchError("No addresses found. Try adjusting your search term.");
+        toast.info("No addresses found. Try entering a more specific address.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error looking up address:", error);
       setSearchError("Failed to look up address. Please try again.");
-      toast.error("Failed to look up address. Please try again.");
+      toast.error("Address lookup service temporarily unavailable. Please try again later.");
     } finally {
       setIsLoading(false);
     }
