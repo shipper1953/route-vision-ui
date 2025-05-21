@@ -119,10 +119,16 @@ export class RealEasyPostService implements EasyPostService {
       shipmentData.options.smartrate_accuracy = shipmentData.options.smartrate_accuracy || 'percentile_95';
       
       if (this.useEdgeFunctions) {
-        // Use Edge Function without any authorization headers
+        console.log('Using Edge Function for shipment creation');
+        
+        // Important: do not include auth headers to avoid 401 errors
         // This function has verify_jwt = false in config.toml
         const { data, error } = await supabase.functions.invoke('create-shipment', {
-          body: { shipmentData }
+          body: { shipmentData },
+          headers: {
+            // Explicitly remove authorization headers
+            'Authorization': undefined
+          }
         });
         
         if (error) {
@@ -130,6 +136,7 @@ export class RealEasyPostService implements EasyPostService {
           throw new Error(error.message || 'Edge Function returned a non-2xx status code');
         }
         
+        console.log('Shipment created via Edge Function:', data?.id);
         return data;
       }
       

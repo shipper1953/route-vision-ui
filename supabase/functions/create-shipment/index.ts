@@ -12,8 +12,11 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('Create-shipment function invoked')
+  
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS preflight request')
     return new Response(null, { 
       status: 204, 
       headers: corsHeaders 
@@ -21,14 +24,32 @@ serve(async (req) => {
   }
 
   try {
-    // We removed authorization requirements since verify_jwt is false for this function
+    console.log('Processing shipment request')
+    
+    // Create Supabase client without requiring authorization
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization') || '' } } }
+      { 
+        global: { 
+          headers: { 
+            // Do not include Authorization header to avoid 401 errors
+          } 
+        } 
+      }
     )
     
-    const { shipmentData } = await req.json()
+    // Parse request JSON
+    const requestData = await req.json()
+    const shipmentData = requestData.shipmentData
+    
+    if (!shipmentData) {
+      console.error('No shipment data provided in request')
+      return new Response(
+        JSON.stringify({ error: 'No shipment data provided' }), 
+        { headers: corsHeaders, status: 400 }
+      )
+    }
     
     // Ensure we have options
     if (!shipmentData.options) {
@@ -42,11 +63,11 @@ serve(async (req) => {
     console.log('Creating shipment with data:', JSON.stringify(shipmentData, null, 2))
     
     if (!easyPostApiKey) {
-      console.error('EasyPost API key is not configured in environment variables');
+      console.error('EasyPost API key is not configured in environment variables')
       return new Response(
         JSON.stringify({ error: 'EasyPost API key is not available. Please configure it in Supabase Secrets.' }), 
         { headers: corsHeaders, status: 500 }
-      );
+      )
     }
     
     const response = await fetch('https://api.easypost.com/v2/shipments', {
@@ -75,7 +96,7 @@ serve(async (req) => {
     
     // Save the shipment information to Supabase if a user is logged in
     try {
-      const authResponse = await supabaseClient.auth.getUser();
+      const authResponse = await supabaseClient.auth.getUser()
       if (!authResponse.error && authResponse.data.user) {
         const { error: saveError } = await supabaseClient
           .from('shipments')
@@ -89,18 +110,19 @@ serve(async (req) => {
             smartrates: shipmentResponse.smartrates || [],
             order_id: shipmentData.reference || null,
             status: 'created'
-          });
+          })
         
         if (saveError) {
-          console.error('Error saving shipment to database:', saveError);
+          console.error('Error saving shipment to database:', saveError)
         }
       }
     } catch (saveErr) {
       // Don't fail the request if we can't save to the database
-      console.error('Error when trying to save shipment:', saveErr);
+      console.error('Error when trying to save shipment:', saveErr)
     }
     
     // Return the EasyPost response with proper CORS headers
+    console.log('Returning successful response')
     return new Response(JSON.stringify(shipmentResponse), { headers: corsHeaders })
     
   } catch (err) {
