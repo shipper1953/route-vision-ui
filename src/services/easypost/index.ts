@@ -1,3 +1,4 @@
+
 import { RealEasyPostService } from "./realEasyPostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,9 @@ export default easyPostService;
 // Re-export types from the easypost types file
 export * from "@/types/easypost";
 
+// Define the endpoint URL for Qboid directly
+const QBOID_ENDPOINT_URL = 'https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions';
+
 // Add a new export for the Qboid scanner integration
 export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
   length: number;
@@ -32,20 +36,30 @@ export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
   orderId?: string;
 }) => void) => {
   try {
-    // In a real implementation, this could be:
-    // 1. A WebSocket connection that listens for events from the Qboid scanner
-    // 2. A polling mechanism that checks for new dimension data periodically
-    // 3. A direct connection to the scanner's API
+    console.log('Setting up Qboid integration with endpoint:', QBOID_ENDPOINT_URL);
     
-    // For now, we'll just return information about the endpoint
-    console.log('Qboid integration configured. Endpoint URL:', 
-      'https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions');
-    
+    // For testing purposes, you can simulate a Qboid device sending data
+    // This can be useful to verify that your callback works correctly
+    setTimeout(() => {
+      console.log('Note: You can test this by sending a POST request to the endpoint with this data:');
+      console.log(JSON.stringify({
+        length: 12.5,
+        width: 8.75,
+        height: 6.25,
+        weight: 32,
+        orderId: "TEST-123"
+      }));
+      
+      console.log('Using curl:');
+      console.log(`curl -X POST ${QBOID_ENDPOINT_URL} -H "Content-Type: application/json" -d '{"length": 12.5, "width": 8.75, "height": 6.25, "weight": 32, "orderId": "TEST-123"}'`);
+    }, 1000);
+
+    // Return the information needed to configure the Qboid scanner
     return {
-      endpointUrl: 'https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions',
+      endpointUrl: QBOID_ENDPOINT_URL,
       configureScanner: () => {
         console.log('Configure your Qboid scanner with the following settings:');
-        console.log('1. Endpoint URL: https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions');
+        console.log('1. Endpoint URL:', QBOID_ENDPOINT_URL);
         console.log('2. Method: POST');
         console.log('3. Content-Type: application/json');
         console.log('4. Body format: { "length": number, "width": number, "height": number, "weight": number, "orderId": "optional" }');

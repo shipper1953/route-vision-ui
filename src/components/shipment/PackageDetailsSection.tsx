@@ -19,22 +19,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { ShipmentForm } from "@/types/shipment";
 import { Button } from "@/components/ui/button";
-import { ScanText, Wifi } from "lucide-react";
+import { ScanText, Wifi, WifiOff, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { listenForQboidData } from "@/services/easypost";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Badge } from "@/components/ui/badge";
 
 export const PackageDetailsSection = () => {
   const form = useFormContext<ShipmentForm>();
   const [configuring, setConfiguring] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [lastUpdateTime, setLastUpdateTime] = useState<string | null>(null);
   
   const handleConfigureQboid = async () => {
     try {
       setConfiguring(true);
+      setConnectionStatus('connecting');
       
       // Get the configuration info - await the Promise
       const qboidInfo = await listenForQboidData((dimensions) => {
         // This callback would be called when new dimensions are received
+        console.log("Received dimensions from Qboid:", dimensions);
         form.setValue("length", dimensions.length);
         form.setValue("width", dimensions.width);
         form.setValue("height", dimensions.height);
@@ -44,6 +49,8 @@ export const PackageDetailsSection = () => {
           form.setValue("orderId", dimensions.orderId);
         }
         
+        setConnectionStatus('connected');
+        setLastUpdateTime(new Date().toLocaleTimeString());
         toast.success("Package dimensions updated from Qboid scanner");
       });
       
@@ -59,23 +66,54 @@ export const PackageDetailsSection = () => {
             <p className="mt-1 font-mono text-xs bg-slate-100 p-2 rounded overflow-auto">
               {`{ "length": 12, "width": 8, "height": 6, "weight": 32 }`}
             </p>
+            <p className="mt-2 text-blue-600">
+              Make sure your Qboid device is on the same network as this computer.
+            </p>
           </div>
         ),
-        duration: 10000,
+        duration: 0, // Keep it visible until dismissed
       });
     } catch (error) {
       console.error("Error configuring Qboid:", error);
       toast.error("Failed to configure Qboid integration");
+      setConnectionStatus('disconnected');
     } finally {
       setConfiguring(false);
     }
   };
   
+  // Reset connection status when unmounting
+  useEffect(() => {
+    return () => {
+      setConnectionStatus('disconnected');
+    };
+  }, []);
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Package Details</CardTitle>
-        <CardDescription>Enter the package dimensions and weight</CardDescription>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>Package Details</CardTitle>
+            <CardDescription>Enter the package dimensions and weight</CardDescription>
+          </div>
+          {connectionStatus !== 'disconnected' && (
+            <Badge 
+              variant={connectionStatus === 'connected' ? "success" : "outline"}
+              className={`${connectionStatus === 'connected' ? 'bg-green-500 hover:bg-green-600' : 'bg-amber-500 hover:bg-amber-600'} flex items-center gap-1`}
+            >
+              {connectionStatus === 'connected' ? (
+                <>
+                  <Check className="h-3 w-3" /> Qboid Connected
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-3 w-3" /> Awaiting Data
+                </>
+              )}
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -159,6 +197,15 @@ export const PackageDetailsSection = () => {
           <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-md">
             <p className="text-sm text-blue-800">
               Package data populated from Qboid scanning system for order #{form.getValues("orderId")}
+              {lastUpdateTime && <span className="ml-2 text-xs text-slate-500">(Last updated: {lastUpdateTime})</span>}
+            </p>
+          </div>
+        )}
+
+        {connectionStatus === 'connected' && !form.getValues("orderId") && lastUpdateTime && (
+          <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-md">
+            <p className="text-sm text-green-800">
+              Package dimensions received from Qboid at {lastUpdateTime}
             </p>
           </div>
         )}
@@ -169,11 +216,24 @@ export const PackageDetailsSection = () => {
           type="button" 
           onClick={handleConfigureQboid}
           variant="outline"
-          className="flex items-center gap-2 mt-2"
+          className={`flex items-center gap-2 mt-2 ${connectionStatus === 'connected' ? 'bg-green-50' : ''}`}
           disabled={configuring}
         >
-          <Wifi className="h-4 w-4" />
-          <span>{configuring ? "Configuring..." : "Configure Qboid WiFi API"}</span>
+          {connectionStatus === 'disconnected' ? (
+            <WifiOff className="h-4 w-4" />
+          ) : (
+            <Wifi className="h-4 w-4" />
+          )}
+          <span>
+            {configuring 
+              ? "Configuring..." 
+              : connectionStatus === 'connected' 
+                ? "Qboid Connected" 
+                : connectionStatus === 'connecting' 
+                  ? "Awaiting Connection" 
+                  : "Configure Qboid WiFi API"
+            }
+          </span>
         </Button>
       </CardFooter>
     </Card>
