@@ -1,9 +1,10 @@
 
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
+import { ConnectionStatus } from "./useQboidConnection";
 
 interface PackageStatusMessageProps {
-  connectionStatus: 'disconnected' | 'connecting' | 'connected';
+  connectionStatus: ConnectionStatus;
   lastUpdateTime: string | null;
 }
 
@@ -12,6 +13,17 @@ export const PackageStatusMessage = ({ connectionStatus, lastUpdateTime }: Packa
   
   // No message if no update time or not needed
   if (!lastUpdateTime) return null;
+  
+  // Error message
+  if (connectionStatus === 'error') {
+    return (
+      <div className="mt-6 p-3 bg-red-50 border border-red-200 rounded-md">
+        <p className="text-sm text-red-800">
+          Failed to connect to Qboid device. Please check your connection and try again.
+        </p>
+      </div>
+    );
+  }
   
   // Order ID specific message
   if (form.getValues("orderId")) {

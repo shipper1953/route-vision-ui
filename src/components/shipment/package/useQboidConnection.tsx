@@ -5,30 +5,38 @@ import { supabase } from "@/integrations/supabase/client";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 
-export type ConnectionStatus = "disconnected" | "connected" | "error";
+export type ConnectionStatus = "disconnected" | "connected" | "connecting" | "error";
 
 export function useQboidConnection() {
   const [configuring, setConfiguring] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
-  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
+  const [lastUpdateTime, setLastUpdateTime] = useState<string | null>(null);
   
   // Get the form context to update form values
   const form = useFormContext<ShipmentForm>();
   
-  // Simulate the Qboid connection
+  // Qboid WiFi API connection
   const handleConfigureQboid = async () => {
     try {
       setConfiguring(true);
+      setConnectionStatus("connecting");
       console.log("Configuring Qboid device...");
       
       // Simulate connection process
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Simulate successful connection
-      setConnectionStatus("connected");
-      setLastUpdateTime(new Date());
+      // In a real implementation, we would configure the device to send dimensions
+      // to our Supabase Edge Function endpoint
+      // The Qboid device would need to be configured with:
+      // - API endpoint: https://YOUR_SUPABASE_URL/functions/v1/qboid-dimensions
+      // - Authorization header: Bearer QBOID_API_TOKEN
       
-      // Simulate getting data from the device
+      // For the demo, simulate a successful connection
+      setConnectionStatus("connected");
+      const currentTime = new Date().toLocaleTimeString();
+      setLastUpdateTime(currentTime);
+      
+      // Simulate receiving data from the Qboid device
       const dimensions = {
         length: 12,
         width: 8,

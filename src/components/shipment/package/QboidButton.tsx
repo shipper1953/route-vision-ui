@@ -1,9 +1,10 @@
 
 import { Button } from "@/components/ui/button";
-import { Wifi, WifiOff } from "lucide-react";
+import { Wifi, WifiOff, AlertTriangle } from "lucide-react";
+import { ConnectionStatus } from "./useQboidConnection";
 
 interface QboidButtonProps {
-  connectionStatus: 'disconnected' | 'connecting' | 'connected';
+  connectionStatus: ConnectionStatus;
   configuring: boolean;
   onClick: () => void;
 }
@@ -13,14 +14,22 @@ export const QboidButton = ({ connectionStatus, configuring, onClick }: QboidBut
     <Button 
       type="button" 
       onClick={onClick}
-      variant={connectionStatus === 'connected' ? "success" : "outline"}
+      variant={connectionStatus === 'connected' ? "success" : 
+              connectionStatus === 'error' ? "destructive" : "outline"}
       className="flex items-center gap-2 mt-2"
       disabled={configuring}
     >
-      {connectionStatus === 'disconnected' ? (
+      {connectionStatus === 'disconnected' && (
         <WifiOff className="h-4 w-4" />
-      ) : (
+      )}
+      {connectionStatus === 'connected' && (
         <Wifi className="h-4 w-4" />
+      )}
+      {connectionStatus === 'error' && (
+        <AlertTriangle className="h-4 w-4" />
+      )}
+      {connectionStatus === 'connecting' && (
+        <Wifi className="h-4 w-4 animate-pulse" />
       )}
       <span>
         {configuring 
@@ -29,7 +38,9 @@ export const QboidButton = ({ connectionStatus, configuring, onClick }: QboidBut
             ? "Qboid Connected" 
             : connectionStatus === 'connecting' 
               ? "Awaiting Connection" 
-              : "Configure Qboid WiFi API"
+              : connectionStatus === 'error'
+                ? "Connection Error" 
+                : "Configure Qboid WiFi API"
         }
       </span>
     </Button>

@@ -28,7 +28,7 @@ export const PackageDetailsSection = () => {
         <div className="flex justify-between items-center">
           <div>
             <CardTitle>Package Details</CardTitle>
-            <CardDescription>Enter the package dimensions and weight</CardDescription>
+            <CardDescription>Enter the package dimensions and weight or connect a Qboid device</CardDescription>
           </div>
           <ConnectionStatusBadge connectionStatus={connectionStatus} />
         </div>

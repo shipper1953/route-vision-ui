@@ -10,12 +10,22 @@ const corsHeaders = {
 }
 
 interface QboidData {
-  orderId?: string;
-  barcode?: string;
-  length: number;
-  width: number;
-  height: number;
-  weight: number;
+  timestamp: string;       // Format: "YYYY/MM/DD HH:MM:SS"
+  l: number;               // Length in mm
+  w: number;               // Width in mm
+  h: number;               // Height in mm
+  weight?: number;         // Weight in grams
+  barcode?: string;        // Optional barcode
+  shape?: string;          // Shape description
+  device: string;          // Device ID
+  note?: string;           // Optional note
+  attributes?: {           // Optional attributes
+    [key: string]: string; 
+  };
+  image?: string;          // Optional base64 encoded image
+  imagecolor?: string;     // Optional base64 encoded color image
+  imageseg?: string;       // Optional base64 encoded segmented image
+  orderId?: string;        // Custom field: order ID reference
 }
 
 console.log('Qboid dimensions API endpoint loaded');
@@ -52,34 +62,58 @@ serve(async (req) => {
     const qboidData: QboidData = await req.json();
     console.log('Received Qboid data:', qboidData);
     
-    // Validate required fields
+    // Validate required fields according to Qboid WiFi API documentation
     if (!qboidData || 
-        typeof qboidData.length !== 'number' || 
-        typeof qboidData.width !== 'number' || 
-        typeof qboidData.height !== 'number' || 
-        typeof qboidData.weight !== 'number') {
+        typeof qboidData.l !== 'number' || 
+        typeof qboidData.w !== 'number' || 
+        typeof qboidData.h !== 'number' ||
+        !qboidData.device ||
+        !qboidData.timestamp) {
       console.error('Invalid Qboid data format');
       return new Response(JSON.stringify({ 
-        error: 'Invalid data format. Required fields: length, width, height, weight as numbers' 
+        error: 'Invalid data format. Required fields: l, w, h, device, timestamp' 
       }), {
         headers: corsHeaders,
         status: 400,
       })
     }
     
-    // If orderId or barcode is provided, we can associate the dimensions with a specific order
-    if (qboidData.orderId || qboidData.barcode) {
-      // Set up Supabase client
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-      )
+    // Set up Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+
+    // Convert mm to inches for compatibility with our system
+    const dimensions = {
+      length: parseFloat((qboidData.l / 25.4).toFixed(2)),  // mm to inches
+      width: parseFloat((qboidData.w / 25.4).toFixed(2)),   // mm to inches
+      height: parseFloat((qboidData.h / 25.4).toFixed(2)),  // mm to inches
+      weight: qboidData.weight ? parseFloat((qboidData.weight / 28.35).toFixed(2)) : null  // g to oz
+    };
       
-      // In a real implementation, we could store these dimensions in a temporary table
-      // associated with the order ID so they can be retrieved when the order is looked up
-      console.log('Order/barcode identified:', qboidData.orderId || qboidData.barcode);
+    // Store in database for future reference
+    try {
+      const { error: saveError } = await supabaseClient
+        .from('shipments')
+        .insert({
+          dimensions: dimensions,
+          weight: dimensions.weight,
+          created_at: new Date().toISOString(),
+          status: 'dimensions_captured',
+          order_id: qboidData.orderId ? parseInt(qboidData.orderId) : null,
+          barcode: qboidData.barcode || null,
+          easypost_id: null
+        });
       
-      // For now, we'll just acknowledge the data was received
+      if (saveError) {
+        console.error('Error saving dimensions to database:', saveError);
+      } else {
+        console.log('Dimensions saved successfully');
+      }
+    } catch (err) {
+      console.error('Failed to save dimensions:', err);
+      // Don't fail the request if we can't save to the database
     }
     
     // Return success response with the processed data
@@ -87,12 +121,10 @@ serve(async (req) => {
       success: true,
       message: 'Package dimensions received successfully',
       data: {
-        length: qboidData.length,
-        width: qboidData.width,
-        height: qboidData.height,
-        weight: qboidData.weight,
-        orderId: qboidData.orderId || null,
+        dimensions: dimensions,
+        timestamp: qboidData.timestamp,
         barcode: qboidData.barcode || null,
+        orderId: qboidData.orderId || null,
       }
     }), {
       headers: corsHeaders,
