@@ -1,3 +1,4 @@
+
 import { EasyPostService } from "@/services/easypostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
@@ -118,10 +119,10 @@ export class RealEasyPostService implements EasyPostService {
       shipmentData.options.smartrate_accuracy = shipmentData.options.smartrate_accuracy || 'percentile_95';
       
       if (this.useEdgeFunctions) {
-        // Use Edge Function if no API key is available in the client
+        // Use Edge Function without any authorization headers
+        // This function has verify_jwt = false in config.toml
         const { data, error } = await supabase.functions.invoke('create-shipment', {
           body: { shipmentData }
-          // We're removing the Auth headers because we're setting the function to not verify JWT
         });
         
         if (error) {

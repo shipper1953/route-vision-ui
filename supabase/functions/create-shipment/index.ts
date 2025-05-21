@@ -21,7 +21,7 @@ serve(async (req) => {
   }
 
   try {
-    // Set up Supabase client with auth context from request
+    // We removed authorization requirements since verify_jwt is false for this function
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -41,6 +41,14 @@ serve(async (req) => {
     
     console.log('Creating shipment with data:', JSON.stringify(shipmentData, null, 2))
     
+    if (!easyPostApiKey) {
+      console.error('EasyPost API key is not configured in environment variables');
+      return new Response(
+        JSON.stringify({ error: 'EasyPost API key is not available. Please configure it in Supabase Secrets.' }), 
+        { headers: corsHeaders, status: 500 }
+      );
+    }
+    
     const response = await fetch('https://api.easypost.com/v2/shipments', {
       method: 'POST',
       headers: {
@@ -52,7 +60,7 @@ serve(async (req) => {
     
     if (!response.ok) {
       const errorData = await response.json()
-      console.error('EasyPost API error:', errorData)
+      console.error('EasyPost API error:', JSON.stringify(errorData, null, 2))
       return new Response(JSON.stringify({
         error: 'EasyPost API error',
         details: errorData
@@ -92,7 +100,7 @@ serve(async (req) => {
       console.error('Error when trying to save shipment:', saveErr);
     }
     
-    // Return the EasyPost response
+    // Return the EasyPost response with proper CORS headers
     return new Response(JSON.stringify(shipmentResponse), { headers: corsHeaders })
     
   } catch (err) {
