@@ -43,10 +43,10 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
         console.log("Auto-searching after debounce:", searchQuery);
         handleSearch();
       }
-    }, 500);
+    }, 800); // Increased debounce time to reduce API calls
     
     return () => clearTimeout(delaySearch);
-  }, [searchQuery, isOpen, isLoading]);
+  }, [searchQuery, isOpen, isLoading, handleSearch]);
 
   const onSelectAddress = async (address: any) => {
     console.log('Address selected in AddressLookup:', address);

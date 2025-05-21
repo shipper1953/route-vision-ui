@@ -23,11 +23,15 @@ export const AddressSearchInput = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch();
+    
+    if (searchQuery.length >= 3) {
+      console.log(`Submitting search for: ${searchQuery}`);
+      onSearch();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && searchQuery.length >= 3) {
       onSearch();
     }
   };

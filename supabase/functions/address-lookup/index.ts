@@ -42,8 +42,8 @@ serve(async (req) => {
     url.searchParams.append('format', 'json');
     url.searchParams.append('limit', '5');
     
-    // Fix: Using the correct type values for Geoapify API
-    url.searchParams.append('type', 'street,city,postcode,amenity');
+    // Fix: Using the correct type values for Geoapify API - important to use only valid values
+    url.searchParams.append('type', 'street,city,postcode');
     
     console.log('Calling Geoapify API with URL:', url.toString().replace(apiKey, '[REDACTED]'));
     
