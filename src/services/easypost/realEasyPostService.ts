@@ -1,6 +1,7 @@
 
 import { EasyPostService } from "@/services/easypostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Implementation of the EasyPost service that uses the real EasyPost API
@@ -8,6 +9,7 @@ import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse }
 export class RealEasyPostService implements EasyPostService {
   private apiKey: string;
   private baseUrl = "https://api.easypost.com/v2";
+  private useEdgeFunctions: boolean;
   
   /**
    * Creates a new instance of the RealEasyPostService
@@ -15,7 +17,13 @@ export class RealEasyPostService implements EasyPostService {
    */
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    console.info('Using live EasyPost API');
+    this.useEdgeFunctions = !apiKey;
+    
+    if (this.apiKey) {
+      console.log('Using direct EasyPost API connection');
+    } else {
+      console.log('Using Supabase Edge Functions for EasyPost operations');
+    }
   }
   
   /**
@@ -27,6 +35,20 @@ export class RealEasyPostService implements EasyPostService {
     try {
       console.log('Verifying address with EasyPost:', address);
       
+      if (this.useEdgeFunctions) {
+        // Use Edge Function if no API key is available in the client
+        const { data, error } = await supabase.functions.invoke('verify-address', {
+          body: { address }
+        });
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        return data;
+      }
+      
+      // Direct API call if API key is available
       const response = await fetch(`${this.baseUrl}/addresses`, {
         method: 'POST',
         headers: {
@@ -88,6 +110,19 @@ export class RealEasyPostService implements EasyPostService {
     try {
       console.log('Creating shipment with data:', shipmentData);
       
+      if (this.useEdgeFunctions) {
+        // Use Edge Function if no API key is available in the client
+        const { data, error } = await supabase.functions.invoke('create-shipment', {
+          body: { shipmentData }
+        });
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        return data;
+      }
+      
       // Add SmartRate options if not already present
       const options = shipmentData.options || {};
       options.smartrate_accuracy = options.smartrate_accuracy || 'percentile_95';
@@ -131,6 +166,19 @@ export class RealEasyPostService implements EasyPostService {
   async purchaseLabel(shipmentId: string, rateId: string): Promise<any> {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`);
+      
+      if (this.useEdgeFunctions) {
+        // Use Edge Function if no API key is available in the client
+        const { data, error } = await supabase.functions.invoke('purchase-label', {
+          body: { shipmentId, rateId }
+        });
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        return data;
+      }
       
       const response = await fetch(`${this.baseUrl}/shipments/${shipmentId}/buy`, {
         method: 'POST',

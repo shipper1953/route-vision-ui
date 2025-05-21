@@ -15,7 +15,10 @@ export type Database = {
           customer: string | null
           id: number
           items: number | null
+          order_total: number | null
+          payment_status: string | null
           required_delivery: string | null
+          shipping_address: string | null
           status: string | null
         }
         Insert: {
@@ -23,7 +26,10 @@ export type Database = {
           customer?: string | null
           id?: number
           items?: number | null
+          order_total?: number | null
+          payment_status?: string | null
           required_delivery?: string | null
+          shipping_address?: string | null
           status?: string | null
         }
         Update: {
@@ -31,7 +37,10 @@ export type Database = {
           customer?: string | null
           id?: number
           items?: number | null
+          order_total?: number | null
+          payment_status?: string | null
           required_delivery?: string | null
+          shipping_address?: string | null
           status?: string | null
         }
         Relationships: []
