@@ -36,6 +36,18 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     console.log(`AddressLookup component mounted for ${type} address`);
   }, [type]);
 
+  // Automatically search if the user has typed more than 3 characters
+  useEffect(() => {
+    const delaySearch = setTimeout(() => {
+      if (searchQuery.length >= 3 && isOpen && !isLoading) {
+        console.log("Auto-searching after debounce:", searchQuery);
+        handleSearch();
+      }
+    }, 500);
+    
+    return () => clearTimeout(delaySearch);
+  }, [searchQuery, isOpen, isLoading]);
+
   const onSelectAddress = async (address: any) => {
     console.log('Address selected in AddressLookup:', address);
     const success = await handleSelectAddress(address);
@@ -54,6 +66,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
             className="w-full flex justify-between items-center"
             onClick={() => {
               console.log(`AddressLookup button clicked for ${type}`);
+              setSearchQuery(""); // Clear previous search
               setIsOpen(true);
             }}
           >

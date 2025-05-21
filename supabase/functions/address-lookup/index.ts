@@ -41,7 +41,9 @@ serve(async (req) => {
     url.searchParams.append('apiKey', apiKey);
     url.searchParams.append('format', 'json');
     url.searchParams.append('limit', '5');
-    url.searchParams.append('type', 'amenity,street,address');
+    
+    // Fix: Using the correct type values for Geoapify API
+    url.searchParams.append('type', 'street,city,postcode,amenity');
     
     console.log('Calling Geoapify API with URL:', url.toString().replace(apiKey, '[REDACTED]'));
     
@@ -51,7 +53,7 @@ serve(async (req) => {
       const errorText = await response.text();
       console.error(`Geoapify API error: ${response.status}`, errorText);
       return new Response(
-        JSON.stringify({ error: `Geoapify API error: ${response.status}` }),
+        JSON.stringify({ error: `Geoapify API error: ${response.status}`, details: errorText }),
         { headers: corsHeaders, status: response.status }
       );
     }

@@ -1,5 +1,5 @@
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +19,17 @@ export const AddressSearchInput = ({
   isLoading
 }: AddressSearchInputProps) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [hasFocus, setHasFocus] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSearch();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      onSearch();
+    }
   };
 
   return (
@@ -32,12 +39,16 @@ export const AddressSearchInput = ({
         placeholder="Enter street, city, or zip..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="flex-1"
+        onKeyDown={handleKeyDown}
+        onFocus={() => setHasFocus(true)}
+        onBlur={() => setHasFocus(false)}
+        className={`flex-1 ${hasFocus ? 'border-primary' : ''}`}
         autoFocus
       />
       <Button 
         type="submit"
         disabled={searchQuery.length < 3 || isLoading}
+        className="bg-tms-blue hover:bg-tms-blue-600"
       >
         {isLoading ? (
           <LoadingSpinner size={16} />
