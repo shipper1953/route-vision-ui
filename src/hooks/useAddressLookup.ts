@@ -7,7 +7,6 @@ import { ShipmentForm } from "@/types/shipment";
 import easyPostService from "@/services/easypost";
 
 export const useAddressLookup = (type: "from" | "to") => {
-  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   
   const form = useFormContext<ShipmentForm>();
@@ -75,8 +74,6 @@ export const useAddressLookup = (type: "from" | "to") => {
   };
 
   return {
-    searchQuery,
-    setSearchQuery,
     isLoading,
     handleSelectAddress
   };

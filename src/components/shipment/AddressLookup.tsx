@@ -10,10 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAddressLookup } from "@/hooks/useAddressLookup";
-import { GeoapifyContext, GeoapifyGeocoderAutocomplete } from '@geoapify/react-geocoder-autocomplete';
-
-// Custom styles for the geocoder autocomplete
-import "@/styles/geocoder.css";
+import { GooglePlacesAutocomplete } from "./address/GooglePlacesAutocomplete";
 
 interface AddressLookupProps {
   type: "from" | "to";
@@ -24,8 +21,6 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   const [isOpen, setIsOpen] = useState(false);
   
   const {
-    searchQuery,
-    setSearchQuery,
     isLoading,
     handleSelectAddress
   } = useAddressLookup(type);
@@ -34,44 +29,6 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   useEffect(() => {
     console.log(`AddressLookup component mounted for ${type} address`);
   }, [type]);
-
-  const onPlaceSelect = async (place: any) => {
-    if (!place) return;
-    
-    console.log('Place selected:', place);
-    
-    // Transform the Geoapify place object to our address format with improved mapping
-    const address = {
-      // Extract actual street address from the properties
-      street1: place.properties.street ? 
-        `${place.properties.housenumber || ''} ${place.properties.street}`.trim() : 
-        place.properties.formatted?.split(',')[0] || '',
-      street2: '', // Initialize as empty string
-      city: place.properties.city || place.properties.county || '',
-      state: place.properties.state || place.properties.state_code || '',
-      zip: place.properties.postcode || '',
-      country: place.properties.country_code?.toUpperCase() || 'US',
-      company: '',
-      name: '',
-      phone: '',
-      email: '',
-    };
-
-    console.log('Transformed address:', address);
-
-    const success = await handleSelectAddress(address);
-    if (success) {
-      setIsOpen(false);
-      toast.success("Address selected successfully");
-    }
-  };
-
-  const onSuggestionChange = (suggestions: any) => {
-    console.log('Suggestions changed:', suggestions?.length || 0, 'results found');
-  };
-
-  // Get Geoapify API key 
-  const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY || "274bcb0749944615912f9997d5c49105";
 
   return (
     <div className={cn("mb-4", className)}>
@@ -93,21 +50,17 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
           <div className="space-y-4">
             <h4 className="font-medium">Find Address</h4>
             
-            <GeoapifyContext apiKey={apiKey}>
-              <GeoapifyGeocoderAutocomplete
-                placeholder="Enter address to search..."
-                type="street"
-                position={{
-                  lat: 37.7749,
-                  lon: -122.4194
-                }}
-                countryCodes={['us']}
-                limit={10}
-                placeSelect={onPlaceSelect}
-                suggestionsChange={onSuggestionChange}
-                debounceDelay={300}
-              />
-            </GeoapifyContext>
+            <GooglePlacesAutocomplete
+              placeholder="Enter address to search..."
+              onAddressSelected={async (address) => {
+                const success = await handleSelectAddress(address);
+                if (success) {
+                  setIsOpen(false);
+                  toast.success("Address selected successfully");
+                }
+              }}
+              isLoading={isLoading}
+            />
             
             <div className="text-xs text-muted-foreground border-t pt-2 mt-2">
               Search for an address to auto-fill the form

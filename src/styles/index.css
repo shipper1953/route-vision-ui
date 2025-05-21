@@ -1,3 +1,2 @@
 
-/* Import geocoder styles */
-@import './geocoder.css';
+/* No need for geocoder styles with Google Places */
