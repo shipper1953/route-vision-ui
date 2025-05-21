@@ -42,11 +42,11 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     
     // Transform the Geoapify place object to our address format with improved mapping
     const address = {
-      // Extract actual street address rather than using the formatted address for street1
-      street1: place.properties.housenumber ? 
-        `${place.properties.housenumber} ${place.properties.street || ''}`.trim() : 
-        place.properties.street || '',
-      street2: place.properties.address_line2 || '', // Don't use country for street2
+      // Extract actual street address from the properties
+      street1: place.properties.street ? 
+        `${place.properties.housenumber || ''} ${place.properties.street}`.trim() : 
+        place.properties.formatted?.split(',')[0] || '',
+      street2: '', // Initialize as empty string
       city: place.properties.city || place.properties.county || '',
       state: place.properties.state || place.properties.state_code || '',
       zip: place.properties.postcode || '',
@@ -96,12 +96,12 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
             <GeoapifyContext apiKey={apiKey}>
               <GeoapifyGeocoderAutocomplete
                 placeholder="Enter address to search..."
-                type="city"
-                filterByCountryCode={['us', 'ca', 'gb', 'au']} 
-                position={{
+                type="street"
+                biasByLocation={{
                   lat: 37.7749,
                   lon: -122.4194
                 }}
+                filterByCountryCode={['us', 'ca', 'gb', 'au']}
                 limit={10}
                 placeSelect={onPlaceSelect}
                 suggestionsChange={onSuggestionChange}
