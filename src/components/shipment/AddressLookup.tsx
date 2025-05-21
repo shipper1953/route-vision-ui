@@ -40,11 +40,13 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     
     console.log('Place selected:', place);
     
-    // Transform the Geoapify place object to our address format
+    // Transform the Geoapify place object to our address format with improved mapping
     const address = {
-      street1: place.properties.address_line1 || 
-        `${place.properties.housenumber || ''} ${place.properties.street || ''}`.trim(),
-      street2: place.properties.address_line2 || '',
+      // Extract actual street address rather than using the formatted address for street1
+      street1: place.properties.housenumber ? 
+        `${place.properties.housenumber} ${place.properties.street || ''}`.trim() : 
+        place.properties.street || '',
+      street2: place.properties.address_line2 || '', // Don't use country for street2
       city: place.properties.city || place.properties.county || '',
       state: place.properties.state || place.properties.state_code || '',
       zip: place.properties.postcode || '',
@@ -54,6 +56,8 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
       phone: '',
       email: '',
     };
+
+    console.log('Transformed address:', address);
 
     const success = await handleSelectAddress(address);
     if (success) {
