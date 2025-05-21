@@ -22,27 +22,37 @@ import { Button } from "@/components/ui/button";
 import { ScanText, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { listenForQboidData } from "@/services/easypost";
+import { useState } from "react";
 
 export const PackageDetailsSection = () => {
   const form = useFormContext<ShipmentForm>();
+  const [configuring, setConfiguring] = useState(false);
   
-  const handleConfigureQboid = () => {
+  const handleConfigureQboid = async () => {
     try {
-      const qboidInfo = listenForQboidData((dimensions) => {
+      setConfiguring(true);
+      
+      // Get the configuration info - await the Promise
+      const qboidInfo = await listenForQboidData((dimensions) => {
         // This callback would be called when new dimensions are received
         form.setValue("length", dimensions.length);
         form.setValue("width", dimensions.width);
         form.setValue("height", dimensions.height);
         form.setValue("weight", dimensions.weight);
         
+        if (dimensions.orderId) {
+          form.setValue("orderId", dimensions.orderId);
+        }
+        
         toast.success("Package dimensions updated from Qboid scanner");
       });
       
+      // Now we can safely access endpointUrl since we've awaited the Promise
       toast.info("Qboid Integration Info", {
         description: (
           <div className="mt-2 text-sm">
             <p className="font-semibold">Configure your Qboid with this endpoint:</p>
-            <p className="mt-1 font-mono text-xs bg-slate-100 p-2 rounded">
+            <p className="mt-1 font-mono text-xs bg-slate-100 p-2 rounded overflow-auto">
               {qboidInfo.endpointUrl}
             </p>
             <p className="mt-2">Use POST method with JSON body containing:</p>
@@ -56,6 +66,8 @@ export const PackageDetailsSection = () => {
     } catch (error) {
       console.error("Error configuring Qboid:", error);
       toast.error("Failed to configure Qboid integration");
+    } finally {
+      setConfiguring(false);
     }
   };
   
@@ -158,9 +170,10 @@ export const PackageDetailsSection = () => {
           onClick={handleConfigureQboid}
           variant="outline"
           className="flex items-center gap-2 mt-2"
+          disabled={configuring}
         >
           <Wifi className="h-4 w-4" />
-          <span>Configure Qboid WiFi API</span>
+          <span>{configuring ? "Configuring..." : "Configure Qboid WiFi API"}</span>
         </Button>
       </CardFooter>
     </Card>
