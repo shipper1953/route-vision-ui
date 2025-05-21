@@ -11,7 +11,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAddressLookup } from "@/hooks/useAddressLookup";
 import { GeoapifyContext, GeoapifyGeocoderAutocomplete } from '@geoapify/react-geocoder-autocomplete';
-import '@geoapify/geocoder-autocomplete/styles/minimal.css';
+
+// Custom styles for the geocoder autocomplete
+import "@/styles/geocoder.css";
 
 interface AddressLookupProps {
   type: "from" | "to";
