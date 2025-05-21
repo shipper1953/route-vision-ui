@@ -97,11 +97,11 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
               <GeoapifyGeocoderAutocomplete
                 placeholder="Enter address to search..."
                 type="street"
-                biasByLocation={{
+                position={{
                   lat: 37.7749,
                   lon: -122.4194
                 }}
-                filterByCountryCode={['us', 'ca', 'gb', 'au']}
+                countryCodes={['us']}
                 limit={10}
                 placeSelect={onPlaceSelect}
                 suggestionsChange={onSuggestionChange}
