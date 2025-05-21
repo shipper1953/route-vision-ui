@@ -1,4 +1,3 @@
-
 import { useFormContext } from "react-hook-form";
 import { 
   Card, 
@@ -99,7 +98,7 @@ export const PackageDetailsSection = () => {
           </div>
           {connectionStatus !== 'disconnected' && (
             <Badge 
-              variant={connectionStatus === 'connected' ? "success" : "outline"}
+              variant={connectionStatus === 'connected' ? "default" : "outline"}
               className={`${connectionStatus === 'connected' ? 'bg-green-500 hover:bg-green-600' : 'bg-amber-500 hover:bg-amber-600'} flex items-center gap-1`}
             >
               {connectionStatus === 'connected' ? (
@@ -215,8 +214,8 @@ export const PackageDetailsSection = () => {
         <Button 
           type="button" 
           onClick={handleConfigureQboid}
-          variant="outline"
-          className={`flex items-center gap-2 mt-2 ${connectionStatus === 'connected' ? 'bg-green-50' : ''}`}
+          variant={connectionStatus === 'connected' ? "success" : "outline"}
+          className="flex items-center gap-2 mt-2"
           disabled={configuring}
         >
           {connectionStatus === 'disconnected' ? (
