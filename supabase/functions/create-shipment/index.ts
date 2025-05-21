@@ -20,14 +20,14 @@ serve(async (req) => {
     })
   }
 
-  // Set up Supabase client with auth context from request
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-  )
-  
   try {
+    // Set up Supabase client with auth context from request
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization') || '' } } }
+    )
+    
     const { shipmentData } = await req.json()
     
     // Ensure we have options

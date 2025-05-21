@@ -1,4 +1,3 @@
-
 import { EasyPostService } from "@/services/easypostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
@@ -121,16 +120,13 @@ export class RealEasyPostService implements EasyPostService {
       if (this.useEdgeFunctions) {
         // Use Edge Function if no API key is available in the client
         const { data, error } = await supabase.functions.invoke('create-shipment', {
-          body: { shipmentData },
-          // Ensure auth is forwarded to the Edge Function
-          headers: { 
-            'Content-Type': 'application/json',
-          }
+          body: { shipmentData }
+          // We're removing the Auth headers because we're setting the function to not verify JWT
         });
         
         if (error) {
           console.error('Edge Function error:', error);
-          throw new Error(error.message || 'Failed to send a request to the Edge Function');
+          throw new Error(error.message || 'Edge Function returned a non-2xx status code');
         }
         
         return data;
