@@ -4,50 +4,14 @@ import { toast } from "sonner";
 import { useFormContext } from "react-hook-form";
 import { Address } from "@/types/easypost";
 import { ShipmentForm } from "@/types/shipment";
-import geoapifyService from "@/services/geoapify/geoapifyService";
 import easyPostService from "@/services/easypost";
 
 export const useAddressLookup = (type: "from" | "to") => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [results, setResults] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
   
   const form = useFormContext<ShipmentForm>();
   const prefix = type;
-
-  const handleSearch = async () => {
-    if (searchQuery.length < 3) {
-      toast.warning("Please enter at least 3 characters to search");
-      return;
-    }
-    
-    setIsLoading(true);
-    setResults([]);
-    setSearchError(null);
-    
-    try {
-      console.log('Starting address lookup with query:', searchQuery);
-      
-      // Use Geoapify service for address lookup
-      const addresses = await geoapifyService.searchAddresses(searchQuery);
-      
-      console.log('Address lookup results:', addresses);
-      setResults(addresses);
-      
-      if (addresses.length === 0) {
-        // Handle no results more gracefully
-        setSearchError("No addresses found. Try adjusting your search term.");
-        toast.info("No addresses found. Try entering a more specific address.");
-      }
-    } catch (error: any) {
-      console.error("Error looking up address:", error);
-      setSearchError("Failed to look up address. Please try again.");
-      toast.error("Address lookup service temporarily unavailable. Please try again later.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSelectAddress = async (address: Address) => {
     try {
@@ -113,10 +77,7 @@ export const useAddressLookup = (type: "from" | "to") => {
   return {
     searchQuery,
     setSearchQuery,
-    results,
     isLoading,
-    searchError,
-    handleSearch,
     handleSelectAddress
   };
 };

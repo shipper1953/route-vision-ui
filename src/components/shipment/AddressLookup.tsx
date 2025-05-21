@@ -10,8 +10,8 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAddressLookup } from "@/hooks/useAddressLookup";
-import { AddressSearchInput } from "./address/AddressSearchInput";
-import { AddressResultsList } from "./address/AddressResultsList";
+import { GeoapifyContext, GeoapifyGeocoderAutocomplete } from '@geoapify/react-geocoder-autocomplete';
+import '@geoapify/geocoder-autocomplete/styles/minimal.css';
 
 interface AddressLookupProps {
   type: "from" | "to";
@@ -24,10 +24,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   const {
     searchQuery,
     setSearchQuery,
-    results,
     isLoading,
-    searchError,
-    handleSearch,
     handleSelectAddress
   } = useAddressLookup(type);
 
@@ -36,26 +33,39 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     console.log(`AddressLookup component mounted for ${type} address`);
   }, [type]);
 
-  // Automatically search if the user has typed more than 3 characters
-  useEffect(() => {
-    const delaySearch = setTimeout(() => {
-      if (searchQuery.length >= 3 && isOpen && !isLoading) {
-        console.log("Auto-searching after debounce:", searchQuery);
-        handleSearch();
-      }
-    }, 1500); // 1.5 second debounce time
+  const onPlaceSelect = async (place: any) => {
+    if (!place) return;
     
-    return () => clearTimeout(delaySearch);
-  }, [searchQuery, isOpen, isLoading, handleSearch]);
+    console.log('Place selected:', place);
+    
+    // Transform the Geoapify place object to our address format
+    const address = {
+      street1: place.properties.address_line1 || 
+        `${place.properties.housenumber || ''} ${place.properties.street || ''}`.trim(),
+      street2: place.properties.address_line2 || '',
+      city: place.properties.city || place.properties.county || '',
+      state: place.properties.state || place.properties.state_code || '',
+      zip: place.properties.postcode || '',
+      country: place.properties.country_code?.toUpperCase() || 'US',
+      company: '',
+      name: '',
+      phone: '',
+      email: '',
+    };
 
-  const onSelectAddress = async (address: any) => {
-    console.log('Address selected in AddressLookup:', address);
     const success = await handleSelectAddress(address);
     if (success) {
       setIsOpen(false);
       toast.success("Address selected successfully");
     }
   };
+
+  const onSuggestionChange = (suggestions: any) => {
+    console.log('Suggestions changed:', suggestions);
+  };
+
+  // Get Geoapify API key 
+  const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY || "274bcb0749944615912f9997d5c49105";
 
   return (
     <div className={cn("mb-4", className)}>
@@ -66,7 +76,6 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
             className="w-full flex justify-between items-center"
             onClick={() => {
               console.log(`AddressLookup button clicked for ${type}`);
-              setSearchQuery(""); // Clear previous search
               setIsOpen(true);
             }}
           >
@@ -74,22 +83,20 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
             <Search className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-80 p-0" align="start">
-          <div className="p-4 space-y-4">
-            <AddressSearchInput
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              onSearch={handleSearch}
-              isLoading={isLoading}
-            />
+        <PopoverContent className="w-[400px] p-4" align="start">
+          <div className="space-y-4">
+            <h4 className="font-medium">Find Address</h4>
             
-            <AddressResultsList
-              results={results}
-              onSelectAddress={onSelectAddress}
-              isLoading={isLoading}
-              searchError={searchError}
-              searchQuery={searchQuery}
-            />
+            <GeoapifyContext apiKey={apiKey}>
+              <GeoapifyGeocoderAutocomplete
+                placeholder="Enter address to search..."
+                type="street"
+                limit={5}
+                placeSelect={onPlaceSelect}
+                suggestionsChange={onSuggestionChange}
+                debounceDelay={500}
+              />
+            </GeoapifyContext>
             
             <div className="text-xs text-muted-foreground border-t pt-2 mt-2">
               Search for an address to auto-fill the form
