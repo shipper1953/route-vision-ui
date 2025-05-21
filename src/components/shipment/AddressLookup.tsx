@@ -43,7 +43,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
         console.log("Auto-searching after debounce:", searchQuery);
         handleSearch();
       }
-    }, 1500); // Increased debounce time to reduce API calls and allow for more complete typing
+    }, 1500); // 1.5 second debounce time
     
     return () => clearTimeout(delaySearch);
   }, [searchQuery, isOpen, isLoading, handleSearch]);

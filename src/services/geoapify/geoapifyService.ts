@@ -1,17 +1,19 @@
 
 import { Address } from "@/types/easypost";
-import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Service for interacting with Geoapify API for address lookup and autocomplete
- * Uses a Supabase Edge Function to securely handle API keys
  */
 export class GeoapifyService {
+  private apiKey: string;
+  
   /**
    * Creates a new instance of the GeoapifyService
    */
   constructor() {
-    console.log('Initializing Geoapify service through Supabase Edge Function');
+    // Get the API key from environment variables
+    this.apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY || "274bcb0749944615912f9997d5c49105";
+    console.log('Initializing Geoapify service with API key');
   }
 
   /**
@@ -28,18 +30,26 @@ export class GeoapifyService {
         return [];
       }
       
-      // Call our Supabase Edge Function
-      console.log('Invoking address-lookup function with query:', query);
-      const { data, error } = await supabase.functions.invoke('address-lookup', {
-        body: { query }
-      });
+      // Call the Geoapify API directly
+      const url = new URL('https://api.geoapify.com/v1/geocode/autocomplete');
+      url.searchParams.append('text', query);
+      url.searchParams.append('apiKey', this.apiKey);
+      url.searchParams.append('format', 'json');
+      url.searchParams.append('limit', '5');
+      url.searchParams.append('type', 'street');
       
-      if (error) {
-        console.error('Error calling address-lookup function:', error);
-        throw new Error(`Address lookup failed: ${error.message}`);
+      console.log('Calling Geoapify API directly');
+      
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Geoapify API error: ${response.status}`, errorText);
+        throw new Error(`Geoapify API error: ${response.status}`);
       }
       
-      console.log('Address lookup response received:', data);
+      const data = await response.json();
+      console.log('Geoapify API response received:', data);
       
       // Transform Geoapify response to our Address format
       if (!data?.results || !Array.isArray(data.results) || data.results.length === 0) {
@@ -83,13 +93,16 @@ export class GeoapifyService {
         };
       }
       
+      const properties = result.properties || {};
+      
       // Extract address components from the Geoapify response format
-      const street1 = result.address_line1 || '';
-      const street2 = result.address_line2 || '';
-      const city = result.city || result.county || '';
-      const state = result.state || result.state_code || '';
-      const zip = result.postcode || result.zip || '';
-      const country = result.country_code?.toUpperCase() || 'US';
+      const street1 = properties.address_line1 || 
+        `${properties.housenumber || ''} ${properties.street || ''}`.trim();
+      const street2 = properties.address_line2 || '';
+      const city = properties.city || properties.county || '';
+      const state = properties.state || properties.state_code || '';
+      const zip = properties.postcode || properties.zip || '';
+      const country = properties.country_code?.toUpperCase() || 'US';
       
       return {
         street1,
