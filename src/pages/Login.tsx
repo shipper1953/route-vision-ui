@@ -42,11 +42,11 @@ const Login = () => {
     <div className="flex min-h-screen w-full">
       {/* Left side (dark navy section) */}
       <div className="hidden md:flex md:w-1/2 bg-tms-navy flex-col justify-center items-center p-12">
-        <div className="mb-24">
+        <div className="mb-24 flex items-center gap-4">
           <ShipTornadoLogo size={64} className="text-white" spin={true} />
+          <h1 className="text-4xl font-bold text-white">Ship Tornado</h1>
         </div>
         <div className="text-white max-w-md">
-          <h1 className="text-4xl font-bold mb-4">Welcome back</h1>
           <p className="text-xl opacity-90">To continue, enter your sign in information</p>
         </div>
       </div>
@@ -55,11 +55,10 @@ const Login = () => {
       <div className="w-full md:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Only show logo on mobile */}
-          <div className="flex justify-center mb-8 md:hidden">
+          <div className="flex justify-center mb-8 md:hidden items-center gap-2">
             <ShipTornadoLogo size={48} />
+            <h2 className="text-2xl font-bold">Ship Tornado</h2>
           </div>
-          
-          <h2 className="text-2xl font-bold mb-6 md:hidden">Welcome Back</h2>
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">

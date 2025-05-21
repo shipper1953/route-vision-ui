@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 import { useSidebar } from "@/context/SidebarContext";
+import { useEffect, useRef } from "react";
 
 interface NavItemProps {
   to: string;
@@ -53,10 +54,31 @@ const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavI
 };
 
 export function TmsSidebar() {
-  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { isCollapsed, toggleSidebar, setIsCollapsed } = useSidebar();
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Add outside click handler to collapse sidebar
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target as Node) &&
+        !isCollapsed &&
+        window.innerWidth <= 768 // Only on mobile/tablet
+      ) {
+        setIsCollapsed(true);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCollapsed, setIsCollapsed]);
 
   return (
     <div 
+      ref={sidebarRef}
       className={cn(
         "h-screen flex flex-col bg-sidebar fixed left-0 top-0 z-40 transition-all duration-300",
         isCollapsed ? "w-16" : "w-64"
@@ -64,7 +86,10 @@ export function TmsSidebar() {
     >
       <div className="flex items-center justify-between p-4">
         {!isCollapsed ? (
-          <ShipTornadoLogo className="text-white" size={32} />
+          <div className="flex items-center gap-2">
+            <ShipTornadoLogo className="text-white" size={32} />
+            <span className="text-white font-semibold text-lg">Ship Tornado</span>
+          </div>
         ) : (
           <div className="w-full flex justify-center">
             <ShipTornadoLogo className="text-white" size={28} spin={false} />
