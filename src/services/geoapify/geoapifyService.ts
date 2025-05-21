@@ -29,6 +29,7 @@ export class GeoapifyService {
       }
       
       // Call our Supabase Edge Function
+      console.log('Invoking address-lookup function with query:', query);
       const { data, error } = await supabase.functions.invoke('address-lookup', {
         body: { query }
       });

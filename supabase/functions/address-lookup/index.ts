@@ -43,6 +43,8 @@ serve(async (req) => {
     url.searchParams.append('limit', '5');
     url.searchParams.append('type', 'amenity,street,address');
     
+    console.log('Calling Geoapify API with URL:', url.toString().replace(apiKey, '[REDACTED]'));
+    
     const response = await fetch(url.toString());
     
     if (!response.ok) {
@@ -55,9 +57,12 @@ serve(async (req) => {
     }
     
     const geoapifyData = await response.json();
+    console.log('Geoapify API response received with status:', response.status);
     
     // Transform the response to make it easier to use in the frontend
     const results = geoapifyData.results || [];
+    console.log(`Found ${results.length} address results`);
+    
     const transformedResults = results.map((feature: any) => {
       const props = feature.properties || {};
       return {

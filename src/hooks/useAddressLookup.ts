@@ -83,6 +83,15 @@ export const useAddressLookup = (type: "from" | "to") => {
       form.setValue(`${prefix}Zip`, verifiedAddress.zip);
       form.setValue(`${prefix}Country`, verifiedAddress.country);
       
+      console.log(`Form values set for ${prefix} address:`, {
+        street1: verifiedAddress.street1,
+        street2: verifiedAddress.street2,
+        city: verifiedAddress.city,
+        state: verifiedAddress.state,
+        zip: verifiedAddress.zip,
+        country: verifiedAddress.country
+      });
+      
       // Clear validation errors for the fields
       form.clearErrors(`${prefix}Street1`);
       form.clearErrors(`${prefix}City`);

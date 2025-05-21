@@ -37,6 +37,7 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   }, [type]);
 
   const onSelectAddress = async (address: any) => {
+    console.log('Address selected in AddressLookup:', address);
     const success = await handleSelectAddress(address);
     if (success) {
       setIsOpen(false);
@@ -51,7 +52,10 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
           <Button 
             variant="outline" 
             className="w-full flex justify-between items-center"
-            onClick={() => setIsOpen(true)}
+            onClick={() => {
+              console.log(`AddressLookup button clicked for ${type}`);
+              setIsOpen(true);
+            }}
           >
             <span>Look up address</span>
             <Search className="h-4 w-4" />

@@ -17,14 +17,25 @@ const App = () => {
     // Test Supabase connection
     const checkSupabaseConnection = async () => {
       try {
-        // Simple query to test connection
-        const { data, error } = await supabase.from('orders').select('id').limit(1);
+        // Test Supabase Edge Functions
+        const testCall = async () => {
+          try {
+            console.log("Testing Supabase Edge Function connectivity...");
+            const { data, error } = await supabase.functions.invoke('address-lookup', {
+              body: { query: "test" }
+            });
+            
+            if (error) {
+              console.error("Supabase Edge Function test error:", error);
+            } else {
+              console.log("Supabase Edge Function test successful:", data);
+            }
+          } catch (err) {
+            console.error("Error testing Supabase Edge Function:", err);
+          }
+        };
         
-        if (error) {
-          console.error("Supabase connection error:", error);
-        } else {
-          console.log("Supabase connection successful");
-        }
+        await testCall();
         
         // Set ready regardless of result to not block app rendering
         setReady(true);

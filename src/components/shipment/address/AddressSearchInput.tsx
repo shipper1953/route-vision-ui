@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,32 +20,31 @@ export const AddressSearchInput = ({
 }: AddressSearchInputProps) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSearch();
+  };
+
   return (
-    <div className="flex space-x-2">
+    <form onSubmit={handleSubmit} className="flex space-x-2">
       <Input
         ref={searchInputRef}
         placeholder="Enter street, city, or zip..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            onSearch();
-          }
-        }}
         className="flex-1"
         autoFocus
       />
       <Button 
-        onClick={onSearch} 
+        type="submit"
         disabled={searchQuery.length < 3 || isLoading}
       >
         {isLoading ? (
           <LoadingSpinner size={16} />
         ) : (
-          "Search"
+          <Search className="h-4 w-4" />
         )}
       </Button>
-    </div>
+    </form>
   );
 };
