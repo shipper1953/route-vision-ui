@@ -1,1 +1,5 @@
+
 project_id = "gidrlosmhpvdcogrkidj"
+
+[functions.address-lookup]
+verify_jwt = false

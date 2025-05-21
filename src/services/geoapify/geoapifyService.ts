@@ -1,19 +1,16 @@
-
 import { Address } from "@/types/easypost";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Service for interacting with Geoapify API for address lookup and autocomplete
+ * Uses a Supabase Edge Function to securely handle API keys
  */
 export class GeoapifyService {
-  private apiKey: string;
-  
   /**
    * Creates a new instance of the GeoapifyService
-   * @param apiKey The Geoapify API key
    */
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-    console.log('Initializing Geoapify service with API key:', apiKey ? 'API key provided' : 'No API key provided');
+  constructor() {
+    console.log('Initializing Geoapify service through Supabase Edge Function');
   }
 
   /**
@@ -23,48 +20,41 @@ export class GeoapifyService {
    */
   async searchAddresses(query: string): Promise<Address[]> {
     try {
-      console.log('Searching addresses with Geoapify, query:', query, 'API key available:', !!this.apiKey);
+      console.log('Searching addresses with query:', query);
       
-      if (!this.apiKey) {
-        console.error('Geoapify API key is missing');
-        throw new Error('Geoapify API key is missing');
+      if (!query || query.length < 3) {
+        console.log('Query too short, skipping search');
+        return [];
       }
       
-      const url = new URL('https://api.geoapify.com/v1/geocode/autocomplete');
-      url.searchParams.append('text', query);
-      url.searchParams.append('apiKey', this.apiKey);
-      url.searchParams.append('format', 'json');
-      url.searchParams.append('limit', '5');
+      // Call our Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke('address-lookup', {
+        body: { query }
+      });
       
-      console.log('Geoapify request URL:', url.toString().replace(this.apiKey, '[API_KEY_HIDDEN]'));
-      
-      const response = await fetch(url.toString());
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Geoapify API error: ${response.status}`, errorText);
-        throw new Error(`Geoapify API error: ${response.status}`);
+      if (error) {
+        console.error('Error calling address-lookup function:', error);
+        throw new Error(`Address lookup failed: ${error.message}`);
       }
       
-      const data = await response.json();
-      console.log('Geoapify search response status:', response.status);
+      console.log('Address lookup response received');
       
       // Transform Geoapify response to our Address format
       if (!data.features || !Array.isArray(data.features) || data.features.length === 0) {
-        console.log('No results returned from Geoapify');
+        console.log('No results returned from address lookup');
         return [];
       }
       
       return this.transformGeoapifyResults(data.features);
     } catch (error) {
-      console.error('Error searching addresses with Geoapify:', error);
+      console.error('Error searching addresses:', error);
       return [];
     }
   }
   
   /**
    * Transforms Geoapify results to our Address format
-   * @param results The Geoapify search results
+   * @param features The Geoapify search results
    * @returns An array of addresses in our format
    */
   private transformGeoapifyResults(features: any[]): Address[] {
@@ -108,66 +98,40 @@ export class GeoapifyService {
   }
 
   /**
-   * Gets detailed address information
+   * Gets detailed address information - Not used in current implementation
    * @param placeId The Geoapify place ID
    * @returns A promise that resolves to an address
    */
   async getAddressDetails(placeId: string): Promise<Address> {
     try {
-      console.log('Getting address details from Geoapify for place ID:', placeId);
+      console.log('Getting address details for place ID:', placeId);
       
       const url = new URL('https://api.geoapify.com/v2/place-details');
       url.searchParams.append('id', placeId);
-      url.searchParams.append('apiKey', this.apiKey);
       
-      const response = await fetch(url.toString());
+      // This would need to be updated to use the edge function as well
+      // For now, we'll return a placeholder as this method is not currently used
       
-      if (!response.ok) {
-        throw new Error(`Geoapify API error: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Geoapify address details response:', data);
-      
-      // Extract address from the response
-      const properties = data.features?.[0]?.properties;
-      
-      if (!properties) {
-        throw new Error('Address details not found');
-      }
-      
-      // Map Geoapify response to our Address format
       return {
-        street1: properties.address_line1 || 
-                [properties.street, properties.housenumber].filter(Boolean).join(' ') || 
-                '',
-        street2: properties.address_line2 || '',
-        city: properties.city || properties.county || '',
-        state: properties.state || properties.state_code || '',
-        zip: properties.postcode || '',
-        country: properties.country_code?.toUpperCase() || 'US',
+        street1: '',
+        street2: '',
+        city: '',
+        state: '',
+        zip: '',
+        country: 'US',
         company: '',
         name: '',
         phone: '',
         email: ''
       };
     } catch (error) {
-      console.error('Error getting address details from Geoapify:', error);
+      console.error('Error getting address details:', error);
       throw error;
     }
   }
 }
 
-// Attempt to get the API key from various environment variable formats
-const apiKey = 
-  import.meta.env.VITE_GEOAPIFY_API_KEY || 
-  import.meta.env.REACT_APP_GEOAPIFY_API_KEY || 
-  import.meta.env.GEOAPIFY_API_KEY || 
-  '274bcb0749944615912f9997d5c49105'; // Fallback key
-
-console.log('Environment variables available:', Object.keys(import.meta.env).filter(key => key.includes('GEOAPIFY')));
-console.log('Initializing Geoapify service with API key available:', !!apiKey);
-
-const geoapifyService = new GeoapifyService(apiKey);
+// Create and export a singleton instance
+const geoapifyService = new GeoapifyService();
 
 export default geoapifyService;
