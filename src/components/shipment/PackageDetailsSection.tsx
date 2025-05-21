@@ -5,7 +5,8 @@ import {
   CardHeader, 
   CardTitle, 
   CardDescription,
-  CardContent 
+  CardContent,
+  CardFooter
 } from "@/components/ui/card";
 import {
   FormField,
@@ -17,9 +18,46 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ShipmentForm } from "@/types/shipment";
+import { Button } from "@/components/ui/button";
+import { ScanText, Wifi } from "lucide-react";
+import { toast } from "sonner";
+import { listenForQboidData } from "@/services/easypost";
 
 export const PackageDetailsSection = () => {
   const form = useFormContext<ShipmentForm>();
+  
+  const handleConfigureQboid = () => {
+    try {
+      const qboidInfo = listenForQboidData((dimensions) => {
+        // This callback would be called when new dimensions are received
+        form.setValue("length", dimensions.length);
+        form.setValue("width", dimensions.width);
+        form.setValue("height", dimensions.height);
+        form.setValue("weight", dimensions.weight);
+        
+        toast.success("Package dimensions updated from Qboid scanner");
+      });
+      
+      toast.info("Qboid Integration Info", {
+        description: (
+          <div className="mt-2 text-sm">
+            <p className="font-semibold">Configure your Qboid with this endpoint:</p>
+            <p className="mt-1 font-mono text-xs bg-slate-100 p-2 rounded">
+              {qboidInfo.endpointUrl}
+            </p>
+            <p className="mt-2">Use POST method with JSON body containing:</p>
+            <p className="mt-1 font-mono text-xs bg-slate-100 p-2 rounded overflow-auto">
+              {`{ "length": 12, "width": 8, "height": 6, "weight": 32 }`}
+            </p>
+          </div>
+        ),
+        duration: 10000,
+      });
+    } catch (error) {
+      console.error("Error configuring Qboid:", error);
+      toast.error("Failed to configure Qboid integration");
+    }
+  };
   
   return (
     <Card>
@@ -113,6 +151,18 @@ export const PackageDetailsSection = () => {
           </div>
         )}
       </CardContent>
+      
+      <CardFooter>
+        <Button 
+          type="button" 
+          onClick={handleConfigureQboid}
+          variant="outline"
+          className="flex items-center gap-2 mt-2"
+        >
+          <Wifi className="h-4 w-4" />
+          <span>Configure Qboid WiFi API</span>
+        </Button>
+      </CardFooter>
     </Card>
   );
 };

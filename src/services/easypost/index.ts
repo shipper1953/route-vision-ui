@@ -1,4 +1,3 @@
-
 import { RealEasyPostService } from "./realEasyPostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,3 +22,37 @@ export default easyPostService;
 
 // Re-export types from the easypost types file
 export * from "@/types/easypost";
+
+// Add a new export for the Qboid scanner integration
+export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
+  length: number;
+  width: number;
+  height: number;
+  weight: number;
+  orderId?: string;
+}) => void) => {
+  try {
+    // In a real implementation, this could be:
+    // 1. A WebSocket connection that listens for events from the Qboid scanner
+    // 2. A polling mechanism that checks for new dimension data periodically
+    // 3. A direct connection to the scanner's API
+    
+    // For now, we'll just return information about the endpoint
+    console.log('Qboid integration configured. Endpoint URL:', 
+      'https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions');
+    
+    return {
+      endpointUrl: 'https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions',
+      configureScanner: () => {
+        console.log('Configure your Qboid scanner with the following settings:');
+        console.log('1. Endpoint URL: https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions');
+        console.log('2. Method: POST');
+        console.log('3. Content-Type: application/json');
+        console.log('4. Body format: { "length": number, "width": number, "height": number, "weight": number, "orderId": "optional" }');
+      }
+    };
+  } catch (error) {
+    console.error('Error setting up Qboid listener:', error);
+    throw error;
+  }
+};
