@@ -17,7 +17,6 @@ declare global {
 
 /**
  * Loads the Google Maps JavaScript API if not already loaded
- * @param callback Function to execute when the API is loaded
  * @returns Promise that resolves when the API is loaded
  */
 export const loadGoogleMapsScript = (): Promise<void> => {
