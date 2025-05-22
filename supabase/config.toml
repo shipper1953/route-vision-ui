@@ -80,4 +80,3 @@ verify_jwt = false
 
 [functions.qboid-dimensions]
 verify_jwt = false
-

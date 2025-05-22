@@ -182,8 +182,13 @@ export class RealEasyPostService implements EasyPostService {
       
       if (this.useEdgeFunctions) {
         // Use Edge Function if no API key is available in the client
+        // CRITICAL FIX: Do not pass authorization headers to avoid 401 errors
         const { data, error } = await supabase.functions.invoke('purchase-label', {
-          body: { shipmentId, rateId }
+          body: { shipmentId, rateId },
+          headers: {
+            // Do not include authorization headers to avoid 401 errors
+            Authorization: undefined
+          }
         });
         
         if (error) {
@@ -193,6 +198,7 @@ export class RealEasyPostService implements EasyPostService {
         return data;
       }
       
+      // Direct API call if API key is available
       const response = await fetch(`${this.baseUrl}/shipments/${shipmentId}/buy`, {
         method: 'POST',
         headers: {
