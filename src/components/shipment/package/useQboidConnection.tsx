@@ -24,47 +24,65 @@ export function useQboidConnection() {
   // Setup real-time listener for Qboid data
   useEffect(() => {
     const setupRealtimeListener = async () => {
-      // Subscribe to the Qboid events table for real-time updates
-      const channel = supabase
-        .channel('qboid-events')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'qboid_events' },
-          (payload) => {
-            console.log('Received qboid event:', payload);
-            
-            // Extract the dimensions data
-            if (payload.new && payload.new.data && payload.new.data.dimensions) {
-              const { dimensions, orderId } = payload.new.data;
+      console.log("Setting up Qboid realtime listener");
+      // First, check if table exists and is enabled for realtime
+      try {
+        // Subscribe to the Qboid events table for real-time updates
+        const channel = supabase
+          .channel('qboid-events')
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'qboid_events' },
+            (payload) => {
+              console.log('Received qboid event:', payload);
               
-              // Update form with dimensions
-              if (form) {
-                form.setValue("length", dimensions.length, { shouldValidate: true });
-                form.setValue("width", dimensions.width, { shouldValidate: true });
-                form.setValue("height", dimensions.height, { shouldValidate: true });
-                form.setValue("weight", dimensions.weight, { shouldValidate: true });
+              // Extract the dimensions data
+              if (payload.new && payload.new.data && payload.new.data.dimensions) {
+                const { dimensions, orderId } = payload.new.data;
                 
-                // If orderId is provided and form has orderId field, update it
-                if (orderId && form.getValues("orderId") === "") {
-                  form.setValue("orderId", orderId, { shouldValidate: true });
+                // Update form with dimensions
+                if (form) {
+                  form.setValue("length", dimensions.length, { shouldValidate: true });
+                  form.setValue("width", dimensions.width, { shouldValidate: true });
+                  form.setValue("height", dimensions.height, { shouldValidate: true });
+                  form.setValue("weight", dimensions.weight, { shouldValidate: true });
+                  
+                  // If orderId is provided and form has orderId field, update it
+                  if (orderId && form.getValues("orderId") === "") {
+                    form.setValue("orderId", orderId, { shouldValidate: true });
+                  }
+                  
+                  // Update connection status and timestamp
+                  setConnectionStatus("connected");
+                  setLastUpdateTime(new Date().toLocaleTimeString());
+                  
+                  // Show success message
+                  toast.success("Package dimensions received from Qboid");
                 }
-                
-                // Update connection status and timestamp
-                setConnectionStatus("connected");
-                setLastUpdateTime(new Date().toLocaleTimeString());
-                
-                // Show success message
-                toast.success("Package dimensions received from Qboid");
               }
             }
-          }
-        )
-        .subscribe();
-        
-      // Cleanup function
-      return () => {
-        supabase.removeChannel(channel);
-      };
+          )
+          .subscribe(async (status) => {
+            console.log('Supabase realtime status:', status);
+            if (status === 'SUBSCRIBED') {
+              console.log("Successfully subscribed to qboid_events table");
+            } else if (status === 'CHANNEL_ERROR') {
+              console.error("Error subscribing to qboid_events table");
+              setConnectionStatus("error");
+              toast.error("Could not connect to Qboid realtime updates");
+            }
+          });
+          
+        // Cleanup function
+        return () => {
+          console.log("Cleaning up Qboid realtime listener");
+          supabase.removeChannel(channel);
+        };
+      } catch (error) {
+        console.error("Error setting up realtime listener:", error);
+        setConnectionStatus("error");
+        toast.error("Failed to set up Qboid connection");
+      }
     };
     
     if (connectionStatus === "connecting") {
@@ -73,6 +91,7 @@ export function useQboidConnection() {
     
     return () => {
       // This will be called when the component unmounts
+      console.log("Cleaning up Qboid connection");
     };
   }, [connectionStatus, form]);
   

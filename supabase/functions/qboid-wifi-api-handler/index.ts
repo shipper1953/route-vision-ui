@@ -35,6 +35,7 @@ serve(async (req) => {
   
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
     return new Response(null, { headers: corsHeaders, status: 204 })
   }
   
@@ -45,6 +46,7 @@ serve(async (req) => {
     
     if (req.method === 'POST' && contentType && contentType.includes('application/json')) {
       const body = await req.json();
+      console.log('Received body:', JSON.stringify(body));
       
       if (body.action === 'validate-token') {
         console.log('Validating token request');
@@ -59,10 +61,12 @@ serve(async (req) => {
       }
       
       // This is actual data from Qboid device
-      console.log('Received data from Qboid device:', body);
+      console.log('Received data from Qboid device:', JSON.stringify(body));
       
       // Verify the Qboid API token
       const qboidToken = req.headers.get('x-qboid-token');
+      console.log('Received token:', qboidToken);
+      
       const validToken = Deno.env.get('QBOID_API_TOKEN') || 'test_token'; // Fallback for testing
       
       if (!qboidToken) {
@@ -81,6 +85,7 @@ serve(async (req) => {
       
       // Parse the request data as QboidData
       const qboidData = body as QboidData;
+      console.log('Parsed qboid data:', JSON.stringify(qboidData));
       
       // Validate required fields according to Qboid WiFi API documentation
       if (!qboidData || 
@@ -97,9 +102,14 @@ serve(async (req) => {
       }
       
       // Set up Supabase client
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+      
+      console.log('Creating Supabase client with URL:', supabaseUrl ? 'URL provided' : 'No URL');
+      
       const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+        supabaseUrl,
+        supabaseAnonKey
       );
 
       // Convert mm to inches for compatibility with our system
@@ -118,6 +128,7 @@ serve(async (req) => {
         
       // Store in database for future reference
       try {
+        console.log('Saving dimensions to database:', JSON.stringify(dimensions));
         const { error: saveError } = await supabaseClient
           .from('shipments')
           .insert({
@@ -133,16 +144,17 @@ serve(async (req) => {
         if (saveError) {
           console.error('Error saving dimensions to database:', saveError);
         } else {
-          console.log('Dimensions saved successfully');
+          console.log('Dimensions saved successfully to shipments table');
         }
       } catch (err) {
-        console.error('Failed to save dimensions:', err);
+        console.error('Failed to save dimensions to shipments table:', err);
         // Don't fail the request if we can't save to the database
       }
       
       // Try to push data to any connected clients via Supabase realtime
       try {
-        await supabaseClient
+        console.log('Publishing realtime event for dimensions:', JSON.stringify(dimensions));
+        const { error: rtError } = await supabaseClient
           .from('qboid_events')
           .insert({
             event_type: 'dimensions_received',
@@ -153,6 +165,12 @@ serve(async (req) => {
               orderId: qboidData.orderId || null
             }
           });
+          
+        if (rtError) {
+          console.error('Error publishing realtime event:', rtError);
+        } else {
+          console.log('Realtime event published successfully');
+        }
       } catch (err) {
         console.error('Failed to publish realtime event:', err);
         // Continue anyway

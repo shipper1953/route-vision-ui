@@ -51,10 +51,17 @@ export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
     console.log('Setting up Qboid integration with endpoint:', QBOID_CONFIG.endpointUrl);
     
     // Get the API token from Supabase
-    const { data: secretData } = await supabase
+    const { data: secretData, error } = await supabase
       .functions.invoke('qboid-wifi-api-handler', {
         body: { action: 'validate-token' }
       });
+    
+    if (error) {
+      console.error('Error validating token:', error);
+      throw new Error('Failed to validate Qboid token');
+    }
+    
+    console.log('Token validation response:', secretData);
     
     // Return the configuration information needed to set up the Qboid scanner
     return {
