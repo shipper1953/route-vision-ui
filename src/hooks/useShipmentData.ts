@@ -111,7 +111,7 @@ export const useShipmentData = () => {
                 : "Unknown Origin",
               destination: "Destination",
               shipDate: order.orderDate,
-              estimatedDeliveryDate: order.shipment!.estimatedDeliveryDate || null,
+              estimatedDelivery: order.shipment!.estimatedDeliveryDate || null,
               actualDelivery: order.shipment!.actualDeliveryDate || null,
               status: order.status,
               weight: order.parcelInfo ? `${order.parcelInfo.weight} oz` : "Unknown",
@@ -136,7 +136,7 @@ export const useShipmentData = () => {
         } else {
           // Transform Supabase data to match our interface
           const formattedShipments: Shipment[] = supabaseShipments.map(s => ({
-            id: s.easypost_id || String(s.id), // Convert id to string
+            id: s.easypost_id || String(s.id),
             tracking: s.tracking_number || 'Pending',
             carrier: s.carrier || 'Unknown',
             carrierUrl: s.tracking_number ? 
@@ -145,8 +145,10 @@ export const useShipmentData = () => {
             origin: s.origin_address ? 'Origin' : 'Unknown Origin',
             destination: s.destination_address ? 'Destination' : 'Unknown Destination',
             shipDate: new Date(s.created_at).toLocaleDateString(),
-            estimatedDeliveryDate: s.estimated_delivery_date ? new Date(s.estimated_delivery_date).toLocaleDateString() : null,
-            actualDelivery: s.actual_delivery_date ? new Date(s.actual_delivery_date).toLocaleDateString() : null,
+            estimatedDelivery: s.estimated_delivery_date ? 
+              new Date(s.estimated_delivery_date).toLocaleDateString() : null,
+            actualDelivery: s.actual_delivery_date ? 
+              new Date(s.actual_delivery_date).toLocaleDateString() : null,
             status: s.status || 'created',
             weight: `${s.weight || '0'} lbs`,
             labelUrl: s.label_url

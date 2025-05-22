@@ -9,7 +9,31 @@ import easyPostService from "@/services/easypost";
 export const useShipment = (orderId?: string) => {
   const [isCreatingShipment, setIsCreatingShipment] = useState(false);
   const [shipmentId, setShipmentId] = useState<string | null>(null);
+  const [shipmentResponse, setShipmentResponse] = useState<any>(null);
+  const [selectedRate, setSelectedRate] = useState<any>(null);
+  const [recommendedRate, setRecommendedRate] = useState<any>(null);
   const navigate = useNavigate();
+
+  const handleShipmentCreated = async (shipmentData: any) => {
+    try {
+      const response = await createShipment(shipmentData);
+      setShipmentResponse(response);
+      
+      // Find and set the recommended rate
+      if (response && response.rates && response.rates.length > 0) {
+        // Find the lowest cost rate as recommended
+        const sorted = [...response.rates].sort((a, b) => 
+          parseFloat(a.rate) - parseFloat(b.rate)
+        );
+        setRecommendedRate(sorted[0]);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error("Error handling shipment creation:", error);
+      throw error;
+    }
+  };
 
   const createShipment = async (shipmentData: any) => {
     setIsCreatingShipment(true);
@@ -75,10 +99,21 @@ export const useShipment = (orderId?: string) => {
     }
   };
 
+  const resetShipment = () => {
+    setShipmentResponse(null);
+    setSelectedRate(null);
+  };
+
   return {
     createShipment,
     purchaseLabel,
     isCreatingShipment,
-    shipmentId
+    shipmentId,
+    shipmentResponse,
+    selectedRate,
+    recommendedRate,
+    setSelectedRate,
+    handleShipmentCreated,
+    resetShipment
   };
 };
