@@ -7,7 +7,7 @@ import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
 import { ShippingRatesCardHeader } from "./ShippingRatesCardHeader";
 import { RatesList } from "./RatesList";
 import { ShippingRatesCardFooter } from "./ShippingRatesCardFooter";
-import { FormProvider, useFormContext } from "react-hook-form";
+import { useFormContext } from "react-hook-form";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
@@ -59,7 +59,7 @@ export const ShippingRatesCard = ({
       <CardContent>
         {availableRates.length > 0 ? (
           <RatesList 
-            rates={availableRates}
+            rates={availableRates as (SmartRate | Rate)[]}
             selectedRate={selectedRate}
             recommendedRate={recommendedRate}
             setSelectedRate={setSelectedRate}
