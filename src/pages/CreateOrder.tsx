@@ -13,7 +13,7 @@ import { orderFormSchema, OrderFormValues } from "@/types/order";
 const CreateOrder = () => {
   const { isSubmitting, onSubmit } = useCreateOrder();
 
-  // Initialize the form
+  // Initialize the form with the correct type
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     defaultValues: {
@@ -49,15 +49,13 @@ const CreateOrder = () => {
         </CardHeader>
         <CardContent>
           <FormProvider {...form}>
-            <Form>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <CustomerInfoSection />
-                  <ShippingAddressSection />
-                </div>
-                
-                <OrderFormActions isSubmitting={isSubmitting} />
-              </form>
+            <Form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <CustomerInfoSection />
+                <ShippingAddressSection />
+              </div>
+              
+              <OrderFormActions isSubmitting={isSubmitting} />
             </Form>
           </FormProvider>
         </CardContent>
