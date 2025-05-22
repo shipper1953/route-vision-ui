@@ -95,9 +95,10 @@ export const useShipmentData = () => {
           const formattedShipments: Shipment[] = supabaseShipments.map(s => ({
             id: s.easypost_id || String(s.id), // Convert id to string
             tracking: s.tracking_number || 'Pending',
-            carrier: s.carrier || 'Unknown', // Add the carrier property
-            // Fix: Use tracking_code instead of tracking_url that doesn't exist
-            carrierUrl: s.tracking_code || s.carrier_url || '#', 
+            carrier: s.carrier || 'Unknown',
+            // Fix: Don't try to access properties that don't exist in the schema
+            carrierUrl: s.tracking_number ? 
+              `https://www.trackingmore.com/track/en/${s.tracking_number}` : '#',
             service: s.carrier_service || 'Standard',
             origin: s.origin_address ? 'Origin' : 'Unknown Origin',
             destination: s.destination_address ? 'Destination' : 'Unknown Destination',
