@@ -5,14 +5,23 @@ import { ArrowRight } from "lucide-react";
 
 interface RatesActionButtonProps {
   loading: boolean;
+  onClick?: () => void; // Add an optional onClick handler
 }
 
-export const RatesActionButton = ({ loading }: RatesActionButtonProps) => {
+export const RatesActionButton = ({ loading, onClick }: RatesActionButtonProps) => {
+  const handleClick = (e: React.MouseEvent) => {
+    if (onClick) {
+      e.preventDefault(); // Prevent default if we have a custom handler
+      onClick();
+    }
+  };
+
   return (
     <Button 
       type="submit" 
       className="bg-tms-blue hover:bg-tms-blue-400"
       disabled={loading}
+      onClick={handleClick}
     >
       {loading ? (
         <>

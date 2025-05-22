@@ -3,6 +3,7 @@ import { TmsLayout } from "@/components/layout/TmsLayout";
 import { ShipmentForm } from "@/components/shipment/ShipmentForm";
 import { ShippingRatesCard } from "@/components/shipment/ShippingRatesCard";
 import { useShipment } from "@/hooks/useShipment";
+import { useState, useEffect } from "react";
 
 const CreateShipment = () => {
   const { 
@@ -13,6 +14,11 @@ const CreateShipment = () => {
     handleShipmentCreated, 
     resetShipment 
   } = useShipment();
+  
+  // Log when shipmentResponse changes to debug
+  useEffect(() => {
+    console.log("Shipment response updated:", shipmentResponse);
+  }, [shipmentResponse]);
   
   return (
     <TmsLayout>

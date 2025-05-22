@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { OrderLookupCard } from "@/components/shipment/OrderLookupCard";
 import { ShipmentFormTabs } from "@/components/shipment/ShipmentFormTabs";
@@ -48,6 +47,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   
   const onSubmit = async (data: ShipmentFormType) => {
     try {
+      console.log("Form submitted with data:", data);
       setLoading(true);
       toast.info("Getting shipping rates...");
       
@@ -82,9 +82,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
           height: data.height,
           weight: data.weight
         },
-        // Add options to ensure SmartRate functionality
         options: {
-          // Use high accuracy level for delivery estimates (95th percentile)
           smartrate_accuracy: 'percentile_95'
         }
       };
@@ -185,6 +183,12 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       setLoading(false);
     }
   };
+
+  // Handle direct button click if form submission doesn't work
+  const handleFormSubmit = () => {
+    console.log("Manually triggering form submission");
+    form.handleSubmit(onSubmit)();
+  };
   
   return (
     <FormProvider {...form}>
@@ -194,7 +198,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
         <ShipmentFormTabs />
         
         <div className="flex justify-end">
-          <RatesActionButton loading={loading} />
+          <RatesActionButton loading={loading} onClick={handleFormSubmit} />
         </div>
       </form>
     </FormProvider>
