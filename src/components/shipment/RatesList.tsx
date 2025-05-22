@@ -4,7 +4,7 @@ import { RateOptionCard } from "./RateOptionCard";
 
 interface RatesListProps {
   rates: (SmartRate | Rate)[];
-  selectedRate: SmartRate | null;
+  selectedRate: SmartRate | Rate | null;
   recommendedRate: SmartRate | null;
   setSelectedRate: (rate: SmartRate | Rate) => void;
 }

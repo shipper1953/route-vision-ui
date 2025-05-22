@@ -2,7 +2,7 @@
 import { CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Package } from "lucide-react";
-import { SmartRate } from "@/services/easypost";
+import { SmartRate, Rate } from "@/services/easypost";
 import { toast } from "sonner";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
@@ -10,13 +10,15 @@ import { useState } from "react";
 import easyPostService from "@/services/easypost";
 
 interface ShippingRatesCardFooterProps {
-  selectedRate: SmartRate | null;
+  selectedRate: SmartRate | Rate | null;
   onBack: () => void;
+  shipmentId?: string; // Add shipmentId as a prop to use when form context isn't available
 }
 
 export const ShippingRatesCardFooter = ({ 
   selectedRate, 
-  onBack 
+  onBack,
+  shipmentId: propShipmentId
 }: ShippingRatesCardFooterProps) => {
   const form = useFormContext<ShipmentForm>();
   const [purchasing, setPurchasing] = useState(false);
@@ -28,8 +30,9 @@ export const ShippingRatesCardFooter = ({
     }
     
     setPurchasing(true);
-    const orderId = form.getValues("orderId");
-    const shipmentId = form.getValues("shipmentId");
+    // Get values from form context if available, otherwise use props
+    const orderId = form?.getValues ? form.getValues("orderId") : undefined;
+    const shipmentId = form?.getValues ? form.getValues("shipmentId") : propShipmentId;
     
     try {
       console.log('Purchasing label for shipment:', shipmentId, 'with rate:', selectedRate.id);

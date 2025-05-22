@@ -3,7 +3,7 @@ import {
   Card, 
   CardContent
 } from "@/components/ui/card";
-import { ShipmentResponse, SmartRate } from "@/services/easypost";
+import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
 import { ShippingRatesCardHeader } from "./ShippingRatesCardHeader";
 import { RatesList } from "./RatesList";
 import { ShippingRatesCardFooter } from "./ShippingRatesCardFooter";
@@ -11,8 +11,8 @@ import { FormProvider, useFormContext } from "react-hook-form";
 
 interface ShippingRatesCardProps {
   shipmentResponse: ShipmentResponse;
-  selectedRate: SmartRate | null;
-  setSelectedRate: (rate: SmartRate | null) => void;
+  selectedRate: SmartRate | Rate | null;
+  setSelectedRate: (rate: SmartRate | Rate | null) => void;
   recommendedRate: SmartRate | null;
   onBack: () => void;
 }
@@ -64,6 +64,7 @@ export const ShippingRatesCard = ({
         <ShippingRatesCardFooter 
           selectedRate={selectedRate}
           onBack={onBack}
+          shipmentId={shipmentResponse.id} // Pass shipment ID from response
         />
       </Card>
     );
@@ -95,6 +96,7 @@ export const ShippingRatesCard = ({
       <ShippingRatesCardFooter 
         selectedRate={selectedRate}
         onBack={onBack}
+        shipmentId={shipmentResponse.id} // Pass shipment ID from response
       />
     </Card>
   );
