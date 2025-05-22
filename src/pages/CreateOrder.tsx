@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarIcon, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OrderAddressLookup } from "@/components/order/OrderAddressLookup";
 
 // Define the form schema using zod
 const orderFormSchema = z.object({
@@ -53,7 +54,7 @@ const orderFormSchema = z.object({
   country: z.string().min(2, { message: "Country is required" }).default("US"),
 });
 
-type OrderFormValues = z.infer<typeof orderFormSchema>;
+export type OrderFormValues = z.infer<typeof orderFormSchema>;
 
 const CreateOrder = () => {
   const navigate = useNavigate();
@@ -261,6 +262,8 @@ const CreateOrder = () => {
 
                 <div className="space-y-4">
                   <h3 className="font-medium text-lg">Shipping Address</h3>
+                  
+                  <OrderAddressLookup />
                   
                   <FormField
                     control={form.control}
