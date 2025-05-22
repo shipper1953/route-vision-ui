@@ -1,7 +1,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FilePdf, Printer, PackageCheck } from "lucide-react";
+import { FileText, Printer, PackageCheck } from "lucide-react";
 import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useNavigate } from "react-router-dom";
@@ -140,7 +140,7 @@ export const ShippingLabelDialog = ({
                   className="flex items-center gap-2 flex-1"
                   disabled={loading}
                 >
-                  <FilePdf className="h-4 w-4" />
+                  <FileText className="h-4 w-4" />
                   Download PDF
                 </Button>
               </div>
