@@ -31,7 +31,9 @@ const Orders = () => {
   useEffect(() => {
     const loadOrders = async () => {
       try {
+        setLoading(true);
         const orderData = await fetchOrders();
+        console.log("Orders loaded:", orderData.length);
         setOrders(orderData);
       } catch (error) {
         console.error("Error loading orders:", error);
@@ -41,7 +43,9 @@ const Orders = () => {
     };
     
     loadOrders();
-  }, []);
+    
+    // Re-fetch orders whenever the URL parameters change (e.g., when navigating back from create order)
+  }, [searchParams]);
   
   const filteredOrders = orders.filter(order => 
     order.id.toLowerCase().includes(searchTerm.toLowerCase()) || 

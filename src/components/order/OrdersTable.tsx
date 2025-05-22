@@ -54,6 +54,8 @@ export const OrdersTable = ({
     );
   }
 
+  console.log("Rendering orders table with", filteredOrders.length, "filtered orders");
+
   return (
     <>
       {filteredOrders.map((order) => (

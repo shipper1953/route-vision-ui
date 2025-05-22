@@ -30,6 +30,13 @@ export async function fetchOrders(): Promise<OrderData[]> {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 500));
   
+  console.log("Fetching orders, total count:", mockOrders.length);
+  
+  // Sort orders by date (newest first) to ensure newly created orders appear at the top
+  const sortedOrders = [...mockOrders].sort((a, b) => {
+    return new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime();
+  });
+  
   // Return a copy of orders to avoid mutation
-  return [...mockOrders];
+  return sortedOrders;
 }

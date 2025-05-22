@@ -23,6 +23,8 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
   // Add to our mock database
   mockOrders.push(newOrder);
   
+  console.log("New order created:", orderId, "Total orders:", mockOrders.length);
+  
   // Return a copy of the new order
   return {...newOrder};
 }
