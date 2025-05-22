@@ -61,7 +61,7 @@ export const ShippingRatesCard = ({
           <RatesList 
             rates={availableRates as (SmartRate | Rate)[]}
             selectedRate={selectedRate}
-            recommendedRate={recommendedRate}
+            recommendedRate={recommendedRate as (SmartRate | Rate | null)}
             setSelectedRate={setSelectedRate}
           />
         ) : (

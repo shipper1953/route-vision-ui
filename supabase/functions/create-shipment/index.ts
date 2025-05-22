@@ -53,6 +53,18 @@ serve(async (req) => {
       );
     }
     
+    // Validate dimensions and weight
+    const { parcel } = shipmentData;
+    if (!parcel || parcel.length <= 0 || parcel.width <= 0 || parcel.height <= 0 || parcel.weight <= 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid package dimensions', 
+          details: 'Package dimensions and weight must be greater than 0' 
+        }), 
+        { headers: corsHeaders, status: 400 }
+      );
+    }
+    
     // Ensure we have options
     if (!shipmentData.options) {
       shipmentData.options = {};

@@ -21,7 +21,7 @@ interface FormFieldProps {
 export const FormField = ({ name, label, placeholder, required = false, type = "text" }: FormFieldProps) => {
   const form = useFormContext<ShipmentForm>();
   
-  // Handle numeric inputs specifically
+  // Handle numeric and other inputs specifically
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
     const value = e.target.value;
     
@@ -32,6 +32,7 @@ export const FormField = ({ name, label, placeholder, required = false, type = "
         field.onChange(parseFloat(value));
       }
     } else {
+      // For all other input types, including phone numbers
       field.onChange(value);
     }
   };
@@ -44,24 +45,15 @@ export const FormField = ({ name, label, placeholder, required = false, type = "
         <FormItem>
           <FormLabel>{label}{!required && " (Optional)"}</FormLabel>
           <FormControl>
-            {type === "number" ? (
-              <Input 
-                type={type} 
-                placeholder={placeholder} 
-                onChange={(e) => handleInputChange(e, field)}
-                value={field.value ?? ''}
-                onBlur={field.onBlur}
-                name={field.name}
-                ref={field.ref}
-              />
-            ) : (
-              <Input 
-                type={type}
-                placeholder={placeholder} 
-                {...field} 
-                value={field.value?.toString() || ''} 
-              />
-            )}
+            <Input 
+              type={type}
+              placeholder={placeholder} 
+              onChange={(e) => handleInputChange(e, field)}
+              value={field.value ?? ''} 
+              onBlur={field.onBlur}
+              name={field.name}
+              ref={field.ref}
+            />
           </FormControl>
           <FormMessage />
         </FormItem>

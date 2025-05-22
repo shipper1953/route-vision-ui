@@ -8,7 +8,7 @@ import { ArrowDownAZ, ArrowDown01, Clock } from "lucide-react";
 interface RatesListProps {
   rates: (SmartRate | Rate)[];
   selectedRate: SmartRate | Rate | null;
-  recommendedRate: SmartRate | null;
+  recommendedRate: SmartRate | Rate | null;
   setSelectedRate: (rate: SmartRate | Rate) => void;
 }
 

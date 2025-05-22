@@ -23,6 +23,13 @@ export const ShipmentFormSubmission = ({
     try {
       const data = form.getValues();
       console.log("Form submitted with data:", data);
+      
+      // Validate package dimensions and weight
+      if (data.length <= 0 || data.width <= 0 || data.height <= 0 || data.weight <= 0) {
+        toast.error("Package dimensions and weight must be greater than 0");
+        return;
+      }
+      
       setLoading(true);
       toast.info("Getting shipping rates...");
       
@@ -87,7 +94,13 @@ export const ShipmentFormSubmission = ({
       onShipmentCreated(response, recommendedRate);
     } catch (error) {
       console.error("Error creating shipment:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to retrieve shipment rates. Please try again.");
+      
+      // Show more specific error message from EasyPost if available
+      if (error instanceof Error && error.message.includes('EasyPost')) {
+        toast.error(error.message);
+      } else {
+        toast.error(error instanceof Error ? error.message : "Failed to retrieve shipment rates. Please check your package dimensions and try again.");
+      }
     } finally {
       setLoading(false);
     }
