@@ -20,7 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Package, Search, FileDown, Truck } from "lucide-react";
+import { Package, Search, FileDown, Truck, ShoppingBag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchOrders, OrderData } from "@/services/orderService";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -86,9 +86,9 @@ const Orders = () => {
           <p className="text-muted-foreground">Manage your customer orders</p>
         </div>
         <div className="mt-4 md:mt-0 flex gap-3">
-          <Button className="bg-tms-blue hover:bg-tms-blue-400" onClick={() => navigate('/create-shipment')}>
-            <Package className="mr-2 h-4 w-4" />
-            Create Shipment
+          <Button className="bg-tms-blue hover:bg-tms-blue-400" onClick={() => navigate('/create-order')}>
+            <ShoppingBag className="mr-2 h-4 w-4" />
+            Create Order
           </Button>
           <Button variant="outline" onClick={() => {}}>
             <FileDown className="mr-2 h-4 w-4" />
