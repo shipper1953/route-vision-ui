@@ -1,35 +1,30 @@
 
-import { CardFooter } from "@/components/ui/card";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Package } from "lucide-react";
-import { SmartRate, Rate } from "@/services/easypost";
-import { toast } from "sonner";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { ArrowLeft, Package, Download } from "lucide-react";
+import { ShipmentResponse, SmartRate } from "@/services/easypost";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
-import { useState } from "react";
-import easyPostService from "@/services/easypost";
-import orderService from "@/services/orderService";
-import { useNavigate } from "react-router-dom";
-import { ShippingLabelDialog } from "./ShippingLabelDialog";
+import { toast } from "sonner";
+import { linkShipmentToOrder } from "@/services/orderService";
 
 interface ShippingRatesCardFooterProps {
-  selectedRate: SmartRate | Rate | null;
+  shipmentResponse: ShipmentResponse;
+  selectedRate: SmartRate | null;
   onBack: () => void;
-  shipmentId?: string; // Add shipmentId as a prop to use when form context isn't available
+  onBuyLabel: (shipmentId: string, rateId: string) => Promise<any>;
 }
 
 export const ShippingRatesCardFooter = ({ 
+  shipmentResponse, 
   selectedRate, 
   onBack,
-  shipmentId: propShipmentId
+  onBuyLabel
 }: ShippingRatesCardFooterProps) => {
-  const form = useFormContext<ShipmentForm>();
   const [purchasing, setPurchasing] = useState(false);
-  const navigate = useNavigate();
-  
-  // Add states for the dialog
-  const [isLabelDialogOpen, setIsLabelDialogOpen] = useState(false);
-  const [labelData, setLabelData] = useState<any>(null);
+  const form = useFormContext<ShipmentForm>();
+  const orderId = form.getValues("orderId");
   
   const handlePurchaseLabel = async () => {
     if (!selectedRate) {
@@ -37,109 +32,59 @@ export const ShippingRatesCardFooter = ({
       return;
     }
     
-    setPurchasing(true);
-    // Get values from form context if available, otherwise use props
-    const orderId = form?.getValues ? form.getValues("orderId") : undefined;
-    const shipmentId = form?.getValues ? form.getValues("shipmentId") : propShipmentId;
+    if (!shipmentResponse.id) {
+      toast.error("Missing shipment ID");
+      return;
+    }
     
+    setPurchasing(true);
     try {
-      console.log('Purchasing label for shipment:', shipmentId, 'with rate:', selectedRate.id);
+      const result = await onBuyLabel(shipmentResponse.id, selectedRate.id);
       
-      if (!shipmentId) {
-        throw new Error("No shipment ID found. Please create a shipment first.");
-      }
-      
-      // Use the EasyPost service directly to purchase the label
-      const labelData = await easyPostService.purchaseLabel(shipmentId, selectedRate.id);
-      
-      // Update the order status if an order ID is available
+      // If there's an associated order, update its status
       if (orderId) {
-        try {
-          await orderService.updateOrderWithShipment(
-            orderId, 
-            shipmentId, 
-            labelData.tracking_code || "Unknown"
-          );
-          console.log("Order updated successfully with shipment data:", labelData);
-        } catch (orderError) {
-          console.error("Error updating order:", orderError);
-          // Continue even if order update fails
-        }
+        await linkShipmentToOrder(orderId, {
+          id: result.id,
+          carrier: result.carrier,
+          service: result.service,
+          trackingNumber: result.tracking_code,
+          trackingUrl: result.tracker.public_url,
+          labelUrl: result.postage_label.label_url
+        });
       }
       
-      toast.success("Shipping label purchased successfully!");
-      
-      // Store the purchased label data in sessionStorage for the Shipments page to use
-      try {
-        sessionStorage.setItem('lastPurchasedLabel', JSON.stringify(labelData));
-      } catch (storageError) {
-        console.error("Error storing label data:", storageError);
-      }
-      
-      // Show the label dialog instead of navigating away
-      setLabelData(labelData);
-      setIsLabelDialogOpen(true);
     } catch (error) {
       console.error("Error purchasing label:", error);
-      
-      // Improved error handling - check if there's a detailed error message from EasyPost
-      let errorMessage = "Failed to purchase shipping label";
-      
-      // Try to extract detailed error message from the response
-      if (error instanceof Error) {
-        // Check if the error response contains details about missing phone number
-        if (error.message.includes('non-2xx status code')) {
-          errorMessage = "Validation error: The recipient needs a phone number. Please add a phone number to the shipping address.";
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
-      toast.error(errorMessage);
+      toast.error("Failed to purchase shipping label");
     } finally {
       setPurchasing(false);
     }
   };
   
-  const handleDialogClose = () => {
-    setIsLabelDialogOpen(false);
-    
-    // Navigate to the Shipments page with the shipment ID as a query parameter
-    // This will highlight the newly created shipment in the table
-    if (labelData && labelData.id) {
-      navigate(`/shipments?highlight=${labelData.id}`);
-    } else {
-      navigate('/shipments');
-    }
-  };
-  
   return (
-    <CardFooter className="flex justify-between">
-      <Button
-        variant="outline"
-        onClick={onBack}
-      >
-        Back to Shipment Details
+    <div className="flex justify-between items-center mt-6 pt-4 border-t">
+      <Button variant="ghost" onClick={onBack} className="gap-1">
+        <ArrowLeft className="w-4 h-4" />
+        Back
       </Button>
-      
       <Button 
-        className="bg-tms-blue hover:bg-tms-blue-400"
-        disabled={!selectedRate || purchasing}
         onClick={handlePurchaseLabel}
+        disabled={!selectedRate || purchasing} 
+        className="bg-tms-blue hover:bg-tms-blue-400 gap-1"
       >
-        <Package className="mr-2 h-4 w-4" />
-        {purchasing ? "Processing..." : "Purchase Label"}
+        {purchasing ? (
+          <>
+            <LoadingSpinner size={16} className="mr-2" />
+            Purchasing...
+          </>
+        ) : (
+          <>
+            <Package className="w-4 h-4" />
+            Buy Label
+            {selectedRate && <span className="ml-1">${parseFloat(selectedRate.rate).toFixed(2)}</span>}
+          </>
+        )}
       </Button>
-      
-      {/* Shipping Label Dialog */}
-      {labelData && (
-        <ShippingLabelDialog
-          isOpen={isLabelDialogOpen}
-          onClose={handleDialogClose}
-          labelUrl={labelData.postage_label?.label_url}
-          shipmentId={labelData.id}
-        />
-      )}
-    </CardFooter>
+    </div>
   );
 };
