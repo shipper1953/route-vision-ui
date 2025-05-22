@@ -6,7 +6,7 @@ import { Address } from "@/types/easypost";
 
 declare global {
   interface Window {
-    google: any;
+    google: typeof google;
     initGooglePlaces: () => void;
   }
 }
