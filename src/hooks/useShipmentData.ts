@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Shipment } from "@/components/shipment/ShipmentsTable";
+import { fetchOrders } from "@/services/orderService";
 
 // Sample data as fallback
 const sampleShipments: Shipment[] = [
@@ -68,7 +69,7 @@ export const useShipmentData = () => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load shipments from Supabase or local storage
+  // Load shipments from Supabase, local storage, and orders
   useEffect(() => {
     const loadShipments = async () => {
       setLoading(true);
@@ -93,11 +94,40 @@ export const useShipmentData = () => {
           }
         }
         
+        // Get shipments from orders
+        let orderShipments: Shipment[] = [];
+        try {
+          const orders = await fetchOrders();
+          orderShipments = orders
+            .filter(order => order.shipment)
+            .map(order => ({
+              id: order.shipment!.id,
+              tracking: order.shipment!.trackingNumber,
+              carrier: order.shipment!.carrier,
+              carrierUrl: order.shipment!.trackingUrl,
+              service: order.shipment!.service,
+              origin: order.shippingAddress 
+                ? `${order.shippingAddress.city}, ${order.shippingAddress.state}` 
+                : "Unknown Origin",
+              destination: "Destination",
+              shipDate: order.orderDate,
+              estimatedDeliveryDate: order.shipment!.estimatedDeliveryDate || null,
+              actualDelivery: order.shipment!.actualDeliveryDate || null,
+              status: order.status,
+              weight: order.parcelInfo ? `${order.parcelInfo.weight} oz` : "Unknown",
+              labelUrl: order.shipment!.labelUrl
+            }));
+          console.log("Found shipments from orders:", orderShipments.length);
+        } catch (err) {
+          console.error("Error getting shipments from orders:", err);
+        }
+        
         if (error || !supabaseShipments?.length) {
-          console.log("No shipments from Supabase, using local storage data");
+          console.log("No shipments from Supabase, using local storage and order data");
           
-          if (localStorageShipments.length > 0) {
-            setShipments(localStorageShipments);
+          if (localStorageShipments.length > 0 || orderShipments.length > 0) {
+            // Merge local storage shipments and order shipments
+            setShipments(mergeShipments([], [...localStorageShipments, ...orderShipments]));
           } else {
             // Use sample data if nothing else is available
             console.log("No local shipments, using sample data");
@@ -115,15 +145,15 @@ export const useShipmentData = () => {
             origin: s.origin_address ? 'Origin' : 'Unknown Origin',
             destination: s.destination_address ? 'Destination' : 'Unknown Destination',
             shipDate: new Date(s.created_at).toLocaleDateString(),
-            estimatedDelivery: s.estimated_delivery_date ? new Date(s.estimated_delivery_date).toLocaleDateString() : null,
+            estimatedDeliveryDate: s.estimated_delivery_date ? new Date(s.estimated_delivery_date).toLocaleDateString() : null,
             actualDelivery: s.actual_delivery_date ? new Date(s.actual_delivery_date).toLocaleDateString() : null,
             status: s.status || 'created',
             weight: `${s.weight || '0'} lbs`,
             labelUrl: s.label_url
           }));
           
-          // Merge with any local storage shipments that might not be in the database yet
-          const mergedShipments = mergeShipments(formattedShipments, localStorageShipments);
+          // Merge with any local storage shipments and order shipments
+          const mergedShipments = mergeShipments(formattedShipments, [...localStorageShipments, ...orderShipments]);
           setShipments(mergedShipments);
           
           // Update local storage with merged list
@@ -156,7 +186,7 @@ export const useShipmentData = () => {
   }, []);
 
   // Helper function to merge shipments from different sources
-  const mergeShipments = (dbShipments: Shipment[], localShipments: Shipment[]): Shipment[] => {
+  const mergeShipments = (dbShipments: Shipment[], otherShipments: Shipment[]): Shipment[] => {
     // Create a map of existing shipments by ID for quick lookup
     const shipmentMap = new Map<string, Shipment>();
     
@@ -165,8 +195,8 @@ export const useShipmentData = () => {
       shipmentMap.set(shipment.id, shipment);
     });
     
-    // Add local shipments if they don't exist in the database yet
-    localShipments.forEach(shipment => {
+    // Add other shipments if they don't exist in the database yet
+    otherShipments.forEach(shipment => {
       if (!shipmentMap.has(shipment.id)) {
         shipmentMap.set(shipment.id, shipment);
       }

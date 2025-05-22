@@ -20,7 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Package, Search, FileDown, Truck, ShoppingBag } from "lucide-react";
+import { Package, Search, FileDown, Truck, ShoppingBag, CalendarCheck, Calendar, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchOrders, OrderData } from "@/services/orderService";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -43,6 +43,43 @@ const OrderStatus = ({ status }: { status: string }) => {
 
   const { label, variant } = getStatusDetails(status);
   return <Badge variant={variant as any}>{label}</Badge>;
+};
+
+const ShipmentInfo = ({ shipment }: { shipment?: OrderData['shipment'] }) => {
+  if (!shipment) return null;
+  
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1">
+        <Truck size={14} className="text-muted-foreground" />
+        <span className="text-sm">{shipment.carrier} {shipment.service}</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <Package size={14} className="text-muted-foreground" />
+        <a 
+          href={shipment.trackingUrl} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+        >
+          {shipment.trackingNumber}
+          <ExternalLink size={12} />
+        </a>
+      </div>
+      {shipment.estimatedDeliveryDate && (
+        <div className="flex items-center gap-1">
+          <Calendar size={14} className="text-muted-foreground" />
+          <span className="text-sm">Est: {new Date(shipment.estimatedDeliveryDate).toLocaleDateString()}</span>
+        </div>
+      )}
+      {shipment.actualDeliveryDate && (
+        <div className="flex items-center gap-1">
+          <CalendarCheck size={14} className="text-muted-foreground" />
+          <span className="text-sm">Delivered: {new Date(shipment.actualDeliveryDate).toLocaleDateString()}</span>
+        </div>
+      )}
+    </div>
+  );
 };
 
 const Orders = () => {
@@ -130,6 +167,7 @@ const Orders = () => {
                   <TableHead>Required Delivery</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Shipment Details</TableHead>
                   <TableHead className="text-right">Value</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -147,6 +185,9 @@ const Orders = () => {
                     <TableCell>{order.items}</TableCell>
                     <TableCell>
                       <OrderStatus status={order.status} />
+                    </TableCell>
+                    <TableCell>
+                      <ShipmentInfo shipment={order.shipment} />
                     </TableCell>
                     <TableCell className="text-right">{order.value}</TableCell>
                     <TableCell>
@@ -170,7 +211,7 @@ const Orders = () => {
                 
                 {filteredOrders.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
+                    <TableCell colSpan={9} className="h-24 text-center">
                       No orders found.
                     </TableCell>
                   </TableRow>

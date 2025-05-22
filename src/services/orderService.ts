@@ -16,6 +16,17 @@ export interface ParcelInfo {
   weight: number;
 }
 
+export interface ShipmentInfo {
+  id: string;
+  carrier: string;
+  service: string;
+  trackingNumber: string;
+  trackingUrl: string;
+  estimatedDeliveryDate?: string;
+  actualDeliveryDate?: string;
+  labelUrl?: string;
+}
+
 export interface OrderData {
   id: string;
   customerName: string;
@@ -29,6 +40,7 @@ export interface OrderData {
   value: string;
   shippingAddress: OrderAddress;
   parcelInfo?: ParcelInfo; // This would come from the Qboid scanning system
+  shipment?: ShipmentInfo; // New field to link shipment details
 }
 
 // Mock database of orders for demonstration purposes
@@ -168,6 +180,34 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
 }
 
 /**
+ * Links a shipment to an order and updates its status
+ * @param orderId The ID of the order to update
+ * @param shipmentInfo The shipment information to link
+ * @returns The updated order or null if not found
+ */
+export async function linkShipmentToOrder(
+  orderId: string,
+  shipmentInfo: ShipmentInfo
+): Promise<OrderData | null> {
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 600));
+  
+  // Find the order
+  const orderIndex = mockOrders.findIndex(order => order.id === orderId);
+  
+  if (orderIndex === -1) {
+    return null;
+  }
+  
+  // Update the order with shipment info and change status to shipped
+  mockOrders[orderIndex].shipment = shipmentInfo;
+  mockOrders[orderIndex].status = "shipped";
+  
+  // Return a copy of the updated order
+  return {...mockOrders[orderIndex]};
+}
+
+/**
  * Updates an order with shipment information
  * @param orderId The ID of the order to update
  * @param shipmentId The ID of the associated shipment
@@ -202,5 +242,6 @@ export default {
   fetchOrderById,
   fetchOrders,
   createOrder,
-  updateOrderWithShipment
+  updateOrderWithShipment,
+  linkShipmentToOrder
 };
