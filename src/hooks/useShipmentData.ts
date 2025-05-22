@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -95,7 +94,7 @@ export const useShipmentData = () => {
           const formattedShipments: Shipment[] = supabaseShipments.map(s => ({
             id: s.easypost_id || String(s.id), // Convert id to string
             tracking: s.tracking_number || 'Pending',
-            carrier: s.carrier || 'Unknown',
+            // Fix here: Use a default value if tracking_url doesn't exist
             carrierUrl: s.tracking_url || '#',
             service: s.carrier_service || 'Standard',
             origin: s.origin_address ? 'Origin' : 'Unknown Origin',
@@ -144,7 +143,7 @@ export const useShipmentData = () => {
           const newShipment: Shipment = {
             id: labelData.id, // This is already a string from EasyPost
             tracking: labelData.tracking_code || 'Pending',
-            carrier: labelData.selected_rate?.carrier || 'Unknown',
+            // Fix here: Use a conditional check for tracker and public_url
             carrierUrl: labelData.tracker?.public_url || '#',
             service: labelData.selected_rate?.service || 'Standard',
             origin: labelData.from_address?.city + ', ' + labelData.from_address?.state || 'Origin',
