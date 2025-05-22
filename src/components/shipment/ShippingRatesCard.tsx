@@ -15,7 +15,7 @@ interface ShippingRatesCardProps {
   shipmentResponse: ShipmentResponse;
   selectedRate: SmartRate | Rate | null;
   setSelectedRate: (rate: SmartRate | Rate | null) => void;
-  recommendedRate: SmartRate | null;
+  recommendedRate: SmartRate | Rate | null;
   onBack: () => void;
 }
 
@@ -75,9 +75,13 @@ export const ShippingRatesCard = ({
       </CardContent>
       
       <ShippingRatesCardFooter 
+        shipmentResponse={shipmentResponse}
         selectedRate={selectedRate}
         onBack={onBack}
-        shipmentId={shipmentResponse.id} // Pass shipment ID from response
+        onBuyLabel={async (shipmentId, rateId) => {
+          // This will be implemented by the parent component through props
+          return {} as any;
+        }}
       />
     </Card>
   );

@@ -4,6 +4,7 @@ import { ShipmentForm } from "@/components/shipment/ShipmentForm";
 import { ShippingRatesCard } from "@/components/shipment/ShippingRatesCard";
 import { useShipment } from "@/hooks/useShipment";
 import { useState, useEffect } from "react";
+import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
 
 const CreateShipment = () => {
   const { 
@@ -12,7 +13,8 @@ const CreateShipment = () => {
     recommendedRate, 
     setSelectedRate, 
     handleShipmentCreated, 
-    resetShipment 
+    resetShipment,
+    purchaseLabel 
   } = useShipment();
   
   // Log when shipmentResponse changes to debug

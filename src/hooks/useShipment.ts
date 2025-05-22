@@ -4,35 +4,21 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { OrderData, linkShipmentToOrder } from "@/services/orderService";
-import easyPostService from "@/services/easypost";
+import easyPostService, { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
 
 export const useShipment = (orderId?: string) => {
   const [isCreatingShipment, setIsCreatingShipment] = useState(false);
   const [shipmentId, setShipmentId] = useState<string | null>(null);
-  const [shipmentResponse, setShipmentResponse] = useState<any>(null);
-  const [selectedRate, setSelectedRate] = useState<any>(null);
-  const [recommendedRate, setRecommendedRate] = useState<any>(null);
+  const [shipmentResponse, setShipmentResponse] = useState<ShipmentResponse | null>(null);
+  const [selectedRate, setSelectedRate] = useState<SmartRate | Rate | null>(null);
+  const [recommendedRate, setRecommendedRate] = useState<SmartRate | Rate | null>(null);
   const navigate = useNavigate();
 
-  const handleShipmentCreated = async (shipmentData: any) => {
-    try {
-      const response = await createShipment(shipmentData);
-      setShipmentResponse(response);
-      
-      // Find and set the recommended rate
-      if (response && response.rates && response.rates.length > 0) {
-        // Find the lowest cost rate as recommended
-        const sorted = [...response.rates].sort((a, b) => 
-          parseFloat(a.rate) - parseFloat(b.rate)
-        );
-        setRecommendedRate(sorted[0]);
-      }
-      
-      return response;
-    } catch (error) {
-      console.error("Error handling shipment creation:", error);
-      throw error;
-    }
+  const handleShipmentCreated = async (response: ShipmentResponse, recRate: SmartRate | Rate | null) => {
+    setShipmentResponse(response);
+    setRecommendedRate(recRate);
+    
+    return response;
   };
 
   const createShipment = async (shipmentData: any) => {
@@ -57,7 +43,7 @@ export const useShipment = (orderId?: string) => {
     }
   };
 
-  const purchaseLabel = async (shipmentId: string, rateId: string, orderId?: string) => {
+  const purchaseLabel = async (shipmentId: string, rateId: string) => {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`);
       
