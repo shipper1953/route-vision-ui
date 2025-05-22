@@ -57,19 +57,25 @@ serve(async (req) => {
       }),
     })
     
+    const responseText = await response.text()
+    let responseData
+    
+    try {
+      responseData = JSON.parse(responseText)
+    } catch (err) {
+      responseData = { raw_response: responseText }
+    }
+    
     if (!response.ok) {
-      const errorData = await response.json()
-      console.error('EasyPost API error:', errorData)
+      console.error('EasyPost API error:', responseData)
       return new Response(JSON.stringify({
         error: 'EasyPost API error',
-        details: errorData
+        details: responseData
       }), {
         headers: corsHeaders,
         status: response.status,
       })
     }
-    
-    const purchaseResponse = await response.json()
     
     // Optional: Try to update shipment status in database if authenticated
     try {
@@ -91,15 +97,19 @@ serve(async (req) => {
             .from('shipments')
             .update({
               status: 'purchased',
-              label_url: purchaseResponse.postage_label?.label_url,
-              tracking_code: purchaseResponse.tracking_code,
-              selected_rate: rateId
+              label_url: responseData.postage_label?.label_url,
+              tracking_code: responseData.tracking_code,
+              selected_rate: rateId,
+              carrier: responseData.selected_rate?.carrier,
+              service: responseData.selected_rate?.service,
+              tracking_url: responseData.tracker?.public_url
             })
             .eq('easypost_id', shipmentId)
-            .eq('user_id', userData.user.id)
             
           if (updateError) {
             console.error('Error updating shipment in database:', updateError)
+          } else {
+            console.log('Shipment updated successfully in database')
           }
         }
       }
@@ -108,8 +118,8 @@ serve(async (req) => {
       // Continue even if database update fails
     }
     
-    // Return the purchase response regardless of database update
-    return new Response(JSON.stringify(purchaseResponse), { headers: corsHeaders })
+    // Return the complete purchase response
+    return new Response(JSON.stringify(responseData), { headers: corsHeaders })
     
   } catch (err) {
     console.error('Error processing request:', err)

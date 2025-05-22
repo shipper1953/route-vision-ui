@@ -1,3 +1,4 @@
+
 import { EasyPostService } from "@/services/easypostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
@@ -209,6 +210,25 @@ export class RealEasyPostService implements EasyPostService {
           throw new Error(error.message);
         }
         
+        // Store the purchased label data in sessionStorage for the Shipments page to use
+        if (data) {
+          sessionStorage.setItem('lastPurchasedLabel', JSON.stringify(data));
+          
+          // Also try to update the order status in localStorage
+          try {
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const updatedOrders = orders.map((order: any) => {
+              if (order.status === 'ready_to_ship') {
+                return {...order, status: 'shipped'};
+              }
+              return order;
+            });
+            localStorage.setItem('orders', JSON.stringify(updatedOrders));
+          } catch (e) {
+            console.log('Could not update orders in localStorage:', e);
+          }
+        }
+        
         return data;
       }
       
@@ -232,6 +252,9 @@ export class RealEasyPostService implements EasyPostService {
       
       const labelData = await response.json();
       console.log('Label purchased successfully:', labelData);
+      
+      // Store the purchased label data in sessionStorage for the Shipments page to use
+      sessionStorage.setItem('lastPurchasedLabel', JSON.stringify(labelData));
       
       return labelData;
     } catch (error) {

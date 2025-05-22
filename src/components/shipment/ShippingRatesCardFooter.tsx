@@ -8,6 +8,7 @@ import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { useState } from "react";
 import easyPostService from "@/services/easypost";
+import orderService from "@/services/orderService";
 
 interface ShippingRatesCardFooterProps {
   selectedRate: SmartRate | Rate | null;
@@ -44,11 +45,26 @@ export const ShippingRatesCardFooter = ({
       // Use the EasyPost service directly to purchase the label
       const labelData = await easyPostService.purchaseLabel(shipmentId, selectedRate.id);
       
+      // Update the order status if an order ID is available
+      if (orderId) {
+        try {
+          await orderService.updateOrderWithShipment(
+            orderId, 
+            shipmentId, 
+            labelData.tracking_code || "Unknown"
+          );
+          console.log("Order updated successfully with shipment data:", labelData);
+        } catch (orderError) {
+          console.error("Error updating order:", orderError);
+          // Continue even if order update fails
+        }
+      }
+      
       toast.success("Shipping label purchased successfully!");
       
-      // Navigate back to Orders page after short delay
+      // Navigate to the Shipments page instead of Orders page
       setTimeout(() => {
-        window.location.href = orderId ? `/orders?highlight=${orderId}` : "/orders";
+        window.location.href = "/shipments";
       }, 2000);
     } catch (error) {
       console.error("Error purchasing label:", error);
