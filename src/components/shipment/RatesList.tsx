@@ -1,11 +1,12 @@
-import { SmartRate } from "@/services/easypost";
+
+import { SmartRate, Rate } from "@/services/easypost";
 import { RateOptionCard } from "./RateOptionCard";
 
 interface RatesListProps {
-  rates: SmartRate[];
+  rates: (SmartRate | Rate)[];
   selectedRate: SmartRate | null;
   recommendedRate: SmartRate | null;
-  setSelectedRate: (rate: SmartRate) => void;
+  setSelectedRate: (rate: SmartRate | Rate) => void;
 }
 
 export const RatesList = ({ 

@@ -1,12 +1,13 @@
+
 import { useState } from "react";
 import { Truck } from "lucide-react";
-import { SmartRate } from "@/services/easypost";
+import { SmartRate, Rate } from "@/services/easypost";
 
 interface RateOptionCardProps {
-  rate: SmartRate;
+  rate: SmartRate | Rate;
   isSelected: boolean;
   isRecommended: boolean;
-  onSelect: (rate: SmartRate) => void;
+  onSelect: (rate: SmartRate | Rate) => void;
 }
 
 export const RateOptionCard = ({ 
@@ -15,6 +16,9 @@ export const RateOptionCard = ({
   isRecommended,
   onSelect 
 }: RateOptionCardProps) => {
+  // Check if rate is a SmartRate by looking for SmartRate-specific properties
+  const isSmartRate = 'delivery_accuracy' in rate || 'delivery_date_guaranteed' in rate;
+  
   const getDeliveryAccuracyLabel = (accuracy?: string) => {
     switch (accuracy) {
       case 'percentile_50':
@@ -71,26 +75,31 @@ export const RateOptionCard = ({
             )}
           </div>
           <div className="text-sm text-muted-foreground">
-            Delivery in {rate.delivery_days} business day{rate.delivery_days !== 1 && 's'} 
-            {rate.delivery_date && ` - Est. delivery ${new Date(rate.delivery_date).toLocaleDateString()}`}
+            {rate.delivery_days && `Delivery in ${rate.delivery_days} business day${rate.delivery_days !== 1 ? 's' : ''}`}
+            {isSmartRate && (rate as SmartRate).delivery_date && 
+              ` - Est. delivery ${new Date((rate as SmartRate).delivery_date as string).toLocaleDateString()}`}
           </div>
         </div>
       </div>
       
       <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-6">
-        <div className="text-center">
-          <div className="text-sm text-muted-foreground">Accuracy</div>
-          <div className="font-medium">
-            {getDeliveryAccuracyLabel(rate.delivery_accuracy)}
-          </div>
-        </div>
-        
-        <div className="text-center">
-          <div className="text-sm text-muted-foreground">Guaranteed</div>
-          <div className="font-medium">
-            {rate.delivery_date_guaranteed ? 'Yes' : 'No'}
-          </div>
-        </div>
+        {isSmartRate && (
+          <>
+            <div className="text-center">
+              <div className="text-sm text-muted-foreground">Accuracy</div>
+              <div className="font-medium">
+                {getDeliveryAccuracyLabel((rate as SmartRate).delivery_accuracy)}
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-sm text-muted-foreground">Guaranteed</div>
+              <div className="font-medium">
+                {(rate as SmartRate).delivery_date_guaranteed ? 'Yes' : 'No'}
+              </div>
+            </div>
+          </>
+        )}
         
         <div className="text-right font-bold text-lg text-tms-blue">
           ${rate.rate}

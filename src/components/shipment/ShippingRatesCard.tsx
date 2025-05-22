@@ -27,6 +27,16 @@ export const ShippingRatesCard = ({
   // Get form context from parent component
   const form = useFormContext();
   
+  // Debug log to see what's coming back from the API
+  console.log("ShippingRatesCard received response:", shipmentResponse);
+  console.log("Available smartrates:", shipmentResponse?.smartrates?.length || 0);
+  console.log("Available rates:", shipmentResponse?.rates?.length || 0);
+  
+  // Use either smartrates or regular rates (fallback) if available
+  const availableRates = shipmentResponse?.smartrates?.length ? 
+    shipmentResponse.smartrates : 
+    (shipmentResponse?.rates?.length ? shipmentResponse.rates : []);
+  
   // If there's no form context, render without FormProvider
   if (!form) {
     return (
@@ -34,9 +44,9 @@ export const ShippingRatesCard = ({
         <ShippingRatesCardHeader />
         
         <CardContent>
-          {shipmentResponse.smartrates && shipmentResponse.smartrates.length > 0 ? (
+          {availableRates.length > 0 ? (
             <RatesList 
-              rates={shipmentResponse.smartrates}
+              rates={availableRates}
               selectedRate={selectedRate}
               recommendedRate={recommendedRate}
               setSelectedRate={setSelectedRate}
@@ -44,6 +54,9 @@ export const ShippingRatesCard = ({
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No shipping rates available
+              {shipmentResponse.id && (
+                <p className="mt-2 text-xs">Shipment created (ID: {shipmentResponse.id}), but no rates were returned.</p>
+              )}
             </div>
           )}
         </CardContent>
@@ -62,9 +75,9 @@ export const ShippingRatesCard = ({
       <ShippingRatesCardHeader />
       
       <CardContent>
-        {shipmentResponse.smartrates && shipmentResponse.smartrates.length > 0 ? (
+        {availableRates.length > 0 ? (
           <RatesList 
-            rates={shipmentResponse.smartrates}
+            rates={availableRates}
             selectedRate={selectedRate}
             recommendedRate={recommendedRate}
             setSelectedRate={setSelectedRate}
@@ -72,6 +85,9 @@ export const ShippingRatesCard = ({
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             No shipping rates available
+            {shipmentResponse.id && (
+              <p className="mt-2 text-xs">Shipment created (ID: {shipmentResponse.id}), but no rates were returned.</p>
+            )}
           </div>
         )}
       </CardContent>
