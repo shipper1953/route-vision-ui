@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ArrowLeft, Package, Download } from "lucide-react";
-import { ShipmentResponse, SmartRate } from "@/services/easypost";
+import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import { linkShipmentToOrder } from "@/services/orderService";
 
 interface ShippingRatesCardFooterProps {
   shipmentResponse: ShipmentResponse;
-  selectedRate: SmartRate | null;
+  selectedRate: SmartRate | Rate | null;
   onBack: () => void;
   onBuyLabel: (shipmentId: string, rateId: string) => Promise<any>;
 }
@@ -24,7 +24,9 @@ export const ShippingRatesCardFooter = ({
 }: ShippingRatesCardFooterProps) => {
   const [purchasing, setPurchasing] = useState(false);
   const form = useFormContext<ShipmentForm>();
-  const orderId = form.getValues("orderId");
+  
+  // Safely get orderID from form context if available
+  const orderId = form?.getValues ? form.getValues("orderId") : undefined;
   
   const handlePurchaseLabel = async () => {
     if (!selectedRate) {
