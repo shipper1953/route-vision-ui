@@ -1,5 +1,5 @@
 
-import { useForm, FormProvider } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,16 +48,16 @@ const CreateOrder = () => {
           <CardDescription>Enter the order details below.</CardDescription>
         </CardHeader>
         <CardContent>
-          <FormProvider {...form}>
-            <Form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <CustomerInfoSection />
                 <ShippingAddressSection />
               </div>
               
               <OrderFormActions isSubmitting={isSubmitting} />
-            </Form>
-          </FormProvider>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </TmsLayout>

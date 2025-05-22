@@ -16,6 +16,12 @@ export const useOrderAddressLookup = () => {
       
       console.log('Selected address for order form:', address);
       
+      if (!form) {
+        console.error("Form context is not available");
+        toast.error("Could not update form with selected address");
+        return false;
+      }
+      
       // Fill in the form with the selected address
       form.setValue('street1', address.street1);
       form.setValue('street2', address.street2 || "");

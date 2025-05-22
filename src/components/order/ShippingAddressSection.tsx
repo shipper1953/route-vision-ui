@@ -6,7 +6,7 @@ import { OrderFormValues } from "@/types/order";
 import { OrderAddressLookup } from "@/components/order/OrderAddressLookup";
 
 export const ShippingAddressSection = () => {
-  const form = useFormContext<OrderFormValues>();
+  // No need to explicitly define the form context as FormField will access it through Form context
   
   return (
     <div className="space-y-4">
@@ -15,7 +15,6 @@ export const ShippingAddressSection = () => {
       <OrderAddressLookup />
       
       <FormField
-        control={form.control}
         name="street1"
         render={({ field }) => (
           <FormItem>
@@ -29,7 +28,6 @@ export const ShippingAddressSection = () => {
       />
       
       <FormField
-        control={form.control}
         name="street2"
         render={({ field }) => (
           <FormItem>
@@ -44,7 +42,6 @@ export const ShippingAddressSection = () => {
       
       <div className="grid grid-cols-2 gap-4">
         <FormField
-          control={form.control}
           name="city"
           render={({ field }) => (
             <FormItem>
@@ -58,7 +55,6 @@ export const ShippingAddressSection = () => {
         />
         
         <FormField
-          control={form.control}
           name="state"
           render={({ field }) => (
             <FormItem>
@@ -74,7 +70,6 @@ export const ShippingAddressSection = () => {
       
       <div className="grid grid-cols-2 gap-4">
         <FormField
-          control={form.control}
           name="zip"
           render={({ field }) => (
             <FormItem>
@@ -88,7 +83,6 @@ export const ShippingAddressSection = () => {
         />
         
         <FormField
-          control={form.control}
           name="country"
           render={({ field }) => (
             <FormItem>

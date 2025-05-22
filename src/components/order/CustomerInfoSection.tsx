@@ -7,18 +7,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useFormContext } from "react-hook-form";
-import { OrderFormValues } from "@/types/order";
 
 export const CustomerInfoSection = () => {
-  const form = useFormContext<OrderFormValues>();
-  
   return (
     <div className="space-y-4">
       <h3 className="font-medium text-lg">Customer Information</h3>
       
       <FormField
-        control={form.control}
         name="customerName"
         render={({ field }) => (
           <FormItem>
@@ -32,7 +27,6 @@ export const CustomerInfoSection = () => {
       />
       
       <FormField
-        control={form.control}
         name="customerCompany"
         render={({ field }) => (
           <FormItem>
@@ -47,7 +41,6 @@ export const CustomerInfoSection = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
-          control={form.control}
           name="customerEmail"
           render={({ field }) => (
             <FormItem>
@@ -61,7 +54,6 @@ export const CustomerInfoSection = () => {
         />
         
         <FormField
-          control={form.control}
           name="customerPhone"
           render={({ field }) => (
             <FormItem>
@@ -77,7 +69,6 @@ export const CustomerInfoSection = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
-          control={form.control}
           name="items"
           render={({ field }) => (
             <FormItem>
@@ -86,7 +77,6 @@ export const CustomerInfoSection = () => {
                 <Input 
                   type="number" 
                   min={1}
-                  {...field}
                   onChange={e => field.onChange(parseInt(e.target.value) || 0)}
                   value={field.value || ""}
                 />
@@ -97,7 +87,6 @@ export const CustomerInfoSection = () => {
         />
         
         <FormField
-          control={form.control}
           name="value"
           render={({ field }) => (
             <FormItem>
@@ -112,7 +101,6 @@ export const CustomerInfoSection = () => {
       </div>
       
       <FormField
-        control={form.control}
         name="requiredDeliveryDate"
         render={({ field }) => (
           <FormItem>
