@@ -26,23 +26,33 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       return null;
     }
     
+    // Parse shipment tracking data if available
+    let shipmentInfo;
+    if (data.tracking) {
+      try {
+        shipmentInfo = JSON.parse(data.tracking);
+      } catch (e) {
+        console.warn("Failed to parse tracking data:", e);
+      }
+    }
+    
     // Convert Supabase data format to our OrderData format
     return {
       id: `ORD-${data.id}`,
       customerName: data.customer_name,
       orderDate: data.order_date,
       requiredDeliveryDate: data.required_delivery_date,
-      status: data.status === "processing" ? "ready_to_ship" : data.status || "ready_to_ship", // Set processing orders to ready_to_ship
+      status: data.status || "processing",
       items: data.items || 0,
       value: data.value?.toString() || "0",
       shippingAddress: data.shipping_address ? JSON.parse(data.shipping_address) : {},
-      shipment: data.tracking_number ? {
+      shipment: shipmentInfo || (data.tracking_number ? {
         id: `SHIP-${data.id}`,
         carrier: "Unknown",
         service: "Standard",
         trackingNumber: data.tracking_number,
         trackingUrl: `https://www.trackingmore.com/track/en/${data.tracking_number}`
-      } : undefined
+      } : undefined)
     };
   } catch (err) {
     console.error("Error fetching order from Supabase:", err);
@@ -79,23 +89,35 @@ export async function fetchOrders(): Promise<OrderData[]> {
     console.log(`Found ${data.length} orders in Supabase`);
     
     // Convert Supabase data to our OrderData format
-    const supabaseOrders: OrderData[] = data.map(order => ({
-      id: `ORD-${order.id}`,
-      customerName: order.customer_name,
-      orderDate: order.order_date,
-      requiredDeliveryDate: order.required_delivery_date,
-      status: order.status === "processing" ? "ready_to_ship" : order.status || "ready_to_ship", // Set processing orders to ready_to_ship
-      items: order.items || 0,
-      value: order.value?.toString() || "0",
-      shippingAddress: order.shipping_address ? JSON.parse(order.shipping_address) : {},
-      shipment: order.tracking_number ? {
-        id: `SHIP-${order.id}`,
-        carrier: "Unknown",
-        service: "Standard",
-        trackingNumber: order.tracking_number,
-        trackingUrl: `https://www.trackingmore.com/track/en/${order.tracking_number}`
-      } : undefined
-    }));
+    const supabaseOrders: OrderData[] = data.map(order => {
+      // Parse shipment tracking data if available
+      let shipmentInfo;
+      if (order.tracking) {
+        try {
+          shipmentInfo = JSON.parse(order.tracking);
+        } catch (e) {
+          console.warn("Failed to parse tracking data for order", order.id, e);
+        }
+      }
+      
+      return {
+        id: `ORD-${order.id}`,
+        customerName: order.customer_name,
+        orderDate: order.order_date,
+        requiredDeliveryDate: order.required_delivery_date,
+        status: order.status || "processing",
+        items: order.items || 0,
+        value: order.value?.toString() || "0",
+        shippingAddress: order.shipping_address ? JSON.parse(order.shipping_address) : {},
+        shipment: shipmentInfo || (order.tracking_number ? {
+          id: `SHIP-${order.id}`,
+          carrier: "Unknown",
+          service: "Standard",
+          trackingNumber: order.tracking_number,
+          trackingUrl: `https://www.trackingmore.com/track/en/${order.tracking_number}`
+        } : undefined)
+      };
+    });
     
     return supabaseOrders;
   } catch (err) {

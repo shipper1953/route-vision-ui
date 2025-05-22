@@ -6,9 +6,12 @@ import { useShipment } from "@/hooks/useShipment";
 import { useState, useEffect } from "react";
 import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
 import { ShippingLabelDialog } from "@/components/shipment/ShippingLabelDialog";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const CreateShipment = () => {
+  const [searchParams] = useSearchParams();
+  const orderId = searchParams.get('orderId');
+  
   const { 
     shipmentResponse, 
     selectedRate, 
@@ -17,7 +20,8 @@ const CreateShipment = () => {
     handleShipmentCreated, 
     resetShipment,
     purchaseLabel 
-  } = useShipment();
+  } = useShipment(orderId);
+  
   const [labelData, setLabelData] = useState<any>(null);
   const [showLabelDialog, setShowLabelDialog] = useState(false);
   const navigate = useNavigate();
@@ -37,7 +41,13 @@ const CreateShipment = () => {
   // Handle dialog close and navigate to orders page
   const handleDialogClose = () => {
     setShowLabelDialog(false);
-    navigate('/orders');
+    
+    // If we have an orderId, highlight it in the orders page
+    if (orderId) {
+      navigate(`/orders?highlight=${orderId}`);
+    } else {
+      navigate('/orders');
+    }
   };
   
   return (

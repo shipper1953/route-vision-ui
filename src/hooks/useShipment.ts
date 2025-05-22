@@ -55,6 +55,8 @@ export const useShipment = (orderId?: string) => {
       // If we have an order ID, link the shipment to the order
       if (orderId) {
         try {
+          console.log(`Linking shipment to order ${orderId}`);
+          
           // Get the ETA from the selected rate
           const selectedRate = labelResponse.selected_rate;
           const estimatedDeliveryDate = selectedRate?.delivery_date || undefined;
@@ -70,11 +72,14 @@ export const useShipment = (orderId?: string) => {
             labelUrl: labelResponse.postage_label?.label_url
           });
           
-          console.log("Shipment linked to order:", orderId);
+          console.log("Shipment successfully linked to order:", orderId);
         } catch (linkError) {
           console.error("Error linking shipment to order:", linkError);
+          toast.error("Could not update order status. Please check the order details page.");
           // Don't fail the overall process if linking fails
         }
+      } else {
+        console.log("No order ID provided, skipping order update");
       }
       
       return labelResponse;

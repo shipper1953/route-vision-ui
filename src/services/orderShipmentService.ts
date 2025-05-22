@@ -15,11 +15,24 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
     // Remove "ORD-" prefix if present for numeric ID lookup
     const numericId = orderId.startsWith('ORD-') ? parseInt(orderId.replace('ORD-', '')) : parseInt(orderId);
     
+    // Format shipment details for JSON storage
+    const shipmentDetails = {
+      id: shipmentInfo.id,
+      carrier: shipmentInfo.carrier,
+      service: shipmentInfo.service,
+      trackingNumber: shipmentInfo.trackingNumber,
+      trackingUrl: shipmentInfo.trackingUrl,
+      estimatedDeliveryDate: shipmentInfo.estimatedDeliveryDate,
+      labelUrl: shipmentInfo.labelUrl
+    };
+    
+    // Update the order with shipment details as JSON and set status to shipped
     const { error } = await supabase
       .from('orders')
       .update({ 
         status: 'shipped',
-        tracking_number: shipmentInfo.trackingNumber
+        tracking_number: shipmentInfo.trackingNumber,
+        tracking: JSON.stringify(shipmentDetails)
       })
       .eq('id', numericId);
     
@@ -29,7 +42,11 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
       throw error;
     }
     
+    // Show success message
     toast.success(`Order ${orderId} marked as shipped`);
+    
+    // Add a small delay before redirecting to give time for the database to update
+    await new Promise(resolve => setTimeout(resolve, 300));
     
   } catch (err) {
     console.error("Error linking shipment to order:", err);
