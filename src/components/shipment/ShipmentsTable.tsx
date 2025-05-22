@@ -16,7 +16,7 @@ import { ShipmentStatus } from "./ShipmentStatus";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export interface Shipment {
-  id: string;
+  id: string;  // Changed to string only
   tracking: string;
   carrier: string;
   carrierUrl: string;

@@ -92,8 +92,8 @@ export const useShipmentData = () => {
           }
         } else {
           // Transform Supabase data to match our interface
-          const formattedShipments = supabaseShipments.map(s => ({
-            id: s.easypost_id || s.id,
+          const formattedShipments: Shipment[] = supabaseShipments.map(s => ({
+            id: s.easypost_id || String(s.id), // Convert id to string
             tracking: s.tracking_number || 'Pending',
             carrier: s.carrier || 'Unknown',
             carrierUrl: s.label_url || '#',
@@ -141,7 +141,7 @@ export const useShipmentData = () => {
         if (!exists && labelData.id) {
           // Create a new shipment entry from the label data
           const newShipment: Shipment = {
-            id: labelData.id,
+            id: labelData.id, // This is already a string from EasyPost
             tracking: labelData.tracking_code || 'Pending',
             carrier: labelData.selected_rate?.carrier || 'Unknown',
             carrierUrl: labelData.tracker?.public_url || '#',
