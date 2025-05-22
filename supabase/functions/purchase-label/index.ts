@@ -77,55 +77,85 @@ serve(async (req) => {
       })
     }
     
-    // Optional: Try to update shipment status in database if authenticated
+    // Update shipment in database if authenticated
     try {
       // Get auth token from request
       const authHeader = req.headers.get('Authorization')
-      if (authHeader) {
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-          { global: { headers: { Authorization: authHeader } } }
-        )
+      
+      // Create Supabase client
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+      const supabaseClient = createClient(
+        supabaseUrl,
+        supabaseAnonKey,
+        { global: { headers: { Authorization: authHeader || '' } } }
+      )
+      
+      // Get authenticated user if available
+      const { data: userData, error: authError } = await supabaseClient.auth.getUser()
+      
+      // Prepare shipment data
+      const shipmentData = {
+        easypost_id: responseData.id,
+        tracking_number: responseData.tracking_code,
+        carrier: responseData.selected_rate?.carrier,
+        carrier_service: responseData.selected_rate?.service,
+        status: 'purchased',
+        label_url: responseData.postage_label?.label_url,
+        // Add user ID if authenticated
+        ...(userData?.user ? { user_id: userData.user.id } : {})
+      };
+      
+      console.log("Saving shipment to database:", shipmentData);
+      
+      // First, check if the shipment exists
+      const { data: existingShipment, error: fetchError } = await supabaseClient
+        .from('shipments')
+        .select('*')
+        .eq('easypost_id', shipmentId)
+        .maybeSingle();
         
-        // Check if we have a valid user
-        const { data: userData, error: authError } = await supabaseClient.auth.getUser()
-        
-        if (!authError && userData?.user) {
-          // Update shipment status in database
-          const { error: updateError } = await supabaseClient
-            .from('shipments')
-            .update({
-              status: 'purchased',
-              label_url: responseData.postage_label?.label_url,
-              tracking_code: responseData.tracking_code,
-              selected_rate: rateId,
-              carrier: responseData.selected_rate?.carrier,
-              service: responseData.selected_rate?.service,
-              tracking_url: responseData.tracker?.public_url
-            })
-            .eq('easypost_id', shipmentId)
-            
-          if (updateError) {
-            console.error('Error updating shipment in database:', updateError)
-          } else {
-            console.log('Shipment updated successfully in database')
-          }
+      if (fetchError) {
+        console.error("Error checking existing shipment:", fetchError);
+      }
+      
+      if (existingShipment) {
+        // Update existing shipment
+        const { error: updateError } = await supabaseClient
+          .from('shipments')
+          .update(shipmentData)
+          .eq('easypost_id', shipmentId);
+          
+        if (updateError) {
+          console.error('Error updating existing shipment:', updateError);
+        } else {
+          console.log('Existing shipment updated successfully');
+        }
+      } else {
+        // Insert new shipment
+        const { error: insertError } = await supabaseClient
+          .from('shipments')
+          .insert(shipmentData);
+          
+        if (insertError) {
+          console.error('Error inserting new shipment:', insertError);
+        } else {
+          console.log('New shipment inserted successfully');
         }
       }
     } catch (err) {
-      console.error('Error updating shipment record:', err)
+      console.error('Error updating shipment record:', err);
       // Continue even if database update fails
     }
     
     // Return the complete purchase response
-    return new Response(JSON.stringify(responseData), { headers: corsHeaders })
+    return new Response(JSON.stringify(responseData), { headers: corsHeaders });
     
   } catch (err) {
-    console.error('Error processing request:', err)
+    console.error('Error processing request:', err);
     return new Response(JSON.stringify({ error: 'Internal server error', details: err.message }), {
       headers: corsHeaders,
       status: 500,
-    })
+    });
   }
-})
+});

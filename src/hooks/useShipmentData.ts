@@ -68,8 +68,8 @@ export const useShipmentData = () => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Load shipments from Supabase or local storage
   useEffect(() => {
-    // Function to load shipments from Supabase or local storage
     const loadShipments = async () => {
       setLoading(true);
       try {
@@ -79,15 +79,28 @@ export const useShipmentData = () => {
           .select('*')
           .order('created_at', { ascending: false });
         
+        console.log("Supabase shipments query result:", { data: supabaseShipments, error });
+        
+        // Get local storage shipments
+        let localStorageShipments: Shipment[] = [];
+        const storedShipments = localStorage.getItem('shipments');
+        if (storedShipments) {
+          try {
+            localStorageShipments = JSON.parse(storedShipments);
+            console.log("Found shipments in local storage:", localStorageShipments.length);
+          } catch (err) {
+            console.error("Error parsing local storage shipments:", err);
+          }
+        }
+        
         if (error || !supabaseShipments?.length) {
-          console.log("No shipments from Supabase, checking local storage");
+          console.log("No shipments from Supabase, using local storage data");
           
-          // Try to get from localStorage as fallback
-          const localShipments = localStorage.getItem('shipments');
-          if (localShipments) {
-            setShipments(JSON.parse(localShipments));
+          if (localStorageShipments.length > 0) {
+            setShipments(localStorageShipments);
           } else {
             // Use sample data if nothing else is available
+            console.log("No local shipments, using sample data");
             setShipments(sampleShipments);
           }
         } else {
@@ -96,7 +109,6 @@ export const useShipmentData = () => {
             id: s.easypost_id || String(s.id), // Convert id to string
             tracking: s.tracking_number || 'Pending',
             carrier: s.carrier || 'Unknown',
-            // Fix: Don't try to access properties that don't exist in the schema
             carrierUrl: s.tracking_number ? 
               `https://www.trackingmore.com/track/en/${s.tracking_number}` : '#',
             service: s.carrier_service || 'Standard',
@@ -110,17 +122,31 @@ export const useShipmentData = () => {
             labelUrl: s.label_url
           }));
           
-          setShipments(formattedShipments);
+          // Merge with any local storage shipments that might not be in the database yet
+          const mergedShipments = mergeShipments(formattedShipments, localStorageShipments);
+          setShipments(mergedShipments);
           
-          // Also save to localStorage for offline access
-          localStorage.setItem('shipments', JSON.stringify(formattedShipments));
+          // Update local storage with merged list
+          localStorage.setItem('shipments', JSON.stringify(mergedShipments));
+          console.log("Saved merged shipments to localStorage:", mergedShipments.length);
         }
       } catch (err) {
         console.error("Error loading shipments:", err);
-        toast.error("Could not load shipments. Showing sample data instead.");
+        toast.error("Could not load shipments. Showing available data instead.");
         
-        // Fallback to sample data
-        setShipments(sampleShipments);
+        // Try to load from localStorage as fallback
+        const storedShipments = localStorage.getItem('shipments');
+        if (storedShipments) {
+          try {
+            setShipments(JSON.parse(storedShipments));
+          } catch (parseErr) {
+            // As a last resort, use sample data
+            setShipments(sampleShipments);
+          }
+        } else {
+          // Fallback to sample data
+          setShipments(sampleShipments);
+        }
       } finally {
         setLoading(false);
       }
@@ -128,6 +154,33 @@ export const useShipmentData = () => {
     
     loadShipments();
   }, []);
+
+  // Helper function to merge shipments from different sources
+  const mergeShipments = (dbShipments: Shipment[], localShipments: Shipment[]): Shipment[] => {
+    // Create a map of existing shipments by ID for quick lookup
+    const shipmentMap = new Map<string, Shipment>();
+    
+    // Add database shipments to the map
+    dbShipments.forEach(shipment => {
+      shipmentMap.set(shipment.id, shipment);
+    });
+    
+    // Add local shipments if they don't exist in the database yet
+    localShipments.forEach(shipment => {
+      if (!shipmentMap.has(shipment.id)) {
+        shipmentMap.set(shipment.id, shipment);
+      }
+    });
+    
+    // Convert map back to array and sort by most recent first
+    return Array.from(shipmentMap.values())
+      .sort((a, b) => {
+        // Simple date parsing for comparison
+        const dateA = new Date(a.shipDate).getTime();
+        const dateB = new Date(b.shipDate).getTime();
+        return dateB - dateA; // Most recent first
+      });
+  };
 
   // Handle recently purchased label from session storage
   useEffect(() => {
@@ -145,7 +198,7 @@ export const useShipmentData = () => {
           // Create a new shipment entry from the label data
           const newShipment: Shipment = {
             id: labelData.id, // This is already a string from EasyPost
-            tracking: labelData.tracking_code || 'Pending',
+            tracking: labelData.tracking_number || 'Pending',
             carrier: labelData.selected_rate?.carrier || 'Unknown', 
             carrierUrl: labelData.tracker?.public_url || '#',
             service: labelData.selected_rate?.service || 'Standard',
@@ -161,14 +214,18 @@ export const useShipmentData = () => {
           
           console.log("Adding new shipment to list:", newShipment);
           
-          // Add to the start of the list
-          setShipments(prev => [newShipment, ...prev]);
+          // Create a new array with the new shipment at the beginning
+          const updatedShipments = [newShipment, ...shipments];
+          setShipments(updatedShipments);
           
           // Update localStorage to persist the new shipment
-          localStorage.setItem('shipments', JSON.stringify([newShipment, ...shipments]));
+          localStorage.setItem('shipments', JSON.stringify(updatedShipments));
           
           // Show a toast notification about the new shipment
           toast.success("New shipment added to your shipments list");
+          
+          // Save to Supabase if possible
+          saveShipmentToSupabase(labelData);
         }
         
         // Clear session storage to prevent duplicates on refresh
@@ -179,6 +236,48 @@ export const useShipmentData = () => {
       }
     }
   }, [shipments]);
+
+  // Function to save shipment to Supabase
+  const saveShipmentToSupabase = async (labelData: any) => {
+    try {
+      if (!labelData) return;
+      
+      // Check if user is authenticated
+      const { data: user } = await supabase.auth.getUser();
+      if (!user?.user) {
+        console.log("User not authenticated, skipping database save");
+        return;
+      }
+
+      // Format shipment data for Supabase
+      const shipmentData = {
+        easypost_id: labelData.id,
+        tracking_number: labelData.tracking_number,
+        carrier: labelData.selected_rate?.carrier,
+        carrier_service: labelData.selected_rate?.service,
+        status: 'purchased',
+        label_url: labelData.postage_label?.label_url,
+        weight: parseFloat(labelData.parcel?.weight) || 0,
+        // Add user_id if you have RLS policies that require it
+        user_id: user.user.id
+      };
+
+      const { data, error } = await supabase
+        .from('shipments')
+        .upsert(shipmentData, {
+          onConflict: 'easypost_id',
+          ignoreDuplicates: false
+        });
+
+      if (error) {
+        console.error("Error saving shipment to Supabase:", error);
+      } else {
+        console.log("Shipment saved to Supabase:", data);
+      }
+    } catch (err) {
+      console.error("Error in saveShipmentToSupabase:", err);
+    }
+  };
 
   return {
     shipments,
