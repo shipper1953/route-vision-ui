@@ -10,6 +10,7 @@ import { useState } from "react";
 import easyPostService from "@/services/easypost";
 import orderService from "@/services/orderService";
 import { useNavigate } from "react-router-dom";
+import { ShippingLabelDialog } from "./ShippingLabelDialog";
 
 interface ShippingRatesCardFooterProps {
   selectedRate: SmartRate | Rate | null;
@@ -25,6 +26,10 @@ export const ShippingRatesCardFooter = ({
   const form = useFormContext<ShipmentForm>();
   const [purchasing, setPurchasing] = useState(false);
   const navigate = useNavigate();
+  
+  // Add states for the dialog
+  const [isLabelDialogOpen, setIsLabelDialogOpen] = useState(false);
+  const [labelData, setLabelData] = useState<any>(null);
   
   const handlePurchaseLabel = async () => {
     if (!selectedRate) {
@@ -71,11 +76,9 @@ export const ShippingRatesCardFooter = ({
         console.error("Error storing label data:", storageError);
       }
       
-      // Navigate to the Shipments page with the shipment ID as a query parameter
-      // This will highlight the newly created shipment in the table
-      setTimeout(() => {
-        navigate(`/shipments?highlight=${shipmentId}`);
-      }, 1000);
+      // Show the label dialog instead of navigating away
+      setLabelData(labelData);
+      setIsLabelDialogOpen(true);
     } catch (error) {
       console.error("Error purchasing label:", error);
       
@@ -98,6 +101,18 @@ export const ShippingRatesCardFooter = ({
     }
   };
   
+  const handleDialogClose = () => {
+    setIsLabelDialogOpen(false);
+    
+    // Navigate to the Shipments page with the shipment ID as a query parameter
+    // This will highlight the newly created shipment in the table
+    if (labelData && labelData.id) {
+      navigate(`/shipments?highlight=${labelData.id}`);
+    } else {
+      navigate('/shipments');
+    }
+  };
+  
   return (
     <CardFooter className="flex justify-between">
       <Button
@@ -115,6 +130,16 @@ export const ShippingRatesCardFooter = ({
         <Package className="mr-2 h-4 w-4" />
         {purchasing ? "Processing..." : "Purchase Label"}
       </Button>
+      
+      {/* Shipping Label Dialog */}
+      {labelData && (
+        <ShippingLabelDialog
+          isOpen={isLabelDialogOpen}
+          onClose={handleDialogClose}
+          labelUrl={labelData.postage_label?.label_url}
+          shipmentId={labelData.id}
+        />
+      )}
     </CardFooter>
   );
 };
