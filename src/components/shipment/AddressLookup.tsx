@@ -55,17 +55,20 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
           <div className="space-y-4">
             <h4 className="font-medium">Find Address</h4>
             
-            <GooglePlacesAutocomplete
-              placeholder="Enter address to search..."
-              onAddressSelected={async (address) => {
-                const success = await handleSelectAddress(address);
-                if (success) {
-                  setIsOpen(false);
-                  toast.success("Address selected successfully");
-                }
-              }}
-              isLoading={isLoading}
-            />
+            {/* Render the Google Places autocomplete only when the popover is open */}
+            {isOpen && (
+              <GooglePlacesAutocomplete
+                placeholder="Enter address to search..."
+                onAddressSelected={async (address) => {
+                  const success = await handleSelectAddress(address);
+                  if (success) {
+                    setIsOpen(false);
+                    toast.success("Address selected successfully");
+                  }
+                }}
+                isLoading={isLoading}
+              />
+            )}
             
             <div className="text-xs text-muted-foreground border-t pt-2 mt-2">
               Search for an address to auto-fill the form

@@ -46,7 +46,7 @@ declare namespace google {
         constructor(options?: {
           types?: string[];
           componentRestrictions?: ComponentRestrictions;
-          fields?: string[];
+          // No fields property in PlaceAutocompleteElement constructor
         });
         
         addEventListener(type: string, listener: EventListener): void;
@@ -57,8 +57,9 @@ declare namespace google {
       interface Place {
         addressComponents?: {
           types: string[];
-          longText: string;
-          shortText: string;
+          longText?: string;
+          shortText?: string;
+          text?: string;
         }[];
         formattedAddress?: string;
         fetchFields(options: { fields: string[] }): Promise<void>;

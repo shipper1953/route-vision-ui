@@ -31,10 +31,24 @@ export const GooglePlacesAutocomplete = ({
   const scriptRef = useRef<HTMLScriptElement | null>(null);
   const autocompleteElementRef = useRef<HTMLElement | null>(null);
   const [scriptLoadError, setScriptLoadError] = useState<string | null>(null);
+  const [attemptCount, setAttemptCount] = useState(0);
 
   // Initialize Google Places autocomplete
   useEffect(() => {
-    // Function to setup the autocomplete element
+    const cleanup = () => {
+      // Remove existing script if we're going to try again
+      if (scriptRef.current) {
+        scriptRef.current.remove();
+        scriptRef.current = null;
+      }
+      
+      // Clear any global handlers that might be registered
+      window.initGooglePlaces = () => {
+        console.log("Old callback cleaned up");
+      };
+    };
+
+    // Setup the autocomplete element
     const setupAutocompleteElement = () => {
       if (!containerRef.current || !window.google?.maps?.places?.PlaceAutocompleteElement) {
         console.warn("Google Maps PlaceAutocompleteElement not available");
@@ -47,11 +61,11 @@ export const GooglePlacesAutocomplete = ({
           containerRef.current.removeChild(containerRef.current.firstChild);
         }
 
-        // Create the new PlaceAutocompleteElement
+        // Create the new PlaceAutocompleteElement with proper parameters
         const element = new window.google.maps.places.PlaceAutocompleteElement({
           types: ["address"],
-          componentRestrictions: { country: "us" },
-          fields: ["address_components", "formatted_address", "geometry"]
+          componentRestrictions: { country: "us" }
+          // Remove 'fields' property as it's not supported in PlaceAutocompleteElement
         });
         
         element.style.width = "100%";
@@ -62,6 +76,8 @@ export const GooglePlacesAutocomplete = ({
         
         containerRef.current.appendChild(element);
         autocompleteElementRef.current = element;
+
+        console.log("PlaceAutocompleteElement added to DOM");
 
         // Add event listener for place selection
         element.addEventListener("gmp-placeselect", (event: any) => {
@@ -74,6 +90,7 @@ export const GooglePlacesAutocomplete = ({
 
           console.log("Selected place:", place);
           
+          // Fetch additional details needed for the address
           place.fetchFields({ fields: ["address_components", "formatted_address", "geometry"] })
             .then(() => {
               const address = transformGooglePlaceToAddress(place);
@@ -81,6 +98,7 @@ export const GooglePlacesAutocomplete = ({
             })
             .catch((error: Error) => {
               console.error("Error fetching place details:", error);
+              setScriptLoadError("Error fetching place details. Please try again.");
             });
         });
       } catch (error) {
@@ -90,6 +108,7 @@ export const GooglePlacesAutocomplete = ({
     };
 
     // Define a global callback that will be called when the API is loaded
+    // This needs to be defined before loading the script
     window.initGooglePlaces = () => {
       console.log("Google Maps API loaded successfully");
       window.googleMapsScriptLoaded = true;
@@ -120,7 +139,7 @@ export const GooglePlacesAutocomplete = ({
       setupAutocompleteElement();
     }
 
-    // Cleanup function to remove the script and event listeners
+    // Cleanup function
     return () => {
       if (autocompleteElementRef.current && containerRef.current) {
         try {
@@ -131,7 +150,7 @@ export const GooglePlacesAutocomplete = ({
         }
       }
     };
-  }, [onAddressSelected]);
+  }, [onAddressSelected, attemptCount]);
 
   // Transform Google place object to our Address format
   const transformGooglePlaceToAddress = (place: google.maps.places.Place): Address => {
@@ -143,23 +162,26 @@ export const GooglePlacesAutocomplete = ({
     let country = "US";
 
     // Extract address components
-    place.addressComponents?.forEach((component: any) => {
-      const types = component.types;
+    if (place.addressComponents) {
+      place.addressComponents.forEach((component: any) => {
+        const types = component.types;
 
-      if (types.includes("street_number")) {
-        street1 = component.longText;
-      } else if (types.includes("route")) {
-        street1 = street1 ? `${street1} ${component.longText}` : component.longText;
-      } else if (types.includes("locality")) {
-        city = component.longText;
-      } else if (types.includes("administrative_area_level_1")) {
-        state = component.shortText;
-      } else if (types.includes("postal_code")) {
-        zip = component.longText;
-      } else if (types.includes("country")) {
-        country = component.shortText;
-      }
-    });
+        if (types.includes("street_number")) {
+          street1 = component.longText || component.text;
+        } else if (types.includes("route")) {
+          const route = component.longText || component.text;
+          street1 = street1 ? `${street1} ${route}` : route;
+        } else if (types.includes("locality")) {
+          city = component.longText || component.text;
+        } else if (types.includes("administrative_area_level_1")) {
+          state = component.shortText || component.text;
+        } else if (types.includes("postal_code")) {
+          zip = component.longText || component.text;
+        } else if (types.includes("country")) {
+          country = component.shortText || component.text;
+        }
+      });
+    }
 
     // If we're missing the street, try to parse it from formatted address
     if (!street1 && place.formattedAddress) {
@@ -183,6 +205,11 @@ export const GooglePlacesAutocomplete = ({
     };
   };
 
+  const handleRetry = () => {
+    setScriptLoadError(null);
+    setAttemptCount(prev => prev + 1);
+  };
+
   if (scriptLoadError) {
     return (
       <div className={`relative ${className}`}>
@@ -194,7 +221,16 @@ export const GooglePlacesAutocomplete = ({
           ref={inputRef}
           aria-label="Address search input"
         />
-        <div className="text-sm text-red-500 mt-1">{scriptLoadError}</div>
+        <div className="text-sm text-red-500 mt-1">
+          {scriptLoadError}
+          <button
+            onClick={handleRetry}
+            className="ml-2 text-blue-500 hover:underline"
+            type="button"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -211,7 +247,8 @@ export const GooglePlacesAutocomplete = ({
         className="w-full"
         aria-label="Address search input"
       >
-        {!window.google?.maps?.places?.PlaceAutocompleteElement && (
+        {/* Show input as placeholder while loading */}
+        {(!window.google?.maps?.places?.PlaceAutocompleteElement || isScriptLoading) && (
           <Input
             type="text"
             placeholder={placeholder}
