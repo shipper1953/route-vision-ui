@@ -80,7 +80,7 @@ export const OrdersTable = ({
           <TableCell>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm">Details</Button>
-              {order.status === 'ready_to_ship' && (
+              {(order.status === 'ready_to_ship' || order.status === 'processing') && (
                 <Button 
                   variant="outline" 
                   size="sm"

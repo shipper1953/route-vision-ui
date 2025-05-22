@@ -18,7 +18,8 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
   // Create the new order with the generated ID
   const newOrder: OrderData = {
     ...orderData,
-    id: orderId
+    id: orderId,
+    status: "ready_to_ship" // Ensure new orders are set to ready_to_ship
   };
   
   // Store the order in Supabase

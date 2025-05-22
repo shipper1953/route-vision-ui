@@ -32,7 +32,7 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       customerName: data.customer_name,
       orderDate: data.order_date,
       requiredDeliveryDate: data.required_delivery_date,
-      status: data.status || "processing",
+      status: data.status === "processing" ? "ready_to_ship" : data.status || "ready_to_ship", // Set processing orders to ready_to_ship
       items: data.items || 0,
       value: data.value?.toString() || "0",
       shippingAddress: data.shipping_address ? JSON.parse(data.shipping_address) : {},
@@ -84,7 +84,7 @@ export async function fetchOrders(): Promise<OrderData[]> {
       customerName: order.customer_name,
       orderDate: order.order_date,
       requiredDeliveryDate: order.required_delivery_date,
-      status: order.status || "processing",
+      status: order.status === "processing" ? "ready_to_ship" : order.status || "ready_to_ship", // Set processing orders to ready_to_ship
       items: order.items || 0,
       value: order.value?.toString() || "0",
       shippingAddress: order.shipping_address ? JSON.parse(order.shipping_address) : {},
