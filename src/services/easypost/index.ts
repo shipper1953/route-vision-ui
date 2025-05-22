@@ -6,10 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 // Get API key safely using environment variables
 const apiKey = (() => {
   try {
-    // Safely check for environment variables
-    return process.env.VITE_EASYPOST_API_KEY || 
-           process.env.EASYPOST_API_KEY || 
-           '';
+    // Use import.meta.env for Vite projects instead of process.env
+    return import.meta.env.VITE_EASYPOST_API_KEY || '';
   } catch (e) {
     console.warn('Error accessing environment variables:', e);
     return '';
@@ -19,6 +17,7 @@ const apiKey = (() => {
 // Check if the API key is available
 if (!apiKey) {
   console.warn('EasyPost API key not found in environment variables. Attempting to use Supabase Edge Functions for shipment operations instead.');
+  console.info('Using Supabase Edge Functions for EasyPost operations');
 } else {
   console.log('EasyPost API key is configured.');
 }

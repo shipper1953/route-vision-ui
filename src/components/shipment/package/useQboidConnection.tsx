@@ -21,6 +21,61 @@ export function useQboidConnection() {
   // Store device configuration in ref to persist between renders
   const configRef = useRef<any>(null);
   
+  // Setup real-time listener for Qboid data
+  useEffect(() => {
+    const setupRealtimeListener = async () => {
+      // Subscribe to the Qboid events table for real-time updates
+      const channel = supabase
+        .channel('qboid-events')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'qboid_events' },
+          (payload) => {
+            console.log('Received qboid event:', payload);
+            
+            // Extract the dimensions data
+            if (payload.new && payload.new.data && payload.new.data.dimensions) {
+              const { dimensions, orderId } = payload.new.data;
+              
+              // Update form with dimensions
+              if (form) {
+                form.setValue("length", dimensions.length, { shouldValidate: true });
+                form.setValue("width", dimensions.width, { shouldValidate: true });
+                form.setValue("height", dimensions.height, { shouldValidate: true });
+                form.setValue("weight", dimensions.weight, { shouldValidate: true });
+                
+                // If orderId is provided and form has orderId field, update it
+                if (orderId && form.getValues("orderId") === "") {
+                  form.setValue("orderId", orderId, { shouldValidate: true });
+                }
+                
+                // Update connection status and timestamp
+                setConnectionStatus("connected");
+                setLastUpdateTime(new Date().toLocaleTimeString());
+                
+                // Show success message
+                toast.success("Package dimensions received from Qboid");
+              }
+            }
+          }
+        )
+        .subscribe();
+        
+      // Cleanup function
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    };
+    
+    if (connectionStatus === "connecting") {
+      setupRealtimeListener();
+    }
+    
+    return () => {
+      // This will be called when the component unmounts
+    };
+  }, [connectionStatus, form]);
+  
   // Handle IP address change for device configuration
   const handleDeviceIpChange = (ip: string) => {
     setDeviceIp(ip);
