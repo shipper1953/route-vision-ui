@@ -41,18 +41,26 @@ export const ShippingRatesCardFooter = ({
     
     setPurchasing(true);
     try {
+      console.log(`Purchasing label for shipment ${shipmentResponse.id} with rate ${selectedRate.id}`);
       const result = await onBuyLabel(shipmentResponse.id, selectedRate.id);
       
-      // If there's an associated order, update its status
-      if (orderId) {
-        await linkShipmentToOrder(orderId, {
-          id: result.id,
-          carrier: result.carrier,
-          service: result.service,
-          trackingNumber: result.tracking_code,
-          trackingUrl: result.tracker.public_url,
-          labelUrl: result.postage_label.label_url
-        });
+      // Show success message with downloaded label link
+      if (result?.postage_label?.label_url) {
+        toast.success(
+          <div>
+            Label purchased successfully!
+            <a 
+              href={result.postage_label.label_url} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="block text-blue-500 underline mt-1"
+            >
+              Download Label
+            </a>
+          </div>
+        );
+      } else {
+        toast.success("Label purchased successfully!");
       }
       
     } catch (error) {

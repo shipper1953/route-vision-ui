@@ -17,6 +17,7 @@ interface ShippingRatesCardProps {
   setSelectedRate: (rate: SmartRate | Rate | null) => void;
   recommendedRate: SmartRate | Rate | null;
   onBack: () => void;
+  onBuyLabel: (shipmentId: string, rateId: string) => Promise<any>;
 }
 
 export const ShippingRatesCard = ({ 
@@ -24,7 +25,8 @@ export const ShippingRatesCard = ({
   selectedRate, 
   setSelectedRate, 
   recommendedRate,
-  onBack 
+  onBack,
+  onBuyLabel
 }: ShippingRatesCardProps) => {
   // Get form context from parent component
   const form = useFormContext();
@@ -78,10 +80,7 @@ export const ShippingRatesCard = ({
         shipmentResponse={shipmentResponse}
         selectedRate={selectedRate}
         onBack={onBack}
-        onBuyLabel={async (shipmentId, rateId) => {
-          // This will be implemented by the parent component through props
-          return {} as any;
-        }}
+        onBuyLabel={onBuyLabel}
       />
     </Card>
   );

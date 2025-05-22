@@ -41,6 +41,7 @@ const CreateShipment = () => {
             setSelectedRate={setSelectedRate}
             recommendedRate={recommendedRate}
             onBack={resetShipment}
+            onBuyLabel={purchaseLabel}
           />
         </div>
       )}
