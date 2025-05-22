@@ -15,10 +15,26 @@ interface FormFieldProps {
   label: string;
   placeholder: string;
   required?: boolean;
+  type?: string;
 }
 
-export const FormField = ({ name, label, placeholder, required = false }: FormFieldProps) => {
+export const FormField = ({ name, label, placeholder, required = false, type = "text" }: FormFieldProps) => {
   const form = useFormContext<ShipmentForm>();
+  
+  // Handle numeric inputs specifically
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
+    const value = e.target.value;
+    
+    if (type === "number") {
+      if (value === '') {
+        field.onChange(undefined);
+      } else {
+        field.onChange(parseFloat(value));
+      }
+    } else {
+      field.onChange(value);
+    }
+  };
   
   return (
     <HookFormField
@@ -28,7 +44,24 @@ export const FormField = ({ name, label, placeholder, required = false }: FormFi
         <FormItem>
           <FormLabel>{label}{!required && " (Optional)"}</FormLabel>
           <FormControl>
-            <Input placeholder={placeholder} {...field} value={field.value?.toString() || ''} />
+            {type === "number" ? (
+              <Input 
+                type={type} 
+                placeholder={placeholder} 
+                onChange={(e) => handleInputChange(e, field)}
+                value={field.value ?? ''}
+                onBlur={field.onBlur}
+                name={field.name}
+                ref={field.ref}
+              />
+            ) : (
+              <Input 
+                type={type}
+                placeholder={placeholder} 
+                {...field} 
+                value={field.value?.toString() || ''} 
+              />
+            )}
           </FormControl>
           <FormMessage />
         </FormItem>
