@@ -32,7 +32,6 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
 
   const handleOpenChange = (open: boolean) => {
     console.log(`Address lookup popover ${open ? 'opening' : 'closing'} for ${type}`);
-    // If closing without selecting an address, no need to do anything special
     setIsOpen(open);
   };
 

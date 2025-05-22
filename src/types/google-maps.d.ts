@@ -42,7 +42,7 @@ declare namespace google {
         types: string[];
       }
       
-      class PlaceAutocompleteElement extends HTMLElement {
+      interface PlaceAutocompleteElement extends HTMLElement {
         constructor(options?: {
           types?: string[];
           componentRestrictions?: ComponentRestrictions;
