@@ -1,62 +1,51 @@
 
+import { supabase } from "@/integrations/supabase/client";
 import { OrderData, ShipmentInfo } from "@/types/orderTypes";
-import mockOrders from "@/data/mockOrdersData";
+import { toast } from "sonner";
 
 /**
- * Links a shipment to an order and updates its status
+ * Links a shipment to an order
  * @param orderId The ID of the order to update
- * @param shipmentInfo The shipment information to link
- * @returns The updated order or null if not found
+ * @param shipmentInfo The shipment info to link
  */
-export async function linkShipmentToOrder(
-  orderId: string,
-  shipmentInfo: ShipmentInfo
-): Promise<OrderData | null> {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 600));
-  
-  // Find the order
-  const orderIndex = mockOrders.findIndex(order => order.id === orderId);
-  
-  if (orderIndex === -1) {
-    return null;
+export async function linkShipmentToOrder(orderId: string, shipmentInfo: ShipmentInfo): Promise<void> {
+  try {
+    console.log(`Linking shipment to order ${orderId}:`, shipmentInfo);
+    
+    // Remove "ORD-" prefix if present for numeric ID lookup
+    const numericId = orderId.startsWith('ORD-') ? parseInt(orderId.replace('ORD-', '')) : parseInt(orderId);
+    
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        status: 'shipped',
+        tracking_number: shipmentInfo.trackingNumber
+      })
+      .eq('id', numericId);
+    
+    if (error) {
+      console.error("Error linking shipment to order:", error);
+      toast.error("Failed to update order with shipment information");
+      throw error;
+    }
+    
+    toast.success(`Order ${orderId} marked as shipped`);
+    
+  } catch (err) {
+    console.error("Error linking shipment to order:", err);
+    throw err;
   }
-  
-  // Update the order with shipment info and change status to shipped
-  mockOrders[orderIndex].shipment = shipmentInfo;
-  mockOrders[orderIndex].status = "shipped";
-  
-  // Return a copy of the updated order
-  return {...mockOrders[orderIndex]};
 }
 
 /**
  * Updates an order with shipment information
  * @param orderId The ID of the order to update
- * @param shipmentId The ID of the associated shipment
- * @param trackingCode The tracking code for the shipment
- * @returns The updated order or null if not found
+ * @param shipmentInfo The shipment info to update
+ * @returns The updated order
+ * @deprecated Use linkShipmentToOrder instead
  */
-export async function updateOrderWithShipment(
-  orderId: string,
-  shipmentId: string,
-  trackingCode: string
-): Promise<OrderData | null> {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 600));
-  
-  // In a real application, this would make an API call to update the order
-  const orderIndex = mockOrders.findIndex(order => order.id === orderId);
-  
-  if (orderIndex === -1) {
-    return null;
-  }
-  
-  // Update the order status
-  mockOrders[orderIndex].status = "shipped";
-  
-  // In a real app, you would also associate the shipment ID and tracking code
-  
-  // Return a copy of the updated order
-  return {...mockOrders[orderIndex]};
+export async function updateOrderWithShipment(orderId: string, shipmentInfo: ShipmentInfo): Promise<OrderData> {
+  return linkShipmentToOrder(orderId, shipmentInfo).then(() => {
+    return { id: orderId } as OrderData;
+  });
 }

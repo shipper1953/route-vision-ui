@@ -49,15 +49,22 @@ export const OrderLookupCard = ({ setOrderLookupComplete }: OrderLookupCardProps
         return;
       }
       
+      console.log("Order found:", order);
+      
       // Update form with order data
       form.setValue("toName", order.customerName);
       form.setValue("toCompany", order.customerCompany || "");
-      form.setValue("toStreet1", order.shippingAddress.street1);
-      form.setValue("toStreet2", order.shippingAddress.street2 || "");
-      form.setValue("toCity", order.shippingAddress.city);
-      form.setValue("toState", order.shippingAddress.state);
-      form.setValue("toZip", order.shippingAddress.zip);
-      form.setValue("toCountry", order.shippingAddress.country);
+      
+      // Properly map shipping address fields from the order
+      if (order.shippingAddress) {
+        form.setValue("toStreet1", order.shippingAddress.street1);
+        form.setValue("toStreet2", order.shippingAddress.street2 || "");
+        form.setValue("toCity", order.shippingAddress.city);
+        form.setValue("toState", order.shippingAddress.state);
+        form.setValue("toZip", order.shippingAddress.zip);
+        form.setValue("toCountry", order.shippingAddress.country);
+      }
+      
       form.setValue("toPhone", order.customerPhone || "");
       form.setValue("toEmail", order.customerEmail || "");
       
