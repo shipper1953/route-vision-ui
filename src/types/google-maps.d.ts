@@ -46,7 +46,6 @@ declare namespace google {
         constructor(options?: {
           types?: string[];
           componentRestrictions?: ComponentRestrictions;
-          // No fields property in PlaceAutocompleteElement constructor
         });
         
         addEventListener(type: string, listener: EventListener): void;
