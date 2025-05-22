@@ -43,7 +43,31 @@ declare namespace google {
       }
       
       class PlaceAutocompleteElement extends HTMLElement {
-        constructor();
+        constructor(options?: {
+          types?: string[];
+          componentRestrictions?: ComponentRestrictions;
+          fields?: string[];
+        });
+        
+        addEventListener(type: string, listener: EventListener): void;
+        removeEventListener(type: string, listener: EventListener): void;
+        style: CSSStyleDeclaration;
+      }
+
+      interface Place {
+        addressComponents?: {
+          types: string[];
+          longText: string;
+          shortText: string;
+        }[];
+        formattedAddress?: string;
+        fetchFields(options: { fields: string[] }): Promise<void>;
+      }
+
+      interface PlaceSelectEvent extends Event {
+        detail: {
+          place: Place;
+        };
       }
     }
     
