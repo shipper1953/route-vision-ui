@@ -5,6 +5,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { ShipmentCard } from "@/components/dashboard/ShipmentCard";
 import { ShipmentsChart, DeliveryPerformanceChart } from "@/components/dashboard/DashboardCharts";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 // Sample shipment data focused on parcels
 const recentShipments = [
@@ -38,6 +39,12 @@ const recentShipments = [
 ];
 
 const Index = () => {
+  const navigate = useNavigate();
+
+  const handleCreateShipment = () => {
+    navigate("/create-shipment");
+  };
+
   return (
     <TmsLayout>
       <div className="animate-fade-in">
@@ -47,7 +54,10 @@ const Index = () => {
             <p className="text-muted-foreground">Overview of your EasyPost shipment operations</p>
           </div>
           <div className="mt-4 md:mt-0 flex gap-3">
-            <Button className="bg-tms-blue hover:bg-tms-blue-400">
+            <Button 
+              className="bg-tms-blue hover:bg-tms-blue-400"
+              onClick={handleCreateShipment}
+            >
               <Package className="mr-2 h-4 w-4" /> Create Shipment
             </Button>
             <Button variant="outline">View Rates</Button>
