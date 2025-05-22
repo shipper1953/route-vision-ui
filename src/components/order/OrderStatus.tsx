@@ -14,6 +14,8 @@ export const OrderStatus = ({ status }: OrderStatusProps) => {
         return { label: 'Ready to Ship', variant: 'warning' };
       case 'shipped':
         return { label: 'Shipped', variant: 'default' };
+      case 'in_transit':
+        return { label: 'In Transit', variant: 'secondary' };
       case 'delivered':
         return { label: 'Delivered', variant: 'success' };
       case 'cancelled':
