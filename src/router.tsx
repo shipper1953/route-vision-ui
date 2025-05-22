@@ -9,6 +9,7 @@ import Index from './pages/Index';
 import Orders from './pages/Orders';
 import Shipments from './pages/Shipments';
 import CreateShipment from './pages/CreateShipment';
+import CreateOrder from './pages/CreateOrder';
 import Users from './pages/Users';
 import CreateUser from './pages/CreateUser';
 import Settings from './pages/Settings';
@@ -48,6 +49,7 @@ const AppRoutes = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<PrivateRoute><Index /></PrivateRoute>} />
             <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
+            <Route path="/create-order" element={<PrivateRoute><CreateOrder /></PrivateRoute>} />
             <Route path="/shipments" element={<PrivateRoute><Shipments /></PrivateRoute>} />
             <Route path="/create-shipment" element={<PrivateRoute><CreateShipment /></PrivateRoute>} />
             <Route path="/users" element={<AdminRoute><Users /></AdminRoute>} />
