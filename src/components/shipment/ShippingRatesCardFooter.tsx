@@ -9,6 +9,7 @@ import { ShipmentForm } from "@/types/shipment";
 import { useState } from "react";
 import easyPostService from "@/services/easypost";
 import orderService from "@/services/orderService";
+import { useNavigate } from "react-router-dom";
 
 interface ShippingRatesCardFooterProps {
   selectedRate: SmartRate | Rate | null;
@@ -23,6 +24,7 @@ export const ShippingRatesCardFooter = ({
 }: ShippingRatesCardFooterProps) => {
   const form = useFormContext<ShipmentForm>();
   const [purchasing, setPurchasing] = useState(false);
+  const navigate = useNavigate();
   
   const handlePurchaseLabel = async () => {
     if (!selectedRate) {
@@ -62,10 +64,18 @@ export const ShippingRatesCardFooter = ({
       
       toast.success("Shipping label purchased successfully!");
       
-      // Navigate to the Shipments page instead of Orders page
+      // Store the purchased label data in sessionStorage for the Shipments page to use
+      try {
+        sessionStorage.setItem('lastPurchasedLabel', JSON.stringify(labelData));
+      } catch (storageError) {
+        console.error("Error storing label data:", storageError);
+      }
+      
+      // Navigate to the Shipments page with the shipment ID as a query parameter
+      // This will highlight the newly created shipment in the table
       setTimeout(() => {
-        window.location.href = "/shipments";
-      }, 2000);
+        navigate(`/shipments?highlight=${shipmentId}`);
+      }, 1000);
     } catch (error) {
       console.error("Error purchasing label:", error);
       

@@ -96,10 +96,10 @@ export const useShipmentData = () => {
             id: s.easypost_id || String(s.id), // Convert id to string
             tracking: s.tracking_number || 'Pending',
             carrier: s.carrier || 'Unknown',
-            carrierUrl: s.label_url || '#',
+            carrierUrl: s.tracking_url || '#',
             service: s.carrier_service || 'Standard',
-            origin: 'Origin',
-            destination: 'Destination',
+            origin: s.origin_address ? 'Origin' : 'Unknown Origin',
+            destination: s.destination_address ? 'Destination' : 'Unknown Destination',
             shipDate: new Date(s.created_at).toLocaleDateString(),
             estimatedDelivery: s.estimated_delivery_date ? new Date(s.estimated_delivery_date).toLocaleDateString() : null,
             actualDelivery: s.actual_delivery_date ? new Date(s.actual_delivery_date).toLocaleDateString() : null,
@@ -134,6 +134,7 @@ export const useShipmentData = () => {
     if (purchasedLabel) {
       try {
         const labelData = JSON.parse(purchasedLabel);
+        console.log("Found purchased label data:", labelData);
         
         // Check if this shipment is already in our list
         const exists = shipments.some(s => s.id === labelData.id);
@@ -146,22 +147,31 @@ export const useShipmentData = () => {
             carrier: labelData.selected_rate?.carrier || 'Unknown',
             carrierUrl: labelData.tracker?.public_url || '#',
             service: labelData.selected_rate?.service || 'Standard',
-            origin: 'From address',
-            destination: 'To address',
+            origin: labelData.from_address?.city + ', ' + labelData.from_address?.state || 'Origin',
+            destination: labelData.to_address?.city + ', ' + labelData.to_address?.state || 'Destination',
             shipDate: new Date().toLocaleDateString(),
             estimatedDelivery: null,
             actualDelivery: null,
             status: 'purchased',
-            weight: `${labelData.parcel?.weight || '0'} oz`,
+            weight: `${labelData.parcel?.weight || '0'} ${labelData.parcel?.weight_unit || 'oz'}`,
             labelUrl: labelData.postage_label?.label_url
           };
+          
+          console.log("Adding new shipment to list:", newShipment);
           
           // Add to the start of the list
           setShipments(prev => [newShipment, ...prev]);
           
-          // Clear session storage to prevent duplicates
-          sessionStorage.removeItem('lastPurchasedLabel');
+          // Update localStorage to persist the new shipment
+          localStorage.setItem('shipments', JSON.stringify([newShipment, ...shipments]));
+          
+          // Show a toast notification about the new shipment
+          toast.success("New shipment added to your shipments list");
         }
+        
+        // Clear session storage to prevent duplicates on refresh
+        // BUT only clear after we've successfully added the shipment
+        sessionStorage.removeItem('lastPurchasedLabel');
       } catch (err) {
         console.error("Error processing label data:", err);
       }

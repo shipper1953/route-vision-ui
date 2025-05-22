@@ -43,43 +43,15 @@ export const ShippingRatesCard = ({
   useEffect(() => {
     if (!availableRates.length) {
       toast.error("No shipping rates available. Please check the shipping details and try again.");
+    } else {
+      // If we have rates and a recommended rate is available but not selected, select it
+      if (recommendedRate && !selectedRate) {
+        setSelectedRate(recommendedRate);
+      }
     }
-  }, [availableRates.length]);
+  }, [availableRates.length, recommendedRate, selectedRate, setSelectedRate]);
   
   // If there's no form context, render without FormProvider
-  if (!form) {
-    return (
-      <Card>
-        <ShippingRatesCardHeader />
-        
-        <CardContent>
-          {availableRates.length > 0 ? (
-            <RatesList 
-              rates={availableRates}
-              selectedRate={selectedRate}
-              recommendedRate={recommendedRate}
-              setSelectedRate={setSelectedRate}
-            />
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No shipping rates available
-              {shipmentResponse.id && (
-                <p className="mt-2 text-xs">Shipment created (ID: {shipmentResponse.id}), but no rates were returned.</p>
-              )}
-            </div>
-          )}
-        </CardContent>
-        
-        <ShippingRatesCardFooter 
-          selectedRate={selectedRate}
-          onBack={onBack}
-          shipmentId={shipmentResponse.id} // Pass shipment ID from response
-        />
-      </Card>
-    );
-  }
-  
-  // If form context exists, use it directly
   return (
     <Card>
       <ShippingRatesCardHeader />
