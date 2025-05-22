@@ -48,7 +48,9 @@ export const OrdersTable = ({
     return (
       <TableRow>
         <TableCell colSpan={9} className="h-24 text-center">
-          No orders found.
+          {orders.length === 0 ? 
+            "No orders found in database. Create your first order!" : 
+            "No orders match your search criteria."}
         </TableCell>
       </TableRow>
     );
@@ -74,7 +76,7 @@ export const OrdersTable = ({
           <TableCell>
             <OrderShipmentInfo shipment={order.shipment} />
           </TableCell>
-          <TableCell className="text-right">{order.value}</TableCell>
+          <TableCell className="text-right">${order.value}</TableCell>
           <TableCell>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm">Details</Button>

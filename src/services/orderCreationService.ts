@@ -1,6 +1,5 @@
 
 import { OrderData } from "@/types/orderTypes";
-import mockOrders from "@/data/mockOrdersData";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -10,7 +9,7 @@ import { toast } from "sonner";
  * @returns The created order
  */
 export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<OrderData> {
-  // Simulate API delay
+  // Simulate API delay for better UX
   await new Promise(resolve => setTimeout(resolve, 600));
   
   // Generate a new order ID
@@ -22,15 +21,24 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
     id: orderId
   };
   
-  // Add to our mock database
-  mockOrders.push(newOrder);
-  
   // Store the order in Supabase
   try {
-    const { error } = await supabase
+    console.log("Saving order to Supabase:", {
+      id: parseInt(orderId.replace('ORD-', '')),
+      customer_name: newOrder.customerName,
+      order_date: newOrder.orderDate,
+      required_delivery_date: newOrder.requiredDeliveryDate,
+      status: newOrder.status,
+      items: newOrder.items,
+      value: parseFloat(newOrder.value),
+      shipping_address: JSON.stringify(newOrder.shippingAddress),
+      customer_id: (await supabase.auth.getUser()).data.user?.id
+    });
+    
+    const { data, error } = await supabase
       .from('orders')
       .insert({
-        id: parseInt(orderId.replace('ORD-', '')), // Convert to numeric ID for Supabase
+        id: parseInt(orderId.replace('ORD-', '')), 
         customer_name: newOrder.customerName,
         order_date: newOrder.orderDate,
         required_delivery_date: newOrder.requiredDeliveryDate,
@@ -39,20 +47,25 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
         value: parseFloat(newOrder.value),
         shipping_address: JSON.stringify(newOrder.shippingAddress),
         customer_id: (await supabase.auth.getUser()).data.user?.id
-      });
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error("Failed to store order in Supabase:", error);
-      toast.error("Order created but failed to sync to database");
+      toast.error("Failed to create order in database");
+      throw error;
     } else {
-      console.log("Order successfully stored in Supabase");
+      console.log("Order successfully stored in Supabase:", data);
+      toast.success(`Order ${orderId} created successfully!`);
     }
   } catch (err) {
     console.error("Error storing order in Supabase:", err);
+    throw err;
   }
   
-  console.log("New order created:", orderId, "Total orders:", mockOrders.length);
+  console.log("New order created:", orderId);
   
-  // Return a copy of the new order
-  return {...newOrder};
+  // Return the new order
+  return newOrder;
 }

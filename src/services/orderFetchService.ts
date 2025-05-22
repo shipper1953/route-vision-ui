@@ -1,6 +1,5 @@
 
 import { OrderData } from "@/types/orderTypes";
-import mockOrders from "@/data/mockOrdersData";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -9,18 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
  * @returns The order data or null if not found
  */
 export async function fetchOrderById(orderId: string): Promise<OrderData | null> {
-  // Simulate API delay
+  // Simulate API delay for better UX
   await new Promise(resolve => setTimeout(resolve, 800));
   
-  // First, try to find the order in our mock database
-  const mockOrder = mockOrders.find(order => order.id === orderId);
-  
-  if (mockOrder) {
-    // Return a copy of the order to avoid mutation
-    return {...mockOrder};
-  }
-  
-  // If not found in mock data, try to fetch from Supabase
   try {
     // Remove "ORD-" prefix if present for numeric ID lookup
     const numericId = orderId.startsWith('ORD-') ? parseInt(orderId.replace('ORD-', '')) : parseInt(orderId);
@@ -32,7 +22,7 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       .single();
     
     if (error || !data) {
-      console.log("Order not found in Supabase:", orderId);
+      console.log("Order not found in Supabase:", orderId, error);
       return null;
     }
     
@@ -65,17 +55,11 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
  * @returns An array of order data
  */
 export async function fetchOrders(): Promise<OrderData[]> {
-  // Simulate API delay
+  // Simulate API delay for better UX
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  console.log("Fetching orders, total count:", mockOrders.length);
+  console.log("Fetching orders from Supabase");
   
-  // Sort orders by date (newest first) to ensure newly created orders appear at the top
-  const sortedMockOrders = [...mockOrders].sort((a, b) => {
-    return new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime();
-  });
-  
-  // Try to fetch orders from Supabase
   try {
     const { data, error } = await supabase
       .from('orders')
@@ -84,14 +68,15 @@ export async function fetchOrders(): Promise<OrderData[]> {
     
     if (error) {
       console.error("Error fetching orders from Supabase:", error);
-      // Return mock data as fallback
-      return sortedMockOrders;
+      return [];
     }
     
     if (!data || data.length === 0) {
-      console.log("No orders found in Supabase, using mock data");
-      return sortedMockOrders;
+      console.log("No orders found in Supabase");
+      return [];
     }
+    
+    console.log(`Found ${data.length} orders in Supabase`);
     
     // Convert Supabase data to our OrderData format
     const supabaseOrders: OrderData[] = data.map(order => ({
@@ -112,22 +97,9 @@ export async function fetchOrders(): Promise<OrderData[]> {
       } : undefined
     }));
     
-    console.log("Found", supabaseOrders.length, "orders in Supabase");
-    
-    // Merge and deduplicate orders from both sources
-    const allOrders = [...supabaseOrders];
-    
-    // Add mock orders that don't exist in Supabase
-    for (const mockOrder of sortedMockOrders) {
-      if (!allOrders.some(order => order.id === mockOrder.id)) {
-        allOrders.push(mockOrder);
-      }
-    }
-    
-    return allOrders;
+    return supabaseOrders;
   } catch (err) {
     console.error("Error fetching orders from Supabase:", err);
-    // Return mock data as fallback
-    return sortedMockOrders;
+    return [];
   }
 }

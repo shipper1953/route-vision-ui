@@ -33,7 +33,7 @@ const Orders = () => {
       try {
         setLoading(true);
         const orderData = await fetchOrders();
-        console.log("Orders loaded:", orderData.length);
+        console.log("Orders loaded from Supabase:", orderData.length);
         setOrders(orderData);
       } catch (error) {
         console.error("Error loading orders:", error);
