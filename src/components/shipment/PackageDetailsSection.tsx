@@ -19,6 +19,9 @@ export const PackageDetailsSection = () => {
     configuring,
     connectionStatus,
     lastUpdateTime,
+    deviceIp,
+    configGuide,
+    handleDeviceIpChange,
     handleConfigureQboid
   } = useQboidConnection();
   
@@ -50,6 +53,9 @@ export const PackageDetailsSection = () => {
           connectionStatus={connectionStatus}
           configuring={configuring}
           onClick={handleConfigureQboid}
+          deviceIp={deviceIp}
+          onDeviceIpChange={handleDeviceIpChange}
+          configGuide={configGuide}
         />
       </CardFooter>
     </Card>

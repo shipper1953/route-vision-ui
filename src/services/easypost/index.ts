@@ -32,8 +32,13 @@ export default easyPostService;
 // Re-export types from the easypost types file
 export * from "@/types/easypost";
 
-// Define the endpoint URL for Qboid directly
-const QBOID_ENDPOINT_URL = 'https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions';
+// Define the Qboid API configuration
+const QBOID_CONFIG = {
+  endpointUrl: 'https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions',
+  deviceDiscoveryUrl: 'http://qboid.local/',
+  configPath: '/config',
+  wifiSetupPath: '/wifi'
+};
 
 // Add a new export for the Qboid scanner integration
 export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
@@ -44,7 +49,7 @@ export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
   orderId?: string;
 }) => void) => {
   try {
-    console.log('Setting up Qboid integration with endpoint:', QBOID_ENDPOINT_URL);
+    console.log('Setting up Qboid integration with endpoint:', QBOID_CONFIG.endpointUrl);
     
     // Get the API token from Supabase
     const { data: secretData } = await supabase
@@ -52,33 +57,34 @@ export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
         body: { action: 'validate-token' }
       });
     
-    // For testing purposes, you can simulate a Qboid device sending data
-    // This can be useful to verify that your callback works correctly
-    setTimeout(() => {
-      console.log('Note: You can test this by sending a POST request to the endpoint with this data:');
-      console.log(JSON.stringify({
-        length: 12.5,
-        width: 8.75,
-        height: 6.25,
-        weight: 32,
-        orderId: "TEST-123"
-      }));
-      
-      console.log('Using curl:');
-      console.log(`curl -X POST ${QBOID_ENDPOINT_URL} -H "Content-Type: application/json" -H "x-qboid-token: YOUR_API_TOKEN" -d '{"length": 12.5, "width": 8.75, "height": 6.25, "weight": 32, "orderId": "TEST-123"}'`);
-    }, 1000);
-
-    // Return the information needed to configure the Qboid scanner
+    // Return the configuration information needed to set up the Qboid scanner
     return {
-      endpointUrl: QBOID_ENDPOINT_URL,
-      configureScanner: () => {
+      endpointUrl: QBOID_CONFIG.endpointUrl,
+      deviceUrl: QBOID_CONFIG.deviceDiscoveryUrl,
+      configureScanner: (deviceIp?: string) => {
+        // Create the configuration URL
+        const configUrl = deviceIp ? 
+          `http://${deviceIp}${QBOID_CONFIG.configPath}` : 
+          `${QBOID_CONFIG.deviceDiscoveryUrl}${QBOID_CONFIG.configPath}`;
+          
         console.log('Configure your Qboid scanner with the following settings:');
-        console.log('1. Endpoint URL:', QBOID_ENDPOINT_URL);
-        console.log('2. Method: POST');
-        console.log('3. Headers:');
-        console.log('   - Content-Type: application/json');
-        console.log('   - x-qboid-token: YOUR_API_TOKEN');
-        console.log('4. Body format: { "length": number, "width": number, "height": number, "weight": number, "orderId": "optional" }');
+        console.log('1. Device configuration URL:', configUrl);
+        console.log('2. API Endpoint URL:', QBOID_CONFIG.endpointUrl);
+        
+        // Return configuration instructions for display
+        return {
+          configUrl,
+          endpointUrl: QBOID_CONFIG.endpointUrl,
+          instructions: [
+            `Open ${configUrl} in your browser to access device settings`,
+            "In the WiFi API tab, enter the following:",
+            `API Endpoint: ${QBOID_CONFIG.endpointUrl}`,
+            "Method: POST",
+            "Content-Type: application/json",
+            "Add Header: x-qboid-token: YOUR_API_TOKEN",
+            "Save settings and place a package to test"
+          ]
+        };
       }
     };
   } catch (error) {
