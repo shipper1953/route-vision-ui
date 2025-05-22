@@ -78,6 +78,8 @@ export type Database = {
           required_delivery_date: string | null
           shipping_address: string | null
           status: string | null
+          tracking: string | null
+          tracking_number: string | null
           value: number | null
         }
         Insert: {
@@ -91,6 +93,8 @@ export type Database = {
           required_delivery_date?: string | null
           shipping_address?: string | null
           status?: string | null
+          tracking?: string | null
+          tracking_number?: string | null
           value?: number | null
         }
         Update: {
@@ -104,6 +108,8 @@ export type Database = {
           required_delivery_date?: string | null
           shipping_address?: string | null
           status?: string | null
+          tracking?: string | null
+          tracking_number?: string | null
           value?: number | null
         }
         Relationships: []

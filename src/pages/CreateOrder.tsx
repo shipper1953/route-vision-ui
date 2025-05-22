@@ -21,6 +21,7 @@ const CreateOrder = () => {
       customerCompany: "",
       customerEmail: "",
       customerPhone: "",
+      requiredDeliveryDate: undefined,
       items: 1,
       value: "",
       street1: "",

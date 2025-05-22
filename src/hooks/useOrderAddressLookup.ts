@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { Address } from "@/types/easypost";
 import { toast } from "sonner";
-import { OrderFormValues } from "@/pages/CreateOrder";
+import { OrderFormValues } from "@/types/order";
 
 export const useOrderAddressLookup = () => {
   const [isLoading, setIsLoading] = useState(false);
