@@ -52,7 +52,21 @@ export const ShippingRatesCardFooter = ({
       }, 2000);
     } catch (error) {
       console.error("Error purchasing label:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to purchase shipping label");
+      
+      // Improved error handling - check if there's a detailed error message from EasyPost
+      let errorMessage = "Failed to purchase shipping label";
+      
+      // Try to extract detailed error message from the response
+      if (error instanceof Error) {
+        // Check if the error response contains details about missing phone number
+        if (error.message.includes('non-2xx status code')) {
+          errorMessage = "Validation error: The recipient needs a phone number. Please add a phone number to the shipping address.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setPurchasing(false);
     }

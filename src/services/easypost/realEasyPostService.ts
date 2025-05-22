@@ -1,4 +1,3 @@
-
 import { EasyPostService } from "@/services/easypostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
@@ -192,6 +191,21 @@ export class RealEasyPostService implements EasyPostService {
         });
         
         if (error) {
+          console.error('Edge Function error:', error);
+          
+          // Improved error handling to pass through detailed error messages
+          if (error.message.includes('422')) {
+            // Try to extract the EasyPost API error from the response
+            try {
+              const errorDetails = JSON.parse(error.message.split('422 ')[1]);
+              if (errorDetails.error === 'EasyPost API error' && errorDetails.details?.error?.message) {
+                throw new Error(`EasyPost validation failed: ${errorDetails.details.error.message}`);
+              }
+            } catch (parseError) {
+              // If parsing fails, just throw the original error
+            }
+          }
+          
           throw new Error(error.message);
         }
         
