@@ -96,7 +96,8 @@ export const useShipmentData = () => {
             id: s.easypost_id || String(s.id), // Convert id to string
             tracking: s.tracking_number || 'Pending',
             carrier: s.carrier || 'Unknown', // Add the carrier property
-            carrierUrl: s.tracking_url || '#', // Use default if tracking_url doesn't exist
+            // Fix: Use tracking_code instead of tracking_url that doesn't exist
+            carrierUrl: s.tracking_code || s.carrier_url || '#', 
             service: s.carrier_service || 'Standard',
             origin: s.origin_address ? 'Origin' : 'Unknown Origin',
             destination: s.destination_address ? 'Destination' : 'Unknown Destination',
@@ -144,7 +145,7 @@ export const useShipmentData = () => {
           const newShipment: Shipment = {
             id: labelData.id, // This is already a string from EasyPost
             tracking: labelData.tracking_code || 'Pending',
-            carrier: labelData.selected_rate?.carrier || 'Unknown', // Add the carrier property
+            carrier: labelData.selected_rate?.carrier || 'Unknown', 
             carrierUrl: labelData.tracker?.public_url || '#',
             service: labelData.selected_rate?.service || 'Standard',
             origin: labelData.from_address?.city + ', ' + labelData.from_address?.state || 'Origin',
