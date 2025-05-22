@@ -34,7 +34,7 @@ export * from "@/types/easypost";
 
 // Define the Qboid API configuration
 const QBOID_CONFIG = {
-  endpointUrl: 'https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-dimensions',
+  endpointUrl: 'https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-wifi-api-handler',
   deviceDiscoveryUrl: 'http://qboid.local/',
   configPath: '/config',
   wifiSetupPath: '/wifi'
@@ -53,7 +53,7 @@ export const listenForQboidData = async (onDimensionsReceived: (dimensions: {
     
     // Get the API token from Supabase
     const { data: secretData } = await supabase
-      .functions.invoke('qboid-dimensions', {
+      .functions.invoke('qboid-wifi-api-handler', {
         body: { action: 'validate-token' }
       });
     

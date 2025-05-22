@@ -78,5 +78,5 @@ verify_jwt = false
 [functions.purchase-label]
 verify_jwt = false
 
-[functions.qboid-dimensions]
+[functions.qboid-wifi-api-handler]
 verify_jwt = false
