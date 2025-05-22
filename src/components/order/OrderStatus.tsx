@@ -16,6 +16,10 @@ export const OrderStatus = ({ status }: OrderStatusProps) => {
         return { label: 'Shipped', variant: 'default' };
       case 'delivered':
         return { label: 'Delivered', variant: 'success' };
+      case 'cancelled':
+        return { label: 'Cancelled', variant: 'destructive' };
+      case 'on_hold':
+        return { label: 'On Hold', variant: 'secondary' };
       default:
         return { label: status, variant: 'outline' };
     }
