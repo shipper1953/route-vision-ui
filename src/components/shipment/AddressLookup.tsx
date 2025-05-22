@@ -30,9 +30,14 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
     console.log(`AddressLookup component mounted for ${type} address`);
   }, [type]);
 
+  const handleOpenChange = (open: boolean) => {
+    // If closing without selecting an address, no need to do anything special
+    setIsOpen(open);
+  };
+
   return (
     <div className={cn("mb-4", className)}>
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <Popover open={isOpen} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button 
             variant="outline" 
