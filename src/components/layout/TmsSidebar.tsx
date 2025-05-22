@@ -8,7 +8,6 @@ import {
   Truck, 
   Users, 
   Settings, 
-  Menu,
   Plus 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +15,12 @@ import { Button } from "@/components/ui/button";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 import { useSidebar } from "@/context/SidebarContext";
 import { useEffect, useRef } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface NavItemProps {
   to: string;
@@ -50,6 +55,49 @@ const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavI
       <Icon size={20} />
       {!isCollapsed && <span>{label}</span>}
     </NavLink>
+  );
+};
+
+const CreateMenu = ({ isCollapsed }: { isCollapsed: boolean }) => {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button 
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full",
+            isCollapsed ? "justify-center" : "",
+            "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
+          )}
+        >
+          <Plus size={20} />
+          {!isCollapsed && <span>Create</span>}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent 
+        side={isCollapsed ? "right" : "bottom"} 
+        align={isCollapsed ? "start" : "center"}
+        className="bg-popover border border-border w-48"
+      >
+        <DropdownMenuItem asChild>
+          <NavLink to="/create-order" className="flex items-center gap-2 cursor-pointer">
+            <Package size={16} />
+            <span>Create Order</span>
+          </NavLink>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <NavLink to="/create-shipment" className="flex items-center gap-2 cursor-pointer">
+            <Truck size={16} />
+            <span>Create Shipment</span>
+          </NavLink>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <NavLink to="/create-user" className="flex items-center gap-2 cursor-pointer">
+            <Users size={16} />
+            <span>Create User</span>
+          </NavLink>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -111,9 +159,8 @@ export function TmsSidebar() {
         <NavItem to="/" icon={Home} label="Dashboard" isCollapsed={isCollapsed} />
         <NavItem to="/orders" icon={Package} label="Orders" isCollapsed={isCollapsed} />
         <NavItem to="/shipments" icon={Truck} label="Shipments" isCollapsed={isCollapsed} />
-        <NavItem to="/create-shipment" icon={Plus} label="Create Shipment" isCollapsed={isCollapsed} />
+        <CreateMenu isCollapsed={isCollapsed} />
         <NavItem to="/users" icon={Users} label="Users" isCollapsed={isCollapsed} adminOnly={true} />
-        <NavItem to="/create-user" icon={Plus} label="Create User" isCollapsed={isCollapsed} adminOnly={true} />
         <NavItem to="/settings" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
       </div>
       
