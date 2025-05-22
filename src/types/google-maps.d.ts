@@ -51,6 +51,7 @@ declare namespace google {
         addEventListener(type: string, listener: EventListener): void;
         removeEventListener(type: string, listener: EventListener): void;
         style: CSSStyleDeclaration;
+        remove(): void;
       }
 
       interface Place {

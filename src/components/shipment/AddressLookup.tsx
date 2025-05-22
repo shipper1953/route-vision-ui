@@ -31,15 +31,21 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
   }, [type]);
 
   const handleOpenChange = (open: boolean) => {
+    console.log(`Address lookup popover ${open ? 'opening' : 'closing'} for ${type}`);
     // If closing without selecting an address, no need to do anything special
     setIsOpen(open);
   };
 
   const handleAddressSelected = async (address: any) => {
-    const success = await handleSelectAddress(address);
-    if (success) {
-      setIsOpen(false);
-      toast.success("Address selected successfully");
+    try {
+      const success = await handleSelectAddress(address);
+      if (success) {
+        setIsOpen(false);
+        toast.success("Address selected successfully");
+      }
+    } catch (error) {
+      console.error("Error handling address selection:", error);
+      toast.error("Failed to process the selected address");
     }
   };
 
@@ -63,7 +69,6 @@ export const AddressLookup = ({ type, className }: AddressLookupProps) => {
           <div className="space-y-4">
             <h4 className="font-medium">Find Address</h4>
             
-            {/* Only render the component when the popover is open */}
             {isOpen && (
               <GooglePlacesAutocomplete
                 placeholder="Enter address to search..."
