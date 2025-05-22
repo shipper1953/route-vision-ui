@@ -5,6 +5,8 @@ import { ShippingRatesCard } from "@/components/shipment/ShippingRatesCard";
 import { useShipment } from "@/hooks/useShipment";
 import { useState, useEffect } from "react";
 import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
+import { ShippingLabelDialog } from "@/components/shipment/ShippingLabelDialog";
+import { useNavigate } from "react-router-dom";
 
 const CreateShipment = () => {
   const { 
@@ -16,11 +18,27 @@ const CreateShipment = () => {
     resetShipment,
     purchaseLabel 
   } = useShipment();
+  const [labelData, setLabelData] = useState<any>(null);
+  const [showLabelDialog, setShowLabelDialog] = useState(false);
+  const navigate = useNavigate();
   
   // Log when shipmentResponse changes to debug
   useEffect(() => {
     console.log("Shipment response updated:", shipmentResponse);
   }, [shipmentResponse]);
+  
+  // Function to handle successful label purchase
+  const handleLabelPurchased = async (result: any) => {
+    console.log("Label purchased successfully:", result);
+    setLabelData(result);
+    setShowLabelDialog(true);
+  };
+  
+  // Handle dialog close and navigate to orders page
+  const handleDialogClose = () => {
+    setShowLabelDialog(false);
+    navigate('/orders');
+  };
   
   return (
     <TmsLayout>
@@ -41,7 +59,28 @@ const CreateShipment = () => {
             setSelectedRate={setSelectedRate}
             recommendedRate={recommendedRate}
             onBack={resetShipment}
-            onBuyLabel={purchaseLabel}
+            onBuyLabel={async (shipmentId, rateId) => {
+              const result = await purchaseLabel(shipmentId, rateId);
+              if (result) {
+                handleLabelPurchased(result);
+              }
+              return result;
+            }}
+          />
+          
+          {/* Shipping Label Dialog */}
+          <ShippingLabelDialog 
+            isOpen={showLabelDialog}
+            onClose={handleDialogClose}
+            labelUrl={labelData?.postage_label?.label_url}
+            shipmentId={labelData?.id || ''}
+            orderDetails={labelData ? {
+              carrier: labelData.selected_rate?.carrier,
+              service: labelData.selected_rate?.service,
+              trackingCode: labelData.tracking_code,
+              trackingUrl: labelData.tracker?.public_url,
+              createdAt: new Date().toLocaleString()
+            } : undefined}
           />
         </div>
       )}

@@ -44,24 +44,8 @@ export const ShippingRatesCardFooter = ({
       console.log(`Purchasing label for shipment ${shipmentResponse.id} with rate ${selectedRate.id}`);
       const result = await onBuyLabel(shipmentResponse.id, selectedRate.id);
       
-      // Show success message with downloaded label link
-      if (result?.postage_label?.label_url) {
-        toast.success(
-          <div>
-            Label purchased successfully!
-            <a 
-              href={result.postage_label.label_url} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="block text-blue-500 underline mt-1"
-            >
-              Download Label
-            </a>
-          </div>
-        );
-      } else {
-        toast.success("Label purchased successfully!");
-      }
+      // Don't show toast here since we'll be showing the dialog
+      // The dialog will be triggered by the parent component
       
     } catch (error) {
       console.error("Error purchasing label:", error);
