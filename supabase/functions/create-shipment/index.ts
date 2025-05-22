@@ -62,6 +62,12 @@ serve(async (req) => {
     // percentile_95 provides a good balance of accuracy and coverage
     shipmentData.options.smartrate_accuracy = shipmentData.options.smartrate_accuracy || 'percentile_95';
     
+    // Adding carrier_accounts parameter to provide better rates
+    if (!shipmentData.carrier_accounts) {
+      // Uncomment and modify this if you have specific carrier accounts to use
+      // shipmentData.carrier_accounts = ['ca_...'];
+    }
+    
     console.log('Creating shipment with data:', JSON.stringify(shipmentData, null, 2));
     
     // Call EasyPost API to create shipment
@@ -88,6 +94,7 @@ serve(async (req) => {
     
     const shipmentResponse = await response.json();
     console.log('SmartRates received:', shipmentResponse.smartrates ? shipmentResponse.smartrates.length : 0);
+    console.log('Standard Rates received:', shipmentResponse.rates ? shipmentResponse.rates.length : 0);
     
     // Save the shipment information to Supabase if a user is logged in
     try {

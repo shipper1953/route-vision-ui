@@ -84,7 +84,8 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
         },
         // Add options to ensure SmartRate functionality
         options: {
-          smartrate_accuracy: 'percentile_95' // Use high accuracy level for delivery estimates
+          // Use high accuracy level for delivery estimates (95th percentile)
+          smartrate_accuracy: 'percentile_95'
         }
       };
       
@@ -95,13 +96,19 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       // Store the shipment ID in the form context
       form.setValue("shipmentId", response.id);
       
+      if (!response.rates?.length && !response.smartrates?.length) {
+        toast.error("No shipping rates available. Please check your package dimensions and try again.");
+        setLoading(false);
+        return;
+      }
+      
       // Find recommended rate based on required delivery date
       let recommendedRate = null;
       
       if (data.requiredDeliveryDate) {
         const requiredDate = new Date(data.requiredDeliveryDate);
         
-        // Find a rate that can deliver by the required date
+        // First check SmartRates if available
         if (response.smartrates && response.smartrates.length > 0) {
           // Filter by rates that will deliver by the required date
           const viableRates = response.smartrates.filter(rate => {
@@ -141,6 +148,19 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
               toast.info("Selected fastest available shipping option instead");
             }
           }
+        } 
+        // Fall back to regular rates if smartrates aren't available
+        else if (response.rates && response.rates.length > 0) {
+          // Sort regular rates by delivery days if available
+          const sortedRates = [...response.rates].sort((a, b) => {
+            if (a.delivery_days === undefined) return 1;
+            if (b.delivery_days === undefined) return -1;
+            return a.delivery_days - b.delivery_days;
+          });
+          
+          // Select the fastest option for standard rates
+          toast.info("Using standard rates (SmartRates not available)");
+          recommendedRate = sortedRates[0];
         }
       } else if (response.smartrates && response.smartrates.length > 0) {
         // If no required date specified, recommend the most economical option
@@ -148,6 +168,12 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
           parseFloat(a.rate) - parseFloat(b.rate)
         )[0];
         toast.success("Most economical shipping option selected");
+      } else if (response.rates && response.rates.length > 0) {
+        // Fall back to standard rates
+        recommendedRate = response.rates.sort((a, b) => 
+          parseFloat(a.rate) - parseFloat(b.rate)
+        )[0];
+        toast.success("Most economical shipping option selected (standard rates)");
       }
       
       toast.success("Shipment rates retrieved successfully");

@@ -1,7 +1,8 @@
 
 import { useState } from "react";
-import { Truck } from "lucide-react";
+import { Truck, Clock, Shield, CheckCircle } from "lucide-react";
 import { SmartRate, Rate } from "@/services/easypost";
+import { Badge } from "@/components/ui/badge";
 
 interface RateOptionCardProps {
   rate: SmartRate | Rate;
@@ -40,6 +41,25 @@ export const RateOptionCard = ({
     }
   };
 
+  // Format delivery date nicely
+  const formatDeliveryDate = (dateStr: string | null) => {
+    if (!dateStr) return "Unknown";
+    
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short', 
+      day: 'numeric'
+    });
+  };
+  
+  // Calculate tooltip text for delivery accuracy
+  const getAccuracyTooltip = (accuracy?: string) => {
+    if (!accuracy) return "No accuracy data available";
+    
+    return `${accuracy.replace('percentile_', '')}% confidence in delivery time estimate`;
+  };
+
   return (
     <div
       className={`p-4 border rounded-md flex flex-col md:flex-row justify-between items-start md:items-center transition-colors cursor-pointer ${
@@ -69,40 +89,40 @@ export const RateOptionCard = ({
             <Truck className="h-4 w-4 text-muted-foreground" />
             {rate.carrier} {rate.service}
             {isRecommended && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                Recommended
-              </span>
+              <Badge className="ml-2 bg-green-500">Recommended</Badge>
+            )}
+            {isSmartRate && (rate as SmartRate).delivery_date_guaranteed && (
+              <Badge className="ml-2 bg-blue-500" title="Delivery date is guaranteed by carrier">
+                <Shield className="h-3 w-3 mr-1" /> Guaranteed
+              </Badge>
             )}
           </div>
-          <div className="text-sm text-muted-foreground">
-            {rate.delivery_days && `Delivery in ${rate.delivery_days} business day${rate.delivery_days !== 1 ? 's' : ''}`}
-            {isSmartRate && (rate as SmartRate).delivery_date && 
-              ` - Est. delivery ${new Date((rate as SmartRate).delivery_date as string).toLocaleDateString()}`}
+          <div className="text-sm text-muted-foreground mt-1">
+            <div className="flex items-center gap-2">
+              <Clock className="h-3 w-3" />
+              {rate.delivery_days && 
+                <span>{rate.delivery_days} business day{rate.delivery_days !== 1 ? 's' : ''}</span>
+              }
+              {isSmartRate && (rate as SmartRate).delivery_date && 
+                <span>Delivery by {formatDeliveryDate((rate as SmartRate).delivery_date)}</span>
+              }
+            </div>
           </div>
         </div>
       </div>
       
       <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-6">
         {isSmartRate && (
-          <>
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground">Accuracy</div>
-              <div className="font-medium">
-                {getDeliveryAccuracyLabel((rate as SmartRate).delivery_accuracy)}
-              </div>
+          <div className="text-center px-3 py-1 bg-blue-50 rounded-full" title={getAccuracyTooltip((rate as SmartRate).delivery_accuracy)}>
+            <div className="text-xs text-blue-700 font-medium flex items-center">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              {getDeliveryAccuracyLabel((rate as SmartRate).delivery_accuracy)} Accuracy
             </div>
-            
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground">Guaranteed</div>
-              <div className="font-medium">
-                {(rate as SmartRate).delivery_date_guaranteed ? 'Yes' : 'No'}
-              </div>
-            </div>
-          </>
+          </div>
         )}
         
         <div className="text-right font-bold text-lg text-tms-blue">
-          ${rate.rate}
+          ${parseFloat(rate.rate).toFixed(2)}
         </div>
       </div>
     </div>

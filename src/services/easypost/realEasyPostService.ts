@@ -135,7 +135,14 @@ export class RealEasyPostService implements EasyPostService {
           throw new Error(error.message || 'Edge Function returned a non-2xx status code');
         }
         
+        if (!data.rates?.length && !data.smartrates?.length) {
+          console.warn('No rates were returned from EasyPost API for this shipment');
+        }
+        
         console.log('Shipment created via Edge Function:', data?.id);
+        console.log('SmartRates returned:', data?.smartrates?.length || 0);
+        console.log('Standard rates returned:', data?.rates?.length || 0);
+        
         return data;
       }
       

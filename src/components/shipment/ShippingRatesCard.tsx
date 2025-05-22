@@ -8,6 +8,8 @@ import { ShippingRatesCardHeader } from "./ShippingRatesCardHeader";
 import { RatesList } from "./RatesList";
 import { ShippingRatesCardFooter } from "./ShippingRatesCardFooter";
 import { FormProvider, useFormContext } from "react-hook-form";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 interface ShippingRatesCardProps {
   shipmentResponse: ShipmentResponse;
@@ -36,6 +38,13 @@ export const ShippingRatesCard = ({
   const availableRates = shipmentResponse?.smartrates?.length ? 
     shipmentResponse.smartrates : 
     (shipmentResponse?.rates?.length ? shipmentResponse.rates : []);
+
+  // Alert user if no rates are available
+  useEffect(() => {
+    if (!availableRates.length) {
+      toast.error("No shipping rates available. Please check the shipping details and try again.");
+    }
+  }, [availableRates.length]);
   
   // If there's no form context, render without FormProvider
   if (!form) {
