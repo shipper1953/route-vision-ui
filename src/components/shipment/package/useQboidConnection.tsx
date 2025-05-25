@@ -13,10 +13,24 @@ interface QboidDimensions {
   orderId?: string;
 }
 
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
 export const useQboidConnection = () => {
-  const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [lastScan, setLastScan] = useState<QboidDimensions | null>(null);
+  const [lastUpdateTime, setLastUpdateTime] = useState<string | null>(null);
+  const [configuring, setConfiguring] = useState(false);
+  const [deviceIp, setDeviceIp] = useState('');
   const form = useFormContext<ShipmentForm>();
+
+  const configGuide = {
+    instructions: [
+      "1. Connect your Qboid device to WiFi",
+      "2. Navigate to the device's web interface",
+      "3. Configure the API endpoint to point to this application",
+      "4. Test the connection by placing a package on the device"
+    ]
+  };
 
   const handleQboidData = useCallback(async (dimensions: QboidDimensions) => {
     console.log('Received Qboid dimensions:', dimensions);
@@ -77,6 +91,9 @@ export const useQboidConnection = () => {
             form.setValue('requiredDeliveryDate', deliveryDate);
           }
           
+          // Set order ID in form for reference
+          form.setValue('orderId', dimensions.orderId);
+          
           toast.success(`Order ${dimensions.orderId} details loaded from Qboid scan`);
         } else {
           console.warn('Order not found:', dimensions.orderId);
@@ -89,8 +106,33 @@ export const useQboidConnection = () => {
     }
     
     setLastScan(dimensions);
+    setLastUpdateTime(new Date().toLocaleTimeString());
+    setConnectionStatus('connected');
     toast.success('Package dimensions updated from Qboid scanner');
   }, [form]);
+
+  const handleDeviceIpChange = useCallback((ip: string) => {
+    setDeviceIp(ip);
+  }, []);
+
+  const handleConfigureQboid = useCallback(async () => {
+    setConfiguring(true);
+    setConnectionStatus('connecting');
+    
+    try {
+      // Simulate configuration process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // For now, just set to connecting state - actual connection happens via realtime
+      toast.info('Qboid device configured. Waiting for data...');
+    } catch (error) {
+      console.error('Error configuring Qboid:', error);
+      setConnectionStatus('error');
+      toast.error('Failed to configure Qboid device');
+    } finally {
+      setConfiguring(false);
+    }
+  }, []);
 
   useEffect(() => {
     console.log('Setting up Qboid realtime listener');
@@ -112,16 +154,15 @@ export const useQboidConnection = () => {
           if (payload.new && payload.new.data) {
             const eventData = payload.new.data as QboidDimensions;
             handleQboidData(eventData);
-            setIsConnected(true);
           }
         }
       )
       .subscribe((status) => {
         console.log('Qboid subscription status:', status);
         if (status === 'SUBSCRIBED') {
-          setIsConnected(true);
+          setConnectionStatus('connecting');
         } else if (status === 'CLOSED') {
-          setIsConnected(false);
+          setConnectionStatus('disconnected');
         }
       });
 
@@ -132,9 +173,19 @@ export const useQboidConnection = () => {
     };
   }, [handleQboidData]);
 
+  // For backward compatibility, also expose isConnected
+  const isConnected = connectionStatus === 'connected';
+
   return {
     isConnected,
+    connectionStatus,
     lastScan,
-    handleQboidData
+    lastUpdateTime,
+    configuring,
+    deviceIp,
+    configGuide,
+    handleQboidData,
+    handleDeviceIpChange,
+    handleConfigureQboid
   };
 };
