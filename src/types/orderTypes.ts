@@ -26,6 +26,7 @@ export interface ShipmentInfo {
   estimatedDeliveryDate?: string;
   actualDeliveryDate?: string;
   labelUrl?: string;
+  cost?: number | string;
 }
 
 export interface OrderData {

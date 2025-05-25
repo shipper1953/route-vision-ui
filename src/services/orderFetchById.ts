@@ -29,6 +29,21 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
     
     console.log("Raw order data from Supabase:", data);
     
+    // Check for related shipment data
+    let shipmentData = null;
+    if (data.shipment_id) {
+      const { data: shipment } = await supabase
+        .from('shipments')
+        .select('*')
+        .eq('id', data.shipment_id)
+        .single();
+      
+      if (shipment) {
+        console.log("Found related shipment data:", shipment);
+        shipmentData = shipment;
+      }
+    }
+    
     // Also check for Qboid dimension data
     const { data: qboidData } = await supabase
       .from('qboid_events')
@@ -43,7 +58,7 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       console.log("Found Qboid events:", qboidData.length);
       
       for (const event of qboidData) {
-        const eventData = event.data as any; // Type assertion for JSON data
+        const eventData = event.data as any;
         if (eventData && (eventData.orderId === searchId || eventData.barcode === searchId)) {
           console.log("Found matching Qboid data for order:", searchId, eventData);
           matchingQboidData = eventData;
@@ -61,6 +76,22 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
         height: matchingQboidData.dimensions?.height || matchingQboidData.height,
         weight: matchingQboidData.dimensions?.weight || matchingQboidData.weight,
         orderId: matchingQboidData.orderId || matchingQboidData.barcode
+      };
+    }
+    
+    // Merge shipment data if found
+    if (shipmentData) {
+      console.log("Merging shipment data with order data");
+      data.shipment_data = {
+        id: shipmentData.id,
+        carrier: shipmentData.carrier,
+        service: shipmentData.service,
+        trackingNumber: shipmentData.tracking_number || 'Pending',
+        trackingUrl: shipmentData.tracking_url || `https://www.trackingmore.com/track/en/${shipmentData.tracking_number}`,
+        estimatedDeliveryDate: shipmentData.estimated_delivery_date,
+        actualDeliveryDate: shipmentData.actual_delivery_date,
+        cost: shipmentData.cost,
+        labelUrl: shipmentData.label_url
       };
     }
     

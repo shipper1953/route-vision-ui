@@ -4,7 +4,7 @@ import { OrderData } from "@/types/orderTypes";
 /**
  * Parses shipment tracking data from various formats
  */
-export function parseShipmentInfo(trackingData: any): any {
+export function parseShipmentInfo(trackingData: any, orderId: string): any {
   if (!trackingData) return undefined;
   
   try {
@@ -14,7 +14,7 @@ export function parseShipmentInfo(trackingData: any): any {
       return trackingData;
     }
   } catch (e) {
-    console.warn("Failed to parse tracking data:", e);
+    console.warn("Failed to parse tracking data for order:", orderId, e);
   }
   return undefined;
 }
@@ -79,7 +79,13 @@ export function parseParcelInfo(dimensionsData: any, orderId: string): any {
 export function convertSupabaseToOrderData(data: any): OrderData {
   const shippingAddress = parseShippingAddress(data.shipping_address);
   const parcelInfo = parseParcelInfo(data.qboid_dimensions, data.order_id);
-  const shipmentInfo = parseShipmentInfo((data as any).tracking);
+  const shipmentInfo = parseShipmentInfo(data.tracking || data.shipment_data, data.order_id);
+  
+  // Determine order status based on shipment info
+  let orderStatus = data.status || "processing";
+  if (shipmentInfo && shipmentInfo.trackingNumber && shipmentInfo.trackingNumber !== 'Pending') {
+    orderStatus = "shipped";
+  }
   
   return {
     id: data.order_id,
@@ -89,17 +95,19 @@ export function convertSupabaseToOrderData(data: any): OrderData {
     customerPhone: data.customer_phone || "",
     orderDate: data.order_date || new Date().toISOString().split('T')[0],
     requiredDeliveryDate: data.required_delivery_date || new Date().toISOString().split('T')[0],
-    status: data.status || "processing",
+    status: orderStatus,
     items: typeof data.items === 'number' ? data.items : 1,
     value: data.value?.toString() || "0",
     shippingAddress: shippingAddress as any,
     parcelInfo: parcelInfo,
-    shipment: shipmentInfo || ((data as any).tracking_number ? {
+    shipment: shipmentInfo || (data.tracking_number ? {
       id: `SHIP-${data.id}`,
-      carrier: "Unknown",
-      service: "Standard",
-      trackingNumber: (data as any).tracking_number,
-      trackingUrl: `https://www.trackingmore.com/track/en/${(data as any).tracking_number}`
+      carrier: data.carrier || "Unknown",
+      service: data.service || "Standard",
+      trackingNumber: data.tracking_number,
+      trackingUrl: `https://www.trackingmore.com/track/en/${data.tracking_number}`,
+      estimatedDeliveryDate: data.estimated_delivery_date,
+      actualDeliveryDate: data.actual_delivery_date
     } : undefined)
   };
 }
