@@ -30,7 +30,12 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
     let shipmentInfo;
     if ((data as any).tracking) {
       try {
-        shipmentInfo = JSON.parse((data as any).tracking);
+        // Only parse if it's a string
+        if (typeof (data as any).tracking === 'string') {
+          shipmentInfo = JSON.parse((data as any).tracking);
+        } else {
+          shipmentInfo = (data as any).tracking;
+        }
       } catch (e) {
         console.warn("Failed to parse tracking data:", e);
       }
@@ -40,7 +45,12 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
     let shippingAddress = {};
     if (data.shipping_address) {
       try {
-        shippingAddress = JSON.parse(data.shipping_address);
+        // Only parse if it's a string
+        if (typeof data.shipping_address === 'string') {
+          shippingAddress = JSON.parse(data.shipping_address);
+        } else {
+          shippingAddress = data.shipping_address;
+        }
       } catch (e) {
         console.warn("Failed to parse shipping address:", e);
         shippingAddress = {};
@@ -108,7 +118,12 @@ export async function fetchOrders(): Promise<OrderData[]> {
       let shipmentInfo;
       if ((order as any).tracking) {
         try {
-          shipmentInfo = JSON.parse((order as any).tracking);
+          // Only parse if it's a string
+          if (typeof (order as any).tracking === 'string') {
+            shipmentInfo = JSON.parse((order as any).tracking);
+          } else {
+            shipmentInfo = (order as any).tracking;
+          }
         } catch (e) {
           console.warn("Failed to parse tracking data for order", order.id, e);
         }
@@ -118,7 +133,12 @@ export async function fetchOrders(): Promise<OrderData[]> {
       let shippingAddress = {};
       if (order.shipping_address) {
         try {
-          shippingAddress = JSON.parse(order.shipping_address);
+          // Only parse if it's a string
+          if (typeof order.shipping_address === 'string') {
+            shippingAddress = JSON.parse(order.shipping_address);
+          } else {
+            shippingAddress = order.shipping_address;
+          }
         } catch (e) {
           console.warn("Failed to parse shipping address for order", order.id, e);
           shippingAddress = {};
