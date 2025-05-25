@@ -65,7 +65,10 @@ serve(async (req) => {
     const smartRateData = await response.json()
     console.log('SmartRates retrieved:', smartRateData.smartrates ? smartRateData.smartrates.length : 0)
     
-    return new Response(JSON.stringify(smartRateData), { headers: corsHeaders })
+    return new Response(JSON.stringify({
+      smartRates: smartRateData.smartrates,
+      count: smartRateData.smartrates ? smartRateData.smartrates.length : 0
+    }), { headers: corsHeaders })
     
   } catch (err) {
     console.error('Error getting SmartRates:', err)

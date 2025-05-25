@@ -117,7 +117,8 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
     // Only close dropdown if focus is not moving to a dropdown item
     // Use a small delay to allow for clicks on dropdown items
     setTimeout(() => {
-      if (!e.currentTarget.contains(document.activeElement)) {
+      // Add null check for currentTarget and document.activeElement
+      if (e.currentTarget && document.activeElement && !e.currentTarget.contains(document.activeElement)) {
         setOpen(false);
       }
     }, 150);
