@@ -30,7 +30,7 @@ export const WeightSection = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Weight</h3>
-        <span className="text-sm text-muted-foreground">in oz</span>
+        <span className="text-sm text-muted-foreground">in lbs</span>
       </div>
       
       <FormField
@@ -38,7 +38,7 @@ export const WeightSection = () => {
         name="weight"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Weight</FormLabel>
+            <FormLabel>Weight (lbs)</FormLabel>
             <FormControl>
               <Input 
                 type="number" 
@@ -51,7 +51,7 @@ export const WeightSection = () => {
               />
             </FormControl>
             <FormDescription>
-              For packages over 1lb, enter 16oz per pound (e.g., 2lbs = 32oz)
+              Enter weight in pounds (e.g., 2.5 lbs)
             </FormDescription>
             <FormMessage />
           </FormItem>

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { DimensionsSection } from "./package/DimensionsSection";
 import { WeightSection } from "./package/WeightSection";
+import { QboidStatusNotification } from "./package/QboidStatusNotification";
 
 export const PackageDetailsSection = () => {
   return (
@@ -17,6 +18,7 @@ export const PackageDetailsSection = () => {
         <CardDescription>Enter the package dimensions and weight</CardDescription>
       </CardHeader>
       <CardContent>
+        <QboidStatusNotification />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <DimensionsSection />
           <WeightSection />
