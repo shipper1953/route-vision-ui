@@ -24,10 +24,7 @@ export const RatesActionButton = ({ loading, onClick }: RatesActionButtonProps) 
       onClick={handleClick}
     >
       {loading ? (
-        <>
-          <LoadingSpinner size={16} className="mr-2 [&>span]:hidden" /> 
-          Getting Rates...
-        </>
+        <LoadingSpinner size={16} className="[&>span]:hidden" />
       ) : (
         <>
           Get Shipping Rates
