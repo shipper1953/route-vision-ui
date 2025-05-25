@@ -47,7 +47,7 @@ export async function fetchOrders(): Promise<OrderData[]> {
         
         // Check for related shipment data by shipment_id first
         if (order.shipment_id) {
-          const { data: shipment, error: shipmentError } = await supabaseClient
+          const { data: shipment, error: shipmentError } = await supabase
             .from('shipments')
             .select('*')
             .eq('id', order.shipment_id)
