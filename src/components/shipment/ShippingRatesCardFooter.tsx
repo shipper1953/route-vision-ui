@@ -64,13 +64,10 @@ export const ShippingRatesCardFooter = ({
       <Button 
         onClick={handlePurchaseLabel}
         disabled={!selectedRate || purchasing} 
-        className="bg-tms-blue hover:bg-tms-blue-400 gap-1"
+        className={purchasing ? "bg-transparent hover:bg-transparent border-transparent" : "bg-tms-blue hover:bg-tms-blue-400 gap-1"}
       >
         {purchasing ? (
-          <>
-            <LoadingSpinner size={16} className="mr-2" />
-            Purchasing...
-          </>
+          <LoadingSpinner size={100} className="[&>span]:hidden [&>div]:bg-transparent tornado-360-spin" />
         ) : (
           <>
             <Package className="w-4 h-4" />
