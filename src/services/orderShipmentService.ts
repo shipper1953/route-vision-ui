@@ -12,8 +12,8 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
   try {
     console.log(`Linking shipment to order ${orderId}:`, shipmentInfo);
     
-    // Remove "ORD-" prefix if present for numeric ID lookup
-    const numericId = orderId.startsWith('ORD-') ? parseInt(orderId.replace('ORD-', '')) : parseInt(orderId);
+    // Remove "ORD-" prefix if present for order_id lookup
+    const searchId = orderId.startsWith('ORD-') ? orderId : `ORD-${orderId}`;
     
     // Format shipment details for JSON storage
     const shipmentDetails = {
@@ -34,7 +34,7 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
         tracking_number: shipmentInfo.trackingNumber,
         tracking: JSON.stringify(shipmentDetails)
       })
-      .eq('id', numericId);
+      .eq('order_id', searchId);
     
     if (error) {
       console.error("Error linking shipment to order:", error);

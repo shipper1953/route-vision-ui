@@ -108,16 +108,26 @@ export const saveShipmentToSupabase = async (labelData: any): Promise<void> => {
       return;
     }
 
-    // Format shipment data for Supabase
+    // Format shipment data for Supabase with all required fields
     const shipmentData = {
       easypost_id: labelData.id,
       tracking_number: labelData.tracking_number,
-      carrier: labelData.selected_rate?.carrier,
+      carrier: labelData.selected_rate?.carrier || 'Unknown',
       carrier_service: labelData.selected_rate?.service,
+      service: labelData.selected_rate?.service || 'Standard',
       status: 'purchased',
       label_url: labelData.postage_label?.label_url,
       weight: parseFloat(labelData.parcel?.weight) || 0,
-      // Add user_id if you have RLS policies that require it
+      cost: parseFloat(labelData.selected_rate?.rate) || 0,
+      package_dimensions: JSON.stringify({
+        length: labelData.parcel?.length || 0,
+        width: labelData.parcel?.width || 0,
+        height: labelData.parcel?.height || 0
+      }),
+      package_weights: JSON.stringify({
+        weight: labelData.parcel?.weight || 0,
+        weight_unit: labelData.parcel?.weight_unit || 'oz'
+      }),
       user_id: user.user.id
     };
 
