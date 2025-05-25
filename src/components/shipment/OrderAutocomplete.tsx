@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { 
   Command,
@@ -30,6 +30,7 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
   const form = useFormContext<ShipmentForm>();
   
   const orderBarcode = form.watch("orderBarcode");
@@ -82,25 +83,25 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
     return matches;
   }, [orders, inputValue]);
 
-  // Show dropdown when there's input, filtered results, and input is focused
-  useEffect(() => {
-    const shouldShow = inputValue && inputValue.trim().length > 0 && filteredOrders.length > 0;
-    setOpen(shouldShow);
-  }, [inputValue, filteredOrders]);
-
   const handleSelect = (order: OrderData) => {
     setInputValue(order.id);
     form.setValue("orderBarcode", order.id);
     setOpen(false);
     onOrderSelected(order);
+    // Restore focus to input after selection
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
   };
 
   const handleInputChange = (value: string) => {
     setInputValue(value);
     form.setValue("orderBarcode", value);
     
-    // If user clears the input, close dropdown
-    if (!value || value.trim().length === 0) {
+    // Show dropdown if there's input and potential matches
+    if (value && value.trim().length > 0) {
+      setOpen(true);
+    } else {
       setOpen(false);
     }
   };
@@ -112,67 +113,85 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
     }
   };
 
+  const handleInputBlur = (e: React.FocusEvent) => {
+    // Only close dropdown if focus is not moving to a dropdown item
+    // Use a small delay to allow for clicks on dropdown items
+    setTimeout(() => {
+      if (!e.currentTarget.contains(document.activeElement)) {
+        setOpen(false);
+      }
+    }, 150);
+  };
+
   return (
     <div className="relative">
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen} modal={false}>
         <PopoverTrigger asChild>
           <div className="relative">
             <Input
+              ref={inputRef}
               placeholder="Enter order ID or scan barcode..."
               value={inputValue}
               onChange={(e) => handleInputChange(e.target.value)}
               onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
               className="pl-10"
+              autoComplete="off"
             />
             <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start">
-          <Command>
-            <CommandList>
+        <PopoverContent 
+          className="w-full p-0 z-50" 
+          align="start"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <Command shouldFilter={false}>
+            <CommandList className="max-h-60">
               {loading ? (
                 <div className="flex items-center justify-center py-4">
                   <LoadingSpinner size={16} className="mr-2" />
                   <span className="text-sm text-muted-foreground">Loading orders...</span>
                 </div>
-              ) : (
-                <>
-                  <CommandEmpty>No matching ready-to-ship orders found.</CommandEmpty>
-                  <CommandGroup heading="Ready to Ship Orders">
-                    {filteredOrders.map((order) => (
-                      <CommandItem
-                        key={order.id}
-                        value={order.id}
-                        onSelect={() => handleSelect(order)}
-                        className="cursor-pointer"
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            inputValue === order.id ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        <div className="flex flex-col flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{order.id}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(order.orderDate).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <span className="text-sm text-muted-foreground truncate">
-                            {order.customerName}
+              ) : filteredOrders.length > 0 ? (
+                <CommandGroup heading="Ready to Ship Orders">
+                  {filteredOrders.map((order) => (
+                    <CommandItem
+                      key={order.id}
+                      value={order.id}
+                      onSelect={() => handleSelect(order)}
+                      className="cursor-pointer"
+                      onMouseDown={(e) => e.preventDefault()} // Prevent input blur
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          inputValue === order.id ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      <div className="flex flex-col flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{order.id}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(order.orderDate).toLocaleDateString()}
                           </span>
-                          {order.requiredDeliveryDate && (
-                            <span className="text-xs text-amber-600">
-                              Required: {new Date(order.requiredDeliveryDate).toLocaleDateString()}
-                            </span>
-                          )}
                         </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </>
-              )}
+                        <span className="text-sm text-muted-foreground truncate">
+                          {order.customerName}
+                        </span>
+                        {order.requiredDeliveryDate && (
+                          <span className="text-xs text-amber-600">
+                            Required: {new Date(order.requiredDeliveryDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ) : inputValue && inputValue.trim().length > 0 ? (
+                <CommandEmpty>No matching ready-to-ship orders found.</CommandEmpty>
+              ) : null}
             </CommandList>
           </Command>
         </PopoverContent>
