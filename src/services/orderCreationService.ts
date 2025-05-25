@@ -16,10 +16,6 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
     throw new Error("No authentication token found");
   }
 
-  // For now, we'll create a mock user ID since we're using JWT auth
-  // In a real implementation, you'd get this from your auth system
-  const mockUserId = "12345678-1234-1234-1234-123456789012";
-
   // Simulate API delay for better UX
   await new Promise(resolve => setTimeout(resolve, 600));
   
@@ -33,7 +29,7 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
     status: "ready_to_ship" // Ensure new orders are set to ready_to_ship
   };
   
-  // Store the order in Supabase
+  // Store the order in Supabase (without user_id for now since we're using mock auth)
   try {
     console.log("Saving order to Supabase:", {
       order_id: orderId,
@@ -46,8 +42,7 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
       customer_phone: newOrder.customerPhone,
       order_date: newOrder.orderDate,
       required_delivery_date: newOrder.requiredDeliveryDate,
-      status: newOrder.status,
-      user_id: mockUserId // Use mock user ID for now
+      status: newOrder.status
     });
     
     const { data, error } = await supabase
@@ -63,8 +58,8 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
         customer_phone: newOrder.customerPhone,
         order_date: newOrder.orderDate,
         required_delivery_date: newOrder.requiredDeliveryDate,
-        status: newOrder.status,
-        user_id: mockUserId // Set the mock user's ID
+        status: newOrder.status
+        // Temporarily omitting user_id since we're using mock auth
       })
       .select()
       .single();
