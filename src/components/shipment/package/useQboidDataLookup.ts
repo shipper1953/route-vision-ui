@@ -29,11 +29,14 @@ export const useQboidDataLookup = ({ handleQboidData }: UseQboidDataLookupProps)
         if (orderData?.qboid_dimensions) {
           console.log('Found Qboid dimensions in order:', orderData.qboid_dimensions);
           
+          // Type assertion for the JSON data structure
+          const qboidDims = orderData.qboid_dimensions as any;
+          
           const dimensions: QboidDimensions = {
-            length: orderData.qboid_dimensions.length || 0,
-            width: orderData.qboid_dimensions.width || 0,
-            height: orderData.qboid_dimensions.height || 0,
-            weight: orderData.qboid_dimensions.weight || 0,
+            length: qboidDims.length || 0,
+            width: qboidDims.width || 0,
+            height: qboidDims.height || 0,
+            weight: qboidDims.weight || 0,
             orderId: urlOrderId
           };
           
