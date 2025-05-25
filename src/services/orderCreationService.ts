@@ -48,6 +48,14 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
         order_id: orderId,
         items: JSON.stringify([{ count: newOrder.items, description: "Order items" }]),
         value: parseFloat(newOrder.value),
+        shipping_address: JSON.stringify(newOrder.shippingAddress),
+        customer_name: newOrder.customerName,
+        customer_company: newOrder.customerCompany,
+        customer_email: newOrder.customerEmail,
+        customer_phone: newOrder.customerPhone,
+        order_date: newOrder.orderDate,
+        required_delivery_date: newOrder.requiredDeliveryDate,
+        status: newOrder.status,
         user_id: user?.id || null
       })
       .select()

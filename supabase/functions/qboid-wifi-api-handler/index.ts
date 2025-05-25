@@ -4,28 +4,28 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const corsHeaders = {
   'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*', // In production, set this to your specific domain
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qboid-token',
 }
 
 interface QboidData {
-  timestamp: string;       // Format: "YYYY/MM/DD HH:MM:SS"
-  l: number;               // Length in mm
-  w: number;               // Width in mm
-  h: number;               // Height in mm
-  weight?: number;         // Weight in grams
-  barcode?: string;        // Optional barcode
-  shape?: string;          // Shape description
-  device: string;          // Device ID
-  note?: string;           // Optional note
-  attributes?: {           // Optional attributes
+  timestamp: string;
+  l: number;
+  w: number;
+  h: number;
+  weight?: number;
+  barcode?: string;
+  shape?: string;
+  device: string;
+  note?: string;
+  attributes?: {
     [key: string]: string; 
   };
-  image?: string;          // Optional base64 encoded image
-  imagecolor?: string;     // Optional base64 encoded color image
-  imageseg?: string;       // Optional base64 encoded segmented image
-  orderId?: string;        // Custom field: order ID reference
+  image?: string;
+  imagecolor?: string;
+  imageseg?: string;
+  orderId?: string;
 }
 
 console.log('Qboid WiFi API handler loaded');
@@ -33,14 +33,12 @@ console.log('Qboid WiFi API handler loaded');
 serve(async (req) => {
   console.log(`Received ${req.method} request to qboid-wifi-api-handler endpoint`);
   
-  // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
     console.log('Handling OPTIONS request');
     return new Response(null, { headers: corsHeaders, status: 204 })
   }
   
   try {
-    // Handle token validation request from frontend
     const url = new URL(req.url);
     const contentType = req.headers.get('content-type');
     
@@ -50,7 +48,6 @@ serve(async (req) => {
       
       if (body.action === 'validate-token') {
         console.log('Validating token request');
-        // Just return success - the actual token validation happens when data is received from the device
         return new Response(JSON.stringify({ 
           success: true, 
           message: 'Use this endpoint in your Qboid WiFi API configuration'
@@ -60,19 +57,15 @@ serve(async (req) => {
         });
       }
       
-      // This is actual data from Qboid device
       console.log('Received data from Qboid device:', JSON.stringify(body));
       
-      // Verify the Qboid API token
       const qboidToken = req.headers.get('x-qboid-token');
       console.log('Received token:', qboidToken);
       
-      const validToken = Deno.env.get('QBOID_API_TOKEN') || 'test_token'; // Fallback for testing
+      const validToken = Deno.env.get('QBOID_API_TOKEN') || 'test_token';
       
       if (!qboidToken) {
         console.warn('Missing Qboid API token');
-        // For development, allow missing token with a warning
-        // In production, you would return 401 here
       } else if (qboidToken !== validToken) {
         console.error('Invalid Qboid API token');
         return new Response(JSON.stringify({ 
@@ -83,11 +76,9 @@ serve(async (req) => {
         });
       }
       
-      // Parse the request data as QboidData
       const qboidData = body as QboidData;
       console.log('Parsed qboid data:', JSON.stringify(qboidData));
       
-      // Validate required fields according to Qboid WiFi API documentation
       if (!qboidData || 
           typeof qboidData.l !== 'number' || 
           typeof qboidData.w !== 'number' || 
@@ -101,7 +92,6 @@ serve(async (req) => {
         });
       }
       
-      // Set up Supabase client
       const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
       const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
       
@@ -114,31 +104,61 @@ serve(async (req) => {
 
       // Convert mm to inches for compatibility with our system
       const dimensions = {
-        length: parseFloat((qboidData.l / 25.4).toFixed(2)),  // mm to inches
-        width: parseFloat((qboidData.w / 25.4).toFixed(2)),   // mm to inches
-        height: parseFloat((qboidData.h / 25.4).toFixed(2)),  // mm to inches
-        weight: qboidData.weight ? parseFloat((qboidData.weight / 28.35).toFixed(2)) : 0  // g to oz, default to 0
+        length: parseFloat((qboidData.l / 25.4).toFixed(2)),
+        width: parseFloat((qboidData.w / 25.4).toFixed(2)),
+        height: parseFloat((qboidData.h / 25.4).toFixed(2)),
+        weight: qboidData.weight ? parseFloat((qboidData.weight / 28.35).toFixed(2)) : 0
       };
       
-      // If weight is not provided, use a default
       if (!dimensions.weight) {
         dimensions.weight = parseFloat((dimensions.length * dimensions.width * dimensions.height * 0.02).toFixed(2));
         console.log(`Weight not provided, estimated as ${dimensions.weight}oz`);
       }
+
+      // Extract order ID from barcode or orderId field
+      let orderIdToUpdate = null;
+      if (qboidData.barcode && qboidData.barcode.startsWith('ORD-')) {
+        orderIdToUpdate = qboidData.barcode;
+      } else if (qboidData.orderId) {
+        orderIdToUpdate = qboidData.orderId.startsWith('ORD-') ? qboidData.orderId : `ORD-${qboidData.orderId}`;
+      }
+
+      // If we have an order ID, update the order with Qboid dimensions
+      if (orderIdToUpdate) {
+        console.log('Updating order with Qboid dimensions:', orderIdToUpdate);
+        try {
+          const { error: updateError } = await supabaseClient
+            .from('orders')
+            .update({
+              qboid_dimensions: JSON.stringify(dimensions)
+            })
+            .eq('order_id', orderIdToUpdate);
+          
+          if (updateError) {
+            console.error('Error updating order with Qboid dimensions:', updateError);
+          } else {
+            console.log('Order updated successfully with Qboid dimensions');
+          }
+        } catch (err) {
+          console.error('Failed to update order with Qboid dimensions:', err);
+        }
+      }
         
-      // Store in database for future reference
+      // Store in shipments table for future reference
       try {
         console.log('Saving dimensions to database:', JSON.stringify(dimensions));
         const { error: saveError } = await supabaseClient
           .from('shipments')
           .insert({
-            dimensions: dimensions,
-            weight: dimensions.weight,
-            created_at: new Date().toISOString(),
+            package_dimensions: dimensions,
+            package_weights: { weight: dimensions.weight, weight_unit: 'oz' },
+            carrier: 'pending',
+            service: 'pending',
             status: 'dimensions_captured',
-            order_id: qboidData.orderId ? parseInt(qboidData.orderId.replace(/\D/g, '')) : null,
-            barcode: qboidData.barcode || null,
-            easypost_id: null
+            cost: 0,
+            estimated_delivery_date: null,
+            actual_delivery_date: null,
+            user_id: null
           });
         
         if (saveError) {
@@ -148,10 +168,9 @@ serve(async (req) => {
         }
       } catch (err) {
         console.error('Failed to save dimensions to shipments table:', err);
-        // Don't fail the request if we can't save to the database
       }
       
-      // Try to push data to any connected clients via Supabase realtime
+      // Publish realtime event for immediate UI updates
       try {
         console.log('Publishing realtime event for dimensions:', JSON.stringify(dimensions));
         const { error: rtError } = await supabaseClient
@@ -162,7 +181,7 @@ serve(async (req) => {
               dimensions: dimensions,
               timestamp: qboidData.timestamp || new Date().toISOString(),
               barcode: qboidData.barcode || null,
-              orderId: qboidData.orderId || null
+              orderId: orderIdToUpdate || null
             }
           });
           
@@ -173,10 +192,8 @@ serve(async (req) => {
         }
       } catch (err) {
         console.error('Failed to publish realtime event:', err);
-        // Continue anyway
       }
       
-      // Return success response with the processed data
       return new Response(JSON.stringify({
         success: true,
         message: 'Package dimensions received successfully',
@@ -184,7 +201,7 @@ serve(async (req) => {
           dimensions: dimensions,
           timestamp: qboidData.timestamp || new Date().toISOString(),
           barcode: qboidData.barcode || null,
-          orderId: qboidData.orderId || null,
+          orderId: orderIdToUpdate || null,
         }
       }), {
         headers: corsHeaders,
@@ -192,7 +209,6 @@ serve(async (req) => {
       });
     }
     
-    // If we get here, the request was invalid
     console.error('Invalid request method or content-type:', req.method, req.headers.get('content-type'));
     return new Response(JSON.stringify({ 
       error: 'Invalid request. Only POST requests with application/json content-type are supported.' 

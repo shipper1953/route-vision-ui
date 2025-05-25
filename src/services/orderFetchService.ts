@@ -56,6 +56,22 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
         shippingAddress = {};
       }
     }
+
+    // Parse Qboid dimensions if available
+    let parcelInfo;
+    if (data.qboid_dimensions) {
+      try {
+        // Only parse if it's a string
+        if (typeof data.qboid_dimensions === 'string') {
+          parcelInfo = JSON.parse(data.qboid_dimensions);
+        } else {
+          parcelInfo = data.qboid_dimensions;
+        }
+        console.log("Qboid dimensions found for order:", orderId, parcelInfo);
+      } catch (e) {
+        console.warn("Failed to parse Qboid dimensions:", e);
+      }
+    }
     
     // Convert Supabase data format to our OrderData format
     return {
@@ -70,6 +86,7 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       items: typeof data.items === 'number' ? data.items : 1,
       value: data.value?.toString() || "0",
       shippingAddress: shippingAddress as any,
+      parcelInfo: parcelInfo, // Include Qboid dimensions as parcel info
       shipment: shipmentInfo || ((data as any).tracking_number ? {
         id: `SHIP-${data.id}`,
         carrier: "Unknown",
@@ -144,6 +161,21 @@ export async function fetchOrders(): Promise<OrderData[]> {
           shippingAddress = {};
         }
       }
+
+      // Parse Qboid dimensions if available
+      let parcelInfo;
+      if (order.qboid_dimensions) {
+        try {
+          // Only parse if it's a string
+          if (typeof order.qboid_dimensions === 'string') {
+            parcelInfo = JSON.parse(order.qboid_dimensions);
+          } else {
+            parcelInfo = order.qboid_dimensions;
+          }
+        } catch (e) {
+          console.warn("Failed to parse Qboid dimensions for order", order.id, e);
+        }
+      }
       
       return {
         id: order.order_id || `ORD-${order.id}`,
@@ -157,6 +189,7 @@ export async function fetchOrders(): Promise<OrderData[]> {
         items: typeof order.items === 'number' ? order.items : 1,
         value: order.value?.toString() || "0",
         shippingAddress: shippingAddress as any,
+        parcelInfo: parcelInfo, // Include Qboid dimensions as parcel info
         shipment: shipmentInfo || ((order as any).tracking_number ? {
           id: `SHIP-${order.id}`,
           carrier: "Unknown",
