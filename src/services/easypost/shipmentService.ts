@@ -71,16 +71,18 @@ export class ShipmentService {
     console.log('Attempting to retrieve SmartRates via dedicated endpoint...');
     
     try {
-      const { data: smartRateData, error: smartRateError } = await supabase.functions.invoke('get-smartrates', {
+      const { data: smartRateResponse, error: smartRateError } = await supabase.functions.invoke('get-smartrates', {
         body: { 
           shipmentId: data.id,
           accuracy: 'percentile_75'
         }
       });
       
-      if (!smartRateError && smartRateData?.smartrates?.length > 0) {
-        data.smartrates = smartRateData.smartrates;
+      if (!smartRateError && smartRateResponse?.smartRates?.length > 0) {
+        data.smartrates = smartRateResponse.smartRates;
         console.log('✅ Successfully retrieved SmartRates via dedicated endpoint:', data.smartrates.length);
+      } else {
+        console.warn('SmartRates endpoint error or no SmartRates returned:', smartRateError || 'No SmartRates in response');
       }
     } catch (smartRateErr) {
       console.warn('Could not retrieve SmartRates via dedicated endpoint:', smartRateErr);
