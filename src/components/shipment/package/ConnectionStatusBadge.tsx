@@ -1,7 +1,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Check, AlertCircle, Wifi } from "lucide-react";
-import { ConnectionStatus } from "./useQboidConnection";
+import { ConnectionStatus } from "./types";
 
 interface ConnectionStatusBadgeProps {
   connectionStatus: ConnectionStatus;

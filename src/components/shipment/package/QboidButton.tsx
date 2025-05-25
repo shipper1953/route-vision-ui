@@ -1,6 +1,7 @@
+
 import { Button } from "@/components/ui/button";
 import { Wifi, WifiOff, AlertTriangle } from "lucide-react";
-import { ConnectionStatus } from "./useQboidConnection";
+import { ConnectionStatus } from "./types";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

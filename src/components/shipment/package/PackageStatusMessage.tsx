@@ -1,7 +1,7 @@
 
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
-import { ConnectionStatus } from "./useQboidConnection";
+import { ConnectionStatus } from "./types";
 import { AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 
 interface PackageStatusMessageProps {
