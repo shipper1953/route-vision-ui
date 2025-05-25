@@ -1,7 +1,9 @@
+
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ShipmentResponse, SmartRate, Rate } from '@/services/easypost';
-import { linkShipmentToOrder } from '@/services/orderService';
+import { linkShipmentToOrder } from '@/services/orderShipmentService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useShipment = (orderId?: string | null) => {
   const [shipmentResponse, setShipmentResponse] = useState<ShipmentResponse | null>(null);
@@ -35,46 +37,47 @@ export const useShipment = (orderId?: string | null) => {
 
   const purchaseLabel = async (shipmentId: string, rateId: string): Promise<any> => {
     try {
-      const response = await fetch('/api/purchase-label', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          shipmentId,
-          rateId,
-        }),
+      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`);
+      
+      // Use Supabase Edge Function instead of /api/purchase-label
+      const { data, error } = await supabase.functions.invoke('purchase-label', {
+        body: { shipmentId, rateId }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to purchase label');
+      if (error) {
+        console.error('Edge Function error:', error);
+        throw new Error(error.message || 'Failed to purchase label');
       }
 
-      const result = await response.json();
+      if (!data) {
+        throw new Error('No data returned from purchase-label function');
+      }
+
+      console.log('Label purchased successfully:', data);
       
       // Store in session storage for the shipments page
-      sessionStorage.setItem('lastPurchasedLabel', JSON.stringify(result));
+      sessionStorage.setItem('lastPurchasedLabel', JSON.stringify(data));
       
       // Link shipment to order if orderId is provided
-      if (orderId && result.id) {
+      if (orderId && data.id) {
         try {
           await linkShipmentToOrder(orderId, {
-            id: result.id,
-            carrier: result.selected_rate?.carrier || 'Unknown',
-            service: result.selected_rate?.service || 'Standard',
-            trackingNumber: result.tracking_code || 'Pending',
-            trackingUrl: result.tracker?.public_url || '#',
-            labelUrl: result.postage_label?.label_url
+            id: data.id,
+            carrier: data.selected_rate?.carrier || 'Unknown',
+            service: data.selected_rate?.service || 'Standard',
+            trackingNumber: data.tracking_code || 'Pending',
+            trackingUrl: data.tracker?.public_url || '#',
+            labelUrl: data.postage_label?.label_url
           });
           
-          console.log(`Successfully linked shipment ${result.id} to order ${orderId}`);
+          console.log(`Successfully linked shipment ${data.id} to order ${orderId}`);
         } catch (linkError) {
           console.error('Error linking shipment to order:', linkError);
           // Don't fail the entire operation if linking fails
         }
       }
       
-      return result;
+      return data;
     } catch (error) {
       console.error('Error purchasing label:', error);
       toast.error('Failed to purchase shipping label');
