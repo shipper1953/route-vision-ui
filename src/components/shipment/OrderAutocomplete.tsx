@@ -29,6 +29,7 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
   const [open, setOpen] = useState(false);
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [inputValue, setInputValue] = useState("");
   const form = useFormContext<ShipmentForm>();
   
   const orderBarcode = form.watch("orderBarcode");
@@ -39,9 +40,11 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
       try {
         setLoading(true);
         const orderData = await fetchOrders();
-        // Filter to only show orders without shipments (open orders)
-        const openOrders = orderData.filter(order => !order.shipment);
-        setOrders(openOrders);
+        // Filter to only show orders that are ready to ship (no shipment yet)
+        const readyToShipOrders = orderData.filter(order => 
+          order.status === "ready_to_ship" || (!order.shipment && order.status !== "shipped")
+        );
+        setOrders(readyToShipOrders);
       } catch (error) {
         console.error("Error loading orders:", error);
       } finally {
@@ -52,31 +55,61 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
     loadOrders();
   }, []);
 
+  // Sync input value with form value
+  useEffect(() => {
+    setInputValue(orderBarcode || "");
+  }, [orderBarcode]);
+
   // Filter orders based on input value
   const filteredOrders = useMemo(() => {
-    if (!orderBarcode || orderBarcode.trim().length === 0) return [];
+    if (!inputValue || inputValue.trim().length === 0) return [];
     
-    const searchTerm = orderBarcode.toLowerCase().trim();
-    return orders.filter(order => 
+    const searchTerm = inputValue.toLowerCase().trim();
+    const matches = orders.filter(order => 
       order.id.toLowerCase().includes(searchTerm) ||
       order.customerName.toLowerCase().includes(searchTerm)
     ).slice(0, 10); // Limit to 10 results for performance
-  }, [orders, orderBarcode]);
 
-  // Show dropdown when there's input and filtered results
+    // Check for exact match - if found, auto-select it
+    const exactMatch = orders.find(order => order.id.toLowerCase() === searchTerm);
+    if (exactMatch && inputValue !== exactMatch.id) {
+      // Auto-select exact match after a short delay
+      setTimeout(() => {
+        handleSelect(exactMatch);
+      }, 100);
+    }
+
+    return matches;
+  }, [orders, inputValue]);
+
+  // Show dropdown when there's input, filtered results, and input is focused
   useEffect(() => {
-    const shouldShow = orderBarcode && orderBarcode.trim().length > 0 && filteredOrders.length > 0;
+    const shouldShow = inputValue && inputValue.trim().length > 0 && filteredOrders.length > 0;
     setOpen(shouldShow);
-  }, [orderBarcode, filteredOrders]);
+  }, [inputValue, filteredOrders]);
 
   const handleSelect = (order: OrderData) => {
+    setInputValue(order.id);
     form.setValue("orderBarcode", order.id);
     setOpen(false);
     onOrderSelected(order);
   };
 
   const handleInputChange = (value: string) => {
+    setInputValue(value);
     form.setValue("orderBarcode", value);
+    
+    // If user clears the input, close dropdown
+    if (!value || value.trim().length === 0) {
+      setOpen(false);
+    }
+  };
+
+  const handleInputFocus = () => {
+    // Show dropdown if there are filtered results when input is focused
+    if (inputValue && inputValue.trim().length > 0 && filteredOrders.length > 0) {
+      setOpen(true);
+    }
   };
 
   return (
@@ -86,8 +119,9 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
           <div className="relative">
             <Input
               placeholder="Enter order ID or scan barcode..."
-              value={orderBarcode || ""}
+              value={inputValue}
               onChange={(e) => handleInputChange(e.target.value)}
+              onFocus={handleInputFocus}
               className="pl-10"
             />
             <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -103,8 +137,8 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
                 </div>
               ) : (
                 <>
-                  <CommandEmpty>No matching orders found.</CommandEmpty>
-                  <CommandGroup heading="Matching Orders">
+                  <CommandEmpty>No matching ready-to-ship orders found.</CommandEmpty>
+                  <CommandGroup heading="Ready to Ship Orders">
                     {filteredOrders.map((order) => (
                       <CommandItem
                         key={order.id}
@@ -115,7 +149,7 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
                         <Check
                           className={cn(
                             "mr-2 h-4 w-4",
-                            orderBarcode === order.id ? "opacity-100" : "opacity-0"
+                            inputValue === order.id ? "opacity-100" : "opacity-0"
                           )}
                         />
                         <div className="flex flex-col flex-1">
