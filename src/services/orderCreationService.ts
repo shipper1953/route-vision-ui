@@ -9,18 +9,12 @@ import { toast } from "sonner";
  * @returns The created order
  */
 export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<OrderData> {
-  // Get the JWT token from localStorage (from our mock auth system)
+  // Check if user is authenticated with our mock auth system
   const token = localStorage.getItem('token');
   
   if (!token) {
     throw new Error("No authentication token found");
   }
-
-  // Set the JWT token for Supabase client
-  await supabase.auth.setSession({
-    access_token: token,
-    refresh_token: token
-  });
 
   // For now, we'll create a mock user ID since we're using JWT auth
   // In a real implementation, you'd get this from your auth system
