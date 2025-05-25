@@ -36,16 +36,30 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       }
     }
     
+    // Parse shipping address from JSON
+    let shippingAddress = {};
+    if (data.shipping_address) {
+      try {
+        shippingAddress = JSON.parse(data.shipping_address);
+      } catch (e) {
+        console.warn("Failed to parse shipping address:", e);
+        shippingAddress = {};
+      }
+    }
+    
     // Convert Supabase data format to our OrderData format
     return {
       id: data.order_id,
-      customerName: (data as any).customer_name || "Unknown Customer",
-      orderDate: (data as any).order_date || new Date().toISOString().split('T')[0],
-      requiredDeliveryDate: (data as any).required_delivery_date || new Date().toISOString().split('T')[0],
-      status: (data as any).status || "processing",
+      customerName: data.customer_name || "Unknown Customer",
+      customerCompany: data.customer_company || "",
+      customerEmail: data.customer_email || "",
+      customerPhone: data.customer_phone || "",
+      orderDate: data.order_date || new Date().toISOString().split('T')[0],
+      requiredDeliveryDate: data.required_delivery_date || new Date().toISOString().split('T')[0],
+      status: data.status || "processing",
       items: typeof data.items === 'number' ? data.items : 1,
       value: data.value?.toString() || "0",
-      shippingAddress: (data as any).shipping_address ? JSON.parse((data as any).shipping_address) : {},
+      shippingAddress: shippingAddress as any,
       shipment: shipmentInfo || ((data as any).tracking_number ? {
         id: `SHIP-${data.id}`,
         carrier: "Unknown",
@@ -100,15 +114,29 @@ export async function fetchOrders(): Promise<OrderData[]> {
         }
       }
       
+      // Parse shipping address from JSON
+      let shippingAddress = {};
+      if (order.shipping_address) {
+        try {
+          shippingAddress = JSON.parse(order.shipping_address);
+        } catch (e) {
+          console.warn("Failed to parse shipping address for order", order.id, e);
+          shippingAddress = {};
+        }
+      }
+      
       return {
         id: order.order_id || `ORD-${order.id}`,
-        customerName: (order as any).customer_name || "Unknown Customer",
-        orderDate: (order as any).order_date || new Date().toISOString().split('T')[0],
-        requiredDeliveryDate: (order as any).required_delivery_date || new Date().toISOString().split('T')[0],
-        status: (order as any).status || "processing",
+        customerName: order.customer_name || "Unknown Customer",
+        customerCompany: order.customer_company || "",
+        customerEmail: order.customer_email || "",
+        customerPhone: order.customer_phone || "",
+        orderDate: order.order_date || new Date().toISOString().split('T')[0],
+        requiredDeliveryDate: order.required_delivery_date || new Date().toISOString().split('T')[0],
+        status: order.status || "processing",
         items: typeof order.items === 'number' ? order.items : 1,
         value: order.value?.toString() || "0",
-        shippingAddress: (order as any).shipping_address ? JSON.parse((order as any).shipping_address) : {},
+        shippingAddress: shippingAddress as any,
         shipment: shipmentInfo || ((order as any).tracking_number ? {
           id: `SHIP-${order.id}`,
           carrier: "Unknown",

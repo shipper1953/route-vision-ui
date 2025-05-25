@@ -58,32 +58,56 @@ export type Database = {
       }
       orders: {
         Row: {
+          customer_company: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
           id: number
           items: Json
+          order_date: string | null
           order_id: string
           qboid_dimensions: Json | null
+          required_delivery_date: string | null
           shipment_id: number | null
+          shipping_address: Json | null
           shipping_address_id: number | null
+          status: string | null
           user_id: string | null
           value: number
         }
         Insert: {
+          customer_company?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           id?: never
           items: Json
+          order_date?: string | null
           order_id: string
           qboid_dimensions?: Json | null
+          required_delivery_date?: string | null
           shipment_id?: number | null
+          shipping_address?: Json | null
           shipping_address_id?: number | null
+          status?: string | null
           user_id?: string | null
           value: number
         }
         Update: {
+          customer_company?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           id?: never
           items?: Json
+          order_date?: string | null
           order_id?: string
           qboid_dimensions?: Json | null
+          required_delivery_date?: string | null
           shipment_id?: number | null
+          shipping_address?: Json | null
           shipping_address_id?: number | null
+          status?: string | null
           user_id?: string | null
           value?: number
         }
