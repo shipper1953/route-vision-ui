@@ -11,219 +11,260 @@ export type Database = {
     Tables: {
       addresses: {
         Row: {
-          address_line1: string | null
+          address_line1: string
           address_line2: string | null
-          city: string | null
-          company: string | null
-          country_code: string | null
+          city: string
+          country: string
           created_at: string | null
-          email: string | null
           id: number
-          is_default: boolean | null
-          lat: number | null
-          lon: number | null
-          name: string | null
-          phone: string | null
-          postcode: string | null
-          state: string | null
+          postal_code: string
+          state: string
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
-          address_line1?: string | null
+          address_line1: string
           address_line2?: string | null
-          city?: string | null
-          company?: string | null
-          country_code?: string | null
+          city: string
+          country: string
           created_at?: string | null
-          email?: string | null
           id?: never
-          is_default?: boolean | null
-          lat?: number | null
-          lon?: number | null
-          name?: string | null
-          phone?: string | null
-          postcode?: string | null
-          state?: string | null
+          postal_code: string
+          state: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
-          address_line1?: string | null
+          address_line1?: string
           address_line2?: string | null
-          city?: string | null
-          company?: string | null
-          country_code?: string | null
+          city?: string
+          country?: string
           created_at?: string | null
-          email?: string | null
           id?: never
-          is_default?: boolean | null
-          lat?: number | null
-          lon?: number | null
-          name?: string | null
-          phone?: string | null
-          postcode?: string | null
-          state?: string | null
+          postal_code?: string
+          state?: string
+          updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "addresses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       orders: {
         Row: {
-          created_at: string | null
-          customer_id: string | null
-          customer_name: string | null
           id: number
-          items: number | null
-          order_date: string
-          payment_status: string | null
-          required_delivery_date: string | null
-          shipping_address: string | null
-          status: string | null
-          tracking: string | null
-          tracking_number: string | null
-          value: number | null
+          items: Json
+          order_id: string
+          qboid_dimensions: Json | null
+          shipment_id: number | null
+          shipping_address_id: number | null
+          user_id: string | null
+          value: number
         }
         Insert: {
-          created_at?: string | null
-          customer_id?: string | null
-          customer_name?: string | null
-          id?: number
-          items?: number | null
-          order_date: string
-          payment_status?: string | null
-          required_delivery_date?: string | null
-          shipping_address?: string | null
-          status?: string | null
-          tracking?: string | null
-          tracking_number?: string | null
-          value?: number | null
+          id?: never
+          items: Json
+          order_id: string
+          qboid_dimensions?: Json | null
+          shipment_id?: number | null
+          shipping_address_id?: number | null
+          user_id?: string | null
+          value: number
         }
         Update: {
-          created_at?: string | null
-          customer_id?: string | null
-          customer_name?: string | null
-          id?: number
-          items?: number | null
-          order_date?: string
-          payment_status?: string | null
-          required_delivery_date?: string | null
-          shipping_address?: string | null
-          status?: string | null
-          tracking?: string | null
-          tracking_number?: string | null
-          value?: number | null
+          id?: never
+          items?: Json
+          order_id?: string
+          qboid_dimensions?: Json | null
+          shipment_id?: number | null
+          shipping_address_id?: number | null
+          user_id?: string | null
+          value?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orders_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_shipping_address_id_fkey"
+            columns: ["shipping_address_id"]
+            isOneToOne: false
+            referencedRelation: "addresses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shipments: {
         Row: {
           actual_delivery_date: string | null
-          carrier: string | null
-          carrier_service: string | null
-          created_at: string
-          destination_address: string | null
-          dimensions: Json | null
-          easypost_id: string | null
+          carrier: string
+          cost: number
           estimated_delivery_date: string | null
           id: number
-          label_url: string | null
-          order_id: number | null
-          origin_address: string | null
-          ship_date: string | null
-          status: string | null
-          tracking_number: string | null
-          weight: number | null
+          package_dimensions: Json
+          package_weights: Json
+          service: string
+          status: string
+          user_id: string | null
         }
         Insert: {
           actual_delivery_date?: string | null
-          carrier?: string | null
-          carrier_service?: string | null
-          created_at?: string
-          destination_address?: string | null
-          dimensions?: Json | null
-          easypost_id?: string | null
+          carrier: string
+          cost: number
           estimated_delivery_date?: string | null
-          id?: number
-          label_url?: string | null
-          order_id?: number | null
-          origin_address?: string | null
-          ship_date?: string | null
-          status?: string | null
-          tracking_number?: string | null
-          weight?: number | null
+          id?: never
+          package_dimensions: Json
+          package_weights: Json
+          service: string
+          status: string
+          user_id?: string | null
         }
         Update: {
           actual_delivery_date?: string | null
-          carrier?: string | null
-          carrier_service?: string | null
-          created_at?: string
-          destination_address?: string | null
-          dimensions?: Json | null
-          easypost_id?: string | null
+          carrier?: string
+          cost?: number
           estimated_delivery_date?: string | null
-          id?: number
-          label_url?: string | null
-          order_id?: number | null
-          origin_address?: string | null
-          ship_date?: string | null
-          status?: string | null
-          tracking_number?: string | null
-          weight?: number | null
+          id?: never
+          package_dimensions?: Json
+          package_weights?: Json
+          service?: string
+          status?: string
+          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "shipments_order_id_fkey"
-            columns: ["order_id"]
+            foreignKeyName: "shipments_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "orders"
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
       }
       shipping_rates: {
         Row: {
-          created_at: string
+          base_rate: number
+          carrier: string
+          delivery_time: string | null
+          dim_limit: Json | null
           id: number
+          service: string
+          shipment_id: number | null
+          user_id: string | null
+          weight_limit: number | null
         }
         Insert: {
-          created_at?: string
-          id?: number
+          base_rate: number
+          carrier: string
+          delivery_time?: string | null
+          dim_limit?: Json | null
+          id?: never
+          service: string
+          shipment_id?: number | null
+          user_id?: string | null
+          weight_limit?: number | null
         }
         Update: {
-          created_at?: string
-          id?: number
+          base_rate?: number
+          carrier?: string
+          delivery_time?: string | null
+          dim_limit?: Json | null
+          id?: never
+          service?: string
+          shipment_id?: number | null
+          user_id?: string | null
+          weight_limit?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shipping_rates_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_rates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_profiles: {
         Row: {
-          carrier: string | null
-          created_at: string
-          delivery_days: number | null
-          easypost_rate_id: string | null
+          created_at: string | null
           id: number
-          rate: number | null
-          service: string | null
-          shipment_id: string | null
+          phone_number: string | null
+          preferences: Json | null
+          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          carrier?: string | null
-          created_at?: string
-          delivery_days?: number | null
-          easypost_rate_id?: string | null
-          id?: number
-          rate?: number | null
-          service?: string | null
-          shipment_id?: string | null
+          created_at?: string | null
+          id?: never
+          phone_number?: string | null
+          preferences?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          carrier?: string | null
-          created_at?: string
-          delivery_days?: number | null
-          easypost_rate_id?: string | null
-          id?: number
-          rate?: number | null
-          service?: string | null
-          shipment_id?: string | null
+          created_at?: string | null
+          id?: never
+          phone_number?: string | null
+          preferences?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          email: string
+          id: string
+          name: string
+          password: string
+          role: string
+        }
+        Insert: {
+          email: string
+          id: string
+          name: string
+          password: string
+          role: string
+        }
+        Update: {
+          email?: string
+          id?: string
+          name?: string
+          password?: string
+          role?: string
         }
         Relationships: []
       }
