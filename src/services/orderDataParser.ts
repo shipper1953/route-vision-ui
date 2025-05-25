@@ -74,12 +74,39 @@ export function parseParcelInfo(dimensionsData: any, orderId: string): any {
 }
 
 /**
+ * Parses items data from JSON or returns default count
+ */
+export function parseItemsData(itemsData: any): number {
+  if (!itemsData) return 1;
+  
+  try {
+    if (typeof itemsData === 'number') {
+      return itemsData;
+    } else if (typeof itemsData === 'string') {
+      const parsed = JSON.parse(itemsData);
+      if (Array.isArray(parsed)) {
+        // Sum up the count from all items
+        return parsed.reduce((total, item) => total + (item.count || 1), 0);
+      }
+      return 1;
+    } else if (Array.isArray(itemsData)) {
+      return itemsData.reduce((total, item) => total + (item.count || 1), 0);
+    }
+  } catch (e) {
+    console.warn("Failed to parse items data:", e);
+  }
+  
+  return 1;
+}
+
+/**
  * Converts Supabase data format to OrderData format
  */
 export function convertSupabaseToOrderData(data: any): OrderData {
   const shippingAddress = parseShippingAddress(data.shipping_address);
   const parcelInfo = parseParcelInfo(data.qboid_dimensions, data.order_id);
   const shipmentInfo = parseShipmentInfo(data.tracking || data.shipment_data, data.order_id);
+  const itemsCount = parseItemsData(data.items);
   
   // Determine order status based on shipment info
   let orderStatus = data.status || "processing";
@@ -96,7 +123,7 @@ export function convertSupabaseToOrderData(data: any): OrderData {
     orderDate: data.order_date || new Date().toISOString().split('T')[0],
     requiredDeliveryDate: data.required_delivery_date || new Date().toISOString().split('T')[0],
     status: orderStatus,
-    items: typeof data.items === 'number' ? data.items : 1,
+    items: itemsCount,
     value: data.value?.toString() || "0",
     shippingAddress: shippingAddress as any,
     parcelInfo: parcelInfo,
