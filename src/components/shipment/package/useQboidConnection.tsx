@@ -1,9 +1,9 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useFormContext } from 'react-hook-form';
 import { ShipmentForm } from '@/types/shipment';
+import { useSearchParams } from 'react-router-dom';
 
 interface QboidDimensions {
   length: number;
@@ -22,6 +22,7 @@ export const useQboidConnection = () => {
   const [configuring, setConfiguring] = useState(false);
   const [deviceIp, setDeviceIp] = useState('');
   const form = useFormContext<ShipmentForm>();
+  const [searchParams] = useSearchParams();
 
   const configGuide = {
     instructions: [
@@ -110,6 +111,51 @@ export const useQboidConnection = () => {
     setConnectionStatus('connected');
     toast.success('Package dimensions updated from Qboid scanner');
   }, [form]);
+
+  // Check for existing Qboid data when component mounts, especially if orderId is in URL
+  useEffect(() => {
+    const checkExistingQboidData = async () => {
+      const urlOrderId = searchParams.get('orderId');
+      if (!urlOrderId) return;
+
+      console.log('Checking for existing Qboid data for order:', urlOrderId);
+      
+      try {
+        const { data: qboidData } = await supabase
+          .from('qboid_events')
+          .select('*')
+          .eq('event_type', 'dimensions_received')
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (qboidData && qboidData.length > 0) {
+          // Find matching data by order ID
+          for (const event of qboidData) {
+            const eventData = event.data;
+            if (eventData && (eventData.orderId === urlOrderId || eventData.barcode === urlOrderId)) {
+              console.log('Found existing Qboid data for current order:', eventData);
+              
+              // Convert to expected format and populate form
+              const dimensions: QboidDimensions = {
+                length: eventData.length || 0,
+                width: eventData.width || 0,
+                height: eventData.height || 0,
+                weight: eventData.weight || 0,
+                orderId: eventData.orderId || eventData.barcode
+              };
+              
+              await handleQboidData(dimensions);
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking existing Qboid data:', error);
+      }
+    };
+
+    checkExistingQboidData();
+  }, [searchParams, handleQboidData]);
 
   const handleDeviceIpChange = useCallback((ip: string) => {
     setDeviceIp(ip);

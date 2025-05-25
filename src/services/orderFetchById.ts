@@ -29,6 +29,41 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
     
     console.log("Raw order data from Supabase:", data);
     
+    // Also check for Qboid dimension data
+    const { data: qboidData } = await supabase
+      .from('qboid_events')
+      .select('*')
+      .eq('event_type', 'dimensions_received')
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    // Find matching Qboid data by order ID in the data payload
+    let matchingQboidData = null;
+    if (qboidData && qboidData.length > 0) {
+      console.log("Found Qboid events:", qboidData.length);
+      
+      for (const event of qboidData) {
+        const eventData = event.data;
+        if (eventData && (eventData.orderId === searchId || eventData.barcode === searchId)) {
+          console.log("Found matching Qboid data for order:", searchId, eventData);
+          matchingQboidData = eventData;
+          break;
+        }
+      }
+    }
+    
+    // Merge Qboid data if found
+    if (matchingQboidData) {
+      console.log("Merging Qboid dimensions with order data");
+      data.qboid_dimensions = {
+        length: matchingQboidData.length,
+        width: matchingQboidData.width,
+        height: matchingQboidData.height,
+        weight: matchingQboidData.weight,
+        orderId: matchingQboidData.orderId || matchingQboidData.barcode
+      };
+    }
+    
     const orderData = convertSupabaseToOrderData(data);
     console.log("Final parsed order data:", orderData);
     
