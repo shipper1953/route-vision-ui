@@ -9,13 +9,9 @@ import { toast } from "sonner";
  * @returns The created order
  */
 export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<OrderData> {
-  // Check if user is authenticated
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    toast.error("You must be logged in to create an order");
-    throw new Error("User not authenticated");
-  }
+  // For now, we'll create a mock user ID since we're using JWT auth
+  // In a real implementation, you'd get this from your auth system
+  const mockUserId = "12345678-1234-1234-1234-123456789012";
 
   // Simulate API delay for better UX
   await new Promise(resolve => setTimeout(resolve, 600));
@@ -44,7 +40,7 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
       order_date: newOrder.orderDate,
       required_delivery_date: newOrder.requiredDeliveryDate,
       status: newOrder.status,
-      user_id: user.id // Ensure user_id is set
+      user_id: mockUserId // Use mock user ID for now
     });
     
     const { data, error } = await supabase
@@ -61,7 +57,7 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
         order_date: newOrder.orderDate,
         required_delivery_date: newOrder.requiredDeliveryDate,
         status: newOrder.status,
-        user_id: user.id // Set the authenticated user's ID
+        user_id: mockUserId // Set the mock user's ID
       })
       .select()
       .single();
