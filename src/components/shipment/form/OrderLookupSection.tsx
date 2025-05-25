@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -16,14 +16,16 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
   const form = useFormContext<ShipmentForm>();
   const [searchParams] = useSearchParams();
   const orderIdFromUrl = searchParams.get("orderId");
+  const hasLoadedOrder = useRef(false);
   
   // Load order data if orderId is provided in the URL
   useEffect(() => {
     async function loadOrderFromId() {
-      if (!orderIdFromUrl) return;
+      if (!orderIdFromUrl || hasLoadedOrder.current) return;
       
       try {
         setLoading(true);
+        hasLoadedOrder.current = true; // Prevent multiple loads
         toast.info(`Loading order ${orderIdFromUrl}...`);
         
         // Set the orderBarcode field (which is what OrderLookupCard uses)
@@ -33,6 +35,7 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
         
         if (!order) {
           toast.error(`Order ${orderIdFromUrl} not found`);
+          hasLoadedOrder.current = false; // Reset if order not found
           return;
         }
         
@@ -77,13 +80,14 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
       } catch (error) {
         console.error("Error loading order from URL:", error);
         toast.error("Failed to load order information");
+        hasLoadedOrder.current = false; // Reset on error to allow retry
       } finally {
         setLoading(false);
       }
     }
     
     loadOrderFromId();
-  }, [orderIdFromUrl, form, setOrderLookupComplete]);
+  }, [orderIdFromUrl]); // Only depend on orderIdFromUrl, not form or setOrderLookupComplete
   
   return (
     <OrderLookupCard setOrderLookupComplete={setOrderLookupComplete} />
