@@ -31,18 +31,29 @@ export async function fetchOrders(): Promise<OrderData[]> {
     
     console.log(`Found ${data.length} orders in Supabase`);
     
+    // First, let's see what shipments exist in the database
+    const { data: allShipments } = await supabase
+      .from('shipments')
+      .select('*');
+    
+    console.log("All shipments in database:", allShipments);
+    
     // Fetch shipment data for all orders that have shipment_id
     const ordersWithShipments = await Promise.all(
       data.map(async (order) => {
+        console.log(`Processing order ${order.order_id}, shipment_id: ${order.shipment_id}`);
+        
         let shipmentData = null;
         
         // Check for related shipment data
         if (order.shipment_id) {
-          const { data: shipment } = await supabase
+          const { data: shipment, error: shipmentError } = await supabase
             .from('shipments')
             .select('*')
             .eq('id', order.shipment_id)
             .single();
+          
+          console.log(`Shipment query for order ${order.order_id}:`, { shipment, shipmentError });
           
           if (shipment) {
             console.log("Found related shipment data for order:", order.order_id, shipment);
