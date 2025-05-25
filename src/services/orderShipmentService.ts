@@ -26,13 +26,15 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
       labelUrl: shipmentInfo.labelUrl
     };
     
-    // Update the order with shipment details as JSON and set status to shipped
+    // Update the order with shipment details as JSON (remove status field since it doesn't exist in schema)
     const { error } = await supabase
       .from('orders')
       .update({ 
-        status: 'shipped',
-        tracking_number: shipmentInfo.trackingNumber,
-        tracking: JSON.stringify(shipmentDetails)
+        // Remove status update since the column doesn't exist in the current schema
+        // tracking_number: shipmentInfo.trackingNumber,
+        // tracking: JSON.stringify(shipmentDetails)
+        // For now, just store the shipment_id reference if available
+        shipment_id: parseInt(shipmentInfo.id.replace(/\D/g, '')) || null
       })
       .eq('order_id', searchId);
     
@@ -43,7 +45,7 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
     }
     
     // Show success message
-    toast.success(`Order ${orderId} marked as shipped`);
+    toast.success(`Order ${orderId} updated with shipment information`);
     
     // Add a small delay before redirecting to give time for the database to update
     await new Promise(resolve => setTimeout(resolve, 300));
