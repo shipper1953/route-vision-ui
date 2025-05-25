@@ -1,4 +1,3 @@
-
 import { useLocation, NavLink } from "react-router-dom";
 import { 
   ChevronLeft, 
@@ -31,16 +30,22 @@ interface NavItemProps {
 
 const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavItemProps) => {
   const location = useLocation();
+  const { setIsCollapsed } = useSidebar();
   const isActive = location.pathname === to;
   
   // For demo purposes, let's assume the user is an admin
   const isAdmin = true;
   
   if (adminOnly && !isAdmin) return null;
+
+  const handleClick = () => {
+    setIsCollapsed(true);
+  };
   
   return (
     <NavLink 
       to={to} 
+      onClick={handleClick}
       className={({ isActive }) => 
         cn(
           "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
@@ -58,6 +63,12 @@ const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavI
 };
 
 const CreateMenu = ({ isCollapsed }: { isCollapsed: boolean }) => {
+  const { setIsCollapsed } = useSidebar();
+
+  const handleMenuItemClick = () => {
+    setIsCollapsed(true);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -78,19 +89,19 @@ const CreateMenu = ({ isCollapsed }: { isCollapsed: boolean }) => {
         className="bg-popover border border-border w-48"
       >
         <DropdownMenuItem asChild>
-          <NavLink to="/create-order" className="flex items-center gap-2 cursor-pointer">
+          <NavLink to="/create-order" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
             <Package size={16} />
             <span>Create Order</span>
           </NavLink>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <NavLink to="/create-shipment" className="flex items-center gap-2 cursor-pointer">
+          <NavLink to="/create-shipment" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
             <Truck size={16} />
             <span>Create Shipment</span>
           </NavLink>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <NavLink to="/create-user" className="flex items-center gap-2 cursor-pointer">
+          <NavLink to="/create-user" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
             <Users size={16} />
             <span>Create User</span>
           </NavLink>
