@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
-import { listenForQboidData } from "@/services/easypost";
 
 export type ConnectionStatus = "disconnected" | "connected" | "connecting" | "error";
 
@@ -25,9 +24,9 @@ export function useQboidConnection() {
   useEffect(() => {
     const setupRealtimeListener = async () => {
       console.log("Setting up Qboid realtime listener");
-      // First, check if table exists and is enabled for realtime
+      
       try {
-        // Subscribe to the Qboid events table for real-time updates
+        // Subscribe to the qboid_events table for real-time updates
         const channel = supabase
           .channel('qboid-events')
           .on(
@@ -36,12 +35,13 @@ export function useQboidConnection() {
             (payload) => {
               console.log('Received qboid event:', payload);
               
-              // Extract the dimensions data
-              if (payload.new && payload.new.data && payload.new.data.dimensions) {
-                const { dimensions, orderId } = payload.new.data;
+              // Extract the dimensions data from the event
+              if (payload.new && payload.new.data) {
+                const eventData = payload.new.data as any;
+                const { dimensions, orderId } = eventData;
                 
-                // Update form with dimensions
-                if (form) {
+                if (dimensions && form) {
+                  // Update form with dimensions
                   form.setValue("length", dimensions.length, { shouldValidate: true });
                   form.setValue("width", dimensions.width, { shouldValidate: true });
                   form.setValue("height", dimensions.height, { shouldValidate: true });
@@ -107,48 +107,36 @@ export function useQboidConnection() {
       setConnectionStatus("connecting");
       console.log("Configuring Qboid device...");
       
-      // Call the service to get configuration information
-      const qboidConfig = await listenForQboidData((dimensions) => {
-        console.log("Received dimensions from Qboid:", dimensions);
-        
-        // Update form with dimensions
-        if (form) {
-          form.setValue("length", dimensions.length, { shouldValidate: true });
-          form.setValue("width", dimensions.width, { shouldValidate: true });
-          form.setValue("height", dimensions.height, { shouldValidate: true });
-          form.setValue("weight", dimensions.weight, { shouldValidate: true });
-          
-          // If orderId is provided and form has orderId field, update it
-          if (dimensions.orderId && form.getValues("orderId") === "") {
-            form.setValue("orderId", dimensions.orderId, { shouldValidate: true });
-          }
-          
-          // Update connection status and timestamp
-          setConnectionStatus("connected");
-          setLastUpdateTime(new Date().toLocaleTimeString());
-          
-          // Show success message
-          toast.success("Package dimensions received from Qboid");
+      // Generate configuration guide for the device
+      const apiEndpoint = `https://gidrlosmhpvdcogrkidj.supabase.co/functions/v1/qboid-wifi-api-handler`;
+      
+      const guide = {
+        apiEndpoint,
+        instructions: [
+          "1. Connect to your Qboid device's WiFi configuration interface",
+          "2. Set the API endpoint URL to: " + apiEndpoint,
+          "3. Configure the device to send POST requests with dimension data",
+          "4. Test the connection by placing a package on the device"
+        ],
+        testUrl: apiEndpoint,
+        expectedFormat: {
+          timestamp: "2025/01/25 12:00:00",
+          l: 203,
+          w: 203, 
+          h: 203,
+          weight: 3629,
+          barcode: "ORD-1234",
+          device: "FH0402281500417"
         }
-      });
+      };
       
-      // Store configuration information
-      configRef.current = qboidConfig;
-      
-      // Generate configuration guide based on provided IP or discovery URL
-      const guide = qboidConfig.configureScanner(deviceIp || undefined);
       setConfigGuide(guide);
       
       // Show toast with configuration instructions
-      toast.info("Please configure your Qboid device with the provided settings");
+      toast.info("Configure your Qboid device with the provided endpoint URL");
       
-      // Simulate successful connection for demo purposes
-      setTimeout(() => {
-        if (connectionStatus !== "connected") {
-          setConnectionStatus("connecting");
-          toast.info("Waiting for Qboid device to send dimensions...");
-        }
-      }, 3000);
+      // The connection status will change to "connected" when we receive data
+      toast.info("Waiting for Qboid device to send dimensions...");
       
     } catch (error) {
       console.error("Error configuring Qboid:", error);

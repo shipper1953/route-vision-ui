@@ -135,6 +135,27 @@ export type Database = {
           },
         ]
       }
+      qboid_events: {
+        Row: {
+          created_at: string | null
+          data: Json
+          event_type: string
+          id: number
+        }
+        Insert: {
+          created_at?: string | null
+          data: Json
+          event_type?: string
+          id?: number
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json
+          event_type?: string
+          id?: number
+        }
+        Relationships: []
+      }
       shipments: {
         Row: {
           actual_delivery_date: string | null
