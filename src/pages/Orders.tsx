@@ -44,8 +44,8 @@ const Orders = () => {
     
     loadOrders();
     
-    // Re-fetch orders whenever the URL parameters change (e.g., when navigating back from create order)
-  }, [searchParams]);
+    // Only depend on the specific highlight parameter value, not the entire searchParams object
+  }, [highlightedOrderId]);
   
   const filteredOrders = orders.filter(order => 
     order.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
