@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ShipmentResponse, SmartRate, Rate } from '@/services/easypost';
-import { linkShipmentToOrder } from '@/services/orderShipmentService';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useShipment = (orderId?: string | null) => {
@@ -37,11 +36,15 @@ export const useShipment = (orderId?: string | null) => {
 
   const purchaseLabel = async (shipmentId: string, rateId: string): Promise<any> => {
     try {
-      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`);
+      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`, orderId ? `for order ${orderId}` : '');
       
-      // Use Supabase Edge Function instead of /api/purchase-label
+      // Use Supabase Edge Function and pass orderId for linking
       const { data, error } = await supabase.functions.invoke('purchase-label', {
-        body: { shipmentId, rateId }
+        body: { 
+          shipmentId, 
+          rateId,
+          orderId: orderId // Pass orderId to edge function
+        }
       });
 
       if (error) {
@@ -58,23 +61,11 @@ export const useShipment = (orderId?: string | null) => {
       // Store in session storage for the shipments page
       sessionStorage.setItem('lastPurchasedLabel', JSON.stringify(data));
       
-      // Link shipment to order if orderId is provided
-      if (orderId && data.id) {
-        try {
-          await linkShipmentToOrder(orderId, {
-            id: data.id,
-            carrier: data.selected_rate?.carrier || 'Unknown',
-            service: data.selected_rate?.service || 'Standard',
-            trackingNumber: data.tracking_code || 'Pending',
-            trackingUrl: data.tracker?.public_url || '#',
-            labelUrl: data.postage_label?.label_url
-          });
-          
-          console.log(`Successfully linked shipment ${data.id} to order ${orderId}`);
-        } catch (linkError) {
-          console.error('Error linking shipment to order:', linkError);
-          // Don't fail the entire operation if linking fails
-        }
+      // Show success message
+      if (orderId) {
+        toast.success(`Label purchased and linked to order ${orderId}`);
+      } else {
+        toast.success('Label purchased successfully');
       }
       
       return data;

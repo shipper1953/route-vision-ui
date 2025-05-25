@@ -22,7 +22,7 @@ serve(async (req) => {
   }
 
   try {
-    const { shipmentId, rateId } = await req.json()
+    const { shipmentId, rateId, orderId } = await req.json()
     
     if (!shipmentId || !rateId) {
       return new Response(JSON.stringify({
@@ -33,7 +33,7 @@ serve(async (req) => {
       })
     }
     
-    console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`)
+    console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`, orderId ? `for order ${orderId}` : '')
     
     if (!easyPostApiKey) {
       return new Response(JSON.stringify({
@@ -86,7 +86,7 @@ serve(async (req) => {
       } else {
         const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
       
-        // Prepare shipment data with correct column names
+        // Prepare shipment data with correct column names, including order_id
         const shipmentData = {
           easypost_id: responseData.id,
           tracking_number: responseData.tracking_code,
@@ -96,6 +96,7 @@ serve(async (req) => {
           label_url: responseData.postage_label?.label_url,
           tracking_url: responseData.tracker?.public_url,
           cost: parseFloat(responseData.selected_rate?.rate) || 0,
+          order_id: orderId || null, // Link to order if provided
           package_dimensions: JSON.stringify({
             length: responseData.parcel?.length || 0,
             width: responseData.parcel?.width || 0,
@@ -142,6 +143,34 @@ serve(async (req) => {
             console.error('Error inserting new shipment:', insertError);
           } else {
             console.log('New shipment inserted successfully');
+          }
+        }
+
+        // If we have an order_id, also update the order to link to this shipment
+        if (orderId) {
+          console.log(`Linking order ${orderId} to shipment`);
+          
+          // Get the shipment ID from database
+          const { data: shipment, error: shipmentError } = await supabaseClient
+            .from('shipments')
+            .select('id')
+            .eq('easypost_id', responseData.id)
+            .maybeSingle();
+          
+          if (shipment && !shipmentError) {
+            const { error: orderUpdateError } = await supabaseClient
+              .from('orders')
+              .update({ 
+                shipment_id: shipment.id,
+                status: 'shipped'
+              })
+              .eq('order_id', orderId.startsWith('ORD-') ? orderId : `ORD-${orderId}`);
+            
+            if (orderUpdateError) {
+              console.error('Error updating order:', orderUpdateError);
+            } else {
+              console.log(`Successfully linked order ${orderId} to shipment and updated status`);
+            }
           }
         }
       }
