@@ -75,6 +75,20 @@
   }
 }
 
+/* 360-degree clockwise rotation */
+@keyframes tornado360Spin {
+  0% { 
+    transform: rotate(0deg); 
+  }
+  100% { 
+    transform: rotate(360deg); 
+  }
+}
+
+.tornado-360-spin {
+  animation: tornado360Spin 2s linear infinite;
+}
+
 .tornado-line-1 {
   animation: tornadoSway 1.7s ease-in-out infinite;
   stroke-width: 2.2;
