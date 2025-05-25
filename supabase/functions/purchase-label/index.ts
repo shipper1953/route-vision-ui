@@ -2,7 +2,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-// Get EasyPost API key from environment variables - check ALL naming conventions
+// Get EasyPost API key from environment variables
 const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY') || 
                       Deno.env.get('VITE_EASYPOST_API_KEY')
 
@@ -10,7 +10,7 @@ console.log('EasyPost API key available in purchase-label function:', easyPostAp
 
 const corsHeaders = {
   'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*', // In production, set this to your specific domain
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
@@ -21,7 +21,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders, status: 204 })
   }
 
-  // CRITICAL FIX: Make authentication optional to avoid errors from unauthenticated requests
   try {
     const { shipmentId, rateId } = await req.json()
     
@@ -77,81 +76,73 @@ serve(async (req) => {
       })
     }
     
-    // Update shipment in database if authenticated
+    // Update shipment in database - use service role key to bypass RLS
     try {
-      // Get auth token from request
-      const authHeader = req.headers.get('Authorization')
-      
-      // Create Supabase client
       const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-      const supabaseClient = createClient(
-        supabaseUrl,
-        supabaseAnonKey,
-        { global: { headers: { Authorization: authHeader || '' } } }
-      )
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
       
-      // Get authenticated user if available
-      const { data: userData, error: authError } = await supabaseClient.auth.getUser()
-      
-      // Prepare shipment data with correct column names
-      const shipmentData = {
-        easypost_id: responseData.id,
-        tracking_number: responseData.tracking_code,
-        carrier: responseData.selected_rate?.carrier,
-        service: responseData.selected_rate?.service, // Use 'service' not 'carrier_service'
-        status: 'purchased',
-        label_url: responseData.postage_label?.label_url,
-        tracking_url: responseData.tracker?.public_url,
-        cost: parseFloat(responseData.selected_rate?.rate) || 0,
-        package_dimensions: JSON.stringify({
-          length: responseData.parcel?.length || 0,
-          width: responseData.parcel?.width || 0,
-          height: responseData.parcel?.height || 0
-        }),
-        package_weights: JSON.stringify({
-          weight: responseData.parcel?.weight || 0,
-          weight_unit: responseData.parcel?.weight_unit || 'oz'
-        }),
-        // Add user ID if authenticated
-        ...(userData?.user ? { user_id: userData.user.id } : {})
-      };
-      
-      console.log("Saving shipment to database:", shipmentData);
-      
-      // First, check if the shipment exists using easypost_id
-      const { data: existingShipment, error: fetchError } = await supabaseClient
-        .from('shipments')
-        .select('*')
-        .eq('easypost_id', shipmentId)
-        .maybeSingle();
-        
-      if (fetchError) {
-        console.error("Error checking existing shipment:", fetchError);
-      }
-      
-      if (existingShipment) {
-        // Update existing shipment
-        const { error: updateError } = await supabaseClient
-          .from('shipments')
-          .update(shipmentData)
-          .eq('easypost_id', shipmentId);
-          
-        if (updateError) {
-          console.error('Error updating existing shipment:', updateError);
-        } else {
-          console.log('Existing shipment updated successfully');
-        }
+      if (!supabaseServiceKey) {
+        console.log("No service role key available, skipping database save");
       } else {
-        // Insert new shipment
-        const { error: insertError } = await supabaseClient
+        const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+      
+        // Prepare shipment data with correct column names
+        const shipmentData = {
+          easypost_id: responseData.id,
+          tracking_number: responseData.tracking_code,
+          carrier: responseData.selected_rate?.carrier,
+          service: responseData.selected_rate?.service,
+          status: 'purchased',
+          label_url: responseData.postage_label?.label_url,
+          tracking_url: responseData.tracker?.public_url,
+          cost: parseFloat(responseData.selected_rate?.rate) || 0,
+          package_dimensions: JSON.stringify({
+            length: responseData.parcel?.length || 0,
+            width: responseData.parcel?.width || 0,
+            height: responseData.parcel?.height || 0
+          }),
+          package_weights: JSON.stringify({
+            weight: responseData.parcel?.weight || 0,
+            weight_unit: responseData.parcel?.weight_unit || 'oz'
+          })
+        };
+
+        console.log("Saving shipment to database:", shipmentData);
+        
+        // First, check if the shipment exists using easypost_id
+        const { data: existingShipment, error: fetchError } = await supabaseClient
           .from('shipments')
-          .insert(shipmentData);
+          .select('*')
+          .eq('easypost_id', shipmentId)
+          .maybeSingle();
           
-        if (insertError) {
-          console.error('Error inserting new shipment:', insertError);
+        if (fetchError) {
+          console.error("Error checking existing shipment:", fetchError);
+        }
+        
+        if (existingShipment) {
+          // Update existing shipment
+          const { error: updateError } = await supabaseClient
+            .from('shipments')
+            .update(shipmentData)
+            .eq('easypost_id', shipmentId);
+            
+          if (updateError) {
+            console.error('Error updating existing shipment:', updateError);
+          } else {
+            console.log('Existing shipment updated successfully');
+          }
         } else {
-          console.log('New shipment inserted successfully');
+          // Insert new shipment
+          const { error: insertError } = await supabaseClient
+            .from('shipments')
+            .insert(shipmentData);
+            
+          if (insertError) {
+            console.error('Error inserting new shipment:', insertError);
+          } else {
+            console.log('New shipment inserted successfully');
+          }
         }
       }
     } catch (err) {

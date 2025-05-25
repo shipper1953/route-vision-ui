@@ -16,19 +16,23 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
     const searchId = orderId.startsWith('ORD-') ? orderId : `ORD-${orderId}`;
     
     // Find the shipment in the database by easypost_id
-    const { data: shipment } = await supabase
+    const { data: shipment, error: shipmentError } = await supabase
       .from('shipments')
       .select('id')
       .eq('easypost_id', shipmentInfo.id)
       .maybeSingle();
     
+    if (shipmentError) {
+      console.error("Error finding shipment:", shipmentError);
+    }
+    
     if (shipment) {
-      // Update the order with the shipment_id reference
+      // Update the order with the shipment_id reference and change status to shipped
       const { error } = await supabase
         .from('orders')
         .update({ 
           shipment_id: shipment.id,
-          status: 'shipped' // Update order status to shipped
+          status: 'shipped'
         })
         .eq('order_id', searchId);
       
@@ -38,13 +42,14 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
         throw error;
       }
       
-      // Show success message
-      toast.success(`Order ${orderId} updated with shipment information`);
+      console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderId} and updated status to shipped`);
+      toast.success(`Order ${orderId} updated with shipment information and marked as shipped`);
       
       // Add a small delay before redirecting to give time for the database to update
       await new Promise(resolve => setTimeout(resolve, 300));
     } else {
       console.warn(`Shipment with easypost_id ${shipmentInfo.id} not found in database`);
+      toast.warning("Shipment created but not linked to order in database");
     }
     
   } catch (err) {

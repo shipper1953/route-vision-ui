@@ -17,7 +17,7 @@ export const useSupabaseShipments = () => {
         const { data: supabaseShipments, error } = await supabase
           .from('shipments')
           .select('*')
-          .order('created_at', { ascending: false });
+          .order('id', { ascending: false });
         
         console.log("Supabase shipments query result:", { data: supabaseShipments, error });
         
@@ -35,18 +35,22 @@ export const useSupabaseShipments = () => {
           id: (s as any).easypost_id || String(s.id),
           tracking: (s as any).tracking_number || 'Pending',
           carrier: s.carrier || 'Unknown',
-          carrierUrl: (s as any).tracking_number ? 
-            `https://www.trackingmore.com/track/en/${(s as any).tracking_number}` : '#',
-          service: (s as any).carrier_service || s.service || 'Standard',
-          origin: (s as any).origin_address ? 'Origin' : 'Unknown Origin',
-          destination: (s as any).destination_address ? 'Destination' : 'Unknown Destination',
-          shipDate: (s as any).created_at ? new Date((s as any).created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+          carrierUrl: (s as any).tracking_url || 
+            ((s as any).tracking_number ? 
+              `https://www.trackingmore.com/track/en/${(s as any).tracking_number}` : '#'),
+          service: s.service || 'Standard',
+          origin: 'Origin', // We don't have origin/destination data in current schema
+          destination: 'Destination',
+          shipDate: new Date().toLocaleDateString(), // Use current date since we don't have ship_date
           estimatedDelivery: s.estimated_delivery_date ? 
             new Date(s.estimated_delivery_date).toLocaleDateString() : null,
           actualDelivery: s.actual_delivery_date ? 
             new Date(s.actual_delivery_date).toLocaleDateString() : null,
           status: s.status || 'created',
-          weight: `${(s as any).weight || '0'} lbs`,
+          weight: `${(s as any).package_weights ? 
+            JSON.parse((s as any).package_weights as string)?.weight || '0' : '0'} ${
+            (s as any).package_weights ? 
+            JSON.parse((s as any).package_weights as string)?.weight_unit || 'oz' : 'oz'}`,
           labelUrl: (s as any).label_url
         }));
         
