@@ -23,12 +23,23 @@ export const useQboidRealtime = ({ handleQboidData, setConnectionStatus }: UseQb
           table: 'qboid_events',
           filter: 'event_type=eq.dimensions_received'
         },
-        (payload) => {
+        async (payload) => {
           console.log('Realtime Qboid event received:', payload);
           
           if (payload.new && payload.new.data) {
-            const eventData = payload.new.data as QboidDimensions;
-            handleQboidData(eventData);
+            const eventData = payload.new.data as any;
+            
+            // Convert the event data to QboidDimensions format
+            const dimensions: QboidDimensions = {
+              length: eventData.dimensions?.length || eventData.length || 0,
+              width: eventData.dimensions?.width || eventData.width || 0,
+              height: eventData.dimensions?.height || eventData.height || 0,
+              weight: eventData.dimensions?.weight || eventData.weight || 0,
+              orderId: eventData.orderId || eventData.barcode
+            };
+            
+            console.log('Processing realtime dimensions:', dimensions);
+            await handleQboidData(dimensions);
           }
         }
       )

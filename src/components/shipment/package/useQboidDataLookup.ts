@@ -19,6 +19,29 @@ export const useQboidDataLookup = ({ handleQboidData }: UseQboidDataLookupProps)
       console.log('Checking for existing Qboid data for order:', urlOrderId);
       
       try {
+        // First check the orders table for qboid_dimensions
+        const { data: orderData } = await supabase
+          .from('orders')
+          .select('qboid_dimensions')
+          .eq('order_id', urlOrderId)
+          .single();
+
+        if (orderData?.qboid_dimensions) {
+          console.log('Found Qboid dimensions in order:', orderData.qboid_dimensions);
+          
+          const dimensions: QboidDimensions = {
+            length: orderData.qboid_dimensions.length || 0,
+            width: orderData.qboid_dimensions.width || 0,
+            height: orderData.qboid_dimensions.height || 0,
+            weight: orderData.qboid_dimensions.weight || 0,
+            orderId: urlOrderId
+          };
+          
+          await handleQboidData(dimensions);
+          return;
+        }
+
+        // Also check qboid_events table for recent events
         const { data: qboidData } = await supabase
           .from('qboid_events')
           .select('*')
@@ -29,11 +52,10 @@ export const useQboidDataLookup = ({ handleQboidData }: UseQboidDataLookupProps)
         if (qboidData && qboidData.length > 0) {
           // Find matching data by order ID
           for (const event of qboidData) {
-            const eventData = event.data as any; // Type assertion for JSON data
+            const eventData = event.data as any;
             if (eventData && (eventData.orderId === urlOrderId || eventData.barcode === urlOrderId)) {
               console.log('Found existing Qboid data for current order:', eventData);
               
-              // Convert to expected format and populate form
               const dimensions: QboidDimensions = {
                 length: eventData.dimensions?.length || eventData.length || 0,
                 width: eventData.dimensions?.width || eventData.width || 0,

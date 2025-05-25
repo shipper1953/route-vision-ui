@@ -93,13 +93,16 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Convert qboid measurements to standard format (convert mm to inches, grams to oz)
+    // Convert qboid measurements to standard format (convert mm to inches, grams to pounds)
     const dimensions = {
       length: parseFloat((qboidData.l / 25.4).toFixed(2)), // mm to inches
       width: parseFloat((qboidData.w / 25.4).toFixed(2)),   // mm to inches  
       height: parseFloat((qboidData.h / 25.4).toFixed(2)),  // mm to inches
-      weight: parseFloat((qboidData.weight / 28.35).toFixed(2)) // grams to oz
+      weight: parseFloat((qboidData.weight / 453.592).toFixed(2)), // grams to pounds (not ounces)
+      orderId: qboidData.barcode || null
     }
+
+    console.log('Converted dimensions:', dimensions)
 
     // If we have an order barcode, update the order with dimensions
     if (qboidData.barcode) {
@@ -130,7 +133,8 @@ serve(async (req) => {
         status: 'measured',
         cost: 0,
         package_dimensions: dimensions,
-        package_weights: { weight: dimensions.weight, weight_unit: 'oz' },
+        package_weights: { weight: dimensions.weight, weight_unit: 'lbs' },
+        order_id: qboidData.barcode || null,
         user_id: null // Service role can insert without user context
       })
 
