@@ -51,29 +51,34 @@ export const OrderLookupCard = ({ setOrderLookupComplete }: OrderLookupCardProps
       
       console.log("Order found:", order);
       
-      // Update form with order data
+      // Update form with customer data
       form.setValue("toName", order.customerName);
       form.setValue("toCompany", order.customerCompany || "");
-      
-      // Properly map shipping address fields from the order
-      if (order.shippingAddress) {
-        form.setValue("toStreet1", order.shippingAddress.street1);
-        form.setValue("toStreet2", order.shippingAddress.street2 || "");
-        form.setValue("toCity", order.shippingAddress.city);
-        form.setValue("toState", order.shippingAddress.state);
-        form.setValue("toZip", order.shippingAddress.zip);
-        form.setValue("toCountry", order.shippingAddress.country);
-      }
-      
       form.setValue("toPhone", order.customerPhone || "");
       form.setValue("toEmail", order.customerEmail || "");
       
+      // Properly map shipping address fields from the order
+      if (order.shippingAddress && Object.keys(order.shippingAddress).length > 0) {
+        console.log("Setting shipping address from lookup:", order.shippingAddress);
+        form.setValue("toStreet1", order.shippingAddress.street1 || "");
+        form.setValue("toStreet2", order.shippingAddress.street2 || "");
+        form.setValue("toCity", order.shippingAddress.city || "");
+        form.setValue("toState", order.shippingAddress.state || "");
+        form.setValue("toZip", order.shippingAddress.zip || "");
+        form.setValue("toCountry", order.shippingAddress.country || "US");
+      } else {
+        console.warn("No valid shipping address found in order during lookup");
+      }
+      
       // Set parcel dimensions and weight if available from Qboid system
-      if (order.parcelInfo) {
-        form.setValue("length", order.parcelInfo.length);
-        form.setValue("width", order.parcelInfo.width);
-        form.setValue("height", order.parcelInfo.height);
-        form.setValue("weight", order.parcelInfo.weight);
+      if (order.parcelInfo && Object.keys(order.parcelInfo).length > 0) {
+        console.log("Setting parcel info from lookup:", order.parcelInfo);
+        form.setValue("length", order.parcelInfo.length || 0);
+        form.setValue("width", order.parcelInfo.width || 0);
+        form.setValue("height", order.parcelInfo.height || 0);
+        form.setValue("weight", order.parcelInfo.weight || 0);
+      } else {
+        console.warn("No valid parcel info found in order during lookup");
       }
       
       // Set order details

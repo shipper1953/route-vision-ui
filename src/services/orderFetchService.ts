@@ -26,55 +26,65 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       return null;
     }
     
+    console.log("Raw order data from Supabase:", data);
+    
     // Parse shipment tracking data if available
     let shipmentInfo;
-    if ((data as any).tracking) {
+    if (data.tracking) {
       try {
-        // Only parse if it's a string
-        if (typeof (data as any).tracking === 'string') {
-          shipmentInfo = JSON.parse((data as any).tracking);
-        } else {
-          shipmentInfo = (data as any).tracking;
+        if (typeof data.tracking === 'string') {
+          shipmentInfo = JSON.parse(data.tracking);
+        } else if (typeof data.tracking === 'object' && data.tracking !== null) {
+          shipmentInfo = data.tracking;
         }
       } catch (e) {
         console.warn("Failed to parse tracking data:", e);
       }
     }
     
-    // Parse shipping address from JSON
+    // Parse shipping address from JSON with better error handling
     let shippingAddress = {};
     if (data.shipping_address) {
       try {
-        // Only parse if it's a string
         if (typeof data.shipping_address === 'string') {
-          shippingAddress = JSON.parse(data.shipping_address);
-        } else {
+          const parsed = JSON.parse(data.shipping_address);
+          if (parsed && typeof parsed === 'object') {
+            shippingAddress = parsed;
+          }
+        } else if (typeof data.shipping_address === 'object' && data.shipping_address !== null) {
           shippingAddress = data.shipping_address;
         }
+        console.log("Parsed shipping address:", shippingAddress);
       } catch (e) {
         console.warn("Failed to parse shipping address:", e);
         shippingAddress = {};
       }
+    } else {
+      console.warn("No shipping address found in order data");
     }
 
-    // Parse Qboid dimensions if available
+    // Parse Qboid dimensions if available with better error handling
     let parcelInfo;
     if (data.qboid_dimensions) {
       try {
-        // Only parse if it's a string
         if (typeof data.qboid_dimensions === 'string') {
-          parcelInfo = JSON.parse(data.qboid_dimensions);
-        } else {
+          const parsed = JSON.parse(data.qboid_dimensions);
+          if (parsed && typeof parsed === 'object') {
+            parcelInfo = parsed;
+          }
+        } else if (typeof data.qboid_dimensions === 'object' && data.qboid_dimensions !== null) {
           parcelInfo = data.qboid_dimensions;
         }
         console.log("Qboid dimensions found for order:", orderId, parcelInfo);
       } catch (e) {
         console.warn("Failed to parse Qboid dimensions:", e);
       }
+    } else {
+      console.warn("No Qboid dimensions found for order:", orderId);
     }
     
     // Convert Supabase data format to our OrderData format
-    return {
+    const orderData = {
       id: data.order_id,
       customerName: data.customer_name || "Unknown Customer",
       customerCompany: data.customer_company || "",
@@ -87,14 +97,17 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       value: data.value?.toString() || "0",
       shippingAddress: shippingAddress as any,
       parcelInfo: parcelInfo, // Include Qboid dimensions as parcel info
-      shipment: shipmentInfo || ((data as any).tracking_number ? {
+      shipment: shipmentInfo || (data.tracking_number ? {
         id: `SHIP-${data.id}`,
         carrier: "Unknown",
         service: "Standard",
-        trackingNumber: (data as any).tracking_number,
-        trackingUrl: `https://www.trackingmore.com/track/en/${(data as any).tracking_number}`
+        trackingNumber: data.tracking_number,
+        trackingUrl: `https://www.trackingmore.com/track/en/${data.tracking_number}`
       } : undefined)
     };
+    
+    console.log("Final parsed order data:", orderData);
+    return orderData;
   } catch (err) {
     console.error("Error fetching order from Supabase:", err);
     return null;
