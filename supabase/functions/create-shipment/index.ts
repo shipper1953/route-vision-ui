@@ -65,31 +65,31 @@ serve(async (req) => {
       );
     }
     
-    // Ensure we have options
+    // Enhanced SmartRate configuration
     if (!shipmentData.options) {
       shipmentData.options = {};
     }
     
-    // Always enable SmartRate with a high accuracy level for best delivery estimates
-    // percentile_95 provides a good balance of accuracy and coverage
-    shipmentData.options.smartrate_accuracy = shipmentData.options.smartrate_accuracy || 'percentile_95';
+    // Force SmartRate to be enabled with multiple accuracy levels for better coverage
+    shipmentData.options.smartrate_accuracy = 'percentile_50'; // Start with 50th percentile for broader coverage
     
-    // Adding carrier_accounts parameter to provide better rates
-    if (!shipmentData.carrier_accounts) {
-      // Uncomment and modify this if you have specific carrier accounts to use
-      // shipmentData.carrier_accounts = ['ca_...'];
-    }
+    console.log('SmartRate configuration:', {
+      smartrate_accuracy: shipmentData.options.smartrate_accuracy,
+      options: shipmentData.options
+    });
     
     console.log('Creating shipment with data:', JSON.stringify(shipmentData, null, 2));
     
-    // Call EasyPost API to create shipment
+    // Call EasyPost API to create shipment with SmartRate
     const response = await fetch('https://api.easypost.com/v2/shipments', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${easyPostApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ shipment: shipmentData }),
+      body: JSON.stringify({ 
+        shipment: shipmentData
+      }),
     });
     
     if (!response.ok) {
@@ -105,8 +105,59 @@ serve(async (req) => {
     }
     
     const shipmentResponse = await response.json();
-    console.log('SmartRates received:', shipmentResponse.smartrates ? shipmentResponse.smartrates.length : 0);
-    console.log('Standard Rates received:', shipmentResponse.rates ? shipmentResponse.rates.length : 0);
+    
+    // Enhanced logging for SmartRate debugging
+    console.log('EasyPost API Response Summary:');
+    console.log('- Shipment ID:', shipmentResponse.id);
+    console.log('- SmartRates received:', shipmentResponse.smartrates ? shipmentResponse.smartrates.length : 0);
+    console.log('- Standard Rates received:', shipmentResponse.rates ? shipmentResponse.rates.length : 0);
+    
+    if (shipmentResponse.smartrates && shipmentResponse.smartrates.length > 0) {
+      console.log('SmartRate details:');
+      shipmentResponse.smartrates.forEach((rate, index) => {
+        console.log(`  ${index + 1}. ${rate.carrier} ${rate.service} - $${rate.rate} (${rate.delivery_days || 'unknown'} days, guaranteed: ${rate.delivery_date_guaranteed})`);
+      });
+    } else {
+      console.warn('⚠️ NO SMARTRATES RETURNED - This might indicate:');
+      console.warn('  1. SmartRate not enabled for this EasyPost account');
+      console.warn('  2. No carrier accounts configured');
+      console.warn('  3. Address combination not supported');
+      console.warn('  4. Package specifications outside SmartRate coverage');
+      
+      // Try to get more SmartRate data with different accuracy level
+      if (shipmentResponse.rates && shipmentResponse.rates.length > 0) {
+        console.log('Attempting to get SmartRates with different accuracy level...');
+        
+        try {
+          const smartRateResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentResponse.id}/smartrate`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${easyPostApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              smartrate_accuracy: 'percentile_75'
+            }),
+          });
+          
+          if (smartRateResponse.ok) {
+            const smartRateData = await smartRateResponse.json();
+            console.log('SmartRate endpoint response:', JSON.stringify(smartRateData, null, 2));
+            
+            // Merge SmartRate data back into shipment response
+            if (smartRateData.smartrates && smartRateData.smartrates.length > 0) {
+              shipmentResponse.smartrates = smartRateData.smartrates;
+              console.log('✅ Successfully retrieved SmartRates via dedicated endpoint');
+            }
+          } else {
+            const smartRateError = await smartRateResponse.json();
+            console.error('SmartRate endpoint error:', smartRateError);
+          }
+        } catch (smartRateErr) {
+          console.error('Error calling SmartRate endpoint:', smartRateErr);
+        }
+      }
+    }
     
     // Save the shipment information to Supabase if a user is logged in
     try {
