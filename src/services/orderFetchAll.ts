@@ -38,26 +38,42 @@ export async function fetchOrders(): Promise<OrderData[]> {
     
     console.log("All shipments in database:", allShipments);
     
-    // Fetch shipment data for all orders that have shipment_id
+    // Fetch shipment data for all orders
     const ordersWithShipments = await Promise.all(
       data.map(async (order) => {
         console.log(`Processing order ${order.order_id}, shipment_id: ${order.shipment_id}`);
         
         let shipmentData = null;
         
-        // Check for related shipment data
+        // Check for related shipment data by shipment_id first
         if (order.shipment_id) {
-          const { data: shipment, error: shipmentError } = await supabase
+          const { data: shipment, error: shipmentError } = await supabaseClient
             .from('shipments')
             .select('*')
             .eq('id', order.shipment_id)
-            .single();
+            .maybeSingle();
           
           console.log(`Shipment query for order ${order.order_id}:`, { shipment, shipmentError });
           
           if (shipment) {
             console.log("Found related shipment data for order:", order.order_id, shipment);
             shipmentData = shipment;
+          }
+        }
+        
+        // If no shipment found by ID, try to find by order ID pattern in EasyPost data
+        if (!shipmentData) {
+          // Look for shipments that might be related to this order
+          const { data: potentialShipments } = await supabase
+            .from('shipments')
+            .select('*')
+            .order('id', { ascending: false })
+            .limit(10);
+          
+          // This is a simple heuristic - in production you'd want a more robust linking mechanism
+          if (potentialShipments && potentialShipments.length > 0) {
+            // For now, just log that we found shipments but couldn't link them
+            console.log(`Found ${potentialShipments.length} shipments but couldn't link to order ${order.order_id}`);
           }
         }
         
@@ -94,7 +110,7 @@ export async function fetchOrders(): Promise<OrderData[]> {
             orderId: matchingQboidData.orderId || matchingQboidData.barcode
           } : order.qboid_dimensions,
           shipment_data: shipmentData ? {
-            id: shipmentData.id,
+            id: shipmentData.easypost_id || String(shipmentData.id),
             carrier: shipmentData.carrier,
             service: shipmentData.service,
             trackingNumber: shipmentData.tracking_number || 'Pending',

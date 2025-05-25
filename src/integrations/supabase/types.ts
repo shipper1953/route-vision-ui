@@ -160,37 +160,49 @@ export type Database = {
         Row: {
           actual_delivery_date: string | null
           carrier: string
-          cost: number
+          cost: number | null
+          easypost_id: string | null
           estimated_delivery_date: string | null
           id: number
-          package_dimensions: Json
-          package_weights: Json
+          label_url: string | null
+          package_dimensions: Json | null
+          package_weights: Json | null
           service: string
           status: string
+          tracking_number: string | null
+          tracking_url: string | null
           user_id: string | null
         }
         Insert: {
           actual_delivery_date?: string | null
           carrier: string
-          cost: number
+          cost?: number | null
+          easypost_id?: string | null
           estimated_delivery_date?: string | null
           id?: never
-          package_dimensions: Json
-          package_weights: Json
+          label_url?: string | null
+          package_dimensions?: Json | null
+          package_weights?: Json | null
           service: string
           status: string
+          tracking_number?: string | null
+          tracking_url?: string | null
           user_id?: string | null
         }
         Update: {
           actual_delivery_date?: string | null
           carrier?: string
-          cost?: number
+          cost?: number | null
+          easypost_id?: string | null
           estimated_delivery_date?: string | null
           id?: never
-          package_dimensions?: Json
-          package_weights?: Json
+          label_url?: string | null
+          package_dimensions?: Json | null
+          package_weights?: Json | null
           service?: string
           status?: string
+          tracking_number?: string | null
+          tracking_url?: string | null
           user_id?: string | null
         }
         Relationships: [

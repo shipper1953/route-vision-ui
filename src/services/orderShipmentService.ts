@@ -15,40 +15,37 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
     // Remove "ORD-" prefix if present for order_id lookup
     const searchId = orderId.startsWith('ORD-') ? orderId : `ORD-${orderId}`;
     
-    // Format shipment details for JSON storage
-    const shipmentDetails = {
-      id: shipmentInfo.id,
-      carrier: shipmentInfo.carrier,
-      service: shipmentInfo.service,
-      trackingNumber: shipmentInfo.trackingNumber,
-      trackingUrl: shipmentInfo.trackingUrl,
-      estimatedDeliveryDate: shipmentInfo.estimatedDeliveryDate,
-      labelUrl: shipmentInfo.labelUrl
-    };
+    // Find the shipment in the database by easypost_id
+    const { data: shipment } = await supabase
+      .from('shipments')
+      .select('id')
+      .eq('easypost_id', shipmentInfo.id)
+      .maybeSingle();
     
-    // Update the order with shipment details as JSON (remove status field since it doesn't exist in schema)
-    const { error } = await supabase
-      .from('orders')
-      .update({ 
-        // Remove status update since the column doesn't exist in the current schema
-        // tracking_number: shipmentInfo.trackingNumber,
-        // tracking: JSON.stringify(shipmentDetails)
-        // For now, just store the shipment_id reference if available
-        shipment_id: parseInt(shipmentInfo.id.replace(/\D/g, '')) || null
-      })
-      .eq('order_id', searchId);
-    
-    if (error) {
-      console.error("Error linking shipment to order:", error);
-      toast.error("Failed to update order with shipment information");
-      throw error;
+    if (shipment) {
+      // Update the order with the shipment_id reference
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          shipment_id: shipment.id,
+          status: 'shipped' // Update order status to shipped
+        })
+        .eq('order_id', searchId);
+      
+      if (error) {
+        console.error("Error linking shipment to order:", error);
+        toast.error("Failed to update order with shipment information");
+        throw error;
+      }
+      
+      // Show success message
+      toast.success(`Order ${orderId} updated with shipment information`);
+      
+      // Add a small delay before redirecting to give time for the database to update
+      await new Promise(resolve => setTimeout(resolve, 300));
+    } else {
+      console.warn(`Shipment with easypost_id ${shipmentInfo.id} not found in database`);
     }
-    
-    // Show success message
-    toast.success(`Order ${orderId} updated with shipment information`);
-    
-    // Add a small delay before redirecting to give time for the database to update
-    await new Promise(resolve => setTimeout(resolve, 300));
     
   } catch (err) {
     console.error("Error linking shipment to order:", err);

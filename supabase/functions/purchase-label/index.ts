@@ -94,21 +94,32 @@ serve(async (req) => {
       // Get authenticated user if available
       const { data: userData, error: authError } = await supabaseClient.auth.getUser()
       
-      // Prepare shipment data
+      // Prepare shipment data with correct column names
       const shipmentData = {
         easypost_id: responseData.id,
         tracking_number: responseData.tracking_code,
         carrier: responseData.selected_rate?.carrier,
-        carrier_service: responseData.selected_rate?.service,
+        service: responseData.selected_rate?.service, // Use 'service' not 'carrier_service'
         status: 'purchased',
         label_url: responseData.postage_label?.label_url,
+        tracking_url: responseData.tracker?.public_url,
+        cost: parseFloat(responseData.selected_rate?.rate) || 0,
+        package_dimensions: JSON.stringify({
+          length: responseData.parcel?.length || 0,
+          width: responseData.parcel?.width || 0,
+          height: responseData.parcel?.height || 0
+        }),
+        package_weights: JSON.stringify({
+          weight: responseData.parcel?.weight || 0,
+          weight_unit: responseData.parcel?.weight_unit || 'oz'
+        }),
         // Add user ID if authenticated
         ...(userData?.user ? { user_id: userData.user.id } : {})
       };
       
       console.log("Saving shipment to database:", shipmentData);
       
-      // First, check if the shipment exists
+      // First, check if the shipment exists using easypost_id
       const { data: existingShipment, error: fetchError } = await supabaseClient
         .from('shipments')
         .select('*')
