@@ -43,7 +43,7 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       console.log("Found Qboid events:", qboidData.length);
       
       for (const event of qboidData) {
-        const eventData = event.data;
+        const eventData = event.data as any; // Type assertion for JSON data
         if (eventData && (eventData.orderId === searchId || eventData.barcode === searchId)) {
           console.log("Found matching Qboid data for order:", searchId, eventData);
           matchingQboidData = eventData;
@@ -56,10 +56,10 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
     if (matchingQboidData) {
       console.log("Merging Qboid dimensions with order data");
       data.qboid_dimensions = {
-        length: matchingQboidData.length,
-        width: matchingQboidData.width,
-        height: matchingQboidData.height,
-        weight: matchingQboidData.weight,
+        length: matchingQboidData.dimensions?.length || matchingQboidData.length,
+        width: matchingQboidData.dimensions?.width || matchingQboidData.width,
+        height: matchingQboidData.dimensions?.height || matchingQboidData.height,
+        weight: matchingQboidData.dimensions?.weight || matchingQboidData.weight,
         orderId: matchingQboidData.orderId || matchingQboidData.barcode
       };
     }

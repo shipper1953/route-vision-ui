@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -131,16 +132,16 @@ export const useQboidConnection = () => {
         if (qboidData && qboidData.length > 0) {
           // Find matching data by order ID
           for (const event of qboidData) {
-            const eventData = event.data;
+            const eventData = event.data as any; // Type assertion for JSON data
             if (eventData && (eventData.orderId === urlOrderId || eventData.barcode === urlOrderId)) {
               console.log('Found existing Qboid data for current order:', eventData);
               
               // Convert to expected format and populate form
               const dimensions: QboidDimensions = {
-                length: eventData.length || 0,
-                width: eventData.width || 0,
-                height: eventData.height || 0,
-                weight: eventData.weight || 0,
+                length: eventData.dimensions?.length || eventData.length || 0,
+                width: eventData.dimensions?.width || eventData.width || 0,
+                height: eventData.dimensions?.height || eventData.height || 0,
+                weight: eventData.dimensions?.weight || eventData.weight || 0,
                 orderId: eventData.orderId || eventData.barcode
               };
               
