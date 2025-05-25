@@ -67,22 +67,17 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       }
     }
     
-    // Merge Qboid data if found
-    if (matchingQboidData) {
-      console.log("Merging Qboid dimensions with order data");
-      data.qboid_dimensions = {
+    // Create enhanced data object with additional properties
+    const enhancedData = {
+      ...data,
+      qboid_dimensions: matchingQboidData ? {
         length: matchingQboidData.dimensions?.length || matchingQboidData.length,
         width: matchingQboidData.dimensions?.width || matchingQboidData.width,
         height: matchingQboidData.dimensions?.height || matchingQboidData.height,
         weight: matchingQboidData.dimensions?.weight || matchingQboidData.weight,
         orderId: matchingQboidData.orderId || matchingQboidData.barcode
-      };
-    }
-    
-    // Merge shipment data if found
-    if (shipmentData) {
-      console.log("Merging shipment data with order data");
-      data.shipment_data = {
+      } : data.qboid_dimensions,
+      shipment_data: shipmentData ? {
         id: shipmentData.id,
         carrier: shipmentData.carrier,
         service: shipmentData.service,
@@ -92,10 +87,18 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
         actualDeliveryDate: shipmentData.actual_delivery_date,
         cost: shipmentData.cost,
         labelUrl: shipmentData.label_url
-      };
+      } : null
+    };
+    
+    if (matchingQboidData) {
+      console.log("Merging Qboid dimensions with order data");
     }
     
-    const orderData = convertSupabaseToOrderData(data);
+    if (shipmentData) {
+      console.log("Merging shipment data with order data");
+    }
+    
+    const orderData = convertSupabaseToOrderData(enhancedData);
     console.log("Final parsed order data:", orderData);
     
     return orderData;
