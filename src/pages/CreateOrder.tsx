@@ -1,6 +1,8 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -9,9 +11,36 @@ import { ShippingAddressSection } from "@/components/order/ShippingAddressSectio
 import { OrderFormActions } from "@/components/order/OrderFormActions";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
 import { orderFormSchema, OrderFormValues } from "@/types/order";
+import { supabase } from "@/integrations/supabase/client";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 const CreateOrder = () => {
   const { isSubmitting, onSubmit } = useCreateOrder();
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setIsAuthenticated(true);
+        } else {
+          // Redirect to login or show auth required message
+          navigate("/login"); // Assuming you have a login page
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
+        navigate("/login");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [navigate]);
 
   // Initialize the form with the correct type
   const form = useForm<OrderFormValues>({
@@ -32,6 +61,31 @@ const CreateOrder = () => {
       country: "US",
     },
   });
+
+  if (isLoading) {
+    return (
+      <TmsLayout>
+        <div className="flex justify-center items-center py-8">
+          <LoadingSpinner size={24} />
+        </div>
+      </TmsLayout>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <TmsLayout>
+        <div className="flex justify-center items-center py-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Authentication Required</CardTitle>
+              <CardDescription>You must be logged in to create orders.</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </TmsLayout>
+    );
+  }
 
   return (
     <TmsLayout>

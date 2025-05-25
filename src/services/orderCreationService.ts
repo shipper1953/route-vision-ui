@@ -9,6 +9,14 @@ import { toast } from "sonner";
  * @returns The created order
  */
 export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<OrderData> {
+  // Check if user is authenticated
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    toast.error("You must be logged in to create an order");
+    throw new Error("User not authenticated");
+  }
+
   // Simulate API delay for better UX
   await new Promise(resolve => setTimeout(resolve, 600));
   
@@ -24,9 +32,6 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
   
   // Store the order in Supabase
   try {
-    // Get the current user (if authenticated)
-    const { data: { user } } = await supabase.auth.getUser();
-    
     console.log("Saving order to Supabase:", {
       order_id: orderId,
       items: JSON.stringify([{ count: newOrder.items, description: "Order items" }]),
@@ -39,7 +44,7 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
       order_date: newOrder.orderDate,
       required_delivery_date: newOrder.requiredDeliveryDate,
       status: newOrder.status,
-      user_id: user?.id || null
+      user_id: user.id // Ensure user_id is set
     });
     
     const { data, error } = await supabase
@@ -56,7 +61,7 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
         order_date: newOrder.orderDate,
         required_delivery_date: newOrder.requiredDeliveryDate,
         status: newOrder.status,
-        user_id: user?.id || null
+        user_id: user.id // Set the authenticated user's ID
       })
       .select()
       .single();
