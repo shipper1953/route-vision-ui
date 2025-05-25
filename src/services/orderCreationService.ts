@@ -28,36 +28,18 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
     const { data: { user } } = await supabase.auth.getUser();
     
     console.log("Saving order to Supabase:", {
-      id: parseInt(orderId.replace('ORD-', '')),
       order_id: orderId,
-      customer_name: newOrder.customerName,
-      customer_company: newOrder.customerCompany || null,
-      customer_email: newOrder.customerEmail || null,
-      customer_phone: newOrder.customerPhone || null,
-      order_date: newOrder.orderDate,
-      required_delivery_date: newOrder.requiredDeliveryDate,
-      status: newOrder.status,
       items: JSON.stringify([{ count: newOrder.items, description: "Order items" }]),
       value: parseFloat(newOrder.value),
-      shipping_address: JSON.stringify(newOrder.shippingAddress),
       user_id: user?.id || null
     });
     
     const { data, error } = await supabase
       .from('orders')
       .insert({
-        id: parseInt(orderId.replace('ORD-', '')), 
         order_id: orderId,
-        customer_name: newOrder.customerName,
-        customer_company: newOrder.customerCompany || null,
-        customer_email: newOrder.customerEmail || null,
-        customer_phone: newOrder.customerPhone || null,
-        order_date: newOrder.orderDate,
-        required_delivery_date: newOrder.requiredDeliveryDate,
-        status: newOrder.status,
         items: JSON.stringify([{ count: newOrder.items, description: "Order items" }]),
         value: parseFloat(newOrder.value),
-        shipping_address: JSON.stringify(newOrder.shippingAddress),
         user_id: user?.id || null
       })
       .select()

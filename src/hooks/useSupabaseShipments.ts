@@ -32,22 +32,22 @@ export const useSupabaseShipments = () => {
         
         // Transform Supabase data to match our interface
         const formattedShipments: Shipment[] = supabaseShipments.map(s => ({
-          id: s.easypost_id || String(s.id),
-          tracking: s.tracking_number || 'Pending',
+          id: (s as any).easypost_id || String(s.id),
+          tracking: (s as any).tracking_number || 'Pending',
           carrier: s.carrier || 'Unknown',
-          carrierUrl: s.tracking_number ? 
-            `https://www.trackingmore.com/track/en/${s.tracking_number}` : '#',
-          service: s.carrier_service || 'Standard',
-          origin: s.origin_address ? 'Origin' : 'Unknown Origin',
-          destination: s.destination_address ? 'Destination' : 'Unknown Destination',
-          shipDate: new Date(s.created_at).toLocaleDateString(),
+          carrierUrl: (s as any).tracking_number ? 
+            `https://www.trackingmore.com/track/en/${(s as any).tracking_number}` : '#',
+          service: (s as any).carrier_service || s.service || 'Standard',
+          origin: (s as any).origin_address ? 'Origin' : 'Unknown Origin',
+          destination: (s as any).destination_address ? 'Destination' : 'Unknown Destination',
+          shipDate: (s as any).created_at ? new Date((s as any).created_at).toLocaleDateString() : new Date().toLocaleDateString(),
           estimatedDelivery: s.estimated_delivery_date ? 
             new Date(s.estimated_delivery_date).toLocaleDateString() : null,
           actualDelivery: s.actual_delivery_date ? 
             new Date(s.actual_delivery_date).toLocaleDateString() : null,
           status: s.status || 'created',
-          weight: `${s.weight || '0'} lbs`,
-          labelUrl: s.label_url
+          weight: `${(s as any).weight || '0'} lbs`,
+          labelUrl: (s as any).label_url
         }));
         
         setShipments(formattedShipments);
