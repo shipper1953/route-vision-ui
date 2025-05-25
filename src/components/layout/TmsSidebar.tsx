@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 import { useSidebar } from "@/context/SidebarContext";
-import { useEffect, useRef } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -102,27 +101,7 @@ const CreateMenu = ({ isCollapsed }: { isCollapsed: boolean }) => {
 };
 
 export function TmsSidebar() {
-  const { isCollapsed, toggleSidebar, setIsCollapsed } = useSidebar();
-  const sidebarRef = useRef<HTMLDivElement>(null);
-
-  // Add outside click handler to collapse sidebar
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        sidebarRef.current &&
-        !sidebarRef.current.contains(event.target as Node) &&
-        !isCollapsed &&
-        window.innerWidth <= 768 // Only on mobile/tablet
-      ) {
-        setIsCollapsed(true);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isCollapsed, setIsCollapsed]);
+  const { isCollapsed, toggleSidebar, sidebarRef } = useSidebar();
 
   return (
     <div 
