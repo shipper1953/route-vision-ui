@@ -19,7 +19,7 @@ export const RatesActionButton = ({ loading, onClick }: RatesActionButtonProps) 
   return (
     <Button 
       type="submit" 
-      className="bg-tms-blue hover:bg-tms-blue-400"
+      className={loading ? "bg-transparent hover:bg-transparent border-transparent" : "bg-tms-blue hover:bg-tms-blue-400"}
       disabled={loading}
       onClick={handleClick}
     >
