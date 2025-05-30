@@ -5,7 +5,42 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
-import { AuthProvider } from 'your-auth-library'; // Adjust the import based on your auth library
+import { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "@supabase/supabase-js"; // Adjust the import based on your Supabase client setup
+
+// Create AuthContext
+const AuthContext = createContext();
+
+// AuthProvider component
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const session = supabase.auth.session();
+    setUser(session?.user ?? null);
+    setLoading(false);
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Custom hook to use the Auth context
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
