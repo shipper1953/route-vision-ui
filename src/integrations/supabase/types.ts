@@ -162,6 +162,7 @@ export type Database = {
           carrier: string
           cost: number | null
           easypost_id: string | null
+          easypost_shipment_id: string | null
           estimated_delivery_date: string | null
           id: number
           label_url: string | null
@@ -179,6 +180,7 @@ export type Database = {
           carrier: string
           cost?: number | null
           easypost_id?: string | null
+          easypost_shipment_id?: string | null
           estimated_delivery_date?: string | null
           id?: never
           label_url?: string | null
@@ -196,6 +198,7 @@ export type Database = {
           carrier?: string
           cost?: number | null
           easypost_id?: string | null
+          easypost_shipment_id?: string | null
           estimated_delivery_date?: string | null
           id?: never
           label_url?: string | null

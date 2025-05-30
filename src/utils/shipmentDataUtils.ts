@@ -11,7 +11,7 @@ export const mergeShipments = (dbShipments: Shipment[], otherShipments: Shipment
   // Create a map of existing shipments by ID for quick lookup
   const shipmentMap = new Map<string, Shipment>();
   
-  // Add database shipments to the map
+  // Add database shipments to the map (these take priority)
   dbShipments.forEach(shipment => {
     shipmentMap.set(shipment.id, shipment);
   });
@@ -55,7 +55,9 @@ export const convertOrderToShipment = (order: OrderData): Shipment => {
     origin: order.shippingAddress 
       ? `${order.shippingAddress.city}, ${order.shippingAddress.state}` 
       : "Unknown Origin",
-    destination: "Destination",
+    destination: order.shippingAddress 
+      ? `${order.shippingAddress.city}, ${order.shippingAddress.state}` 
+      : "Unknown Destination",
     shipDate: order.orderDate,
     estimatedDelivery: order.shipment!.estimatedDeliveryDate || null,
     actualDelivery: order.shipment!.actualDeliveryDate || null,
@@ -128,7 +130,9 @@ export const saveShipmentToSupabase = async (labelData: any): Promise<void> => {
         weight: labelData.parcel?.weight || 0,
         weight_unit: labelData.parcel?.weight_unit || 'oz'
       }),
-      user_id: user.user.id
+      user_id: user.user.id,
+      order_id: labelData.reference || null, // Link to order if available
+      tracking_url: labelData.tracker?.public_url
     };
 
     const { data, error } = await supabase

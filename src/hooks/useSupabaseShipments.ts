@@ -14,46 +14,88 @@ export const useSupabaseShipments = () => {
   useEffect(() => {
     const loadShipmentsFromSupabase = async () => {
       try {
-        const { data: supabaseShipments, error } = await supabase
+        // Get all shipments with their related order data
+        const { data: supabaseShipments, error: shipmentsError } = await supabase
           .from('shipments')
-          .select('*')
+          .select(`
+            *,
+            orders!left (
+              order_id,
+              customer_name,
+              shipping_address,
+              qboid_dimensions
+            )
+          `)
           .order('id', { ascending: false });
         
-        console.log("Supabase shipments query result:", { data: supabaseShipments, error });
+        console.log("Supabase shipments query result:", { data: supabaseShipments, error: shipmentsError });
         
-        if (error) {
-          throw new Error(`Supabase error: ${error.message}`);
+        if (shipmentsError) {
+          throw new Error(`Supabase error: ${shipmentsError.message}`);
         }
         
         if (!supabaseShipments?.length) {
+          console.log("No shipments found in Supabase");
           setShipments([]);
           return;
         }
         
         // Transform Supabase data to match our interface
-        const formattedShipments: Shipment[] = supabaseShipments.map(s => ({
-          id: (s as any).easypost_id || String(s.id),
-          tracking: (s as any).tracking_number || 'Pending',
-          carrier: s.carrier || 'Unknown',
-          carrierUrl: (s as any).tracking_url || 
-            ((s as any).tracking_number ? 
-              `https://www.trackingmore.com/track/en/${(s as any).tracking_number}` : '#'),
-          service: s.service || 'Standard',
-          origin: 'Origin', // We don't have origin/destination data in current schema
-          destination: 'Destination',
-          shipDate: new Date().toLocaleDateString(), // Use current date since we don't have ship_date
-          estimatedDelivery: s.estimated_delivery_date ? 
-            new Date(s.estimated_delivery_date).toLocaleDateString() : null,
-          actualDelivery: s.actual_delivery_date ? 
-            new Date(s.actual_delivery_date).toLocaleDateString() : null,
-          status: s.status || 'created',
-          weight: `${(s as any).package_weights ? 
-            JSON.parse((s as any).package_weights as string)?.weight || '0' : '0'} ${
-            (s as any).package_weights ? 
-            JSON.parse((s as any).package_weights as string)?.weight_unit || 'oz' : 'oz'}`,
-          labelUrl: (s as any).label_url
-        }));
+        const formattedShipments: Shipment[] = supabaseShipments.map(s => {
+          const orderData = Array.isArray(s.orders) ? s.orders[0] : s.orders;
+          
+          // Get dimensions from order if available, otherwise from shipment
+          let weight = 'Unknown';
+          if (orderData?.qboid_dimensions?.weight) {
+            weight = `${orderData.qboid_dimensions.weight} oz`;
+          } else if (s.package_weights) {
+            try {
+              const weights = typeof s.package_weights === 'string' 
+                ? JSON.parse(s.package_weights) 
+                : s.package_weights;
+              weight = `${weights.weight || '0'} ${weights.weight_unit || 'oz'}`;
+            } catch (e) {
+              weight = 'Unknown';
+            }
+          }
+          
+          // Determine origin and destination
+          let origin = 'Origin';
+          let destination = 'Destination';
+          
+          if (orderData?.shipping_address) {
+            try {
+              const address = typeof orderData.shipping_address === 'string'
+                ? JSON.parse(orderData.shipping_address)
+                : orderData.shipping_address;
+              destination = `${address.city || 'Unknown'}, ${address.state || 'Unknown'}`;
+            } catch (e) {
+              destination = 'Destination';
+            }
+          }
+          
+          return {
+            id: s.easypost_id || String(s.id),
+            tracking: s.tracking_number || 'Pending',
+            carrier: s.carrier || 'Unknown',
+            carrierUrl: s.tracking_url || 
+              (s.tracking_number ? 
+                `https://www.trackingmore.com/track/en/${s.tracking_number}` : '#'),
+            service: s.service || 'Standard',
+            origin,
+            destination,
+            shipDate: s.created_at ? new Date(s.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+            estimatedDelivery: s.estimated_delivery_date ? 
+              new Date(s.estimated_delivery_date).toLocaleDateString() : null,
+            actualDelivery: s.actual_delivery_date ? 
+              new Date(s.actual_delivery_date).toLocaleDateString() : null,
+            status: s.status || 'created',
+            weight,
+            labelUrl: s.label_url
+          };
+        });
         
+        console.log(`Formatted ${formattedShipments.length} shipments from Supabase`);
         setShipments(formattedShipments);
       } catch (err) {
         console.error("Error loading shipments from Supabase:", err);
