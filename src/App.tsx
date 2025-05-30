@@ -4,7 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SidebarProvider } from "@/context/SidebarContext";
-import AppRoutes from "./router";
+import { RouterProvider } from "react-router-dom";
+import { router } from "./router";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -23,7 +24,7 @@ const App = () => {
         <SidebarProvider>
           <Toaster />
           <Sonner position="top-right" />
-          <AppRoutes />
+          <RouterProvider router={router} />
         </SidebarProvider>
       </TooltipProvider>
     </QueryClientProvider>
