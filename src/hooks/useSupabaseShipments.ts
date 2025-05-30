@@ -46,16 +46,27 @@ export const useSupabaseShipments = () => {
           
           // Get dimensions from order if available, otherwise from shipment
           let weight = 'Unknown';
-          if (orderData?.qboid_dimensions?.weight) {
-            weight = `${orderData.qboid_dimensions.weight} oz`;
+          if (orderData?.qboid_dimensions) {
+            try {
+              const dimensions = typeof orderData.qboid_dimensions === 'string' 
+                ? JSON.parse(orderData.qboid_dimensions) 
+                : orderData.qboid_dimensions;
+              if (dimensions && typeof dimensions === 'object' && 'weight' in dimensions) {
+                weight = `${dimensions.weight} oz`;
+              }
+            } catch (e) {
+              console.warn("Error parsing qboid dimensions:", e);
+            }
           } else if (s.package_weights) {
             try {
               const weights = typeof s.package_weights === 'string' 
                 ? JSON.parse(s.package_weights) 
                 : s.package_weights;
-              weight = `${weights.weight || '0'} ${weights.weight_unit || 'oz'}`;
+              if (weights && typeof weights === 'object' && 'weight' in weights) {
+                weight = `${weights.weight || '0'} ${weights.weight_unit || 'oz'}`;
+              }
             } catch (e) {
-              weight = 'Unknown';
+              console.warn("Error parsing package weights:", e);
             }
           }
           
@@ -68,11 +79,18 @@ export const useSupabaseShipments = () => {
               const address = typeof orderData.shipping_address === 'string'
                 ? JSON.parse(orderData.shipping_address)
                 : orderData.shipping_address;
-              destination = `${address.city || 'Unknown'}, ${address.state || 'Unknown'}`;
+              if (address && typeof address === 'object' && 'city' in address && 'state' in address) {
+                destination = `${address.city || 'Unknown'}, ${address.state || 'Unknown'}`;
+              }
             } catch (e) {
-              destination = 'Destination';
+              console.warn("Error parsing shipping address:", e);
             }
           }
+          
+          // Use estimated_delivery_date or actual_delivery_date as shipDate fallback since created_at doesn't exist
+          const shipDate = s.estimated_delivery_date ? 
+            new Date(s.estimated_delivery_date).toLocaleDateString() : 
+            new Date().toLocaleDateString();
           
           return {
             id: s.easypost_id || String(s.id),
@@ -84,7 +102,7 @@ export const useSupabaseShipments = () => {
             service: s.service || 'Standard',
             origin,
             destination,
-            shipDate: s.created_at ? new Date(s.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+            shipDate,
             estimatedDelivery: s.estimated_delivery_date ? 
               new Date(s.estimated_delivery_date).toLocaleDateString() : null,
             actualDelivery: s.actual_delivery_date ? 
