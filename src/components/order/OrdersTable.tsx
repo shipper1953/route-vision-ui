@@ -1,7 +1,7 @@
 
 import { OrderData } from "@/types/orderTypes";
 import { useNavigate } from "react-router-dom";
-import { Truck, Edit } from "lucide-react";
+import { Truck, Edit, Barcode } from "lucide-react";
 import { 
   Table,
   TableBody,
@@ -37,6 +37,70 @@ export const OrdersTable = ({
   const handleEditOrder = (orderId: string) => {
     // Navigate to edit order page
     navigate(`/edit-order/${orderId}`);
+  };
+
+  const handlePrintBarcode = (orderId: string) => {
+    // Create a new window for printing the barcode
+    const printWindow = window.open('', '_blank', 'width=400,height=200');
+    if (!printWindow) return;
+
+    // HTML content for the barcode label (3x1 inch)
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Barcode Label - ${orderId}</title>
+          <style>
+            @page {
+              size: 3in 1in;
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 8px;
+              font-family: Arial, sans-serif;
+              width: 3in;
+              height: 1in;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              box-sizing: border-box;
+            }
+            .barcode {
+              font-family: "Libre Barcode 128", monospace;
+              font-size: 24px;
+              margin-bottom: 4px;
+            }
+            .order-id {
+              font-size: 12px;
+              font-weight: bold;
+            }
+            @media print {
+              body {
+                background: white;
+              }
+            }
+          </style>
+          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
+        </head>
+        <body>
+          <div class="barcode">*${orderId}*</div>
+          <div class="order-id">${orderId}</div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    
+    // Wait for fonts to load then print
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    };
   };
 
   if (isLoading) {
@@ -85,6 +149,15 @@ export const OrdersTable = ({
           <TableCell>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm">Details</Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => handlePrintBarcode(order.id)}
+                className="flex items-center gap-1"
+              >
+                <Barcode className="h-3.5 w-3.5" />
+                Print
+              </Button>
               {order.status === 'ready_to_ship' && (
                 <Button 
                   variant="outline" 
