@@ -1,7 +1,7 @@
 
 import { OrderData } from "@/types/orderTypes";
 import { useNavigate } from "react-router-dom";
-import { Truck } from "lucide-react";
+import { Truck, Edit } from "lucide-react";
 import { 
   Table,
   TableBody,
@@ -32,6 +32,11 @@ export const OrdersTable = ({
   const handleCreateShipmentForOrder = (orderId: string) => {
     // Navigate to create shipment page with the order ID
     navigate(`/create-shipment?orderId=${orderId}`);
+  };
+
+  const handleEditOrder = (orderId: string) => {
+    // Navigate to edit order page
+    navigate(`/edit-order/${orderId}`);
   };
 
   if (isLoading) {
@@ -80,6 +85,17 @@ export const OrdersTable = ({
           <TableCell>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm">Details</Button>
+              {order.status === 'ready_to_ship' && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleEditOrder(order.id)}
+                  className="flex items-center gap-1"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              )}
               {(order.status === 'ready_to_ship' || order.status === 'processing') && (
                 <Button 
                   variant="outline" 
