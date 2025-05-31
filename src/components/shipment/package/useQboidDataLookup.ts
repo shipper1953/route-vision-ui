@@ -20,10 +20,11 @@ export const useQboidDataLookup = ({ handleQboidData }: UseQboidDataLookupProps)
       
       try {
         // First check the orders table for qboid_dimensions
+        // Use order_id_link to search since urlOrderId is a string
         const { data: orderData } = await supabase
           .from('orders')
           .select('qboid_dimensions')
-          .eq('order_id', urlOrderId)
+          .eq('order_id_link', urlOrderId)
           .single();
 
         if (orderData?.qboid_dimensions) {

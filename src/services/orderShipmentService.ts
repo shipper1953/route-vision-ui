@@ -32,13 +32,14 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
       console.log(`Found shipment in database with id: ${shipment.id}`);
       
       // Update the order with the shipment_id reference and change status to shipped
+      // Use order_id_link to find the order since orderId is a string
       const { error } = await supabase
         .from('orders')
         .update({ 
           shipment_id: shipment.id,
           status: 'shipped'
         })
-        .eq('order_id', searchId);
+        .eq('order_id_link', searchId);
       
       if (error) {
         console.error("Error linking shipment to order:", error);

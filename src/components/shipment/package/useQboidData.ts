@@ -32,12 +32,12 @@ export const useQboidData = () => {
           order = orders.find((o: any) => o.id === dimensions.orderId);
         }
         
-        // If not found in localStorage, try Supabase
+        // If not found in localStorage, try Supabase using order_id_link
         if (!order) {
           const { data: supabaseOrder } = await supabase
             .from('orders')
             .select('*')
-            .eq('order_id', dimensions.orderId)
+            .eq('order_id_link', dimensions.orderId)
             .single();
           
           order = supabaseOrder;

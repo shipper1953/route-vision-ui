@@ -16,10 +16,11 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
     // Remove "ORD-" prefix if present for order_id lookup
     const searchId = orderId.startsWith('ORD-') ? orderId : `ORD-${orderId}`;
     
+    // Search by order_id_link (string field) instead of order_id (number field)
     const { data, error } = await supabase
       .from('orders')
       .select('*')
-      .eq('order_id', searchId)
+      .eq('order_id_link', searchId)
       .single();
     
     if (error || !data) {

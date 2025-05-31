@@ -41,7 +41,8 @@ export async function fetchOrders(): Promise<OrderData[]> {
     // Fetch shipment data for all orders
     const ordersWithShipments = await Promise.all(
       data.map(async (order) => {
-        console.log(`Processing order ${order.order_id}, shipment_id: ${order.shipment_id}`);
+        const orderIdLink = order.order_id_link || `ORD-${order.order_id}`;
+        console.log(`Processing order ${orderIdLink}, shipment_id: ${order.shipment_id}`);
         
         let shipmentData = null;
         
@@ -53,10 +54,10 @@ export async function fetchOrders(): Promise<OrderData[]> {
             .eq('id', order.shipment_id)
             .maybeSingle();
           
-          console.log(`Shipment query for order ${order.order_id}:`, { shipment, shipmentError });
+          console.log(`Shipment query for order ${orderIdLink}:`, { shipment, shipmentError });
           
           if (shipment) {
-            console.log("Found related shipment data for order:", order.order_id, shipment);
+            console.log("Found related shipment data for order:", orderIdLink, shipment);
             shipmentData = shipment;
           }
         }
@@ -73,7 +74,7 @@ export async function fetchOrders(): Promise<OrderData[]> {
           // This is a simple heuristic - in production you'd want a more robust linking mechanism
           if (potentialShipments && potentialShipments.length > 0) {
             // For now, just log that we found shipments but couldn't link them
-            console.log(`Found ${potentialShipments.length} shipments but couldn't link to order ${order.order_id}`);
+            console.log(`Found ${potentialShipments.length} shipments but couldn't link to order ${orderIdLink}`);
           }
         }
         
@@ -88,7 +89,7 @@ export async function fetchOrders(): Promise<OrderData[]> {
         // Find matching Qboid data by order ID in the data payload
         let matchingQboidData = null;
         if (qboidData && qboidData.length > 0) {
-          const searchId = order.order_id.startsWith('ORD-') ? order.order_id : `ORD-${order.order_id}`;
+          const searchId = orderIdLink;
           
           for (const event of qboidData) {
             const eventData = event.data as any;
