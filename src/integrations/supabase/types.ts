@@ -65,7 +65,8 @@ export type Database = {
           id: number
           items: Json
           order_date: string | null
-          order_id: string
+          order_id: number
+          order_id_link: string | null
           qboid_dimensions: Json | null
           required_delivery_date: string | null
           shipment_id: number | null
@@ -83,7 +84,8 @@ export type Database = {
           id?: never
           items: Json
           order_date?: string | null
-          order_id: string
+          order_id: number
+          order_id_link?: string | null
           qboid_dimensions?: Json | null
           required_delivery_date?: string | null
           shipment_id?: number | null
@@ -101,7 +103,8 @@ export type Database = {
           id?: never
           items?: Json
           order_date?: string | null
-          order_id?: string
+          order_id?: number
+          order_id_link?: string | null
           qboid_dimensions?: Json | null
           required_delivery_date?: string | null
           shipment_id?: number | null
@@ -166,7 +169,8 @@ export type Database = {
           estimated_delivery_date: string | null
           id: number
           label_url: string | null
-          order_id: string | null
+          order_id: number | null
+          order_id_link: string | null
           package_dimensions: Json | null
           package_weights: Json | null
           service: string
@@ -184,7 +188,8 @@ export type Database = {
           estimated_delivery_date?: string | null
           id?: never
           label_url?: string | null
-          order_id?: string | null
+          order_id?: number | null
+          order_id_link?: string | null
           package_dimensions?: Json | null
           package_weights?: Json | null
           service: string
@@ -202,7 +207,8 @@ export type Database = {
           estimated_delivery_date?: string | null
           id?: never
           label_url?: string | null
-          order_id?: string | null
+          order_id?: number | null
+          order_id_link?: string | null
           package_dimensions?: Json | null
           package_weights?: Json | null
           service?: string
@@ -317,7 +323,7 @@ export type Database = {
         }
         Insert: {
           email: string
-          id: string
+          id?: string
           name: string
           password: string
           role: string
