@@ -47,10 +47,13 @@ const Orders = () => {
     // Only depend on the specific highlight parameter value, not the entire searchParams object
   }, [highlightedOrderId]);
   
-  const filteredOrders = orders.filter(order => 
-    order.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    order.customerName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders = orders.filter(order => {
+    const orderId = String(order.id || '').toLowerCase();
+    const customerName = String(order.customerName || '').toLowerCase();
+    const searchLower = searchTerm.toLowerCase();
+    
+    return orderId.includes(searchLower) || customerName.includes(searchLower);
+  });
 
   return (
     <TmsLayout>
