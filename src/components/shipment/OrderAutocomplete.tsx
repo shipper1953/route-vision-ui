@@ -66,14 +66,16 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
     if (!inputValue || inputValue.trim().length === 0) return [];
     
     const searchTerm = inputValue.toLowerCase().trim();
-    const matches = orders.filter(order => 
-      order.id.toLowerCase().includes(searchTerm) ||
-      order.customerName.toLowerCase().includes(searchTerm)
-    ).slice(0, 10); // Limit to 10 results for performance
+    const matches = orders.filter(order => {
+      const orderId = String(order.id || '').toLowerCase();
+      const customerName = String(order.customerName || '').toLowerCase();
+      
+      return orderId.includes(searchTerm) || customerName.includes(searchTerm);
+    }).slice(0, 10); // Limit to 10 results for performance
 
     // Check for exact match - if found, auto-select it
-    const exactMatch = orders.find(order => order.id.toLowerCase() === searchTerm);
-    if (exactMatch && inputValue !== exactMatch.id) {
+    const exactMatch = orders.find(order => String(order.id || '').toLowerCase() === searchTerm);
+    if (exactMatch && inputValue !== String(exactMatch.id)) {
       // Auto-select exact match after a short delay
       setTimeout(() => {
         handleSelect(exactMatch);
@@ -84,8 +86,8 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
   }, [orders, inputValue]);
 
   const handleSelect = (order: OrderData) => {
-    setInputValue(order.id);
-    form.setValue("orderBarcode", order.id);
+    setInputValue(String(order.id));
+    form.setValue("orderBarcode", String(order.id));
     setOpen(false);
     onOrderSelected(order);
     // Restore focus to input after selection
@@ -160,7 +162,7 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
                   {filteredOrders.map((order) => (
                     <CommandItem
                       key={order.id}
-                      value={order.id}
+                      value={String(order.id)}
                       onSelect={() => handleSelect(order)}
                       className="cursor-pointer"
                       onMouseDown={(e) => e.preventDefault()} // Prevent input blur
@@ -168,7 +170,7 @@ export const OrderAutocomplete = ({ onOrderSelected }: OrderAutocompleteProps) =
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          inputValue === order.id ? "opacity-100" : "opacity-0"
+                          inputValue === String(order.id) ? "opacity-100" : "opacity-0"
                         )}
                       />
                       <div className="flex flex-col flex-1">
