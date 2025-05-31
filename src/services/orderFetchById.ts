@@ -13,18 +13,53 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
   await new Promise(resolve => setTimeout(resolve, 800));
   
   try {
-    // Remove "ORD-" prefix if present for order_id lookup
-    const searchId = orderId.startsWith('ORD-') ? orderId : `ORD-${orderId}`;
+    console.log("Fetching order by ID:", orderId);
     
-    // Search by order_id_link (string field) instead of order_id (number field)
-    const { data, error } = await supabase
+    // Try multiple search strategies to find the order
+    let data = null;
+    let error = null;
+    
+    // First, try searching by order_id_link (string field)
+    const searchId = orderId.startsWith('ORD-') ? orderId : `ORD-${orderId}`;
+    console.log("Searching with order_id_link:", searchId);
+    
+    const { data: linkResult, error: linkError } = await supabase
       .from('orders')
       .select('*')
       .eq('order_id_link', searchId)
-      .single();
+      .maybeSingle();
     
-    if (error || !data) {
-      console.log("Order not found in Supabase:", orderId, error);
+    if (linkResult) {
+      data = linkResult;
+      console.log("Found order by order_id_link:", searchId);
+    } else if (linkError) {
+      console.log("Error searching by order_id_link:", linkError);
+    }
+    
+    // If not found by link, try searching by order_id (numeric field)
+    if (!data) {
+      const numericOrderId = orderId.replace('ORD-', '');
+      if (!isNaN(Number(numericOrderId))) {
+        console.log("Searching with numeric order_id:", numericOrderId);
+        
+        const { data: numericResult, error: numericError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('order_id', parseInt(numericOrderId))
+          .maybeSingle();
+        
+        if (numericResult) {
+          data = numericResult;
+          console.log("Found order by numeric order_id:", numericOrderId);
+        } else if (numericError) {
+          console.log("Error searching by numeric order_id:", numericError);
+          error = numericError;
+        }
+      }
+    }
+    
+    if (!data) {
+      console.log("Order not found in Supabase:", orderId);
       return null;
     }
     
@@ -37,7 +72,7 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
         .from('shipments')
         .select('*')
         .eq('id', data.shipment_id)
-        .single();
+        .maybeSingle();
       
       if (shipment) {
         console.log("Found related shipment data:", shipment);
@@ -45,7 +80,7 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       }
     }
     
-    // Also check for Qboid dimension data
+    // Check for Qboid dimension data
     const { data: qboidData } = await supabase
       .from('qboid_events')
       .select('*')
@@ -60,8 +95,8 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
       
       for (const event of qboidData) {
         const eventData = event.data as any;
-        if (eventData && (eventData.orderId === searchId || eventData.barcode === searchId)) {
-          console.log("Found matching Qboid data for order:", searchId, eventData);
+        if (eventData && (eventData.orderId === searchId || eventData.barcode === searchId || eventData.orderId === orderId || eventData.barcode === orderId)) {
+          console.log("Found matching Qboid data for order:", orderId, eventData);
           matchingQboidData = eventData;
           break;
         }
@@ -79,7 +114,7 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
         orderId: matchingQboidData.orderId || matchingQboidData.barcode
       } : data.qboid_dimensions,
       shipment_data: shipmentData ? {
-        id: shipmentData.id,
+        id: shipmentData.easypost_id || String(shipmentData.id),
         carrier: shipmentData.carrier,
         service: shipmentData.service,
         trackingNumber: shipmentData.tracking_number || 'Pending',

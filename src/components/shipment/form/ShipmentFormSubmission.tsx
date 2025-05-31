@@ -33,6 +33,10 @@ export const ShipmentFormSubmission = ({
       setLoading(true);
       toast.info("Getting shipping rates...");
       
+      // Include order ID in the shipment reference if available
+      const orderReference = data.orderId || data.orderBarcode || null;
+      console.log("Using order reference for shipment:", orderReference);
+      
       const shipmentData = {
         from_address: {
           name: data.fromName,
@@ -66,15 +70,20 @@ export const ShipmentFormSubmission = ({
         },
         options: {
           smartrate_accuracy: 'percentile_95'
-        }
+        },
+        // Include order reference for linking
+        reference: orderReference
       };
       
       console.log("Creating shipment with data:", shipmentData);
       
       const response = await easyPostService.createShipment(shipmentData);
       
-      // Store the shipment ID in the form context
+      // Store the shipment ID and order reference in the form context
       form.setValue("shipmentId", response.id);
+      if (orderReference) {
+        form.setValue("orderReference", orderReference);
+      }
       
       if (!response.rates?.length && !response.smartrates?.length) {
         toast.error("No shipping rates available. Please check your package dimensions and try again.");

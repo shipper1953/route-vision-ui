@@ -17,19 +17,23 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
   const [searchParams] = useSearchParams();
   const orderIdFromUrl = searchParams.get("orderId");
   const loadedOrderIdRef = useRef<string | null>(null);
+  const isLoadingRef = useRef(false);
   
   // Load order data if orderId is provided in the URL
   useEffect(() => {
     async function loadOrderFromId() {
       // Skip if no orderId, already loaded this order, or currently loading
-      if (!orderIdFromUrl || loadedOrderIdRef.current === orderIdFromUrl || loading) {
+      if (!orderIdFromUrl || 
+          loadedOrderIdRef.current === orderIdFromUrl || 
+          isLoadingRef.current) {
         return;
       }
       
       try {
+        isLoadingRef.current = true;
         setLoading(true);
         loadedOrderIdRef.current = orderIdFromUrl; // Mark this order as being loaded
-        toast.info(`Loading order ${orderIdFromUrl}...`);
+        console.log(`Loading order ${orderIdFromUrl} from URL...`);
         
         // Set the orderBarcode field (which is what OrderLookupCard uses)
         form.setValue("orderBarcode", orderIdFromUrl);
@@ -78,7 +82,7 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
         form.setValue("orderId", order.id);
         form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
         
-        toast.success("Order information loaded");
+        toast.success("Order information loaded successfully");
         setOrderLookupComplete(true);
       } catch (error) {
         console.error("Error loading order from URL:", error);
@@ -86,16 +90,18 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
         loadedOrderIdRef.current = null; // Reset on error to allow retry
       } finally {
         setLoading(false);
+        isLoadingRef.current = false;
       }
     }
     
     loadOrderFromId();
-  }, [orderIdFromUrl, loading]); // Include loading in dependencies to prevent concurrent executions
+  }, [orderIdFromUrl, form, setOrderLookupComplete]);
   
   // Reset the loaded order ref when orderIdFromUrl changes to a different order
   useEffect(() => {
     if (orderIdFromUrl !== loadedOrderIdRef.current && loadedOrderIdRef.current !== null) {
       loadedOrderIdRef.current = null;
+      isLoadingRef.current = false;
     }
   }, [orderIdFromUrl]);
   
