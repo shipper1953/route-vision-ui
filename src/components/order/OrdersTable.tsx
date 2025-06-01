@@ -30,8 +30,8 @@ export const OrdersTable = ({
   const navigate = useNavigate();
 
   const handleCreateShipmentForOrder = (orderId: string) => {
-    // Navigate to create shipment page with the order ID
-    navigate(`/create-shipment?orderId=${orderId}`);
+    // Navigate to create shipment page with the order ID using the correct route
+    navigate(`/shipments/new?orderId=${orderId}`);
   };
 
   const handleEditOrder = (orderId: string) => {
