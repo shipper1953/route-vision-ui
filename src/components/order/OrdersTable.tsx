@@ -44,7 +44,7 @@ export const OrdersTable = ({
     const printWindow = window.open('', '_blank', 'width=400,height=200');
     if (!printWindow) return;
 
-    // HTML content for the barcode label (3x1 inch)
+    // HTML content for the Code 39 barcode label (3x1 inch)
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -57,7 +57,7 @@ export const OrdersTable = ({
             }
             body {
               margin: 0;
-              padding: 8px;
+              padding: 4px;
               font-family: Arial, sans-serif;
               width: 3in;
               height: 1in;
@@ -66,23 +66,32 @@ export const OrdersTable = ({
               justify-content: center;
               align-items: center;
               box-sizing: border-box;
+              background: white;
             }
             .barcode {
-              font-family: "Libre Barcode 128", monospace;
-              font-size: 24px;
-              margin-bottom: 4px;
+              font-family: "Libre Barcode 39", "Libre Barcode 39 Text", monospace;
+              font-size: 32px;
+              letter-spacing: 2px;
+              margin-bottom: 2px;
+              line-height: 1;
+              text-align: center;
+              width: 100%;
             }
             .order-id {
-              font-size: 12px;
+              font-size: 10px;
               font-weight: bold;
+              text-align: center;
+              margin-top: 2px;
             }
             @media print {
               body {
-                background: white;
+                background: white !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
               }
             }
           </style>
-          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&family=Libre+Barcode+39+Text&display=swap" rel="stylesheet">
         </head>
         <body>
           <div class="barcode">*${orderId}*</div>
@@ -99,7 +108,7 @@ export const OrdersTable = ({
       setTimeout(() => {
         printWindow.print();
         printWindow.close();
-      }, 500);
+      }, 1000);
     };
   };
 
