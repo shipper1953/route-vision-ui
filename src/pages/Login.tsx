@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ShipTornadoLogo } from '@/components/logo/ShipTornadoLogo';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
@@ -12,8 +13,15 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, error, loading } = useAuth();
+  const { login, error, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,13 +29,10 @@ const Login = () => {
 
     try {
       await login(email, password);
-      toast({
-        title: 'Success!',
-        description: 'You have successfully logged in.',
-      });
+      toast.success('Successfully logged in!');
       navigate('/');
     } catch (err) {
-      // Error is handled in the AuthContext
+      toast.error(error || 'Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +72,7 @@ const Login = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@example.com"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -83,7 +88,7 @@ const Login = () => {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -99,7 +104,7 @@ const Login = () => {
               </div>
             </div>
             
-            {(error || (!loading && !isLoading && error)) && (
+            {error && (
               <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
                 {error}
               </div>
@@ -123,12 +128,6 @@ const Login = () => {
               </a>
             </div>
           </form>
-          
-          <div className="mt-8 text-center text-xs text-muted-foreground">
-            <p>Demo accounts:</p>
-            <p>Admin: admin@example.com / password</p>
-            <p>User: user@example.com / password</p>
-          </div>
         </div>
       </div>
     </div>

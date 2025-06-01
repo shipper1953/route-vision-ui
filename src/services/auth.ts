@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 interface LoginResponse {
@@ -23,5 +24,24 @@ export const auth = {
     if (error) {
       throw new Error(error.message);
     }
+  },
+
+  signUp: async (email: string, password: string, metadata?: any): Promise<any> => {
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: metadata
+      }
+    });
+    
+    if (error) {
+      throw new Error(error.message);
+    }
+    
+    return data;
   },
 };
