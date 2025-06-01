@@ -29,6 +29,9 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
     if (shipment) {
       console.log(`Found shipment in database with id: ${shipment.id}`);
       
+      // Convert shipment.id to number since it comes as bigint (string) from Supabase
+      const shipmentIdNumber = parseInt(String(shipment.id), 10);
+      
       // Try to update order using multiple strategies
       let updateSuccess = false;
       
@@ -39,7 +42,7 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
         const { error: stringError } = await supabase
           .from('orders')
           .update({ 
-            shipment_id: Number(shipment.id),
+            shipment_id: shipmentIdNumber,
             status: 'shipped'
           })
           .eq('order_id', orderIdStr);
@@ -61,7 +64,7 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
         const { error: numericError } = await supabase
           .from('orders')
           .update({ 
-            shipment_id: Number(shipment.id),
+            shipment_id: shipmentIdNumber,
             status: 'shipped'
           })
           .eq('order_id', orderIdNumeric);
@@ -83,7 +86,7 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
         const { error: idError } = await supabase
           .from('orders')
           .update({ 
-            shipment_id: Number(shipment.id),
+            shipment_id: shipmentIdNumber,
             status: 'shipped'
           })
           .eq('id', orderIdNumeric);
