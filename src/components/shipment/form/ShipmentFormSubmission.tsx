@@ -79,11 +79,8 @@ export const ShipmentFormSubmission = ({
       
       const response = await easyPostService.createShipment(shipmentData);
       
-      // Store the shipment ID and order reference in the form context
+      // Store the shipment ID in the form context
       form.setValue("shipmentId", response.id);
-      if (orderReference) {
-        form.setValue("orderReference", orderReference);
-      }
       
       if (!response.rates?.length && !response.smartrates?.length) {
         toast.error("No shipping rates available. Please check your package dimensions and try again.");
