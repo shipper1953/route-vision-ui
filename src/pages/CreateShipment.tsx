@@ -34,82 +34,47 @@ const CreateShipment = () => {
     }
   }, [shipmentResponse]);
 
-  // Function to handle successful label purchase and insert to Supabase
+  // Function to handle successful label purchase and verify database save
   const handleLabelPurchased = async (result: any) => {
     console.log("Label purchased successfully:", result);
     setLabelData(result);
     setShowLabelDialog(true);
 
-    // Insert shipment to Supabase - the Edge Function should handle this, but let's verify
+    // The Edge Function should handle database saving, so we just verify it was saved
     if (result && result.id) {
       console.log("Verifying shipment was saved to database with easypost_id:", result.id);
       
-      // Check if shipment exists in database
-      const { data: existingShipment, error: checkError } = await supabase
-        .from('shipments')
-        .select('*')
-        .eq('easypost_id', result.id)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error("Error checking shipment in database:", checkError);
-        toast.error("Error verifying shipment in database");
-      } else if (existingShipment) {
-        console.log("✅ Shipment confirmed in database:", existingShipment);
-        toast.success("Shipment successfully saved to database!");
-      } else {
-        console.warn("⚠️ Shipment not found in database, attempting manual save...");
-        
-        // Get current user to include user_id in the manual save
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError || !user) {
-          console.error("Error getting current user:", userError);
-          toast.error("Authentication error - cannot save shipment");
-          return;
-        }
-        
-        // Manual fallback save if Edge Function didn't save it - include user_id
-        const shipmentData = {
-          easypost_id: result.id,
-          tracking_number: result.tracking_code,
-          carrier: result.selected_rate?.carrier || 'Unknown',
-          service: result.selected_rate?.service || 'Standard',
-          status: "purchased",
-          label_url: result.postage_label?.label_url,
-          weight: String(parseFloat(result.parcel?.weight) || 0),
-          cost: parseFloat(result.selected_rate?.rate) || 0,
-          package_dimensions: JSON.stringify({
-            length: result.parcel?.length || 0,
-            width: result.parcel?.width || 0,
-            height: result.parcel?.height || 0
-          }),
-          package_weights: JSON.stringify({
-            weight: result.parcel?.weight || 0,
-            weight_unit: result.parcel?.weight_unit || 'oz'
-          }),
-          tracking_url: result.tracker?.public_url,
-          user_id: user.id, // Include user_id for RLS
-          created_at: new Date().toISOString(),
-        };
-
-        console.log("Manual shipment data to be saved:", shipmentData);
-
-        const { error: insertError, data: insertData } = await supabase
+      // Wait a moment for the Edge Function to complete its database save
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check if shipment exists in database with a few retries
+      let shipmentFound = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: existingShipment, error: checkError } = await supabase
           .from('shipments')
-          .insert(shipmentData)
-          .select();
+          .select('*')
+          .eq('easypost_id', result.id)
+          .maybeSingle();
 
-        if (insertError) {
-          console.error("Failed to manually save shipment:", insertError);
-          toast.error("Failed to save shipment: " + insertError.message);
-        } else {
-          console.log("✅ Successfully manually saved shipment to database:", insertData);
-          toast.success("Shipment manually saved to database!");
+        if (checkError) {
+          console.error("Error checking shipment in database:", checkError);
+        } else if (existingShipment) {
+          console.log("✅ Shipment confirmed in database:", existingShipment);
+          toast.success("Shipment successfully saved to database!");
+          shipmentFound = true;
+          break;
+        } else if (attempt < 2) {
+          console.log(`Attempt ${attempt + 1}: Shipment not found yet, retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
+
+      if (!shipmentFound) {
+        console.warn("⚠️ Shipment not found in database after multiple attempts");
+        toast.warning("Label purchased successfully, but shipment may not be saved to database");
+      }
     } else {
-      console.warn("No result or result.id available for saving to database");
+      console.warn("No result or result.id available for verification");
     }
   };
 
