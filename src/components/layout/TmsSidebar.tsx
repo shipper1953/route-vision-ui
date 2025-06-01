@@ -7,7 +7,8 @@ import {
   Users, 
   Settings, 
   Plus,
-  LogOut 
+  LogOut,
+  Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
@@ -31,10 +32,8 @@ interface NavItemProps {
 const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavItemProps) => {
   const location = useLocation();
   const { setIsCollapsed } = useSidebar();
+  const { isAdmin } = useAuth();
   const isActive = location.pathname === to;
-  
-  // For demo purposes, let's assume the user is an admin
-  const isAdmin = true;
   
   if (adminOnly && !isAdmin) return null;
 
@@ -91,6 +90,7 @@ const LogoutButton = ({ isCollapsed }: { isCollapsed: boolean }) => {
 
 const CreateMenu = ({ isCollapsed }: { isCollapsed: boolean }) => {
   const { setIsCollapsed } = useSidebar();
+  const { isAdmin } = useAuth();
 
   const handleMenuItemClick = () => {
     setIsCollapsed(true);
@@ -116,23 +116,25 @@ const CreateMenu = ({ isCollapsed }: { isCollapsed: boolean }) => {
         className="bg-popover border border-border w-48"
       >
         <DropdownMenuItem asChild>
-          <NavLink to="/create-order" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
+          <NavLink to="/orders/new" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
             <Package size={16} />
             <span>Create Order</span>
           </NavLink>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <NavLink to="/create-shipment" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
+          <NavLink to="/shipments/new" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
             <Truck size={16} />
             <span>Create Shipment</span>
           </NavLink>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <NavLink to="/create-user" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
-            <Users size={16} />
-            <span>Create User</span>
-          </NavLink>
-        </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem asChild>
+            <NavLink to="/create-user" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
+              <Users size={16} />
+              <span>Create User</span>
+            </NavLink>
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -176,6 +178,7 @@ export function TmsSidebar() {
         <NavItem to="/shipments" icon={Truck} label="Shipments" isCollapsed={isCollapsed} />
         <CreateMenu isCollapsed={isCollapsed} />
         <NavItem to="/users" icon={Users} label="Users" isCollapsed={isCollapsed} adminOnly={true} />
+        <NavItem to="/admin" icon={Shield} label="Admin Panel" isCollapsed={isCollapsed} adminOnly={true} />
         <NavItem to="/settings" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
       </div>
 

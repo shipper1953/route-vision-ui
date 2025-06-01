@@ -1,6 +1,7 @@
-
 import { useEffect, useState } from "react";
 import { TmsLayout } from "@/components/layout/TmsLayout";
+import { useAuth } from "@/context/AuthContext";
+import { Navigate } from "react-router-dom";
 import { 
   Table,
   TableBody,
@@ -20,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Users as UsersIcon, Search, Plus } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 type DatabaseUser = {
@@ -76,11 +76,28 @@ const UserRole = ({ role }: { role: string }) => {
 };
 
 const Users = () => {
+  const { isAdmin, loading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState<SupabaseUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <TmsLayout>
+        <div className="flex items-center justify-center min-h-64">
+          <div>Loading...</div>
+        </div>
+      </TmsLayout>
+    );
+  }
+
+  // Redirect non-admin users
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
 
   useEffect(() => {
     const fetchUsers = async () => {

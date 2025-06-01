@@ -13,6 +13,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   signUp: (email: string, password: string, metadata?: any) => Promise<void>;
   userProfile: any;
+  isAdmin: boolean;
+  hasRole: (role: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -144,6 +146,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isAuthenticated = !!session && !!user;
+  const isAdmin = userProfile?.role === 'admin';
+  const hasRole = (role: string) => userProfile?.role === role;
 
   return (
     <AuthContext.Provider value={{ 
@@ -155,7 +159,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login, 
       logout,
       signUp,
-      userProfile
+      userProfile,
+      isAdmin,
+      hasRole
     }}>
       {children}
     </AuthContext.Provider>

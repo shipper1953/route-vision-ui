@@ -1,9 +1,10 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { TmsLayout } from "@/components/layout/TmsLayout";
+import { useAuth } from "@/context/AuthContext";
+import { Navigate } from "react-router-dom";
 import { 
   Card, 
   CardContent, 
@@ -33,7 +34,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Users, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 const userSchema = z.object({
@@ -49,9 +49,26 @@ const userSchema = z.object({
 type UserForm = z.infer<typeof userSchema>;
 
 const CreateUser = () => {
+  const { isAdmin, loading: authLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <TmsLayout>
+        <div className="flex items-center justify-center min-h-64">
+          <div>Loading...</div>
+        </div>
+      </TmsLayout>
+    );
+  }
+
+  // Redirect non-admin users
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
   const form = useForm<UserForm>({
     resolver: zodResolver(userSchema),
     defaultValues: {

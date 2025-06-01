@@ -11,6 +11,7 @@ import CreateShipment from "./pages/CreateShipment";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
 import CreateUser from "./pages/CreateUser";
+import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -57,6 +58,10 @@ export const router = createBrowserRouter([
   {
     path: "/create-user",
     element: <CreateUser />,
+  },
+  {
+    path: "/admin",
+    element: <AdminPanel />,
   },
   {
     path: "*",
