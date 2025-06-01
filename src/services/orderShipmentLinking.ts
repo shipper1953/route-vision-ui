@@ -40,16 +40,17 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
       if (isNaN(Number(orderIdStr))) {
         console.log("Attempting to update order with string order_id:", orderIdStr);
         
-        const { error: stringError } = await supabase
+        const { data: updatedOrder, error: stringError } = await supabase
           .from('orders')
           .update({ 
             shipment_id: shipmentIdNumber,
             status: 'shipped'
           })
-          .eq('order_id', orderIdStr);
+          .eq('order_id', orderIdStr)
+          .select();
         
-        if (!stringError) {
-          console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderIdStr} via string order_id`);
+        if (!stringError && updatedOrder && updatedOrder.length > 0) {
+          console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderIdStr} via string order_id:`, updatedOrder[0]);
           toast.success(`Order ${orderIdStr} updated with shipment information and marked as shipped`);
           updateSuccess = true;
         } else {
@@ -61,16 +62,17 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
       if (!updateSuccess && !isNaN(Number(orderIdStr))) {
         console.log("Attempting to update order with numeric order_id:", orderIdStr);
         
-        const { error: numericError } = await supabase
+        const { data: updatedOrder, error: numericError } = await supabase
           .from('orders')
           .update({ 
             shipment_id: shipmentIdNumber,
             status: 'shipped'
           })
-          .eq('order_id', orderIdStr);
+          .eq('order_id', orderIdStr)
+          .select();
         
-        if (!numericError) {
-          console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderIdStr} via numeric order_id`);
+        if (!numericError && updatedOrder && updatedOrder.length > 0) {
+          console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderIdStr} via numeric order_id:`, updatedOrder[0]);
           toast.success(`Order ${orderIdStr} updated with shipment information and marked as shipped`);
           updateSuccess = true;
         } else {
@@ -83,16 +85,17 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
         console.log("Attempting to update order with id field:", orderIdStr);
         
         const orderIdNumeric = parseInt(orderIdStr, 10);
-        const { error: idError } = await supabase
+        const { data: updatedOrder, error: idError } = await supabase
           .from('orders')
           .update({ 
             shipment_id: shipmentIdNumber,
             status: 'shipped'
           })
-          .eq('id', orderIdNumeric);
+          .eq('id', orderIdNumeric)
+          .select();
         
-        if (!idError) {
-          console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderIdStr} via id field`);
+        if (!idError && updatedOrder && updatedOrder.length > 0) {
+          console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderIdStr} via id field:`, updatedOrder[0]);
           toast.success(`Order ${orderIdStr} updated with shipment information and marked as shipped`);
           updateSuccess = true;
         } else {
@@ -100,9 +103,47 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
         }
       }
       
+      // Strategy 4: Debug and broader search if all else fails
+      if (!updateSuccess) {
+        console.log("All update strategies failed. Performing debug search...");
+        
+        // Try a broader search to find the order
+        const { data: foundOrder, error: searchError } = await supabase
+          .from('orders')
+          .select('id, order_id, customer_name')
+          .or(`order_id.eq.${orderIdStr},id.eq.${isNaN(Number(orderIdStr)) ? 0 : Number(orderIdStr)}`)
+          .maybeSingle();
+        
+        if (!searchError && foundOrder) {
+          console.log(`Found order through broader search:`, foundOrder);
+          const { data: finalUpdate, error: finalError } = await supabase
+            .from('orders')
+            .update({ 
+              shipment_id: shipmentIdNumber,
+              status: 'shipped'
+            })
+            .eq('id', foundOrder.id)
+            .select();
+          
+          if (!finalError && finalUpdate && finalUpdate.length > 0) {
+            console.log(`Successfully linked via broader search:`, finalUpdate[0]);
+            toast.success(`Order ${orderIdStr} updated with shipment information and marked as shipped`);
+            updateSuccess = true;
+          }
+        }
+      }
+      
       if (!updateSuccess) {
         console.error("All update strategies failed for order:", orderIdStr);
-        toast.error("Failed to update order with shipment information");
+        
+        // Show available orders for debugging
+        const { data: debugOrders } = await supabase
+          .from('orders')
+          .select('id, order_id, customer_name')
+          .limit(5);
+        
+        console.log("Available orders for debugging:", debugOrders);
+        toast.error(`Failed to link shipment to order ${orderIdStr}. Check console for debugging info.`);
         throw new Error("Failed to update order with shipment information");
       }
       
