@@ -9,55 +9,9 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      addresses: {
-        Row: {
-          address_line1: string
-          address_line2: string | null
-          city: string
-          country: string
-          created_at: string | null
-          id: number
-          postal_code: string
-          state: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          address_line1: string
-          address_line2?: string | null
-          city: string
-          country: string
-          created_at?: string | null
-          id?: never
-          postal_code: string
-          state: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          address_line1?: string
-          address_line2?: string | null
-          city?: string
-          country?: string
-          created_at?: string | null
-          id?: never
-          postal_code?: string
-          state?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "addresses_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       orders: {
         Row: {
+          created_at: string | null
           customer_company: string | null
           customer_email: string | null
           customer_name: string | null
@@ -66,17 +20,16 @@ export type Database = {
           items: Json
           order_date: string | null
           order_id: number
-          order_id_link: string | null
           qboid_dimensions: Json | null
           required_delivery_date: string | null
           shipment_id: number | null
           shipping_address: Json | null
-          shipping_address_id: number | null
           status: string | null
           user_id: string | null
           value: number
         }
         Insert: {
+          created_at?: string | null
           customer_company?: string | null
           customer_email?: string | null
           customer_name?: string | null
@@ -84,18 +37,17 @@ export type Database = {
           id?: never
           items: Json
           order_date?: string | null
-          order_id: number
-          order_id_link?: string | null
+          order_id?: number
           qboid_dimensions?: Json | null
           required_delivery_date?: string | null
           shipment_id?: number | null
           shipping_address?: Json | null
-          shipping_address_id?: number | null
           status?: string | null
           user_id?: string | null
           value: number
         }
         Update: {
+          created_at?: string | null
           customer_company?: string | null
           customer_email?: string | null
           customer_name?: string | null
@@ -104,12 +56,10 @@ export type Database = {
           items?: Json
           order_date?: string | null
           order_id?: number
-          order_id_link?: string | null
           qboid_dimensions?: Json | null
           required_delivery_date?: string | null
           shipment_id?: number | null
           shipping_address?: Json | null
-          shipping_address_id?: number | null
           status?: string | null
           user_id?: string | null
           value?: number
@@ -120,13 +70,6 @@ export type Database = {
             columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "shipments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_shipping_address_id_fkey"
-            columns: ["shipping_address_id"]
-            isOneToOne: false
-            referencedRelation: "addresses"
             referencedColumns: ["id"]
           },
           {
@@ -182,62 +125,78 @@ export type Database = {
           actual_delivery_date: string | null
           carrier: string
           cost: number | null
+          created_at: string | null
           easypost_id: string | null
           easypost_shipment_id: string | null
           estimated_delivery_date: string | null
           id: number
           label_url: string | null
           order_id: number | null
-          order_id_link: string | null
           package_dimensions: Json | null
           package_weights: Json | null
+          rates: Json | null
           service: string
+          smartrates: Json | null
           status: string
           tracking_number: string | null
           tracking_url: string | null
           user_id: string | null
+          weight: string | null
         }
         Insert: {
           actual_delivery_date?: string | null
           carrier: string
           cost?: number | null
+          created_at?: string | null
           easypost_id?: string | null
           easypost_shipment_id?: string | null
           estimated_delivery_date?: string | null
-          id?: never
+          id?: number
           label_url?: string | null
           order_id?: number | null
-          order_id_link?: string | null
           package_dimensions?: Json | null
           package_weights?: Json | null
+          rates?: Json | null
           service: string
+          smartrates?: Json | null
           status: string
           tracking_number?: string | null
           tracking_url?: string | null
           user_id?: string | null
+          weight?: string | null
         }
         Update: {
           actual_delivery_date?: string | null
           carrier?: string
           cost?: number | null
+          created_at?: string | null
           easypost_id?: string | null
           easypost_shipment_id?: string | null
           estimated_delivery_date?: string | null
-          id?: never
+          id?: number
           label_url?: string | null
           order_id?: number | null
-          order_id_link?: string | null
           package_dimensions?: Json | null
           package_weights?: Json | null
+          rates?: Json | null
           service?: string
+          smartrates?: Json | null
           status?: string
           tracking_number?: string | null
           tracking_url?: string | null
           user_id?: string | null
+          weight?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "shipments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_user_id_fkey1"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -296,41 +255,6 @@ export type Database = {
           },
         ]
       }
-      user_profiles: {
-        Row: {
-          created_at: string | null
-          id: number
-          phone_number: string | null
-          preferences: Json | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: never
-          phone_number?: string | null
-          preferences?: Json | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: never
-          phone_number?: string | null
-          preferences?: Json | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_profiles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       users: {
         Row: {
           email: string
@@ -364,14 +288,97 @@ export type Database = {
             referencedRelation: "roles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "users_role_fkey"
+            columns: ["role"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["name"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      hypopg_hidden_indexes: {
+        Row: {
+          am_name: unknown | null
+          index_name: unknown | null
+          indexrelid: unknown | null
+          is_hypo: boolean | null
+          schema_name: unknown | null
+          table_name: unknown | null
+        }
+        Relationships: []
+      }
+      hypopg_list_indexes: {
+        Row: {
+          am_name: unknown | null
+          index_name: string | null
+          indexrelid: unknown | null
+          schema_name: unknown | null
+          table_name: unknown | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      hypopg: {
+        Args: Record<PropertyKey, never>
+        Returns: Record<string, unknown>[]
+      }
+      hypopg_create_index: {
+        Args: { sql_order: string }
+        Returns: Record<string, unknown>[]
+      }
+      hypopg_drop_index: {
+        Args: { indexid: unknown }
+        Returns: boolean
+      }
+      hypopg_get_indexdef: {
+        Args: { indexid: unknown }
+        Returns: string
+      }
+      hypopg_hidden_indexes: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          indexid: unknown
+        }[]
+      }
+      hypopg_hide_index: {
+        Args: { indexid: unknown }
+        Returns: boolean
+      }
+      hypopg_relation_size: {
+        Args: { indexid: unknown }
+        Returns: number
+      }
+      hypopg_reset: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      hypopg_reset_index: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      hypopg_unhide_all_indexes: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      hypopg_unhide_index: {
+        Args: { indexid: unknown }
+        Returns: boolean
+      }
+      index_advisor: {
+        Args: { query: string }
+        Returns: {
+          startup_cost_before: Json
+          startup_cost_after: Json
+          total_cost_before: Json
+          total_cost_after: Json
+          index_statements: string[]
+          errors: string[]
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
