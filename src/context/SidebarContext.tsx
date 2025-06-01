@@ -1,5 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
 
 interface SidebarContextType {
   isCollapsed: boolean;
@@ -14,7 +15,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const toggleSidebar = () => {
     setIsCollapsed(prev => !prev);
   };
@@ -22,18 +23,13 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   // Auto-collapse after 15 seconds
   useEffect(() => {
     if (!isCollapsed) {
-      // Clear any existing timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      
-      // Set new timeout for 15 seconds
       timeoutRef.current = setTimeout(() => {
         setIsCollapsed(true);
       }, 15000);
     }
-
-    // Cleanup timeout on unmount or when collapsed
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -53,30 +49,54 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
         setIsCollapsed(true);
       }
     };
-
-    // Only add event listener when sidebar is expanded
     if (!isCollapsed) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isCollapsed]);
-  
+
   return (
     <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed, toggleSidebar, sidebarRef }}>
-      {children}
+      <SidebarWithLogout sidebarRef={sidebarRef}>
+        {children}
+      </SidebarWithLogout>
     </SidebarContext.Provider>
+  );
+}
+
+// SidebarWithLogout wraps children and renders the logout button at the bottom of the sidebar
+function SidebarWithLogout({
+  children,
+  sidebarRef,
+}: {
+  children: React.ReactNode;
+  sidebarRef: React.RefObject<HTMLDivElement>;
+}) {
+  const { logout, loading } = useAuth();
+
+  return (
+    <div ref={sidebarRef} className="flex flex-col h-full">
+      <div className="flex-1">{children}</div>
+      <div className="p-4 border-t mt-auto">
+        <Button
+          onClick={logout}
+          disabled={loading}
+          className="w-full bg-tms-navy hover:bg-tms-navy/90"
+          variant="outline"
+        >
+          Logout
+        </Button>
+      </div>
+    </div>
   );
 }
 
 export function useSidebar() {
   const context = useContext(SidebarContext);
-  
   if (context === undefined) {
     throw new Error("useSidebar must be used within a SidebarProvider");
   }
-  
   return context;
 }

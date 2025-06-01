@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -13,13 +12,13 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, error } = useAuth();
+  const { login, error, loading } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       await login(email, password);
       toast({
@@ -100,7 +99,7 @@ const Login = () => {
               </div>
             </div>
             
-            {error && (
+            {(error || (!loading && !isLoading && error)) && (
               <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
                 {error}
               </div>
@@ -109,9 +108,9 @@ const Login = () => {
             <Button 
               type="submit" 
               className="w-full bg-tms-navy hover:bg-opacity-90" 
-              disabled={isLoading}
+              disabled={isLoading || loading}
             >
-              {isLoading ? "Signing in..." : "Sign in"}
+              {(isLoading || loading) ? "Signing in..." : "Sign in"}
             </Button>
             
             <div className="flex flex-col space-y-2 items-center text-sm text-center">

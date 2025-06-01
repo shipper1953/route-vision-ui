@@ -1,5 +1,4 @@
-
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import Index from "@/pages/Index";
 import Orders from "@/pages/Orders";
 import EditOrder from "@/pages/EditOrder";
@@ -11,47 +10,92 @@ import Users from "@/pages/Users";
 import CreateUser from "@/pages/CreateUser";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
+import { useAuth } from "@/context/AuthContext";
+import React from "react";
+
+// Helper for protected routes
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null; // or a spinner
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
 
 export const router = createBrowserRouter([
   {
+    path: "/login",
+    element: <Login />,
+  },
+  {
     path: "/",
-    element: <Index />,
+    element: (
+      <ProtectedRoute>
+        <Index />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/orders",
-    element: <Orders />,
+    element: (
+      <ProtectedRoute>
+        <Orders />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/edit-order/:orderId",
-    element: <EditOrder />,
+    element: (
+      <ProtectedRoute>
+        <EditOrder />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/create-order",
-    element: <CreateOrder />,
+    element: (
+      <ProtectedRoute>
+        <CreateOrder />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/shipments",
-    element: <Shipments />,
+    element: (
+      <ProtectedRoute>
+        <Shipments />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/create-shipment",
-    element: <CreateShipment />,
+    element: (
+      <ProtectedRoute>
+        <CreateShipment />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/settings",
-    element: <Settings />,
+    element: (
+      <ProtectedRoute>
+        <Settings />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/users",
-    element: <Users />,
+    element: (
+      <ProtectedRoute>
+        <Users />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/create-user",
-    element: <CreateUser />,
-  },
-  {
-    path: "/login",
-    element: <Login />,
+    element: (
+      <ProtectedRoute>
+        <CreateUser />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "*",
