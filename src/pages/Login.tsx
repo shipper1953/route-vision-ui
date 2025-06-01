@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -42,7 +43,7 @@ const Login = () => {
         setSetupFailed(true);
         // Provide demo credentials but indicate they need to be created manually
         setDefaultCredentials({ 
-          email: "admin@shiptornado.dev", 
+          email: "admin@shiptornado.app", 
           password: "ShipTornado123!" 
         });
       }
