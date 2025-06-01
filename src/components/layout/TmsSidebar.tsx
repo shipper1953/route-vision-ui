@@ -129,7 +129,7 @@ const CreateMenu = ({ isCollapsed }: { isCollapsed: boolean }) => {
         </DropdownMenuItem>
         {isAdmin && (
           <DropdownMenuItem asChild>
-            <NavLink to="/create-user" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
+            <NavLink to="/users/new" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
               <Users size={16} />
               <span>Create User</span>
             </NavLink>
