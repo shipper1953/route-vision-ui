@@ -90,3 +90,12 @@ export function DeliveryPerformanceChart() {
     </div>
   );
 }
+
+export function DashboardCharts() {
+  return (
+    <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <ShipmentsChart />
+      <DeliveryPerformanceChart />
+    </div>
+  );
+}

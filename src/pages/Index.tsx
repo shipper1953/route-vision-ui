@@ -34,6 +34,17 @@ const Index = () => {
     return null;
   }
 
+  // Sample shipment data for the ShipmentCard
+  const sampleShipment = {
+    id: "SHP-001",
+    title: "Package to New York",
+    origin: "Boston, MA",
+    destination: "New York, NY",
+    date: "2025-06-01",
+    status: "in_transit" as const,
+    client: "Acme Corp"
+  };
+
   return (
     <TmsLayout>
       <div className="space-y-6">
@@ -48,26 +59,34 @@ const Index = () => {
           <StatCard
             title="Total Orders"
             value="24"
-            change="+12%"
-            changeType="positive"
+            trend={{
+              value: "+12%",
+              positive: true
+            }}
           />
           <StatCard
             title="Active Shipments"
             value="18"
-            change="+8%"
-            changeType="positive"
+            trend={{
+              value: "+8%",
+              positive: true
+            }}
           />
           <StatCard
             title="Delivered Today"
             value="6"
-            change="+2"
-            changeType="positive"
+            trend={{
+              value: "+2",
+              positive: true
+            }}
           />
           <StatCard
             title="Pending Pickups"
             value="3"
-            change="-1"
-            changeType="negative"
+            trend={{
+              value: "-1",
+              positive: false
+            }}
           />
         </div>
 
@@ -76,7 +95,7 @@ const Index = () => {
             <DashboardCharts />
           </div>
           <div className="col-span-3">
-            <ShipmentCard />
+            <ShipmentCard shipment={sampleShipment} />
           </div>
         </div>
       </div>
