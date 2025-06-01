@@ -22,11 +22,32 @@ serve(async (req) => {
     return new Response(null, { headers, status: 204 })
   }
 
-  // Set up Supabase client with auth context
+  // Get the authorization header
+  const authHeader = req.headers.get('authorization')
+  console.log('Auth header present:', authHeader ? 'YES' : 'NO')
+  
+  if (!authHeader) {
+    console.error('No authorization header found')
+    return new Response(JSON.stringify({ 
+      error: 'Authorization header missing' 
+    }), {
+      headers,
+      status: 401,
+    })
+  }
+
+  // Set up Supabase client with auth context - improved header handling
   const supabaseClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    { 
+      global: { 
+        headers: { 
+          Authorization: authHeader,
+          'x-client-info': req.headers.get('x-client-info') || 'supabase-js/2.7.1'
+        } 
+      } 
+    }
   )
   
   // Verify authenticated user with better error handling
