@@ -6,11 +6,13 @@ import {
   Truck, 
   Users, 
   Settings, 
-  Plus 
+  Plus,
+  LogOut 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 import { useSidebar } from "@/context/SidebarContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +60,32 @@ const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavI
       <Icon size={20} />
       {!isCollapsed && <span>{label}</span>}
     </NavLink>
+  );
+};
+
+const LogoutButton = ({ isCollapsed }: { isCollapsed: boolean }) => {
+  const { logout, loading } = useAuth();
+  const { setIsCollapsed } = useSidebar();
+
+  const handleLogout = () => {
+    setIsCollapsed(true);
+    logout();
+  };
+
+  return (
+    <button 
+      onClick={handleLogout}
+      disabled={loading}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full",
+        isCollapsed ? "justify-center" : "",
+        "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground",
+        loading && "opacity-50 cursor-not-allowed"
+      )}
+    >
+      <LogOut size={20} />
+      {!isCollapsed && <span>Logout</span>}
+    </button>
   );
 };
 
@@ -149,6 +177,10 @@ export function TmsSidebar() {
         <CreateMenu isCollapsed={isCollapsed} />
         <NavItem to="/users" icon={Users} label="Users" isCollapsed={isCollapsed} adminOnly={true} />
         <NavItem to="/settings" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
+      </div>
+
+      <div className="p-2">
+        <LogoutButton isCollapsed={isCollapsed} />
       </div>
       
       {!isCollapsed && (
