@@ -22,13 +22,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuthStorage();
   };
 
-  const handleFetchUserProfile = async (userId: string) => {
-    const profile = await fetchUserProfile(userId);
-    setUserProfile(profile);
-    return profile;
-  };
-
   useEffect(() => {
+    let mounted = true;
+
     const initializeAuth = async () => {
       try {
         console.log('Initializing auth...');
@@ -38,31 +34,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (error) {
           console.error('Error getting session:', error);
-          setError(error.message);
-          clearAuthState();
+          if (mounted) {
+            setError(error.message);
+            clearAuthState();
+          }
           return;
         }
 
-        if (session?.user) {
+        if (session?.user && mounted) {
           console.log('Found existing session for:', session.user.email);
           setUser(session.user);
           
-          // Try to fetch or create user profile
-          const profile = await handleFetchUserProfile(session.user.id);
-          if (!profile) {
-            console.log('No profile found, creating one...');
-            await createUserProfile(session.user);
-          }
-        } else {
+          // Try to fetch user profile in background
+          setTimeout(async () => {
+            if (mounted) {
+              try {
+                const profile = await fetchUserProfile(session.user.id);
+                if (mounted) {
+                  setUserProfile(profile);
+                }
+              } catch (error) {
+                console.error('Error fetching user profile:', error);
+              }
+            }
+          }, 0);
+        } else if (mounted) {
           console.log('No existing session found');
           clearAuthState();
         }
       } catch (error: any) {
         console.error('Error in auth initialization:', error);
-        setError(error.message);
-        clearAuthState();
+        if (mounted) {
+          setError(error.message);
+          clearAuthState();
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -72,22 +81,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.email);
       
+      if (!mounted) return;
+      
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user);
         setError(null);
-        // Try to create profile if it doesn't exist
-        await createUserProfile(session.user);
-        await handleFetchUserProfile(session.user.id);
+        
+        // Defer profile operations to avoid blocking auth flow
+        setTimeout(async () => {
+          if (mounted) {
+            try {
+              await createUserProfile(session.user);
+              const profile = await fetchUserProfile(session.user.id);
+              if (mounted) {
+                setUserProfile(profile);
+              }
+            } catch (error) {
+              console.error('Error handling user profile:', error);
+            }
+          }
+        }, 100);
       } else if (event === 'SIGNED_OUT') {
         clearAuthState();
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         setUser(session.user);
       }
       
-      setLoading(false);
+      if (mounted) {
+        setLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -109,9 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.user) {
         console.log('Login successful for:', data.user.email);
-        setUser(data.user);
-        await createUserProfile(data.user);
-        await handleFetchUserProfile(data.user.id);
+        // Don't set user state here - let the auth state change handler do it
         toast.success('Login successful');
       }
     } catch (error: any) {
@@ -136,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
       
-      clearAuthState();
+      // clearAuthState will be called by the auth state change handler
       toast.success('Logged out successfully');
     } catch (error: any) {
       console.error('Logout failed:', error);
@@ -168,7 +194,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        await createUserProfile(data.user);
         toast.success('Account created successfully');
       }
     } catch (error: any) {
