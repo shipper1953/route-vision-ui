@@ -40,14 +40,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           setTimeout(async () => {
             try {
-              const { data: profile } = await supabase
+              console.log('Fetching user profile for:', session.user.id);
+              const { data: profile, error: profileError } = await supabase
                 .from('users')
                 .select('*')
                 .eq('id', session.user.id)
-                .single();
-              setUserProfile(profile);
+                .maybeSingle(); // Use maybeSingle instead of single to avoid errors when no data
+              
+              if (profileError) {
+                console.warn('Error fetching user profile:', profileError);
+                setUserProfile(null);
+              } else {
+                console.log('User profile fetched:', profile);
+                setUserProfile(profile);
+              }
             } catch (err) {
               console.warn('Could not fetch user profile:', err);
+              setUserProfile(null);
             }
           }, 0);
         } else {
