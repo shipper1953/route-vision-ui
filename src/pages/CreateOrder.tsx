@@ -9,7 +9,7 @@ import { ShippingAddressSection } from "@/components/order/ShippingAddressSectio
 import { OrderFormActions } from "@/components/order/OrderFormActions";
 import { orderFormSchema, OrderFormValues } from "@/types/order";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";

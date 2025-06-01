@@ -4,7 +4,7 @@ import { TmsHeader } from "./TmsHeader";
 import { PageTransition } from "@/components/transitions/PageTransition";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 
