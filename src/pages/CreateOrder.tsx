@@ -16,7 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 const CreateOrder = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,6 +41,11 @@ const CreateOrder = () => {
   });
 
   const onSubmit = async (values: OrderFormValues) => {
+    if (!user?.id) {
+      toast.error("You must be logged in to create an order");
+      return;
+    }
+
     setIsSubmitting(true);
     
     // Generate a unique order ID
@@ -65,11 +70,15 @@ const CreateOrder = () => {
         country: values.country,
       }),
       status: "ready_to_ship",
+      user_id: user.id, // Set the user_id from authenticated user
       created_at: new Date().toISOString(),
     };
 
+    console.log("Creating order with data:", orderData);
+
     const { error } = await supabase.from("orders").insert(orderData);
     if (error) {
+      console.error("Supabase error:", error);
       toast.error("Failed to create order: " + error.message);
     } else {
       toast.success("Order created successfully!");
