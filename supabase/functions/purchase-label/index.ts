@@ -9,12 +9,12 @@ const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
 console.log('EasyPost API key available in purchase-label function:', easyPostApiKey ? 'YES' : 'NO')
 
 serve(async (req) => {
-  // Set up CORS headers
+  // Set up CORS headers - updated to include x-client-info
   const headers = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*', // In production, set this to your actual domain
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   }
 
   // Handle preflight OPTIONS request
