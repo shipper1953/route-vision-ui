@@ -30,7 +30,7 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
       console.log(`Found shipment in database with id: ${shipment.id}`);
       
       // Convert shipment.id to number - it comes as bigint from Supabase
-      const shipmentIdNumber = typeof shipment.id === 'bigint' ? Number(shipment.id) : shipment.id;
+      const shipmentIdNumber = Number(shipment.id);
       console.log(`Converted shipment ID to number: ${shipmentIdNumber}`);
       
       // Try to update order using multiple strategies

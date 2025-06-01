@@ -25,11 +25,11 @@ export const useQboidData = () => {
         
         // Get order data from localStorage first (faster)
         const ordersData = localStorage.getItem('orders');
-        let order: Record<string, any> | null = null;
+        let order = null;
         
         if (ordersData) {
           const orders = JSON.parse(ordersData);
-          order = orders.find((o: Record<string, any>) => o.id === dimensions.orderId);
+          order = orders.find((o: any) => o.id === dimensions.orderId);
         }
         
         // If not found in localStorage, try Supabase using order_id_link
