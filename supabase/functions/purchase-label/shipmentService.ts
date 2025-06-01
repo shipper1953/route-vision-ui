@@ -8,14 +8,17 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
   
   if (!supabaseServiceKey) {
     console.log("No service role key available, skipping database save");
-    return null;
+    return { finalShipmentId: null, supabaseClient: null };
   }
 
   const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
+  // Get the current user from the JWT token in the request context
+  // Since we're using service role, we need to get the user ID from the auth context
+  // For now, we'll skip user_id in service role context and let RLS handle it differently
+  
   // Prepare shipment data with correct column names that match the database schema
-  // Removed order_id field since it was removed from the shipments table
-  const shipmentData: ShipmentData = {
+  const shipmentData: any = {
     easypost_id: responseData.id,
     tracking_number: responseData.tracking_code,
     carrier: responseData.selected_rate?.carrier || 'Unknown',
@@ -68,7 +71,7 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
       finalShipmentId = updatedShipment?.id;
     }
   } else {
-    // Insert new shipment
+    // Insert new shipment using service role (bypasses RLS)
     const { data: newShipment, error: insertError } = await supabaseClient
       .from('shipments')
       .insert(shipmentData)

@@ -60,7 +60,16 @@ const CreateShipment = () => {
       } else {
         console.warn("⚠️ Shipment not found in database, attempting manual save...");
         
-        // Manual fallback save if Edge Function didn't save it - removed order_id field
+        // Get current user to include user_id in the manual save
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
+          console.error("Error getting current user:", userError);
+          toast.error("Authentication error - cannot save shipment");
+          return;
+        }
+        
+        // Manual fallback save if Edge Function didn't save it - include user_id
         const shipmentData = {
           easypost_id: result.id,
           tracking_number: result.tracking_code,
@@ -80,6 +89,7 @@ const CreateShipment = () => {
             weight_unit: result.parcel?.weight_unit || 'oz'
           }),
           tracking_url: result.tracker?.public_url,
+          user_id: user.id, // Include user_id for RLS
           created_at: new Date().toISOString(),
         };
 
