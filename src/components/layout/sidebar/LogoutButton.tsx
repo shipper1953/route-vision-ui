@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface LogoutButtonProps {
   isCollapsed: boolean;
@@ -11,10 +12,18 @@ interface LogoutButtonProps {
 export const LogoutButton = ({ isCollapsed }: LogoutButtonProps) => {
   const { logout, loading } = useAuth();
   const { setIsCollapsed } = useSidebar();
+  const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsCollapsed(true);
-    logout();
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still redirect to login even if logout fails
+      navigate('/login');
+    }
   };
 
   return (
