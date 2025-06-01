@@ -2,218 +2,194 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-// Get EasyPost API key from environment variables - check ALL naming conventions
-const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY') || 
-                      Deno.env.get('VITE_EASYPOST_API_KEY')
+const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
 
-console.log('EasyPost API key available in Edge Function:', easyPostApiKey ? 'YES' : 'NO');
-
-const corsHeaders = {
-  'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*', // In production, set this to your specific domain
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+console.log('EasyPost API key available in Edge Function:', easyPostApiKey ? 'YES' : 'NO')
 
 serve(async (req) => {
-  console.log('Create-shipment function invoked');
+  console.log('Create-shipment function invoked')
   
+  // Set up CORS headers
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
+
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS preflight request');
-    return new Response(null, { 
-      status: 204, 
-      headers: corsHeaders 
-    });
+    console.log('Handling OPTIONS preflight request')
+    return new Response(null, { headers: corsHeaders, status: 204 })
   }
 
   try {
-    console.log('Processing shipment request');
-    console.log('API Key available:', easyPostApiKey ? 'Yes' : 'No');
+    console.log('Processing shipment request')
+    console.log('API Key available:', easyPostApiKey ? 'Yes' : 'No')
     
     if (!easyPostApiKey) {
-      console.error('CRITICAL ERROR: EasyPost API key is not configured in environment variables');
-      return new Response(
-        JSON.stringify({ 
-          error: 'EasyPost API key is not available. Please configure it in Supabase Secrets with name EASYPOST_API_KEY or VITE_EASYPOST_API_KEY.' 
-        }), 
-        { headers: corsHeaders, status: 500 }
-      );
+      return new Response(JSON.stringify({
+        error: 'EasyPost API key not configured'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      })
     }
-    
-    // Parse request JSON
-    const requestData = await req.json();
-    const shipmentData = requestData.shipmentData;
-    
-    if (!shipmentData) {
-      console.error('No shipment data provided in request');
-      return new Response(
-        JSON.stringify({ error: 'No shipment data provided' }), 
-        { headers: corsHeaders, status: 400 }
-      );
-    }
-    
-    // Validate dimensions and weight
-    const { parcel } = shipmentData;
-    if (!parcel || parcel.length <= 0 || parcel.width <= 0 || parcel.height <= 0 || parcel.weight <= 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid package dimensions', 
-          details: 'Package dimensions and weight must be greater than 0' 
-        }), 
-        { headers: corsHeaders, status: 400 }
-      );
-    }
+
+    const { shipmentData } = await req.json()
     
     // Enhanced SmartRate configuration
     if (!shipmentData.options) {
-      shipmentData.options = {};
+      shipmentData.options = {}
     }
     
-    // Force SmartRate to be enabled with multiple accuracy levels for better coverage
-    shipmentData.options.smartrate_accuracy = 'percentile_50'; // Start with 50th percentile for broader coverage
+    // Set SmartRate accuracy to a more reliable level
+    shipmentData.options.smartrate_accuracy = shipmentData.options.smartrate_accuracy || 'percentile_75'
     
     console.log('SmartRate configuration:', {
       smartrate_accuracy: shipmentData.options.smartrate_accuracy,
       options: shipmentData.options
-    });
+    })
     
-    console.log('Creating shipment with data:', JSON.stringify(shipmentData, null, 2));
+    console.log('Creating shipment with data:', JSON.stringify(shipmentData, null, 2))
     
-    // Call EasyPost API to create shipment with SmartRate
+    // Call EasyPost API to create shipment
     const response = await fetch('https://api.easypost.com/v2/shipments', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${easyPostApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         shipment: shipmentData
       }),
-    });
+    })
     
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('EasyPost API error:', JSON.stringify(errorData, null, 2));
+      const errorData = await response.json()
+      console.error('EasyPost API error:', errorData)
+      
+      let errorMessage = 'Failed to create shipment'
+      if (errorData.error?.message) {
+        errorMessage = errorData.error.message
+      } else if (response.status === 422) {
+        errorMessage = 'Invalid shipment data. Please check addresses and package dimensions.'
+      } else if (response.status === 401) {
+        errorMessage = 'Invalid EasyPost API key'
+      }
+      
       return new Response(JSON.stringify({
-        error: 'EasyPost API error',
+        error: errorMessage,
         details: errorData
       }), {
-        headers: corsHeaders,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: response.status,
-      });
+      })
     }
     
-    const shipmentResponse = await response.json();
+    const shipmentResponse = await response.json()
     
-    // Enhanced logging for SmartRate debugging
-    console.log('EasyPost API Response Summary:');
-    console.log('- Shipment ID:', shipmentResponse.id);
-    console.log('- SmartRates received:', shipmentResponse.smartRates ? shipmentResponse.smartRates.length : 0);
-    console.log('- Standard Rates received:', shipmentResponse.rates ? shipmentResponse.rates.length : 0);
+    console.log('EasyPost API Response Summary:')
+    console.log('- Shipment ID:', shipmentResponse.id)
+    console.log('- SmartRates received:', shipmentResponse.smartRates ? shipmentResponse.smartRates.length : 0)
+    console.log('- Standard Rates received:', shipmentResponse.rates ? shipmentResponse.rates.length : 0)
     
-    if (shipmentResponse.smartRates && shipmentResponse.smartRates.length > 0) {
-      console.log('SmartRate details:');
-      shipmentResponse.smartRates.forEach((rate, index) => {
-        console.log(`  ${index + 1}. ${rate.carrier} ${rate.service} - $${rate.rate} (${rate.delivery_days || 'unknown'} days, guaranteed: ${rate.delivery_date_guaranteed})`);
-      });
-    } else {
-      console.warn('⚠️ NO SMARTRATES RETURNED - This might indicate:');
-      console.warn('  1. SmartRate not enabled for this EasyPost account');
-      console.warn('  2. No carrier accounts configured');
-      console.warn('  3. Address combination not supported');
-      console.warn('  4. Package specifications outside SmartRate coverage');
+    // If no SmartRates, try to get them with a separate call
+    if ((!shipmentResponse.smartRates || shipmentResponse.smartRates.length === 0) && 
+        shipmentResponse.rates && shipmentResponse.rates.length > 0) {
       
-      // Try to get more SmartRate data with different accuracy level
-      if (shipmentResponse.rates && shipmentResponse.rates.length > 0) {
-        console.log('Attempting to get SmartRates with different accuracy level...');
-        
-        try {
-          const smartRateResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentResponse.id}/smartrate`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${easyPostApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              smartrate_accuracy: 'percentile_75'
-            }),
-          });
-          
-          if (smartRateResponse.ok) {
-            const smartRateData = await smartRateResponse.json();
-            console.log('SmartRate endpoint response:', JSON.stringify(smartRateData, null, 2));
-            
-            // Merge SmartRate data back into shipment response
-            if (smartRateData.smartrates && smartRateData.smartrates.length > 0) {
-              shipmentResponse.smartRates = smartRateData.smartrates;
-              console.log('✅ Successfully retrieved SmartRates via dedicated endpoint');
-            }
-          } else {
-            const smartRateError = await smartRateResponse.json();
-            console.error('SmartRate endpoint error:', smartRateError);
+      console.log('⚠️ NO SMARTRATES RETURNED - This might indicate:')
+      console.error('  1. SmartRate not enabled for this EasyPost account')
+      console.error('  2. No carrier accounts configured')
+      console.error('  3. Address combination not supported')
+      console.error('  4. Package specifications outside SmartRate coverage')
+      
+      console.log('Attempting to get SmartRates with different accuracy level...')
+      
+      try {
+        const smartRateResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentResponse.id}/smartrates`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${easyPostApiKey}`,
+            'Content-Type': 'application/json',
           }
-        } catch (smartRateErr) {
-          console.error('Error calling SmartRate endpoint:', smartRateErr);
-        }
-      }
-    }
-    
-    // Save the shipment information to Supabase if a user is logged in
-    try {
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-      );
-      
-      // Try to get the user from the authorization header
-      const authHeader = req.headers.get('Authorization');
-      let userId = null;
-      
-      if (authHeader) {
-        try {
-          const { data } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
-          userId = data.user?.id;
-        } catch (authErr) {
-          console.warn('Could not verify user from auth header:', authErr);
-        }
-      }
-      
-      if (userId) {
-        const { error: saveError } = await supabaseClient
-          .from('shipments')
-          .insert({
-            user_id: userId,
-            easypost_id: shipmentResponse.id,
-            to_address: shipmentData.to_address,
-            from_address: shipmentData.from_address,
-            parcel: shipmentData.parcel,
-            rates: shipmentResponse.rates || [],
-            smartrates: shipmentResponse.smartRates || [],
-            order_id: shipmentData.reference || null,
-            status: 'created'
-          });
+        })
         
-        if (saveError) {
-          console.error('Error saving shipment to database:', saveError);
+        if (smartRateResponse.ok) {
+          const smartRateData = await smartRateResponse.json()
+          if (smartRateData.smartrates && smartRateData.smartrates.length > 0) {
+            shipmentResponse.smartRates = smartRateData.smartrates
+            console.log('✅ Successfully retrieved SmartRates via GET:', smartRateData.smartrates.length)
+          }
+        } else {
+          const smartRateError = await smartRateResponse.json()
+          console.error('SmartRate endpoint error:', smartRateError)
         }
-      } else {
-        console.log('No authenticated user, skipping database save');
+      } catch (smartRateErr) {
+        console.error('Error calling SmartRate GET endpoint:', smartRateErr)
       }
-    } catch (saveErr) {
-      // Don't fail the request if we can't save to the database
-      console.error('Error when trying to save shipment:', saveErr);
     }
     
-    // Return the EasyPost response with proper CORS headers
-    console.log('Returning successful response');
-    return new Response(JSON.stringify(shipmentResponse), { headers: corsHeaders });
+    // Try to save to database if user is authenticated
+    const authHeader = req.headers.get('Authorization')
+    if (authHeader) {
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          { global: { headers: { Authorization: authHeader } } }
+        )
+        
+        const { data: authData } = await supabaseClient.auth.getUser()
+        if (authData?.user) {
+          console.log('Authenticated user found, saving shipment to database')
+          
+          const shipmentDbData = {
+            easypost_id: shipmentResponse.id,
+            user_id: authData.user.id,
+            status: 'created',
+            from_address: JSON.stringify(shipmentData.from_address),
+            to_address: JSON.stringify(shipmentData.to_address),
+            package_dimensions: JSON.stringify({
+              length: shipmentData.parcel.length,
+              width: shipmentData.parcel.width,
+              height: shipmentData.parcel.height
+            }),
+            package_weights: JSON.stringify({
+              weight: shipmentData.parcel.weight,
+              weight_unit: 'oz'
+            }),
+            created_at: new Date().toISOString(),
+          }
+          
+          const { error: insertError } = await supabaseClient
+            .from('shipments')
+            .insert(shipmentDbData)
+          
+          if (insertError) {
+            console.error('Failed to save shipment to database:', insertError)
+          } else {
+            console.log('Shipment saved to database successfully')
+          }
+        }
+      } catch (dbError) {
+        console.error('Database operation failed:', dbError)
+      }
+    } else {
+      console.log('No authenticated user, skipping database save')
+    }
+    
+    console.log('Returning successful response')
+    return new Response(JSON.stringify(shipmentResponse), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
     
   } catch (err) {
-    console.error('Error processing request:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error', details: err.message }), {
-      headers: corsHeaders,
+    console.error('Error in create-shipment function:', err)
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error', 
+      details: err.message 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
-    });
+    })
   }
 })

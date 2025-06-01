@@ -4,25 +4,46 @@ import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface LogoutButtonProps {
   isCollapsed: boolean;
 }
 
 export const LogoutButton = ({ isCollapsed }: LogoutButtonProps) => {
-  const { logout, loading } = useAuth();
+  const { logout, loading, clearAuthState } = useAuth();
   const { setIsCollapsed } = useSidebar();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     setIsCollapsed(true);
+    
     try {
+      console.log('Starting logout process...');
+      
+      // Clear auth state immediately
+      clearAuthState();
+      
+      // Perform logout
       await logout();
-      navigate('/login');
+      
+      // Force navigation to login
+      navigate('/login', { replace: true });
+      
+      // Clear any remaining storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      toast.success('Successfully logged out');
+      
     } catch (error) {
       console.error('Logout error:', error);
-      // Still redirect to login even if logout fails
-      navigate('/login');
+      
+      // Still clear state and redirect even if logout fails
+      clearAuthState();
+      navigate('/login', { replace: true });
+      
+      toast.warning('Logout completed (with some issues)');
     }
   };
 

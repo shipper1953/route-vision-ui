@@ -15,6 +15,7 @@ interface AuthContextType {
   userProfile: any;
   isAdmin: boolean;
   hasRole: (role: string) => boolean;
+  clearAuthState: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +27,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
 
+  const clearAuthState = () => {
+    console.log('Clearing auth state');
+    setUser(null);
+    setSession(null);
+    setUserProfile(null);
+    setError(null);
+    // Clear any stored auth data
+    localStorage.removeItem('supabase.auth.token');
+    sessionStorage.clear();
+  };
+
   useEffect(() => {
     console.log('AuthProvider initializing...');
     
@@ -33,11 +45,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
+        
+        // Handle sign out event specifically
+        if (event === 'SIGNED_OUT') {
+          clearAuthState();
+          setLoading(false);
+          return;
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         // Fetch user profile when user logs in
-        if (session?.user) {
+        if (session?.user && event === 'SIGNED_IN') {
           setTimeout(async () => {
             try {
               console.log('Fetching user profile for:', session.user.id);
@@ -45,21 +65,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .from('users')
                 .select('*')
                 .eq('id', session.user.id)
-                .maybeSingle(); // Use maybeSingle instead of single to avoid errors when no data
+                .maybeSingle();
               
               if (profileError) {
                 console.warn('Error fetching user profile:', profileError);
+                // Don't fail login if profile fetch fails, just log warning
                 setUserProfile(null);
-              } else {
+              } else if (profile) {
                 console.log('User profile fetched:', profile);
                 setUserProfile(profile);
+              } else {
+                console.log('No profile found for user, creating basic profile entry');
+                // Create a basic profile entry if none exists
+                const { data: newProfile, error: insertError } = await supabase
+                  .from('users')
+                  .insert({
+                    id: session.user.id,
+                    email: session.user.email,
+                    name: session.user.email?.split('@')[0] || 'User',
+                    role: 'user'
+                  })
+                  .select()
+                  .single();
+                
+                if (insertError) {
+                  console.warn('Could not create user profile:', insertError);
+                  setUserProfile(null);
+                } else {
+                  console.log('Created new user profile:', newProfile);
+                  setUserProfile(newProfile);
+                }
               }
             } catch (err) {
               console.warn('Could not fetch user profile:', err);
               setUserProfile(null);
             }
           }, 0);
-        } else {
+        } else if (!session?.user) {
           setUserProfile(null);
         }
         
@@ -147,10 +189,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         throw new Error(error.message);
       }
-      setUserProfile(null);
+      // Clear state immediately
+      clearAuthState();
     } catch (err) {
       console.error('Logout error:', err);
       setError(err instanceof Error ? err.message : 'Logout failed');
+      // Still clear state even if logout fails
+      clearAuthState();
     }
   };
 
@@ -170,7 +215,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signUp,
       userProfile,
       isAdmin,
-      hasRole
+      hasRole,
+      clearAuthState
     }}>
       {children}
     </AuthContext.Provider>

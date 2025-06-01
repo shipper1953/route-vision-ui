@@ -1,3 +1,4 @@
+
 import { ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -25,7 +26,8 @@ export class ShipmentService {
         shipmentData.options = {};
       }
 
-      shipmentData.options.smartrate_accuracy = shipmentData.options.smartrate_accuracy || 'percentile_50';
+      // Use a more reliable SmartRate accuracy level
+      shipmentData.options.smartrate_accuracy = shipmentData.options.smartrate_accuracy || 'percentile_75';
 
       console.log('SmartRate configuration:', {
         smartrate_accuracy: shipmentData.options.smartrate_accuracy
@@ -38,6 +40,18 @@ export class ShipmentService {
       return this.createShipmentDirectly(shipmentData);
     } catch (error) {
       console.error('Error creating shipment:', error);
+      
+      // Provide more helpful error messages
+      if (error instanceof Error) {
+        if (error.message.includes('401')) {
+          throw new Error('Authentication failed. Please log out and log back in.');
+        } else if (error.message.includes('422')) {
+          throw new Error('Invalid shipment data. Please check your addresses and package dimensions.');
+        } else if (error.message.includes('404')) {
+          throw new Error('EasyPost service unavailable. Please try again later.');
+        }
+      }
+      
       throw error;
     }
   }
@@ -46,30 +60,45 @@ export class ShipmentService {
     console.log('Using Edge Function for shipment creation');
 
     const { data, error } = await supabase.functions.invoke<EasyPostEdgeResponse>('create-shipment', {
-      body: { shipmentData },
-      headers: {
-        Authorization: undefined
-      }
+      body: { shipmentData }
     });
 
     if (error) {
       console.error('Edge Function error:', error);
-      throw new Error(error.message || 'Edge Function returned a non-2xx status code');
+      
+      // Handle specific error cases
+      if (error.message.includes('EasyPost API key not configured')) {
+        throw new Error('EasyPost configuration issue. Please contact support.');
+      } else if (error.message.includes('Invalid shipment data')) {
+        throw new Error('Please verify your shipping addresses and package dimensions.');
+      }
+      
+      throw new Error(error.message || 'Failed to create shipment');
     }
 
-    console.log('Shipment created via Edge Function:', data?.id);
-    console.log('SmartRates returned:', data?.smartRates?.length || 0);
-    console.log('Standard rates returned:', data?.rates?.length || 0);
+    if (!data) {
+      throw new Error('No response from shipment service');
+    }
 
+    console.log('Shipment created via Edge Function:', data.id);
+    console.log('SmartRates returned:', data.smartRates?.length || 0);
+    console.log('Standard rates returned:', data.rates?.length || 0);
+
+    // If no SmartRates but we have standard rates, log the issue
     if ((!data.smartRates || data.smartRates.length === 0) && data.rates && data.rates.length > 0) {
-      await this.tryGetSmartRatesViaEdgeFunction(data);
+      console.warn('⚠️ SmartRates not available. Possible causes:');
+      console.warn('1. SmartRates not enabled for your EasyPost account');
+      console.warn('2. Your account tier may not support SmartRates');
+      console.warn('3. Address combination not supported for SmartRates');
+      console.warn('4. Package specifications outside SmartRate coverage');
+      console.warn('Falling back to standard rates.');
     }
 
     if (!data.rates?.length && !data.smartRates?.length) {
-      console.warn('No rates were returned from EasyPost API for this shipment');
+      throw new Error('No shipping rates available. Please check your package dimensions and addresses.');
     }
 
-    // Map EasyPostEdgeResponse to ShipmentResponse by adding required properties
+    // Map EasyPostEdgeResponse to ShipmentResponse
     const shipmentResponse: ShipmentResponse = {
       ...data,
       object: data['object'] || 'shipment',
@@ -77,29 +106,8 @@ export class ShipmentService {
       selected_rate: data['selected_rate'] || null,
       rates: data.rates ?? [],
     };
+    
     return shipmentResponse;
-  }
-
-  private async tryGetSmartRatesViaEdgeFunction(data: EasyPostEdgeResponse): Promise<void> {
-    console.log('Attempting to retrieve SmartRates via dedicated endpoint...');
-
-    try {
-      const { data: smartRateResponse, error: smartRateError } = await supabase.functions.invoke<{ smartRates: any[] }>('get-smartrates', {
-        body: {
-          shipmentId: data.id,
-          accuracy: 'percentile_75'
-        }
-      });
-
-      if (!smartRateError && smartRateResponse?.smartRates?.length > 0) {
-        data.smartRates = smartRateResponse.smartRates;
-        console.log('✅ Successfully retrieved SmartRates via dedicated endpoint:', data.smartRates.length);
-      } else {
-        console.warn('SmartRates endpoint error or no SmartRates returned:', smartRateError || 'No SmartRates in response');
-      }
-    } catch (smartRateErr) {
-      console.warn('Could not retrieve SmartRates via dedicated endpoint:', smartRateErr);
-    }
   }
 
   private async createShipmentDirectly(shipmentData: ShipmentRequest): Promise<ShipmentResponse> {
@@ -120,6 +128,13 @@ export class ShipmentService {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('EasyPost API error:', errorData);
+      
+      if (response.status === 401) {
+        throw new Error('Invalid EasyPost API key. Please check your configuration.');
+      } else if (response.status === 422) {
+        throw new Error('Invalid shipment data. Please check your addresses and package dimensions.');
+      }
+      
       throw new Error(errorData.error?.message || 'Failed to create shipment');
     }
 
@@ -131,36 +146,9 @@ export class ShipmentService {
 
     if ((!shipmentResponse.smartRates || shipmentResponse.smartRates.length === 0) &&
       shipmentResponse.rates && shipmentResponse.rates.length > 0) {
-      await this.tryGetSmartRatesDirectly(shipmentResponse);
+      console.warn('⚠️ SmartRates not available - falling back to standard rates');
     }
 
     return shipmentResponse;
-  }
-
-  private async tryGetSmartRatesDirectly(shipmentResponse: any): Promise<void> {
-    console.log('No SmartRates in initial response, trying dedicated endpoint...');
-
-    try {
-      const smartRateResponse = await fetch(`${this.baseUrl}/shipments/${shipmentResponse.id}/smartrates`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (smartRateResponse.ok) {
-        const smartRateData = await smartRateResponse.json();
-        if (smartRateData.smartrates && smartRateData.smartrates.length > 0) {
-          shipmentResponse.smartRates = smartRateData.smartrates;
-          console.log('✅ Successfully retrieved SmartRates via GET:', smartRateData.smartrates.length);
-        }
-      } else {
-        const smartRateError = await smartRateResponse.json();
-        console.warn('SmartRate endpoint error:', smartRateError);
-      }
-    } catch (smartRateErr) {
-      console.warn('Error calling SmartRate GET endpoint:', smartRateErr);
-    }
   }
 }
