@@ -39,12 +39,25 @@ export const useShipment = (orderId?: string | null) => {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`, orderId ? `for order ${orderId}` : '');
       
-      // Get the current session including the access token
+      // Get the current session and validate it thoroughly
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError || !session) {
+      console.log('Session check:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        hasAccessToken: !!session?.access_token,
+        userEmail: session?.user?.email,
+        sessionError: sessionError
+      });
+      
+      if (sessionError) {
         console.error('Session error:', sessionError);
-        throw new Error('Authentication session not available. Please log in again.');
+        throw new Error(`Session error: ${sessionError.message}`);
+      }
+      
+      if (!session) {
+        console.error('No session found');
+        throw new Error('No active session found. Please log in again.');
       }
       
       if (!session.access_token) {
@@ -52,10 +65,15 @@ export const useShipment = (orderId?: string | null) => {
         throw new Error('No valid authentication token. Please log out and log back in.');
       }
       
-      console.log('Using session for user:', session.user?.email);
-      console.log('Access token available:', session.access_token ? 'YES' : 'NO');
+      if (!session.user) {
+        console.error('No user in session');
+        throw new Error('No user found in session. Please log in again.');
+      }
       
-      // Call the Edge Function with explicit token
+      console.log('Session validation passed for user:', session.user.email);
+      
+      // Call the Edge Function with explicit authorization
+      console.log('Calling purchase-label Edge Function...');
       const { data, error } = await supabase.functions.invoke('purchase-label', {
         body: { 
           shipmentId, 

@@ -25,43 +25,38 @@ serve(async (req) => {
   try {
     console.log('Processing purchase-label request...')
     
-    // Create Supabase client without forcing auth headers - let it handle automatically
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    )
-    
-    // Get the JWT token from the request
+    // Get the JWT token from the Authorization header
     const authHeader = req.headers.get('Authorization')
     console.log('Auth header present:', authHeader ? 'YES' : 'NO')
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('Invalid or missing authorization header')
       return new Response(JSON.stringify({ 
-        error: 'Invalid authorization header',
-        details: 'Please ensure you are logged in with a valid session' 
+        error: 'Missing authorization header',
+        details: 'Please ensure you are logged in' 
       }), {
         headers,
         status: 401,
       })
     }
 
-    // Extract JWT token
-    const jwt = authHeader.replace('Bearer ', '')
-    console.log('JWT token present:', jwt ? 'YES' : 'NO')
+    // Create Supabase client 
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    )
     
-    // Verify the JWT token directly
+    // Extract and verify the JWT token
+    const jwt = authHeader.replace('Bearer ', '')
+    console.log('JWT token length:', jwt.length)
+    
+    // Use getUser with the JWT token to verify authentication
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(jwt)
     
     if (authError) {
       console.error('JWT verification error:', authError)
       return new Response(JSON.stringify({ 
-        error: 'Authentication verification failed', 
+        error: 'Authentication failed', 
         details: authError.message 
       }), {
         headers,
@@ -70,10 +65,10 @@ serve(async (req) => {
     }
     
     if (!user) {
-      console.error('No user found in JWT')
+      console.error('No user found in JWT token')
       return new Response(JSON.stringify({ 
-        error: 'User not authenticated',
-        details: 'No user found in token' 
+        error: 'User not found',
+        details: 'Invalid authentication token' 
       }), {
         headers,
         status: 401,
@@ -166,9 +161,20 @@ serve(async (req) => {
       // Don't fail the label purchase if database save fails
     }
     
-    // Update shipment status in database
+    // Update shipment status in database using authenticated client
     try {
-      const { error: updateError } = await supabaseClient
+      // Create a new Supabase client with the user's JWT for database operations
+      const authenticatedClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        {
+          global: {
+            headers: { Authorization: authHeader },
+          },
+        }
+      )
+      
+      const { error: updateError } = await authenticatedClient
         .from('shipments')
         .update({
           status: 'purchased',
