@@ -2,8 +2,9 @@
 import { useAuth } from "@/context";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { DashboardCharts } from "@/components/dashboard/DashboardCharts";
-import { StatCard } from "@/components/dashboard/StatCard";
 import { ShipmentCard } from "@/components/dashboard/ShipmentCard";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -48,47 +49,9 @@ const Index = () => {
   return (
     <TmsLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome to your transportation management system
-          </p>
-        </div>
+        <DashboardHeader />
         
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Orders"
-            value="24"
-            trend={{
-              value: "+12%",
-              positive: true
-            }}
-          />
-          <StatCard
-            title="Active Shipments"
-            value="18"
-            trend={{
-              value: "+8%",
-              positive: true
-            }}
-          />
-          <StatCard
-            title="Delivered Today"
-            value="6"
-            trend={{
-              value: "+2",
-              positive: true
-            }}
-          />
-          <StatCard
-            title="Pending Pickups"
-            value="3"
-            trend={{
-              value: "-1",
-              positive: false
-            }}
-          />
-        </div>
+        <MetricsGrid />
 
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-7">
           <div className="col-span-4">
