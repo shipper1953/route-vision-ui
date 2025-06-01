@@ -109,12 +109,12 @@ serve(async (req) => {
     // Enhanced logging for SmartRate debugging
     console.log('EasyPost API Response Summary:');
     console.log('- Shipment ID:', shipmentResponse.id);
-    console.log('- SmartRates received:', shipmentResponse.smartrates ? shipmentResponse.smartrates.length : 0);
+    console.log('- SmartRates received:', shipmentResponse.smartRates ? shipmentResponse.smartRates.length : 0);
     console.log('- Standard Rates received:', shipmentResponse.rates ? shipmentResponse.rates.length : 0);
     
-    if (shipmentResponse.smartrates && shipmentResponse.smartrates.length > 0) {
+    if (shipmentResponse.smartRates && shipmentResponse.smartRates.length > 0) {
       console.log('SmartRate details:');
-      shipmentResponse.smartrates.forEach((rate, index) => {
+      shipmentResponse.smartRates.forEach((rate, index) => {
         console.log(`  ${index + 1}. ${rate.carrier} ${rate.service} - $${rate.rate} (${rate.delivery_days || 'unknown'} days, guaranteed: ${rate.delivery_date_guaranteed})`);
       });
     } else {
@@ -146,7 +146,7 @@ serve(async (req) => {
             
             // Merge SmartRate data back into shipment response
             if (smartRateData.smartrates && smartRateData.smartrates.length > 0) {
-              shipmentResponse.smartrates = smartRateData.smartrates;
+              shipmentResponse.smartRates = smartRateData.smartrates;
               console.log('✅ Successfully retrieved SmartRates via dedicated endpoint');
             }
           } else {
@@ -189,7 +189,7 @@ serve(async (req) => {
             from_address: shipmentData.from_address,
             parcel: shipmentData.parcel,
             rates: shipmentResponse.rates || [],
-            smartrates: shipmentResponse.smartrates || [],
+            smartrates: shipmentResponse.smartRates || [],
             order_id: shipmentData.reference || null,
             status: 'created'
           });

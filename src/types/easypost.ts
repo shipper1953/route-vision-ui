@@ -66,7 +66,7 @@ export interface ShipmentResponse {
   status: string;
   tracking_code?: string;
   rates: Rate[];
-  smartrates?: SmartRate[];
+  smartRates?: SmartRate[];
   selected_rate: Rate | null;
 }
 

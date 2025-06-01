@@ -33,12 +33,12 @@ export const ShippingRatesCard = ({
   
   // Debug log to see what's coming back from the API
   console.log("ShippingRatesCard received response:", shipmentResponse);
-  console.log("Available smartrates:", shipmentResponse?.smartrates?.length || 0);
+  console.log("Available smartrates:", shipmentResponse?.smartRates?.length || 0);
   console.log("Available rates:", shipmentResponse?.rates?.length || 0);
   
   // Use either smartrates or regular rates (fallback) if available
-  const availableRates = shipmentResponse?.smartrates?.length ? 
-    shipmentResponse.smartrates : 
+  const availableRates = shipmentResponse?.smartRates?.length ? 
+    shipmentResponse.smartRates : 
     (shipmentResponse?.rates?.length ? shipmentResponse.rates : []);
 
   // Alert user if no rates are available

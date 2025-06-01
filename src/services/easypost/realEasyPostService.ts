@@ -1,4 +1,3 @@
-
 import { EasyPostService } from "@/services/easypostService";
 import { Address, AddressVerificationResult, ShipmentRequest, ShipmentResponse } from "@/types/easypost";
 import { AddressService } from "./addressService";
@@ -45,6 +44,60 @@ export class RealEasyPostService implements EasyPostService {
    */
   async createShipment(shipmentData: ShipmentRequest): Promise<ShipmentResponse> {
     return this.shipmentService.createShipment(shipmentData);
+  }
+
+  /**
+   * Creates a shipment and selects the lowest-cost rate that meets the delivery deadline
+   * @param shipmentData The shipment request
+   * @param requiredDeliveryDate Latest acceptable delivery date (ISO string)
+   * @returns A promise that resolves to the created shipment with SmartRates metadata
+   */
+  async createSmartShipment(shipmentData: ShipmentRequest, requiredDeliveryDate: string): Promise<ShipmentResponse> {
+    const shipment = await this.shipmentService.createShipment(shipmentData);
+
+    if (!shipment) {
+      throw new Error("Failed to create shipment.");
+    }
+
+    console.log("Shipment created:", JSON.stringify(shipment, null, 2));
+
+    const smartRates = shipment.smartRates;
+
+    if (!smartRates || !Array.isArray(smartRates)) {
+      console.warn("SmartRates not available, falling back to standard rates.");
+      return shipment;
+    }
+
+    const cutoffDate = new Date(requiredDeliveryDate);
+
+const validRates = smartRates.filter(rate => {
+  const transit = rate.time_in_transit as { guaranteed_delivery_date?: string } | null;
+
+  if (!transit?.guaranteed_delivery_date) return false;
+
+  try {
+    const guaranteeDate = new Date(transit.guaranteed_delivery_date);
+    return guaranteeDate <= cutoffDate;
+  } catch {
+    return false;
+  }
+});
+
+    if (validRates.length === 0) {
+      console.warn("No SmartRates met delivery deadline. Returning shipment with all SmartRates for manual review.");
+      shipment.smartRates = smartRates;
+      return shipment;
+    }
+
+    const best = validRates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+
+    // Optionally, if you want to attach the best rate, you need to extend the ShipmentResponse type.
+    // (Uncomment the next line if you have extended the interface accordingly)
+    // (shipment as any).bestSmartRate = best;
+
+    shipment.smartRates = smartRates;
+
+    return shipment;
   }
   
   /**
