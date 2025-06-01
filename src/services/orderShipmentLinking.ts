@@ -29,8 +29,14 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
     if (shipment) {
       console.log(`Found shipment in database with id: ${shipment.id}`);
       
-      // Convert shipment.id to number since it comes as bigint (string) from Supabase
-      const shipmentIdNumber = parseInt(String(shipment.id), 10);
+      // Convert shipment.id to number since it comes as bigint from Supabase
+      // Ensure we handle the conversion properly and validate it's a valid number
+      const shipmentIdNumber = Number(shipment.id);
+      if (isNaN(shipmentIdNumber)) {
+        console.error("Invalid shipment ID from database:", shipment.id);
+        toast.error("Invalid shipment ID");
+        throw new Error("Invalid shipment ID");
+      }
       
       // Try to update order using multiple strategies
       let updateSuccess = false;
