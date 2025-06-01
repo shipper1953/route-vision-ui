@@ -40,74 +40,64 @@ const CreateShipment = () => {
     setLabelData(result);
     setShowLabelDialog(true);
 
-    // Insert shipment to Supabase with correct data types matching the schema
+    // Insert shipment to Supabase - the Edge Function should handle this, but let's verify
     if (result && result.id) {
-      console.log("Preparing to save shipment to database with easypost_id:", result.id);
+      console.log("Verifying shipment was saved to database with easypost_id:", result.id);
       
-      const shipmentData = {
-        easypost_id: result.id,
-        tracking_number: result.tracking_code,
-        carrier: result.selected_rate?.carrier || 'Unknown',
-        service: result.selected_rate?.service || 'Standard',
-        status: "purchased",
-        label_url: result.postage_label?.label_url,
-        weight: String(parseFloat(result.parcel?.weight) || 0),
-        cost: parseFloat(result.selected_rate?.rate) || 0,
-        package_dimensions: JSON.stringify({
-          length: result.parcel?.length || 0,
-          width: result.parcel?.width || 0,
-          height: result.parcel?.height || 0
-        }),
-        package_weights: JSON.stringify({
-          weight: result.parcel?.weight || 0,
-          weight_unit: result.parcel?.weight_unit || 'oz'
-        }),
-        // Convert orderId to number if it's a numeric string, otherwise null
-        order_id: orderId && !isNaN(Number(orderId)) ? Number(orderId) : null,
-        tracking_url: result.tracker?.public_url,
-        created_at: new Date().toISOString(),
-      };
-
-      console.log("Shipment data to be saved:", shipmentData);
-
-      // Check if shipment already exists first
-      const { data: existingShipment } = await supabase
+      // Check if shipment exists in database
+      const { data: existingShipment, error: checkError } = await supabase
         .from('shipments')
-        .select('id')
+        .select('*')
         .eq('easypost_id', result.id)
         .maybeSingle();
 
-      console.log("Existing shipment check result:", existingShipment);
-
-      if (existingShipment) {
-        // Update existing shipment
-        console.log("Updating existing shipment with id:", existingShipment.id);
-        const { error } = await supabase
-          .from('shipments')
-          .update(shipmentData)
-          .eq('easypost_id', result.id);
-
-        if (error) {
-          console.error("Failed to update shipment:", error);
-          toast.error("Failed to update shipment: " + error.message);
-        } else {
-          console.log("Successfully updated shipment in database");
-          toast.success("Shipment updated in database!");
-        }
+      if (checkError) {
+        console.error("Error checking shipment in database:", checkError);
+        toast.error("Error verifying shipment in database");
+      } else if (existingShipment) {
+        console.log("✅ Shipment confirmed in database:", existingShipment);
+        toast.success("Shipment successfully saved to database!");
       } else {
-        // Insert new shipment
-        console.log("Inserting new shipment");
-        const { error, data } = await supabase
+        console.warn("⚠️ Shipment not found in database, attempting manual save...");
+        
+        // Manual fallback save if Edge Function didn't save it
+        const shipmentData = {
+          easypost_id: result.id,
+          tracking_number: result.tracking_code,
+          carrier: result.selected_rate?.carrier || 'Unknown',
+          service: result.selected_rate?.service || 'Standard',
+          status: "purchased",
+          label_url: result.postage_label?.label_url,
+          weight: String(parseFloat(result.parcel?.weight) || 0),
+          cost: parseFloat(result.selected_rate?.rate) || 0,
+          package_dimensions: JSON.stringify({
+            length: result.parcel?.length || 0,
+            width: result.parcel?.width || 0,
+            height: result.parcel?.height || 0
+          }),
+          package_weights: JSON.stringify({
+            weight: result.parcel?.weight || 0,
+            weight_unit: result.parcel?.weight_unit || 'oz'
+          }),
+          // Convert orderId to number if it's a numeric string, otherwise null
+          order_id: orderId && !isNaN(Number(orderId)) ? Number(orderId) : null,
+          tracking_url: result.tracker?.public_url,
+          created_at: new Date().toISOString(),
+        };
+
+        console.log("Manual shipment data to be saved:", shipmentData);
+
+        const { error: insertError, data: insertData } = await supabase
           .from('shipments')
           .insert(shipmentData)
           .select();
 
-        if (error) {
-          console.error("Failed to save shipment:", error);
-          toast.error("Failed to save shipment: " + error.message);
+        if (insertError) {
+          console.error("Failed to manually save shipment:", insertError);
+          toast.error("Failed to save shipment: " + insertError.message);
         } else {
-          console.log("Successfully inserted shipment into database:", data);
-          toast.success("Shipment saved to database!");
+          console.log("✅ Successfully manually saved shipment to database:", insertData);
+          toast.success("Shipment manually saved to database!");
         }
       }
     } else {
