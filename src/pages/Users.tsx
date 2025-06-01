@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { 
@@ -63,10 +64,8 @@ const UserRole = ({ role }: { role: string }) => {
     switch (role) {
       case 'admin':
         return { label: 'Admin', variant: 'default' };
-      case 'manager':
-        return { label: 'Manager', variant: 'secondary' };
-      case 'staff':
-        return { label: 'Staff', variant: 'outline' };
+      case 'user':
+        return { label: 'User', variant: 'secondary' };
       default:
         return { label: role, variant: 'outline' };
     }

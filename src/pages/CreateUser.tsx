@@ -31,15 +31,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { Users, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const userSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
-  role: z.string({
+  role: z.enum(['admin', 'user'], {
     required_error: "Please select a role",
   }),
   sendInvitation: z.boolean().default(true),
@@ -57,7 +58,7 @@ const CreateUser = () => {
       firstName: "",
       lastName: "",
       email: "",
-      role: "",
+      role: "user",
       sendInvitation: true,
     },
   });
@@ -66,11 +67,35 @@ const CreateUser = () => {
     try {
       setIsSubmitting(true);
       
-      // This would typically be an API call to create the user
-      console.log("Creating user:", data);
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Create user account using Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: data.email,
+        password: Math.random().toString(36).slice(-8), // Temporary password
+        email_confirm: !data.sendInvitation, // Auto-confirm if not sending invitation
+        user_metadata: {
+          first_name: data.firstName,
+          last_name: data.lastName,
+          name: `${data.firstName} ${data.lastName}`,
+        },
+      });
+
+      if (authError) {
+        toast.error("Failed to create user: " + authError.message);
+        return;
+      }
+
+      // Update the user's role in our users table
+      if (authData.user) {
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ role: data.role })
+          .eq('id', authData.user.id);
+
+        if (updateError) {
+          console.warn("Failed to update user role:", updateError);
+          // Continue anyway as the user was created
+        }
+      }
       
       toast.success("User created successfully!");
       navigate("/users");
@@ -165,8 +190,7 @@ const CreateUser = () => {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="staff">Staff</SelectItem>
+                        <SelectItem value="user">User</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
