@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input';
 import { ShipTornadoLogo } from '@/components/logo/ShipTornadoLogo';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
+import { createDefaultAdminUser } from '@/utils/setupDefaultUser';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [defaultCredentials, setDefaultCredentials] = useState<{email: string, password: string} | null>(null);
   const { login, error, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -22,6 +24,24 @@ const Login = () => {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
+
+  // Set up default admin user on component mount
+  useEffect(() => {
+    const setupAdmin = async () => {
+      try {
+        const result = await createDefaultAdminUser();
+        setDefaultCredentials({ email: result.email, password: result.password });
+        if (!result.exists) {
+          toast.success("Default admin user created! Use the credentials shown below to login.");
+        }
+      } catch (error) {
+        console.error("Failed to setup default admin:", error);
+        // Don't show error to user as this is a fallback mechanism
+      }
+    };
+
+    setupAdmin();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +60,13 @@ const Login = () => {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  const useDefaultCredentials = () => {
+    if (defaultCredentials) {
+      setEmail(defaultCredentials.email);
+      setPassword(defaultCredentials.password);
+    }
   };
 
   return (
@@ -63,6 +90,28 @@ const Login = () => {
             <ShipTornadoLogo size={48} />
             <h2 className="text-2xl font-bold">Ship Tornado</h2>
           </div>
+          
+          {/* Default credentials info */}
+          {defaultCredentials && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <h3 className="font-medium text-blue-900 mb-2">Default Admin Credentials</h3>
+              <p className="text-sm text-blue-700 mb-2">
+                Email: <code className="bg-blue-100 px-1 rounded">{defaultCredentials.email}</code>
+              </p>
+              <p className="text-sm text-blue-700 mb-3">
+                Password: <code className="bg-blue-100 px-1 rounded">{defaultCredentials.password}</code>
+              </p>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                onClick={useDefaultCredentials}
+                className="w-full"
+              >
+                Use Default Credentials
+              </Button>
+            </div>
+          )}
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
