@@ -1,144 +1,19 @@
 
-import { useLocation, NavLink } from "react-router-dom";
 import { 
   Home, 
   Package, 
   Truck, 
   Users, 
   Settings, 
-  Plus,
-  LogOut,
   Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 import { useSidebar } from "@/context/SidebarContext";
-import { useAuth } from "@/context/AuthContext";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-interface NavItemProps {
-  to: string;
-  icon: React.ElementType;
-  label: string;
-  isCollapsed: boolean;
-  adminOnly?: boolean;
-}
-
-const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavItemProps) => {
-  const location = useLocation();
-  const { setIsCollapsed } = useSidebar();
-  const { isAdmin } = useAuth();
-  const isActive = location.pathname === to;
-  
-  if (adminOnly && !isAdmin) return null;
-
-  const handleClick = () => {
-    // Collapse sidebar when option is selected
-    setIsCollapsed(true);
-  };
-  
-  return (
-    <NavLink 
-      to={to} 
-      onClick={handleClick}
-      className={({ isActive }) => 
-        cn(
-          "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
-          isCollapsed ? "justify-center" : "",
-          isActive 
-            ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-            : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
-        )
-      }
-    >
-      <Icon size={20} />
-      {!isCollapsed && <span>{label}</span>}
-    </NavLink>
-  );
-};
-
-const LogoutButton = ({ isCollapsed }: { isCollapsed: boolean }) => {
-  const { logout, loading } = useAuth();
-  const { setIsCollapsed } = useSidebar();
-
-  const handleLogout = () => {
-    setIsCollapsed(true);
-    logout();
-  };
-
-  return (
-    <button 
-      onClick={handleLogout}
-      disabled={loading}
-      className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full",
-        isCollapsed ? "justify-center" : "",
-        "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground",
-        loading && "opacity-50 cursor-not-allowed"
-      )}
-    >
-      <LogOut size={20} />
-      {!isCollapsed && <span>Logout</span>}
-    </button>
-  );
-};
-
-const CreateMenu = ({ isCollapsed }: { isCollapsed: boolean }) => {
-  const { setIsCollapsed } = useSidebar();
-  const { isAdmin } = useAuth();
-
-  const handleMenuItemClick = () => {
-    setIsCollapsed(true);
-  };
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button 
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full",
-            isCollapsed ? "justify-center" : "",
-            "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
-          )}
-        >
-          <Plus size={20} />
-          {!isCollapsed && <span>Create</span>}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent 
-        side={isCollapsed ? "right" : "bottom"} 
-        align={isCollapsed ? "start" : "center"}
-        className="bg-popover border border-border w-48"
-      >
-        <DropdownMenuItem asChild>
-          <NavLink to="/orders/new" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
-            <Package size={16} />
-            <span>Create Order</span>
-          </NavLink>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <NavLink to="/shipments/new" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
-            <Truck size={16} />
-            <span>Create Shipment</span>
-          </NavLink>
-        </DropdownMenuItem>
-        {isAdmin && (
-          <DropdownMenuItem asChild>
-            <NavLink to="/users/new" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
-              <Users size={16} />
-              <span>Create User</span>
-            </NavLink>
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-};
+import { NavItem } from "./sidebar/NavItem";
+import { LogoutButton } from "./sidebar/LogoutButton";
+import { CreateMenu } from "./sidebar/CreateMenu";
+import { UserProfile } from "./sidebar/UserProfile";
 
 export function TmsSidebar() {
   const { isCollapsed, toggleSidebar, sidebarRef } = useSidebar();
@@ -186,19 +61,7 @@ export function TmsSidebar() {
         <LogoutButton isCollapsed={isCollapsed} />
       </div>
       
-      {!isCollapsed && (
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-sidebar-accent flex items-center justify-center text-sidebar-accent-foreground font-medium">
-              UA
-            </div>
-            <div>
-              <div className="text-sidebar-foreground font-medium">User Name</div>
-              <div className="text-sidebar-foreground/70 text-sm">Administrator</div>
-            </div>
-          </div>
-        </div>
-      )}
+      <UserProfile isCollapsed={isCollapsed} />
     </div>
   );
 }
