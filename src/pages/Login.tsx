@@ -16,7 +16,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [defaultCredentials, setDefaultCredentials] = useState<{email: string, password: string} | null>(null);
   const [connectionError, setConnectionError] = useState(false);
-  const [setupFailed, setSetupFailed] = useState(false);
+  const [needsManualSetup, setNeedsManualSetup] = useState(false);
   const { login, error, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -27,29 +27,29 @@ const Login = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Set up default admin user on component mount
+  // Check user status without attempting automatic creation
   useEffect(() => {
-    const setupAdmin = async () => {
+    const checkUserStatus = async () => {
       try {
         const result = await createDefaultAdminUser();
         setDefaultCredentials({ email: result.email, password: result.password });
         setConnectionError(false);
-        setSetupFailed(false);
+        
         if (!result.exists) {
-          toast.success("Default admin user created! Use the credentials shown below to login.");
+          setNeedsManualSetup(true);
+          console.log("Manual user setup required");
         }
       } catch (error) {
-        console.error("Failed to setup default admin:", error);
-        setSetupFailed(true);
-        // Provide demo credentials but indicate they need to be created manually
+        console.error("Failed to check user status:", error);
+        setNeedsManualSetup(true);
         setDefaultCredentials({ 
-          email: "admin@shiptornado.app", 
+          email: "admin@test.com", 
           password: "ShipTornado123!" 
         });
       }
     };
 
-    setupAdmin();
+    checkUserStatus();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,7 +102,7 @@ const Login = () => {
         <div className="w-full max-w-md">
           {/* Only show logo on mobile */}
           <div className="flex justify-center mb-8 md:hidden items-center gap-2">
-            <ShipTornadoLogo size={48} />
+            <ShipTornadoLogo size={48} className="text-tms-navy" />
             <h2 className="text-2xl font-bold">Ship Tornado</h2>
           </div>
           
@@ -116,40 +116,38 @@ const Login = () => {
             </div>
           )}
           
-          {/* Setup failed warning */}
-          {setupFailed && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-              <h3 className="font-medium text-red-900 mb-2">User Setup Required</h3>
-              <p className="text-sm text-red-700 mb-2">
-                Unable to automatically create admin user. Please create a user manually using the credentials below:
-              </p>
-              <p className="text-sm text-red-700">
-                You can create users through the "Create User" page after logging in with any existing account, or contact your administrator.
-              </p>
-            </div>
-          )}
-          
-          {/* Default credentials info */}
-          {defaultCredentials && (
+          {/* Manual setup required */}
+          {needsManualSetup && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-              <h3 className="font-medium text-blue-900 mb-2">
-                {setupFailed ? "Suggested Admin Credentials" : "Default Admin Credentials"}
-              </h3>
-              <p className="text-sm text-blue-700 mb-2">
-                Email: <code className="bg-blue-100 px-1 rounded">{defaultCredentials.email}</code>
-              </p>
+              <h3 className="font-medium text-blue-900 mb-2">User Setup Required</h3>
               <p className="text-sm text-blue-700 mb-3">
-                Password: <code className="bg-blue-100 px-1 rounded">{defaultCredentials.password}</code>
+                To get started, you'll need to create your first user account. You can:
               </p>
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm"
-                onClick={useDefaultCredentials}
-                className="w-full"
-              >
-                Use {setupFailed ? "Suggested" : "Default"} Credentials
-              </Button>
+              <ul className="text-sm text-blue-700 mb-3 list-disc list-inside space-y-1">
+                <li>Use the "Create User" page after logging in with any existing account</li>
+                <li>Create an account directly in your Supabase dashboard</li>
+                <li>Contact your system administrator</li>
+              </ul>
+              {defaultCredentials && (
+                <div className="mt-3">
+                  <p className="text-sm text-blue-700 mb-2">
+                    <strong>Suggested test credentials:</strong>
+                  </p>
+                  <p className="text-sm text-blue-700">
+                    Email: <code className="bg-blue-100 px-1 rounded">{defaultCredentials.email}</code><br/>
+                    Password: <code className="bg-blue-100 px-1 rounded">{defaultCredentials.password}</code>
+                  </p>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={useDefaultCredentials}
+                    className="w-full mt-2"
+                  >
+                    Use Suggested Credentials
+                  </Button>
+                </div>
+              )}
             </div>
           )}
           

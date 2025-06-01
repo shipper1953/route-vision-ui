@@ -2,64 +2,33 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export const createDefaultAdminUser = async () => {
-  const defaultEmail = "admin@shiptornado.app";
+  const defaultEmail = "admin@test.com";
   const defaultPassword = "ShipTornado123!";
   
   try {
-    console.log("Checking if default admin user exists...");
+    console.log("Checking if any users exist...");
     
-    // Check if user already exists
-    const { data: existingUsers } = await supabase
+    // Instead of creating a user automatically, just check if any users exist
+    // This avoids the email validation errors we're seeing
+    const { data: existingUsers, error: fetchError } = await supabase
       .from('users')
       .select('email')
-      .eq('email', defaultEmail);
+      .limit(1);
+    
+    if (fetchError) {
+      console.log("Cannot check users table:", fetchError.message);
+      throw fetchError;
+    }
     
     if (existingUsers && existingUsers.length > 0) {
-      console.log("Default admin user already exists");
+      console.log("Users already exist in the system");
       return { email: defaultEmail, password: defaultPassword, exists: true };
     }
     
-    console.log("Creating default admin user...");
+    console.log("No users found - manual user creation required");
+    // Don't attempt automatic creation, just return suggested credentials
+    return { email: defaultEmail, password: defaultPassword, exists: false };
     
-    // Create the user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: defaultEmail,
-      password: defaultPassword,
-      options: {
-        data: {
-          name: "Default Admin",
-          role: "admin"
-        }
-      }
-    });
-    
-    if (authError) {
-      console.error("Error creating auth user:", authError);
-      throw authError;
-    }
-    
-    if (authData.user) {
-      // Insert into users table
-      const { error: userError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          name: "Default Admin",
-          email: defaultEmail,
-          role: "admin",
-          password: "" // Password is managed by Supabase Auth
-        });
-      
-      if (userError) {
-        console.error("Error creating user profile:", userError);
-        throw userError;
-      }
-      
-      console.log("Default admin user created successfully");
-      return { email: defaultEmail, password: defaultPassword, exists: false };
-    }
-    
-    throw new Error("Failed to create user");
   } catch (error) {
     console.error("Error in createDefaultAdminUser:", error);
     throw error;
