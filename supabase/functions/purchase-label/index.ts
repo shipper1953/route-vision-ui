@@ -86,7 +86,7 @@ serve(async (req) => {
       } else {
         const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
       
-        // Prepare shipment data with correct column names, including order_id
+        // Prepare shipment data with correct column names
         const shipmentData = {
           easypost_id: responseData.id,
           tracking_number: responseData.tracking_code,
@@ -96,7 +96,7 @@ serve(async (req) => {
           label_url: responseData.postage_label?.label_url,
           tracking_url: responseData.tracker?.public_url,
           cost: parseFloat(responseData.selected_rate?.rate) || 0,
-          order_id: orderId || null, // Link to order if provided
+          weight: String(parseFloat(responseData.parcel?.weight) || 0),
           package_dimensions: JSON.stringify({
             length: responseData.parcel?.length || 0,
             width: responseData.parcel?.width || 0,
@@ -105,7 +105,8 @@ serve(async (req) => {
           package_weights: JSON.stringify({
             weight: responseData.parcel?.weight || 0,
             weight_unit: responseData.parcel?.weight_unit || 'oz'
-          })
+          }),
+          created_at: new Date().toISOString(),
         };
 
         console.log("Saving shipment to database:", shipmentData);
@@ -121,6 +122,8 @@ serve(async (req) => {
           console.error("Error checking existing shipment:", fetchError);
         }
         
+        let finalShipmentId = null;
+        
         if (existingShipment) {
           // Update existing shipment
           const { error: updateError } = await supabaseClient
@@ -132,45 +135,87 @@ serve(async (req) => {
             console.error('Error updating existing shipment:', updateError);
           } else {
             console.log('Existing shipment updated successfully');
+            finalShipmentId = existingShipment.id;
           }
         } else {
           // Insert new shipment
-          const { error: insertError } = await supabaseClient
+          const { data: newShipment, error: insertError } = await supabaseClient
             .from('shipments')
-            .insert(shipmentData);
+            .insert(shipmentData)
+            .select('id')
+            .single();
             
           if (insertError) {
             console.error('Error inserting new shipment:', insertError);
           } else {
             console.log('New shipment inserted successfully');
+            finalShipmentId = newShipment?.id;
           }
         }
 
-        // If we have an order_id, also update the order to link to this shipment
-        if (orderId) {
-          console.log(`Linking order ${orderId} to shipment`);
+        // If we have an order_id and successfully saved the shipment, link them
+        if (orderId && finalShipmentId) {
+          console.log(`Linking order ${orderId} to shipment ${finalShipmentId}`);
           
-          // Get the shipment ID from database
-          const { data: shipment, error: shipmentError } = await supabaseClient
-            .from('shipments')
-            .select('id')
-            .eq('easypost_id', responseData.id)
-            .maybeSingle();
+          // Try multiple strategies to find and update the order
+          let orderUpdateSuccess = false;
           
-          if (shipment && !shipmentError) {
-            const { error: orderUpdateError } = await supabaseClient
+          // Strategy 1: Try with the orderId as-is if it's a string ID
+          if (isNaN(Number(orderId))) {
+            const { error: orderUpdateError1 } = await supabaseClient
               .from('orders')
               .update({ 
-                shipment_id: shipment.id,
+                shipment_id: finalShipmentId,
                 status: 'shipped'
               })
-              .eq('order_id', orderId.startsWith('ORD-') ? orderId : `ORD-${orderId}`);
+              .eq('order_id', orderId);
             
-            if (orderUpdateError) {
-              console.error('Error updating order:', orderUpdateError);
+            if (!orderUpdateError1) {
+              console.log(`Successfully linked order ${orderId} to shipment via string order_id`);
+              orderUpdateSuccess = true;
             } else {
-              console.log(`Successfully linked order ${orderId} to shipment and updated status`);
+              console.log('Failed to update via string order_id:', orderUpdateError1);
             }
+          }
+          
+          // Strategy 2: Try with numeric order_id if not successful yet
+          if (!orderUpdateSuccess && !isNaN(Number(orderId))) {
+            const { error: orderUpdateError2 } = await supabaseClient
+              .from('orders')
+              .update({ 
+                shipment_id: finalShipmentId,
+                status: 'shipped'
+              })
+              .eq('order_id', parseInt(orderId));
+            
+            if (!orderUpdateError2) {
+              console.log(`Successfully linked order ${orderId} to shipment via numeric order_id`);
+              orderUpdateSuccess = true;
+            } else {
+              console.log('Failed to update via numeric order_id:', orderUpdateError2);
+            }
+          }
+          
+          // Strategy 3: Try with id field if numeric
+          if (!orderUpdateSuccess && !isNaN(Number(orderId))) {
+            const { error: orderUpdateError3 } = await supabaseClient
+              .from('orders')
+              .update({ 
+                shipment_id: finalShipmentId,
+                status: 'shipped'
+              })
+              .eq('id', parseInt(orderId));
+            
+            if (!orderUpdateError3) {
+              console.log(`Successfully linked order ${orderId} to shipment via id field`);
+              orderUpdateSuccess = true;
+            } else {
+              console.log('Failed to update via id field:', orderUpdateError3);
+            }
+          }
+          
+          if (!orderUpdateSuccess) {
+            console.error(`Failed to link order ${orderId} to shipment using all strategies`);
           }
         }
       }
