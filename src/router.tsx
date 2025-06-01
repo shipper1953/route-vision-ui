@@ -18,12 +18,8 @@ import React from "react";
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
   
-  // For now, let's bypass authentication to see if pages load
-  // if (loading) return <div>Loading...</div>;
-  // return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
-  
-  // Temporarily bypass authentication
-  return <>{children}</>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 export const router = createBrowserRouter([

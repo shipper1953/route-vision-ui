@@ -1,7 +1,6 @@
+
 import { useLocation, NavLink } from "react-router-dom";
 import { 
-  ChevronLeft, 
-  ChevronRight,
   Home, 
   Package, 
   Truck, 
@@ -10,7 +9,6 @@ import {
   Plus 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 import { useSidebar } from "@/context/SidebarContext";
 import {
@@ -39,6 +37,7 @@ const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavI
   if (adminOnly && !isAdmin) return null;
 
   const handleClick = () => {
+    // Collapse sidebar when option is selected
     setIsCollapsed(true);
   };
   
@@ -114,11 +113,19 @@ const CreateMenu = ({ isCollapsed }: { isCollapsed: boolean }) => {
 export function TmsSidebar() {
   const { isCollapsed, toggleSidebar, sidebarRef } = useSidebar();
 
+  // Handle click on open space when collapsed to expand
+  const handleSidebarClick = (e: React.MouseEvent) => {
+    if (isCollapsed && e.target === e.currentTarget) {
+      toggleSidebar();
+    }
+  };
+
   return (
     <div 
       ref={sidebarRef}
+      onClick={handleSidebarClick}
       className={cn(
-        "h-screen flex flex-col bg-sidebar fixed left-0 top-0 z-40 transition-all duration-300",
+        "h-screen flex flex-col bg-sidebar fixed left-0 top-0 z-40 transition-all duration-300 cursor-pointer",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
@@ -132,16 +139,6 @@ export function TmsSidebar() {
           <div className="w-full flex justify-center">
             <ShipTornadoLogo className="text-white" size={28} spin={false} />
           </div>
-        )}
-        {!isCollapsed && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleSidebar}
-            className="text-sidebar-foreground hover:bg-sidebar-accent ml-auto"
-          >
-            <ChevronLeft size={20} />
-          </Button>
         )}
       </div>
 
@@ -165,19 +162,6 @@ export function TmsSidebar() {
               <div className="text-sidebar-foreground/70 text-sm">Administrator</div>
             </div>
           </div>
-        </div>
-      )}
-      
-      {isCollapsed && (
-        <div className="p-2 pb-4 flex justify-center">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleSidebar}
-            className="text-sidebar-foreground hover:bg-sidebar-accent"
-          >
-            <ChevronRight size={20} />
-          </Button>
         </div>
       )}
     </div>

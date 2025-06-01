@@ -1,6 +1,8 @@
+
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 
 interface SidebarContextType {
   isCollapsed: boolean;
@@ -12,33 +14,14 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // Start collapsed
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const toggleSidebar = () => {
     setIsCollapsed(prev => !prev);
   };
 
-  // Auto-collapse after 15 seconds
-  useEffect(() => {
-    if (!isCollapsed) {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        setIsCollapsed(true);
-      }, 15000);
-    }
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-  }, [isCollapsed]);
-
-  // Handle outside clicks
+  // Handle outside clicks to collapse sidebar
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -49,9 +32,11 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
         setIsCollapsed(true);
       }
     };
+
     if (!isCollapsed) {
       document.addEventListener('mousedown', handleClickOutside);
     }
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -83,10 +68,11 @@ function SidebarWithLogout({
         <Button
           onClick={logout}
           disabled={loading}
-          className="w-full bg-tms-navy hover:bg-tms-navy/90"
-          variant="outline"
+          className="w-full bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+          variant="destructive"
         >
-          Logout
+          <LogOut size={16} />
+          {!loading && <span>Logout</span>}
         </Button>
       </div>
     </div>

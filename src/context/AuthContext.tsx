@@ -18,10 +18,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     console.log('AuthProvider initializing...');
-    // For now, let's set authentication to true to bypass auth issues
-    setIsAuthenticated(true);
+    // Check for existing authentication state
+    const authState = localStorage.getItem('isAuthenticated');
+    if (authState === 'true') {
+      setIsAuthenticated(true);
+    }
     setLoading(false);
-    console.log('AuthProvider initialized - authenticated:', true);
+    console.log('AuthProvider initialized - authenticated:', authState === 'true');
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -30,8 +33,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // Mock login for now
-      setIsAuthenticated(true);
+      // Simple auth check for demo
+      if (email === 'admin@example.com' && password === 'password') {
+        setIsAuthenticated(true);
+        localStorage.setItem('isAuthenticated', 'true');
+      } else if (email === 'user@example.com' && password === 'password') {
+        setIsAuthenticated(true);
+        localStorage.setItem('isAuthenticated', 'true');
+      } else {
+        throw new Error('Invalid email or password');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -42,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     console.log('Logout');
     setIsAuthenticated(false);
+    localStorage.removeItem('isAuthenticated');
     setError(null);
   };
 
