@@ -61,14 +61,13 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
       if (!updateSuccess && !isNaN(Number(orderIdStr))) {
         console.log("Attempting to update order with numeric order_id:", orderIdStr);
         
-        const orderIdNumeric = parseInt(orderIdStr, 10);
         const { error: numericError } = await supabase
           .from('orders')
           .update({ 
             shipment_id: shipmentIdNumber,
             status: 'shipped'
           })
-          .eq('order_id', orderIdNumeric);
+          .eq('order_id', orderIdStr);
         
         if (!numericError) {
           console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderIdStr} via numeric order_id`);

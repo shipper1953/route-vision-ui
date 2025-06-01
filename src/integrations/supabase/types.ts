@@ -19,7 +19,7 @@ export type Database = {
           id: number
           items: Json
           order_date: string | null
-          order_id: number
+          order_id: string
           qboid_dimensions: Json | null
           required_delivery_date: string | null
           shipment_id: number | null
@@ -34,17 +34,17 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
-          id?: never
-          items: Json
+          id?: number
+          items?: Json
           order_date?: string | null
-          order_id?: number
+          order_id: string
           qboid_dimensions?: Json | null
           required_delivery_date?: string | null
           shipment_id?: number | null
           shipping_address?: Json | null
           status?: string | null
           user_id?: string | null
-          value: number
+          value?: number
         }
         Update: {
           created_at?: string | null
@@ -52,10 +52,10 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
-          id?: never
+          id?: number
           items?: Json
           order_date?: string | null
-          order_id?: number
+          order_id?: string
           qboid_dimensions?: Json | null
           required_delivery_date?: string | null
           shipment_id?: number | null
@@ -70,13 +70,6 @@ export type Database = {
             columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "shipments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -127,7 +120,6 @@ export type Database = {
           cost: number | null
           created_at: string | null
           easypost_id: string | null
-          easypost_shipment_id: string | null
           estimated_delivery_date: string | null
           id: number
           label_url: string | null
@@ -148,7 +140,6 @@ export type Database = {
           cost?: number | null
           created_at?: string | null
           easypost_id?: string | null
-          easypost_shipment_id?: string | null
           estimated_delivery_date?: string | null
           id?: number
           label_url?: string | null
@@ -157,7 +148,7 @@ export type Database = {
           rates?: Json | null
           service: string
           smartrates?: Json | null
-          status: string
+          status?: string
           tracking_number?: string | null
           tracking_url?: string | null
           user_id?: string | null
@@ -169,7 +160,6 @@ export type Database = {
           cost?: number | null
           created_at?: string | null
           easypost_id?: string | null
-          easypost_shipment_id?: string | null
           estimated_delivery_date?: string | null
           id?: number
           label_url?: string | null
@@ -184,22 +174,7 @@ export type Database = {
           user_id?: string | null
           weight?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "shipments_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shipments_user_id_fkey1"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       shipping_rates: {
         Row: {
@@ -218,7 +193,7 @@ export type Database = {
           carrier: string
           delivery_time?: string | null
           dim_limit?: Json | null
-          id?: never
+          id?: number
           service: string
           shipment_id?: number | null
           user_id?: string | null
@@ -229,7 +204,7 @@ export type Database = {
           carrier?: string
           delivery_time?: string | null
           dim_limit?: Json | null
-          id?: never
+          id?: number
           service?: string
           shipment_id?: number | null
           user_id?: string | null
@@ -241,13 +216,6 @@ export type Database = {
             columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "shipments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shipping_rates_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]

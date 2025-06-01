@@ -36,10 +36,10 @@ export const useQboidData = () => {
         
         if (ordersData) {
           const orders = JSON.parse(ordersData);
-          order = orders.find((o: any) => o.id === dimensions.orderId);
+          order = orders.find((o: any) => String(o.id) === String(dimensions.orderId));
         }
         
-        // If not found in localStorage, try Supabase using order_id_link
+        // If not found in localStorage, try Supabase using order_id
         if (!order) {
           const { data: supabaseOrder } = await supabase
             .from('orders')
@@ -76,7 +76,7 @@ export const useQboidData = () => {
           }
           
           // Set order ID in form for reference
-          form.setValue('orderId', dimensions.orderId);
+          form.setValue('orderId', String(dimensions.orderId));
           
           toast.success(`Order ${dimensions.orderId} details loaded from Qboid scan`);
         } else {

@@ -31,7 +31,7 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
         shipment_id: finalShipmentId,
         status: 'shipped'
       })
-      .eq('order_id', Number(orderId));
+      .eq('order_id', orderId);
     
     if (!orderUpdateError2) {
       console.log(`Successfully linked order ${orderId} to shipment via numeric order_id`);
@@ -43,13 +43,14 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
   
   // Strategy 3: Try with id field if numeric
   if (!orderUpdateSuccess && !isNaN(Number(orderId))) {
+    const orderIdNumeric = parseInt(orderId, 10);
     const { error: orderUpdateError3 } = await supabaseClient
       .from('orders')
       .update({ 
         shipment_id: finalShipmentId,
         status: 'shipped'
       })
-      .eq('id', Number(orderId));
+      .eq('id', orderIdNumeric);
     
     if (!orderUpdateError3) {
       console.log(`Successfully linked order ${orderId} to shipment via id field`);
