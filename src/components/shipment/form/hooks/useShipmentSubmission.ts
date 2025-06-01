@@ -42,7 +42,7 @@ export const useShipmentSubmission = ({
       // Store the shipment ID in the form context
       form.setValue("shipmentId", response.id);
       
-      if (!response.rates?.length && !response.smartrates?.length) {
+      if (!response.rates?.length && !response.smartRates?.length) {
         toast.error("No shipping rates available. Please check your package dimensions and try again.");
         return;
       }

@@ -41,15 +41,15 @@ const CreateOrder = () => {
 
   const onSubmit = async (values: OrderFormValues) => {
     setIsSubmitting(true);
-    // Prepare order data for Supabase
+    // Prepare order data for Supabase with correct types
     const orderData = {
       customer_name: values.customerName,
       customer_company: values.customerCompany,
       customer_email: values.customerEmail,
       customer_phone: values.customerPhone,
-      required_delivery_date: values.requiredDeliveryDate,
+      required_delivery_date: values.requiredDeliveryDate ? values.requiredDeliveryDate.toISOString().split('T')[0] : null,
       items: values.items,
-      value: values.value,
+      value: parseFloat(values.value) || 0,
       shipping_address: {
         street1: values.street1,
         street2: values.street2,
@@ -62,7 +62,7 @@ const CreateOrder = () => {
       created_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from("orders").insert([orderData]);
+    const { error } = await supabase.from("orders").insert(orderData);
     if (error) {
       toast.error("Failed to create order: " + error.message);
     } else {

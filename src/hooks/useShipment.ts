@@ -14,9 +14,9 @@ export const useShipment = (orderId?: string | null) => {
     console.log("Shipment created:", response);
     setShipmentResponse(response);
     
-    // Set recommended rate if smartrates are available
-    if (response.smartrates && response.smartrates.length > 0) {
-      const recommended = response.smartrates[0];
+    // Set recommended rate if smartRates are available
+    if (response.smartRates && response.smartRates.length > 0) {
+      const recommended = response.smartRates[0];
       setRecommendedRate(recommended);
       setSelectedRate(recommended);
     } else if (response.rates && response.rates.length > 0) {

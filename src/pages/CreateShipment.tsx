@@ -1,3 +1,4 @@
+
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { ShipmentForm } from "@/components/shipment/ShipmentForm";
 import { ShippingRatesCard } from "@/components/shipment/ShippingRatesCard";
@@ -39,7 +40,7 @@ const CreateShipment = () => {
     setLabelData(result);
     setShowLabelDialog(true);
 
-    // Upsert shipment to Supabase
+    // Upsert shipment to Supabase with correct data types
     if (result && result.id) {
       const shipmentData = {
         easypost_id: result.id,
@@ -48,7 +49,7 @@ const CreateShipment = () => {
         service: result.selected_rate?.service,
         status: "purchased",
         label_url: result.postage_label?.label_url,
-        weight: parseFloat(result.parcel?.weight) || 0,
+        weight: String(parseFloat(result.parcel?.weight) || 0), // Convert to string
         cost: parseFloat(result.selected_rate?.rate) || 0,
         package_dimensions: JSON.stringify({
           length: result.parcel?.length || 0,

@@ -41,7 +41,8 @@ export async function fetchOrders(): Promise<OrderData[]> {
     // Fetch shipment data for all orders
     const ordersWithShipments = await Promise.all(
       data.map(async (order) => {
-        const orderIdLink = order.order_id_link || `ORD-${order.order_id}`;
+        // Use order.id since order_id_link doesn't exist in the schema
+        const orderIdLink = `ORD-${order.order_id || order.id}`;
         console.log(`Processing order ${orderIdLink}, shipment_id: ${order.shipment_id}`);
         
         let shipmentData = null;

@@ -7,11 +7,11 @@ export function findRecommendedRateByDate(response: ShipmentResponse, requiredDa
   console.log("Finding rate for delivery by:", requiredDate.toDateString());
   
   // First check SmartRates if available
-  if (response.smartrates && response.smartrates.length > 0) {
+  if (response.smartRates && response.smartRates.length > 0) {
     console.log("Checking SmartRates for delivery date requirement");
     
     // Filter by rates that will deliver by the required date
-    const viableRates = response.smartrates.filter(rate => {
+    const viableRates = response.smartRates.filter(rate => {
       if (!rate.delivery_date) return false;
       const deliveryDate = new Date(rate.delivery_date);
       const isViable = deliveryDate <= requiredDate;
@@ -46,8 +46,8 @@ export function findRecommendedRateByDate(response: ShipmentResponse, requiredDa
       toast.warning("No shipping options available to meet the required delivery date");
       
       // If no options meet the required date, find the fastest option
-      if (response.smartrates.length > 0) {
-        const sortedByDelivery = [...response.smartrates].sort((a, b) => {
+      if (response.smartRates.length > 0) {
+        const sortedByDelivery = [...response.smartRates].sort((a, b) => {
           if (!a.delivery_date) return 1;
           if (!b.delivery_date) return -1;
           return new Date(a.delivery_date).getTime() - new Date(b.delivery_date).getTime();
@@ -80,9 +80,9 @@ export function findRecommendedRateByDate(response: ShipmentResponse, requiredDa
 }
 
 export function findMostEconomicalRate(response: ShipmentResponse): SmartRate | Rate | null {
-  if (response.smartrates && response.smartrates.length > 0) {
+  if (response.smartRates && response.smartRates.length > 0) {
     // If no required date specified, recommend the most economical option
-    const lowestRate = response.smartrates.sort((a, b) => 
+    const lowestRate = response.smartRates.sort((a, b) => 
       parseFloat(a.rate) - parseFloat(b.rate)
     )[0];
     console.log(`Selected most economical SmartRate: ${lowestRate.carrier} ${lowestRate.service} - $${lowestRate.rate}`);
