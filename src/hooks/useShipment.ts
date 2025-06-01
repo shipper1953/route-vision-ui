@@ -39,17 +39,40 @@ export const useShipment = (orderId?: string | null) => {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`, orderId ? `for order ${orderId}` : '');
       
-      // Use Supabase Edge Function and pass orderId for linking
+      // Get the current session to ensure we have proper authentication
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Authentication failed. Please log in again.');
+      }
+      
+      if (!session) {
+        throw new Error('No active session. Please log in again.');
+      }
+
+      console.log('Current session user:', session.user?.email);
+      
+      // Use Supabase Edge Function with proper authentication
       const { data, error } = await supabase.functions.invoke('purchase-label', {
         body: { 
           shipmentId, 
           rateId,
-          orderId: orderId ? String(orderId) : null // Ensure orderId is a string
+          orderId: orderId ? String(orderId) : null
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
         }
       });
 
       if (error) {
         console.error('Edge Function error:', error);
+        
+        // Check for specific error types
+        if (error.message.includes('Auth session missing') || error.message.includes('Unauthorized')) {
+          throw new Error('Authentication failed. Please log out and log back in.');
+        }
+        
         throw new Error(error.message || 'Failed to purchase label');
       }
 
