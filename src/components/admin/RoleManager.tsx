@@ -30,7 +30,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: "user" | "admin";
 }
 
 export const RoleManager = () => {
@@ -58,7 +58,7 @@ export const RoleManager = () => {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: string) => {
+  const updateUserRole = async (userId: string, newRole: "user" | "admin") => {
     try {
       const { error } = await supabase
         .from('users')
@@ -111,7 +111,7 @@ export const RoleManager = () => {
                 <TableCell>
                   <Select
                     value={user.role}
-                    onValueChange={(newRole) => updateUserRole(user.id, newRole)}
+                    onValueChange={(newRole: "user" | "admin") => updateUserRole(user.id, newRole)}
                   >
                     <SelectTrigger className="w-32">
                       <SelectValue />
