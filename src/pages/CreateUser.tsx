@@ -85,8 +85,9 @@ const CreateUser = () => {
   const onSubmit = async (data: UserForm) => {
     try {
       setIsSubmitting(true);
+      console.log('Creating user with data:', data);
       
-      // Create user account using Supabase Auth
+      // Create user account using Supabase Auth Admin API
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: data.email,
         password: Math.random().toString(36).slice(-8), // Temporary password
@@ -99,20 +100,53 @@ const CreateUser = () => {
       });
 
       if (authError) {
+        console.error("Auth error:", authError);
         toast.error("Failed to create user: " + authError.message);
         return;
       }
 
-      // Update the user's role in our users table
+      console.log('User created in auth:', authData.user?.id);
+
+      // Wait a moment for the trigger to create the user in the users table
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Now update the user's role using the service role
       if (authData.user) {
-        const { error: updateError } = await supabase
+        console.log('Updating user role to:', data.role);
+        
+        // First check if the user exists in the users table
+        const { data: existingUser, error: checkError } = await supabase
           .from('users')
-          .update({ role: data.role })
-          .eq('id', authData.user.id);
+          .select('id, role')
+          .eq('id', authData.user.id)
+          .single();
+
+        console.log('Existing user check:', existingUser, checkError);
+
+        if (checkError && checkError.code !== 'PGRST116') {
+          console.error("Error checking existing user:", checkError);
+        }
+
+        // Update or insert the user with the correct role
+        const { data: updateData, error: updateError } = await supabase
+          .from('users')
+          .upsert({
+            id: authData.user.id,
+            name: `${data.firstName} ${data.lastName}`,
+            email: data.email,
+            role: data.role,
+            password: '', // Password is managed by Supabase auth
+          }, {
+            onConflict: 'id'
+          });
+
+        console.log('Role update result:', updateData, updateError);
 
         if (updateError) {
-          console.warn("Failed to update user role:", updateError);
-          // Continue anyway as the user was created
+          console.error("Failed to update user role:", updateError);
+          toast.error("User created but failed to set role: " + updateError.message);
+        } else {
+          console.log('User role updated successfully');
         }
       }
       
