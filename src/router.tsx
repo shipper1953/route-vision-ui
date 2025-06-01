@@ -1,103 +1,62 @@
 
-import { createBrowserRouter, Navigate } from "react-router-dom";
-import Index from "@/pages/Index";
-import Orders from "@/pages/Orders";
-import EditOrder from "@/pages/EditOrder";
-import CreateOrder from "@/pages/CreateOrder";
-import Shipments from "@/pages/Shipments";
-import CreateShipment from "@/pages/CreateShipment";
-import Settings from "@/pages/Settings";
-import Users from "@/pages/Users";
-import CreateUser from "@/pages/CreateUser";
-import Login from "@/pages/Login";
-import NotFound from "@/pages/NotFound";
-import { useAuth } from "@/context/AuthContext";
-import React from "react";
-
-// Helper for protected routes
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
-  
-  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
-}
+import { createBrowserRouter } from "react-router-dom";
+import Index from "./pages/Index";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Orders from "./pages/Orders";
+import CreateOrder from "./pages/CreateOrder";
+import EditOrder from "./pages/EditOrder";
+import Shipments from "./pages/Shipments";
+import CreateShipment from "./pages/CreateShipment";
+import Settings from "./pages/Settings";
+import Users from "./pages/Users";
+import CreateUser from "./pages/CreateUser";
+import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Index />,
+  },
   {
     path: "/login",
     element: <Login />,
   },
   {
-    path: "/",
-    element: (
-      <ProtectedRoute>
-        <Index />
-      </ProtectedRoute>
-    ),
+    path: "/signup",
+    element: <Signup />,
   },
   {
     path: "/orders",
-    element: (
-      <ProtectedRoute>
-        <Orders />
-      </ProtectedRoute>
-    ),
+    element: <Orders />,
   },
   {
-    path: "/edit-order/:orderId",
-    element: (
-      <ProtectedRoute>
-        <EditOrder />
-      </ProtectedRoute>
-    ),
+    path: "/orders/new",
+    element: <CreateOrder />,
   },
   {
-    path: "/create-order",
-    element: (
-      <ProtectedRoute>
-        <CreateOrder />
-      </ProtectedRoute>
-    ),
+    path: "/orders/:id/edit",
+    element: <EditOrder />,
   },
   {
     path: "/shipments",
-    element: (
-      <ProtectedRoute>
-        <Shipments />
-      </ProtectedRoute>
-    ),
+    element: <Shipments />,
   },
   {
-    path: "/create-shipment",
-    element: (
-      <ProtectedRoute>
-        <CreateShipment />
-      </ProtectedRoute>
-    ),
+    path: "/shipments/new",
+    element: <CreateShipment />,
   },
   {
     path: "/settings",
-    element: (
-      <ProtectedRoute>
-        <Settings />
-      </ProtectedRoute>
-    ),
+    element: <Settings />,
   },
   {
     path: "/users",
-    element: (
-      <ProtectedRoute>
-        <Users />
-      </ProtectedRoute>
-    ),
+    element: <Users />,
   },
   {
     path: "/create-user",
-    element: (
-      <ProtectedRoute>
-        <CreateUser />
-      </ProtectedRoute>
-    ),
+    element: <CreateUser />,
   },
   {
     path: "*",

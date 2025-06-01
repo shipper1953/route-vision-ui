@@ -1,22 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ShipTornadoLogo } from '@/components/logo/ShipTornadoLogo';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
-import { createDefaultAdminUser } from '@/utils/setupDefaultUser';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [defaultCredentials, setDefaultCredentials] = useState<{email: string, password: string} | null>(null);
-  const [connectionError, setConnectionError] = useState(false);
-  const [needsManualSetup, setNeedsManualSetup] = useState(false);
   const { login, error, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -26,31 +22,6 @@ const Login = () => {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
-
-  // Check user status without attempting automatic creation
-  useEffect(() => {
-    const checkUserStatus = async () => {
-      try {
-        const result = await createDefaultAdminUser();
-        setDefaultCredentials({ email: result.email, password: result.password });
-        setConnectionError(false);
-        
-        if (!result.exists) {
-          setNeedsManualSetup(true);
-          console.log("Manual user setup required");
-        }
-      } catch (error) {
-        console.error("Failed to check user status:", error);
-        setNeedsManualSetup(true);
-        setDefaultCredentials({ 
-          email: "admin@test.com", 
-          password: "ShipTornado123!" 
-        });
-      }
-    };
-
-    checkUserStatus();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,12 +33,7 @@ const Login = () => {
       navigate('/');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
-      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('network')) {
-        setConnectionError(true);
-        toast.error('Connection error. Please check your internet connection and try again.');
-      } else {
-        toast.error(errorMessage);
-      }
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -75,13 +41,6 @@ const Login = () => {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
-  };
-
-  const useDefaultCredentials = () => {
-    if (defaultCredentials) {
-      setEmail(defaultCredentials.email);
-      setPassword(defaultCredentials.password);
-    }
   };
 
   return (
@@ -93,7 +52,7 @@ const Login = () => {
           <h1 className="text-4xl font-bold text-white">Ship Tornado</h1>
         </div>
         <div className="text-white max-w-md">
-          <p className="text-xl opacity-90">To continue, enter your sign in information</p>
+          <p className="text-xl opacity-90">Welcome back! Sign in to continue</p>
         </div>
       </div>
 
@@ -105,51 +64,11 @@ const Login = () => {
             <ShipTornadoLogo size={48} className="text-tms-navy" />
             <h2 className="text-2xl font-bold">Ship Tornado</h2>
           </div>
-          
-          {/* Connection error warning */}
-          {connectionError && (
-            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <h3 className="font-medium text-yellow-900 mb-2">Connection Issue Detected</h3>
-              <p className="text-sm text-yellow-700">
-                Unable to connect to authentication service. Please check your internet connection.
-              </p>
-            </div>
-          )}
-          
-          {/* Manual setup required */}
-          {needsManualSetup && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-              <h3 className="font-medium text-blue-900 mb-2">User Setup Required</h3>
-              <p className="text-sm text-blue-700 mb-3">
-                To get started, you'll need to create your first user account. You can:
-              </p>
-              <ul className="text-sm text-blue-700 mb-3 list-disc list-inside space-y-1">
-                <li>Use the "Create User" page after logging in with any existing account</li>
-                <li>Create an account directly in your Supabase dashboard</li>
-                <li>Contact your system administrator</li>
-              </ul>
-              {defaultCredentials && (
-                <div className="mt-3">
-                  <p className="text-sm text-blue-700 mb-2">
-                    <strong>Suggested test credentials:</strong>
-                  </p>
-                  <p className="text-sm text-blue-700">
-                    Email: <code className="bg-blue-100 px-1 rounded">{defaultCredentials.email}</code><br/>
-                    Password: <code className="bg-blue-100 px-1 rounded">{defaultCredentials.password}</code>
-                  </p>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    onClick={useDefaultCredentials}
-                    className="w-full mt-2"
-                  >
-                    Use Suggested Credentials
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold">Sign In</h2>
+            <p className="text-muted-foreground">Enter your credentials to access your account</p>
+          </div>
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -207,8 +126,10 @@ const Login = () => {
             
             <div className="flex flex-col space-y-2 items-center text-sm text-center">
               <div className="flex space-x-1">
-                <span className="text-muted-foreground">New user?</span>
-                <a href="#" className="text-tms-navy font-medium hover:underline">Apply</a>
+                <span className="text-muted-foreground">New to Ship Tornado?</span>
+                <Link to="/signup" className="text-tms-navy font-medium hover:underline">
+                  Create an account
+                </Link>
               </div>
               <a href="#" className="text-tms-navy font-medium hover:underline">
                 Forgot your password?
