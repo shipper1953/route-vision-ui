@@ -20,7 +20,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Users as UsersIcon, Search, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client"; // Make sure this path is correct
+import { supabase } from "@/integrations/supabase/client";
+
+type DatabaseUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  password: string;
+  role_id: number;
+};
 
 type SupabaseUser = {
   id: string;
@@ -83,7 +92,16 @@ const Users = () => {
         setError("Failed to fetch users.");
         setUsers([]);
       } else {
-        setUsers(data || []);
+        // Transform database users to match SupabaseUser interface
+        const transformedUsers: SupabaseUser[] = (data || []).map((user: DatabaseUser) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          status: 'active', // Default status since it's not in database
+          lastLogin: 'Never' // Default lastLogin since it's not in database
+        }));
+        setUsers(transformedUsers);
       }
       setLoading(false);
     };
