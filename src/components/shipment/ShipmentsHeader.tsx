@@ -15,7 +15,7 @@ export const ShipmentsHeader = () => {
       <div className="mt-4 md:mt-0 flex gap-3">
         <Button 
           className="bg-tms-blue hover:bg-tms-blue-400"
-          onClick={() => navigate('/create-shipment')}
+          onClick={() => navigate('/shipments/new')}
         >
           <Plus className="mr-2 h-4 w-4" />
           Create Shipment
