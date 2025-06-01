@@ -39,7 +39,7 @@ export const useShipment = (orderId?: string | null) => {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`, orderId ? `for order ${orderId}` : '');
       
-      // Verify we have an authenticated session
+      // Get the current session including the access token
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session) {
@@ -47,15 +47,23 @@ export const useShipment = (orderId?: string | null) => {
         throw new Error('Authentication session not available. Please log in again.');
       }
       
-      console.log('Using session for user:', session.user?.email);
-      console.log('Session token available:', session.access_token ? 'YES' : 'NO');
+      if (!session.access_token) {
+        console.error('No access token in session');
+        throw new Error('No valid authentication token. Please log out and log back in.');
+      }
       
-      // Call the Edge Function with proper authentication
+      console.log('Using session for user:', session.user?.email);
+      console.log('Access token available:', session.access_token ? 'YES' : 'NO');
+      
+      // Call the Edge Function with explicit token
       const { data, error } = await supabase.functions.invoke('purchase-label', {
         body: { 
           shipmentId, 
           rateId,
           orderId: orderId ? String(orderId) : null
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
         }
       });
 

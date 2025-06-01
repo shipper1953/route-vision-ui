@@ -25,37 +25,41 @@ serve(async (req) => {
   try {
     console.log('Processing purchase-label request...')
     
-    // Create Supabase client with the correct auth context
+    // Create Supabase client without forcing auth headers - let it handle automatically
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    )
+    
+    // Get the JWT token from the request
     const authHeader = req.headers.get('Authorization')
     console.log('Auth header present:', authHeader ? 'YES' : 'NO')
     
-    if (!authHeader) {
-      console.error('No authorization header found in request')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Invalid or missing authorization header')
       return new Response(JSON.stringify({ 
-        error: 'No authorization header provided',
-        details: 'Please ensure you are logged in' 
+        error: 'Invalid authorization header',
+        details: 'Please ensure you are logged in with a valid session' 
       }), {
         headers,
         status: 401,
       })
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    )
+    // Extract JWT token
+    const jwt = authHeader.replace('Bearer ', '')
+    console.log('JWT token present:', jwt ? 'YES' : 'NO')
     
-    // Verify authenticated user
-    console.log('Verifying user authentication...')
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    // Verify the JWT token directly
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(jwt)
     
     if (authError) {
-      console.error('Auth verification error:', authError)
+      console.error('JWT verification error:', authError)
       return new Response(JSON.stringify({ 
         error: 'Authentication verification failed', 
         details: authError.message 
@@ -66,10 +70,10 @@ serve(async (req) => {
     }
     
     if (!user) {
-      console.error('No user found after auth verification')
+      console.error('No user found in JWT')
       return new Response(JSON.stringify({ 
         error: 'User not authenticated',
-        details: 'No user found in session' 
+        details: 'No user found in token' 
       }), {
         headers,
         status: 401,
