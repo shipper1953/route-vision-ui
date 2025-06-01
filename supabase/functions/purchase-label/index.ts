@@ -75,7 +75,7 @@ serve(async (req) => {
       })
     }
 
-    console.log('User authenticated successfully:', user.email)
+    console.log('User authenticated successfully:', user.email, 'User ID:', user.id)
 
     const { shipmentId, rateId, orderId } = await req.json()
     
@@ -88,7 +88,7 @@ serve(async (req) => {
       })
     }
     
-    console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}` + (orderId ? ` for order ${orderId}` : ''))
+    console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}` + (orderId ? ` for order ${orderId}` : '') + ` for user ${user.id}`)
     
     if (!easyPostApiKey) {
       return new Response(JSON.stringify({
@@ -142,19 +142,25 @@ serve(async (req) => {
     const purchaseResponse = await response.json()
     console.log('Label purchased successfully from EasyPost:', purchaseResponse.id)
     
-    // Save shipment to database
+    // Save shipment to database with user_id
     try {
-      const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId)
+      const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, user.id)
       
       // If we have an orderId, link the shipment to the order
       if (orderId && finalShipmentId) {
         try {
-          await linkShipmentToOrder(supabaseClient, orderId, finalShipmentId)
-          console.log(`Successfully linked shipment ${purchaseResponse.id} to order ${orderId}`)
+          const linkSuccess = await linkShipmentToOrder(supabaseClient, orderId, finalShipmentId)
+          if (linkSuccess) {
+            console.log(`✓ Successfully linked shipment ${purchaseResponse.id} to order ${orderId}`)
+          } else {
+            console.error(`✗ Failed to link shipment ${purchaseResponse.id} to order ${orderId}`)
+          }
         } catch (linkError) {
           console.error('Error linking shipment to order:', linkError)
           // Don't fail the whole operation if linking fails
         }
+      } else {
+        console.log('No orderId or finalShipmentId for linking:', { orderId, finalShipmentId })
       }
     } catch (dbError) {
       console.error('Database save error:', dbError)

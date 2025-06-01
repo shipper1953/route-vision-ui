@@ -2,7 +2,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { ShipmentData } from './types.ts'
 
-export async function saveShipmentToDatabase(responseData: any, orderId?: string | null) {
+export async function saveShipmentToDatabase(responseData: any, orderId?: string | null, userId?: string | null) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   
@@ -13,10 +13,6 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
 
   const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Get the current user from the JWT token in the request context
-  // Since we're using service role, we need to get the user ID from the auth context
-  // For now, we'll skip user_id in service role context and let RLS handle it differently
-  
   // Prepare shipment data with correct column names that match the database schema
   const shipmentData: any = {
     easypost_id: responseData.id,
@@ -38,9 +34,12 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
       weight_unit: responseData.parcel?.weight_unit || 'oz'
     }),
     created_at: new Date().toISOString(),
+    // Add user_id if provided
+    ...(userId && { user_id: userId }),
   };
 
-  console.log("Saving shipment to database:", shipmentData);
+  console.log("Saving shipment to database with user_id:", userId);
+  console.log("Shipment data:", shipmentData);
   
   // First, check if the shipment exists using easypost_id
   const { data: existingShipment, error: fetchError } = await supabaseClient
@@ -67,7 +66,7 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
     if (updateError) {
       console.error('Error updating existing shipment:', updateError);
     } else {
-      console.log('Existing shipment updated successfully');
+      console.log('Existing shipment updated successfully with user_id:', userId);
       finalShipmentId = updatedShipment?.id;
     }
   } else {
@@ -81,7 +80,7 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
     if (insertError) {
       console.error('Error inserting new shipment:', insertError);
     } else {
-      console.log('New shipment inserted successfully:', newShipment);
+      console.log('New shipment inserted successfully with user_id:', userId, newShipment);
       finalShipmentId = newShipment?.id;
     }
   }
