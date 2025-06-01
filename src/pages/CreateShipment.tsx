@@ -60,7 +60,7 @@ const CreateShipment = () => {
       } else {
         console.warn("⚠️ Shipment not found in database, attempting manual save...");
         
-        // Manual fallback save if Edge Function didn't save it
+        // Manual fallback save if Edge Function didn't save it - removed order_id field
         const shipmentData = {
           easypost_id: result.id,
           tracking_number: result.tracking_code,
@@ -79,8 +79,6 @@ const CreateShipment = () => {
             weight: result.parcel?.weight || 0,
             weight_unit: result.parcel?.weight_unit || 'oz'
           }),
-          // Convert orderId to number if it's a numeric string, otherwise null
-          order_id: orderId && !isNaN(Number(orderId)) ? Number(orderId) : null,
           tracking_url: result.tracker?.public_url,
           created_at: new Date().toISOString(),
         };

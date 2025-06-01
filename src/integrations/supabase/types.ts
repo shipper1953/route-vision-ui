@@ -131,7 +131,6 @@ export type Database = {
           estimated_delivery_date: string | null
           id: number
           label_url: string | null
-          order_id: number | null
           package_dimensions: Json | null
           package_weights: Json | null
           rates: Json | null
@@ -153,7 +152,6 @@ export type Database = {
           estimated_delivery_date?: string | null
           id?: number
           label_url?: string | null
-          order_id?: number | null
           package_dimensions?: Json | null
           package_weights?: Json | null
           rates?: Json | null
@@ -175,7 +173,6 @@ export type Database = {
           estimated_delivery_date?: string | null
           id?: number
           label_url?: string | null
-          order_id?: number | null
           package_dimensions?: Json | null
           package_weights?: Json | null
           rates?: Json | null

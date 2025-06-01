@@ -14,6 +14,7 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
   const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
   // Prepare shipment data with correct column names that match the database schema
+  // Removed order_id field since it was removed from the shipments table
   const shipmentData: ShipmentData = {
     easypost_id: responseData.id,
     tracking_number: responseData.tracking_code,
