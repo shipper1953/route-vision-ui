@@ -61,7 +61,7 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
       if (!updateSuccess && !isNaN(Number(orderIdStr))) {
         console.log("Attempting to update order with numeric order_id:", orderIdStr);
         
-        const orderIdNumeric = Number(orderIdStr);
+        const orderIdNumeric = parseInt(orderIdStr, 10);
         const { error: numericError } = await supabase
           .from('orders')
           .update({ 
@@ -83,7 +83,7 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
       if (!updateSuccess && !isNaN(Number(orderIdStr))) {
         console.log("Attempting to update order with id field:", orderIdStr);
         
-        const orderIdNumeric = Number(orderIdStr);
+        const orderIdNumeric = parseInt(orderIdStr, 10);
         const { error: idError } = await supabase
           .from('orders')
           .update({ 

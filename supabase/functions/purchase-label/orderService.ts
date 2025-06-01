@@ -1,5 +1,5 @@
 
-export async function linkOrderToShipment(supabaseClient: any, orderId: string, finalShipmentId: number) {
+export async function linkShipmentToOrder(supabaseClient: any, orderId: string, finalShipmentId: number) {
   console.log(`Linking order ${orderId} to shipment ${finalShipmentId}`);
   
   // Try multiple strategies to find and update the order

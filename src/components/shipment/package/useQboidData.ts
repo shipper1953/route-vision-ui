@@ -4,7 +4,14 @@ import { useFormContext } from 'react-hook-form';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ShipmentForm } from '@/types/shipment';
-import { QboidDimensions } from './types';
+
+export interface QboidDimensions {
+  length: number;
+  width: number;
+  height: number;
+  weight: number;
+  orderId?: string;
+}
 
 export const useQboidData = () => {
   const form = useFormContext<ShipmentForm>();
@@ -25,7 +32,7 @@ export const useQboidData = () => {
         
         // Get order data from localStorage first (faster)
         const ordersData = localStorage.getItem('orders');
-        let order = null;
+        let order: any = null;
         
         if (ordersData) {
           const orders = JSON.parse(ordersData);
@@ -37,7 +44,7 @@ export const useQboidData = () => {
           const { data: supabaseOrder } = await supabase
             .from('orders')
             .select('*')
-            .eq('order_id_link', dimensions.orderId)
+            .eq('order_id', dimensions.orderId)
             .single();
           
           order = supabaseOrder;
