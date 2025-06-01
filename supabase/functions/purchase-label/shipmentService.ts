@@ -13,12 +13,12 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
 
   const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Prepare shipment data with correct column names
+  // Prepare shipment data with correct column names that match the database schema
   const shipmentData: ShipmentData = {
     easypost_id: responseData.id,
     tracking_number: responseData.tracking_code,
-    carrier: responseData.selected_rate?.carrier,
-    service: responseData.selected_rate?.service,
+    carrier: responseData.selected_rate?.carrier || 'Unknown',
+    service: responseData.selected_rate?.service || 'Standard',
     status: 'purchased',
     label_url: responseData.postage_label?.label_url,
     tracking_url: responseData.tracker?.public_url,
@@ -53,16 +53,18 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
   
   if (existingShipment) {
     // Update existing shipment
-    const { error: updateError } = await supabaseClient
+    const { data: updatedShipment, error: updateError } = await supabaseClient
       .from('shipments')
       .update(shipmentData)
-      .eq('easypost_id', responseData.id);
+      .eq('easypost_id', responseData.id)
+      .select('id')
+      .single();
       
     if (updateError) {
       console.error('Error updating existing shipment:', updateError);
     } else {
       console.log('Existing shipment updated successfully');
-      finalShipmentId = existingShipment.id;
+      finalShipmentId = updatedShipment?.id;
     }
   } else {
     // Insert new shipment
@@ -75,7 +77,7 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
     if (insertError) {
       console.error('Error inserting new shipment:', insertError);
     } else {
-      console.log('New shipment inserted successfully');
+      console.log('New shipment inserted successfully:', newShipment);
       finalShipmentId = newShipment?.id;
     }
   }
