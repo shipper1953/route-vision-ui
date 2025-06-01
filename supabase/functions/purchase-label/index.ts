@@ -23,24 +23,41 @@ serve(async (req) => {
   }
 
   try {
-    // Create Supabase client - it will automatically use the auth context from the request
+    console.log('Processing purchase-label request...')
+    
+    // Create Supabase client with the correct auth context
+    const authHeader = req.headers.get('Authorization')
+    console.log('Auth header present:', authHeader ? 'YES' : 'NO')
+    
+    if (!authHeader) {
+      console.error('No authorization header found in request')
+      return new Response(JSON.stringify({ 
+        error: 'No authorization header provided',
+        details: 'Please ensure you are logged in' 
+      }), {
+        headers,
+        status: 401,
+      })
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     )
     
-    // Verify authenticated user using the proper Edge Function pattern
+    // Verify authenticated user
+    console.log('Verifying user authentication...')
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     
     if (authError) {
-      console.error('Auth error:', authError)
+      console.error('Auth verification error:', authError)
       return new Response(JSON.stringify({ 
-        error: 'Authentication failed', 
+        error: 'Authentication verification failed', 
         details: authError.message 
       }), {
         headers,
@@ -49,14 +66,17 @@ serve(async (req) => {
     }
     
     if (!user) {
-      console.error('No user found in session')
-      return new Response(JSON.stringify({ error: 'User not authenticated' }), {
+      console.error('No user found after auth verification')
+      return new Response(JSON.stringify({ 
+        error: 'User not authenticated',
+        details: 'No user found in session' 
+      }), {
         headers,
         status: 401,
       })
     }
 
-    console.log('Authenticated user:', user.email)
+    console.log('User authenticated successfully:', user.email)
 
     const { shipmentId, rateId, orderId } = await req.json()
     
@@ -82,6 +102,7 @@ serve(async (req) => {
     }
     
     // Call EasyPost API to purchase the label
+    console.log('Calling EasyPost API...')
     const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
       method: 'POST',
       headers: {
@@ -120,7 +141,7 @@ serve(async (req) => {
     }
     
     const purchaseResponse = await response.json()
-    console.log('Label purchased successfully:', purchaseResponse.id)
+    console.log('Label purchased successfully from EasyPost:', purchaseResponse.id)
     
     // Save shipment to database
     try {
@@ -162,6 +183,7 @@ serve(async (req) => {
       console.error('Failed to update shipment status:', updateErr)
     }
     
+    console.log('Returning successful response')
     return new Response(JSON.stringify(purchaseResponse), { headers })
     
   } catch (err) {

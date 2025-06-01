@@ -48,8 +48,9 @@ export const useShipment = (orderId?: string | null) => {
       }
       
       console.log('Using session for user:', session.user?.email);
+      console.log('Session token available:', session.access_token ? 'YES' : 'NO');
       
-      // Use Supabase Edge Function - let Supabase handle authentication automatically
+      // Call the Edge Function with proper authentication
       const { data, error } = await supabase.functions.invoke('purchase-label', {
         body: { 
           shipmentId, 
