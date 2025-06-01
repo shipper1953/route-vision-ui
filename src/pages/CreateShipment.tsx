@@ -42,6 +42,8 @@ const CreateShipment = () => {
 
     // Insert shipment to Supabase with correct data types (no upsert to avoid conflict)
     if (result && result.id) {
+      console.log("Preparing to save shipment to database with easypost_id:", result.id);
+      
       const shipmentData = {
         easypost_id: result.id,
         tracking_number: result.tracking_code,
@@ -65,6 +67,8 @@ const CreateShipment = () => {
         created_at: new Date().toISOString(),
       };
 
+      console.log("Shipment data to be saved:", shipmentData);
+
       // Check if shipment already exists first
       const { data: existingShipment } = await supabase
         .from('shipments')
@@ -72,8 +76,11 @@ const CreateShipment = () => {
         .eq('easypost_id', result.id)
         .maybeSingle();
 
+      console.log("Existing shipment check result:", existingShipment);
+
       if (existingShipment) {
         // Update existing shipment
+        console.log("Updating existing shipment with id:", existingShipment.id);
         const { error } = await supabase
           .from('shipments')
           .update(shipmentData)
@@ -83,21 +90,27 @@ const CreateShipment = () => {
           console.error("Failed to update shipment:", error);
           toast.error("Failed to update shipment: " + error.message);
         } else {
+          console.log("Successfully updated shipment in database");
           toast.success("Shipment updated in database!");
         }
       } else {
         // Insert new shipment
-        const { error } = await supabase
+        console.log("Inserting new shipment");
+        const { error, data } = await supabase
           .from('shipments')
-          .insert(shipmentData);
+          .insert(shipmentData)
+          .select();
 
         if (error) {
           console.error("Failed to save shipment:", error);
           toast.error("Failed to save shipment: " + error.message);
         } else {
+          console.log("Successfully inserted shipment into database:", data);
           toast.success("Shipment saved to database!");
         }
       }
+    } else {
+      console.warn("No result or result.id available for saving to database");
     }
   };
 
