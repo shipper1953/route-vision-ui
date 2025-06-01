@@ -19,26 +19,24 @@ export async function fetchOrderById(orderId: string): Promise<OrderData | null>
     let data: any = null;
     let error = null;
     
-    // First, try searching by order_id (numeric field)
-    if (!isNaN(Number(orderId))) {
-      console.log("Searching with numeric order_id:", orderId);
-      
-      const { data: numericResult, error: numericError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('order_id', parseInt(orderId))
-        .maybeSingle();
-      
-      if (numericResult) {
-        data = numericResult;
-        console.log("Found order by numeric order_id:", orderId);
-      } else if (numericError) {
-        console.log("Error searching by numeric order_id:", numericError);
-        error = numericError;
-      }
+    // First, try searching by order_id (text field)
+    console.log("Searching with order_id:", orderId);
+    
+    const { data: orderResult, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    
+    if (orderResult) {
+      data = orderResult;
+      console.log("Found order by order_id:", orderId);
+    } else if (orderError) {
+      console.log("Error searching by order_id:", orderError);
+      error = orderError;
     }
     
-    // If not found by numeric ID, try searching by id field
+    // If not found by order_id, try searching by id field (if orderId is numeric)
     if (!data && !isNaN(Number(orderId))) {
       console.log("Searching with id field:", orderId);
       

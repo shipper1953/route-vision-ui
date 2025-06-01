@@ -31,12 +31,8 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
   
   // Store the order in Supabase
   try {
-    // Generate a numeric order_id for the database
-    const numericOrderId = Math.floor(1000 + Math.random() * 90000);
-    
     console.log("Saving order to Supabase:", {
-      order_id: numericOrderId,
-      order_id_link: orderId, // Store the string ID in the link field
+      order_id: orderId, // Use the string ID as order_id
       items: JSON.stringify([{ count: newOrder.items, description: "Order items" }]),
       value: parseFloat(newOrder.value),
       shipping_address: JSON.stringify(newOrder.shippingAddress),
@@ -52,8 +48,7 @@ export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<Ord
     const { data, error } = await supabase
       .from('orders')
       .insert({
-        order_id: numericOrderId,
-        order_id_link: orderId, // Store the string ID here
+        order_id: orderId, // Use the string ID directly
         items: JSON.stringify([{ count: newOrder.items, description: "Order items" }]),
         value: parseFloat(newOrder.value),
         shipping_address: JSON.stringify(newOrder.shippingAddress),

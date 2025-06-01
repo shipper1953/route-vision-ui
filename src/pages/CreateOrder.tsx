@@ -1,3 +1,4 @@
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { TmsLayout } from "@/components/layout/TmsLayout";
@@ -41,23 +42,28 @@ const CreateOrder = () => {
 
   const onSubmit = async (values: OrderFormValues) => {
     setIsSubmitting(true);
+    
+    // Generate a unique order ID
+    const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+    
     // Prepare order data for Supabase with correct types
     const orderData = {
+      order_id: orderId, // Add the required order_id field
       customer_name: values.customerName,
       customer_company: values.customerCompany,
       customer_email: values.customerEmail,
       customer_phone: values.customerPhone,
       required_delivery_date: values.requiredDeliveryDate ? values.requiredDeliveryDate.toISOString().split('T')[0] : null,
-      items: values.items,
+      items: JSON.stringify([{ count: values.items, description: "Order items" }]), // Convert to JSON string
       value: parseFloat(values.value) || 0,
-      shipping_address: {
+      shipping_address: JSON.stringify({
         street1: values.street1,
         street2: values.street2,
         city: values.city,
         state: values.state,
         zip: values.zip,
         country: values.country,
-      },
+      }),
       status: "ready_to_ship",
       created_at: new Date().toISOString(),
     };

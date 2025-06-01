@@ -2,7 +2,14 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { QboidDimensions } from './types';
+
+interface QboidDimensions {
+  length: number;
+  width: number;
+  height: number;
+  weight: number;
+  orderId?: string;
+}
 
 interface UseQboidDataLookupProps {
   handleQboidData: (dimensions: QboidDimensions) => Promise<void>;
@@ -20,11 +27,10 @@ export const useQboidDataLookup = ({ handleQboidData }: UseQboidDataLookupProps)
       
       try {
         // First check the orders table for qboid_dimensions
-        // Use order_id_link to search since urlOrderId is a string
         const { data: orderData } = await supabase
           .from('orders')
           .select('qboid_dimensions')
-          .eq('order_id_link', urlOrderId)
+          .eq('order_id', urlOrderId)
           .single();
 
         if (orderData?.qboid_dimensions) {
