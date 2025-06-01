@@ -186,7 +186,7 @@ serve(async (req) => {
                 shipment_id: finalShipmentId,
                 status: 'shipped'
               })
-              .eq('order_id', parseInt(orderId));
+              .eq('order_id', Number(orderId));
             
             if (!orderUpdateError2) {
               console.log(`Successfully linked order ${orderId} to shipment via numeric order_id`);
@@ -204,7 +204,7 @@ serve(async (req) => {
                 shipment_id: finalShipmentId,
                 status: 'shipped'
               })
-              .eq('id', parseInt(orderId));
+              .eq('id', Number(orderId));
             
             if (!orderUpdateError3) {
               console.log(`Successfully linked order ${orderId} to shipment via id field`);
