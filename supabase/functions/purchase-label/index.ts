@@ -9,7 +9,7 @@ const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
 console.log('EasyPost API key available in purchase-label function:', easyPostApiKey ? 'YES' : 'NO')
 
 serve(async (req) => {
-  // Set up CORS headers - updated to include x-client-info
+  // Set up CORS headers
   const headers = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -22,57 +22,42 @@ serve(async (req) => {
     return new Response(null, { headers, status: 204 })
   }
 
-  // Get the authorization header
-  const authHeader = req.headers.get('authorization')
-  console.log('Auth header present:', authHeader ? 'YES' : 'NO')
-  
-  if (!authHeader) {
-    console.error('No authorization header found')
-    return new Response(JSON.stringify({ 
-      error: 'Authorization header missing' 
-    }), {
-      headers,
-      status: 401,
-    })
-  }
-
-  // Set up Supabase client with auth context - improved header handling
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    { 
-      global: { 
-        headers: { 
-          Authorization: authHeader,
-          'x-client-info': req.headers.get('x-client-info') || 'supabase-js/2.7.1'
-        } 
-      } 
-    }
-  )
-  
-  // Verify authenticated user with better error handling
-  const { data: authData, error: authError } = await supabaseClient.auth.getUser()
-  if (authError) {
-    console.error('Auth error:', authError)
-    return new Response(JSON.stringify({ 
-      error: 'Authentication failed', 
-      details: authError.message 
-    }), {
-      headers,
-      status: 401,
-    })
-  }
-  
-  if (!authData.user) {
-    return new Response(JSON.stringify({ error: 'User not authenticated' }), {
-      headers,
-      status: 401,
-    })
-  }
-
-  console.log('Authenticated user:', authData.user.email)
-
   try {
+    // Create Supabase client - it will automatically use the auth context from the request
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    )
+    
+    // Verify authenticated user using the proper Edge Function pattern
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    
+    if (authError) {
+      console.error('Auth error:', authError)
+      return new Response(JSON.stringify({ 
+        error: 'Authentication failed', 
+        details: authError.message 
+      }), {
+        headers,
+        status: 401,
+      })
+    }
+    
+    if (!user) {
+      console.error('No user found in session')
+      return new Response(JSON.stringify({ error: 'User not authenticated' }), {
+        headers,
+        status: 401,
+      })
+    }
+
+    console.log('Authenticated user:', user.email)
+
     const { shipmentId, rateId, orderId } = await req.json()
     
     if (!shipmentId || !rateId) {
@@ -139,12 +124,12 @@ serve(async (req) => {
     
     // Save shipment to database
     try {
-      const { finalShipmentId, supabaseClient: dbClient } = await saveShipmentToDatabase(purchaseResponse, orderId)
+      const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId)
       
       // If we have an orderId, link the shipment to the order
       if (orderId && finalShipmentId) {
         try {
-          await linkShipmentToOrder(dbClient, orderId, finalShipmentId)
+          await linkShipmentToOrder(supabaseClient, orderId, finalShipmentId)
           console.log(`Successfully linked shipment ${purchaseResponse.id} to order ${orderId}`)
         } catch (linkError) {
           console.error('Error linking shipment to order:', linkError)
@@ -166,10 +151,12 @@ serve(async (req) => {
           tracking_number: purchaseResponse.tracking_code,
         })
         .eq('easypost_id', shipmentId)
-        .eq('user_id', authData.user.id)
+        .eq('user_id', user.id)
       
       if (updateError) {
         console.error('Error updating shipment in database:', updateError)
+      } else {
+        console.log('Successfully updated shipment status in database')
       }
     } catch (updateErr) {
       console.error('Failed to update shipment status:', updateErr)

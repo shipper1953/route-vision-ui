@@ -39,7 +39,7 @@ export const useShipment = (orderId?: string | null) => {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`, orderId ? `for order ${orderId}` : '');
       
-      // Get the current session to ensure we have valid authentication
+      // Verify we have an authenticated session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session) {
@@ -49,16 +49,12 @@ export const useShipment = (orderId?: string | null) => {
       
       console.log('Using session for user:', session.user?.email);
       
-      // Use Supabase Edge Function with explicit auth token
+      // Use Supabase Edge Function - let Supabase handle authentication automatically
       const { data, error } = await supabase.functions.invoke('purchase-label', {
         body: { 
           shipmentId, 
           rateId,
           orderId: orderId ? String(orderId) : null
-        },
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
         }
       });
 
