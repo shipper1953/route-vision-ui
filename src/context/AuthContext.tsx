@@ -1,109 +1,122 @@
-
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode';
-import { auth } from '../services/auth';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { auth } from "@/services/auth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AuthContextType {
-  user: User | null;
+  user: any;
+  isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  isAuthenticated: boolean;
-  isAdmin: boolean;
+  logout: () => Promise<void>;
+  requireRegistration: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isAuthenticated: false,
+  loading: true,
+  error: null,
+  login: async () => {},
+  logout: async () => {},
+  requireRegistration: false,
+});
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [requireRegistration, setRequireRegistration] = useState(false);
 
+  // Listen for auth state changes
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('token');
-        
-        if (token) {
-          try {
-            const decoded = jwtDecode<User>(token);
-            setUser(decoded);
-            setIsAuthenticated(true);
-          } catch (error) {
-            // Invalid token
-            localStorage.removeItem('token');
-            setUser(null);
-            setIsAuthenticated(false);
-          }
-        }
-      } catch (error) {
-        console.error("Auth check error:", error);
-      } finally {
-        setLoading(false);
+    const getSession = async () => {
+      setLoading(true);
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUser(data.user);
+      } else {
+        setUser(null);
       }
+      setLoading(false);
     };
-    
-    checkAuth();
+    getSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    setRequireRegistration(false);
     try {
-      setLoading(true);
-      setError(null);
-      const { token } = await auth.login(email, password);
-      
-      localStorage.setItem('token', token);
-      
-      const decoded = jwtDecode<User>(token);
-      setUser(decoded);
-      setIsAuthenticated(true);
-    } catch (error) {
-      setError("Invalid credentials. Please try again.");
-      console.error("Login error:", error);
+      const { user } = await auth.login(email, password);
+      if (user) {
+        // Check if user exists in the users table
+        const { data: existingUser, error: fetchError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+
+        if (!existingUser && !fetchError) {
+          // User authenticated but not in users table, require registration
+          setRequireRegistration(true);
+          setUser(null);
+          setError("Account found, but not registered. Please register as a new user.");
+        } else {
+          setUser(user);
+          setRequireRegistration(false);
+        }
+      } else {
+        setUser(null);
+        setRequireRegistration(false);
+      }
+    } catch (err: any) {
+      setError(err.message || "Login failed");
+      setUser(null);
+      setRequireRegistration(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-    setIsAuthenticated(false);
+  const logout = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await auth.logout();
+      setUser(null);
+      setRequireRegistration(false);
+    } catch (err: any) {
+      setError(err.message || "Logout failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const isAdmin = user?.role === 'admin';
-
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      error, 
-      login, 
-      logout, 
-      isAuthenticated, 
-      isAdmin 
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        loading,
+        error,
+        login,
+        logout,
+        requireRegistration,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);

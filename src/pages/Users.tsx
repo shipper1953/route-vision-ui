@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { 
   Table,
@@ -21,50 +20,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Users as UsersIcon, Search, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client"; // Make sure this path is correct
 
-// Sample data - would be fetched from API in production
-const users = [
-  { 
-    id: "USR-1234", 
-    name: "John Smith", 
-    email: "john.smith@shiptornado.com", 
-    role: "admin", 
-    status: "active",
-    lastLogin: "May 14, 2025" 
-  },
-  { 
-    id: "USR-1235", 
-    name: "Sarah Johnson", 
-    email: "sarah.johnson@shiptornado.com", 
-    role: "manager", 
-    status: "active",
-    lastLogin: "May 15, 2025" 
-  },
-  { 
-    id: "USR-1236", 
-    name: "Michael Brown", 
-    email: "michael.brown@shiptornado.com", 
-    role: "staff", 
-    status: "active",
-    lastLogin: "May 13, 2025" 
-  },
-  { 
-    id: "USR-1237", 
-    name: "Emily Davis", 
-    email: "emily.davis@shiptornado.com", 
-    role: "manager", 
-    status: "inactive",
-    lastLogin: "April 30, 2025" 
-  },
-  { 
-    id: "USR-1238", 
-    name: "Robert Wilson", 
-    email: "robert.wilson@shiptornado.com", 
-    role: "staff", 
-    status: "pending",
-    lastLogin: "Never" 
-  }
-];
+type SupabaseUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  lastLogin: string;
+};
 
 const UserStatus = ({ status }: { status: string }) => {
   const getStatusDetails = (status: string) => {
@@ -104,12 +69,31 @@ const UserRole = ({ role }: { role: string }) => {
 
 const Users = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [users, setUsers] = useState<SupabaseUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      setError(null);
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) {
+        setError("Failed to fetch users.");
+        setUsers([]);
+      } else {
+        setUsers(data || []);
+      }
+      setLoading(false);
+    };
+    fetchUsers();
+  }, []);
+
   const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.role.toLowerCase().includes(searchTerm.toLowerCase())
+    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.role?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -145,7 +129,11 @@ const Users = () => {
             </div>
           </div>
           <CardDescription>
-            Showing {filteredUsers.length} of {users.length} users
+            {loading
+              ? "Loading users..."
+              : error
+                ? error
+                : `Showing ${filteredUsers.length} of ${users.length} users`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -161,29 +149,45 @@ const Users = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-muted-foreground/20 flex items-center justify-center text-sm font-medium">
-                        {user.name.split(' ').map(name => name[0]).join('')}
-                      </div>
-                      <span className="font-medium">{user.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <UserRole role={user.role} />
-                  </TableCell>
-                  <TableCell>
-                    <UserStatus status={user.status} />
-                  </TableCell>
-                  <TableCell>{user.lastLogin}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm">Edit</Button>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">
+                    Loading...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">
+                    No users found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-muted-foreground/20 flex items-center justify-center text-sm font-medium">
+                          {user.name
+                            ? user.name.split(' ').map(name => name[0]).join('')
+                            : "?"}
+                        </div>
+                        <span className="font-medium">{user.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <UserRole role={user.role} />
+                    </TableCell>
+                    <TableCell>
+                      <UserStatus status={user.status} />
+                    </TableCell>
+                    <TableCell>{user.lastLogin || "Never"}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm">Edit</Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

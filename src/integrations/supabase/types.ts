@@ -159,6 +159,24 @@ export type Database = {
         }
         Relationships: []
       }
+      roles: {
+        Row: {
+          description: string | null
+          id: number
+          name: string
+        }
+        Insert: {
+          description?: string | null
+          id?: never
+          name: string
+        }
+        Update: {
+          description?: string | null
+          id?: never
+          name?: string
+        }
+        Relationships: []
+      }
       shipments: {
         Row: {
           actual_delivery_date: string | null
@@ -320,6 +338,7 @@ export type Database = {
           name: string
           password: string
           role: string
+          role_id: number | null
         }
         Insert: {
           email: string
@@ -327,6 +346,7 @@ export type Database = {
           name: string
           password: string
           role: string
+          role_id?: number | null
         }
         Update: {
           email?: string
@@ -334,8 +354,17 @@ export type Database = {
           name?: string
           password?: string
           role?: string
+          role_id?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_role"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
