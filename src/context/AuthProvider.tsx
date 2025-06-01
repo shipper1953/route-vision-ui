@@ -17,7 +17,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('Clearing auth state...');
     setUser(null);
     setUserProfile(null);
-    setLoading(false);
     setError(null);
     clearAuthStorage();
   };
@@ -28,6 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       try {
         console.log('Initializing auth...');
+        setLoading(true);
         
         // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession();
