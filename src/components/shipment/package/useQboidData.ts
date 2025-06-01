@@ -25,7 +25,7 @@ export const useQboidData = () => {
         
         // Get order data from localStorage first (faster)
         const ordersData = localStorage.getItem('orders');
-        let order = null;
+        let order: any = null;
         
         if (ordersData) {
           const orders = JSON.parse(ordersData);
