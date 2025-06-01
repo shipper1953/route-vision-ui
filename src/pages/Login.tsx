@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +15,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [defaultCredentials, setDefaultCredentials] = useState<{email: string, password: string} | null>(null);
   const [connectionError, setConnectionError] = useState(false);
+  const [setupFailed, setSetupFailed] = useState(false);
   const { login, error, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -33,15 +33,16 @@ const Login = () => {
         const result = await createDefaultAdminUser();
         setDefaultCredentials({ email: result.email, password: result.password });
         setConnectionError(false);
+        setSetupFailed(false);
         if (!result.exists) {
           toast.success("Default admin user created! Use the credentials shown below to login.");
         }
       } catch (error) {
         console.error("Failed to setup default admin:", error);
-        setConnectionError(true);
-        // Provide fallback credentials for demo purposes
+        setSetupFailed(true);
+        // Provide demo credentials but indicate they need to be created manually
         setDefaultCredentials({ 
-          email: "admin@example.com", 
+          email: "admin@shiptornado.dev", 
           password: "ShipTornado123!" 
         });
       }
@@ -114,10 +115,25 @@ const Login = () => {
             </div>
           )}
           
+          {/* Setup failed warning */}
+          {setupFailed && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+              <h3 className="font-medium text-red-900 mb-2">User Setup Required</h3>
+              <p className="text-sm text-red-700 mb-2">
+                Unable to automatically create admin user. Please create a user manually using the credentials below:
+              </p>
+              <p className="text-sm text-red-700">
+                You can create users through the "Create User" page after logging in with any existing account, or contact your administrator.
+              </p>
+            </div>
+          )}
+          
           {/* Default credentials info */}
           {defaultCredentials && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-              <h3 className="font-medium text-blue-900 mb-2">Default Admin Credentials</h3>
+              <h3 className="font-medium text-blue-900 mb-2">
+                {setupFailed ? "Suggested Admin Credentials" : "Default Admin Credentials"}
+              </h3>
               <p className="text-sm text-blue-700 mb-2">
                 Email: <code className="bg-blue-100 px-1 rounded">{defaultCredentials.email}</code>
               </p>
@@ -131,7 +147,7 @@ const Login = () => {
                 onClick={useDefaultCredentials}
                 className="w-full"
               >
-                Use Default Credentials
+                Use {setupFailed ? "Suggested" : "Default"} Credentials
               </Button>
             </div>
           )}
