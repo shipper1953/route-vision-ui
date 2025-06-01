@@ -31,33 +31,31 @@ export const useShipmentData = () => {
         console.log("Supabase shipments:", supabaseShipments.length);
         console.log("Order shipments:", orderShipments.length);
         
-        // Get local storage shipments
-        const localStorageShipments = loadShipmentsFromLocalStorage();
-        console.log("Local storage shipments:", localStorageShipments.length);
-        
         // Always prioritize Supabase shipments as the primary source
         if (supabaseShipments.length > 0) {
-          // Merge all sources with Supabase taking priority
-          const mergedShipments = mergeShipments(
-            supabaseShipments, 
-            [...localStorageShipments, ...orderShipments]
-          );
+          console.log("Using Supabase as primary source, total:", supabaseShipments.length);
+          setShipments(supabaseShipments);
+          saveShipmentsToLocalStorage(supabaseShipments);
           
-          console.log("Using Supabase as primary source, merged total:", mergedShipments.length);
-          setShipments(mergedShipments);
-          saveShipmentsToLocalStorage(mergedShipments);
-          
-        } else if (localStorageShipments.length > 0 || orderShipments.length > 0) {
-          // If no Supabase shipments, merge local storage and order shipments
-          const mergedShipments = mergeShipments(localStorageShipments, orderShipments);
-          console.log("No Supabase shipments, using local/order sources, total:", mergedShipments.length);
-          setShipments(mergedShipments);
-          saveShipmentsToLocalStorage(mergedShipments);
+        } else if (orderShipments.length > 0) {
+          // If no Supabase shipments, use order shipments
+          console.log("No Supabase shipments, using order sources, total:", orderShipments.length);
+          setShipments(orderShipments);
+          saveShipmentsToLocalStorage(orderShipments);
           
         } else {
-          // Use sample data only if nothing else is available
-          console.log("No shipments found from any source, using sample data");
-          setShipments(sampleShipments);
+          // Get local storage shipments as fallback
+          const localStorageShipments = loadShipmentsFromLocalStorage();
+          console.log("Local storage shipments:", localStorageShipments.length);
+          
+          if (localStorageShipments.length > 0) {
+            console.log("Using local storage shipments, total:", localStorageShipments.length);
+            setShipments(localStorageShipments);
+          } else {
+            // Use sample data only if nothing else is available and no user is logged in
+            console.log("No shipments found from any source, using sample data");
+            setShipments(sampleShipments);
+          }
         }
         
         // Log any Supabase errors but don't fail completely

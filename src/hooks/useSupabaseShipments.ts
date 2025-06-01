@@ -14,7 +14,18 @@ export const useSupabaseShipments = () => {
   useEffect(() => {
     const loadShipmentsFromSupabase = async () => {
       try {
-        // Get all shipments with their related order data
+        console.log("Loading shipments from Supabase...");
+        
+        // Get current user to ensure we only fetch their shipments
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.log("No authenticated user found");
+          setShipments([]);
+          setLoading(false);
+          return;
+        }
+
+        // Get all shipments for the current user with their related order data
         const { data: supabaseShipments, error: shipmentsError } = await supabase
           .from('shipments')
           .select(`
@@ -26,7 +37,8 @@ export const useSupabaseShipments = () => {
               qboid_dimensions
             )
           `)
-          .order('id', { ascending: false });
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
         
         console.log("Supabase shipments query result:", { data: supabaseShipments, error: shipmentsError });
         
@@ -35,7 +47,7 @@ export const useSupabaseShipments = () => {
         }
         
         if (!supabaseShipments?.length) {
-          console.log("No shipments found in Supabase");
+          console.log("No shipments found in Supabase for current user");
           setShipments([]);
           return;
         }
@@ -44,20 +56,9 @@ export const useSupabaseShipments = () => {
         const formattedShipments: Shipment[] = supabaseShipments.map(s => {
           const orderData = Array.isArray(s.orders) ? s.orders[0] : s.orders;
           
-          // Get dimensions from order if available, otherwise from shipment
+          // Get weight information
           let weight = 'Unknown';
-          if (orderData?.qboid_dimensions) {
-            try {
-              const dimensions = typeof orderData.qboid_dimensions === 'string' 
-                ? JSON.parse(orderData.qboid_dimensions) 
-                : orderData.qboid_dimensions;
-              if (dimensions && typeof dimensions === 'object' && 'weight' in dimensions) {
-                weight = `${dimensions.weight} oz`;
-              }
-            } catch (e) {
-              console.warn("Error parsing qboid dimensions:", e);
-            }
-          } else if (s.package_weights) {
+          if (s.package_weights) {
             try {
               const weights = typeof s.package_weights === 'string' 
                 ? JSON.parse(s.package_weights) 
@@ -68,6 +69,8 @@ export const useSupabaseShipments = () => {
             } catch (e) {
               console.warn("Error parsing package weights:", e);
             }
+          } else if (s.weight) {
+            weight = s.weight.includes('oz') || s.weight.includes('lb') ? s.weight : `${s.weight} oz`;
           }
           
           // Determine origin and destination
@@ -87,9 +90,9 @@ export const useSupabaseShipments = () => {
             }
           }
           
-          // Use estimated_delivery_date or actual_delivery_date as shipDate fallback since created_at doesn't exist
-          const shipDate = s.estimated_delivery_date ? 
-            new Date(s.estimated_delivery_date).toLocaleDateString() : 
+          // Use created_at for ship date
+          const shipDate = s.created_at ? 
+            new Date(s.created_at).toLocaleDateString() : 
             new Date().toLocaleDateString();
           
           return {
@@ -113,7 +116,7 @@ export const useSupabaseShipments = () => {
           };
         });
         
-        console.log(`Formatted ${formattedShipments.length} shipments from Supabase`);
+        console.log(`Formatted ${formattedShipments.length} shipments from Supabase for user ${user.email}`);
         setShipments(formattedShipments);
       } catch (err) {
         console.error("Error loading shipments from Supabase:", err);
