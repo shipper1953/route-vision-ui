@@ -34,22 +34,22 @@ const CreateShipment = () => {
     }
   }, [shipmentResponse]);
 
-  // Function to handle successful label purchase and upsert to Supabase
+  // Function to handle successful label purchase and insert to Supabase
   const handleLabelPurchased = async (result: any) => {
     console.log("Label purchased successfully:", result);
     setLabelData(result);
     setShowLabelDialog(true);
 
-    // Upsert shipment to Supabase with correct data types
+    // Insert shipment to Supabase with correct data types (no upsert to avoid conflict)
     if (result && result.id) {
       const shipmentData = {
         easypost_id: result.id,
         tracking_number: result.tracking_code,
-        carrier: result.selected_rate?.carrier,
-        service: result.selected_rate?.service,
+        carrier: result.selected_rate?.carrier || 'Unknown',
+        service: result.selected_rate?.service || 'Standard',
         status: "purchased",
         label_url: result.postage_label?.label_url,
-        weight: String(parseFloat(result.parcel?.weight) || 0), // Convert to string
+        weight: String(parseFloat(result.parcel?.weight) || 0),
         cost: parseFloat(result.selected_rate?.rate) || 0,
         package_dimensions: JSON.stringify({
           length: result.parcel?.length || 0,
@@ -65,14 +65,38 @@ const CreateShipment = () => {
         created_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
+      // Check if shipment already exists first
+      const { data: existingShipment } = await supabase
         .from('shipments')
-        .upsert(shipmentData, { onConflict: 'easypost_id', ignoreDuplicates: false });
+        .select('id')
+        .eq('easypost_id', result.id)
+        .maybeSingle();
 
-      if (error) {
-        toast.error("Failed to save shipment: " + error.message);
+      if (existingShipment) {
+        // Update existing shipment
+        const { error } = await supabase
+          .from('shipments')
+          .update(shipmentData)
+          .eq('easypost_id', result.id);
+
+        if (error) {
+          console.error("Failed to update shipment:", error);
+          toast.error("Failed to update shipment: " + error.message);
+        } else {
+          toast.success("Shipment updated in database!");
+        }
       } else {
-        toast.success("Shipment saved to database!");
+        // Insert new shipment
+        const { error } = await supabase
+          .from('shipments')
+          .insert(shipmentData);
+
+        if (error) {
+          console.error("Failed to save shipment:", error);
+          toast.error("Failed to save shipment: " + error.message);
+        } else {
+          toast.success("Shipment saved to database!");
+        }
       }
     }
   };
