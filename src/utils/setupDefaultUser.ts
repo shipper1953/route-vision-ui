@@ -2,7 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export const createDefaultAdminUser = async () => {
-  const defaultEmail = "admin@shiptornado.com";
+  const defaultEmail = "admin@example.com";
   const defaultPassword = "ShipTornado123!";
   
   try {

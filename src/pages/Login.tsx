@@ -15,6 +15,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [defaultCredentials, setDefaultCredentials] = useState<{email: string, password: string} | null>(null);
+  const [connectionError, setConnectionError] = useState(false);
   const { login, error, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -31,12 +32,18 @@ const Login = () => {
       try {
         const result = await createDefaultAdminUser();
         setDefaultCredentials({ email: result.email, password: result.password });
+        setConnectionError(false);
         if (!result.exists) {
           toast.success("Default admin user created! Use the credentials shown below to login.");
         }
       } catch (error) {
         console.error("Failed to setup default admin:", error);
-        // Don't show error to user as this is a fallback mechanism
+        setConnectionError(true);
+        // Provide fallback credentials for demo purposes
+        setDefaultCredentials({ 
+          email: "admin@example.com", 
+          password: "ShipTornado123!" 
+        });
       }
     };
 
@@ -52,7 +59,13 @@ const Login = () => {
       toast.success('Successfully logged in!');
       navigate('/');
     } catch (err) {
-      toast.error(error || 'Login failed');
+      const errorMessage = err instanceof Error ? err.message : 'Login failed';
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('network')) {
+        setConnectionError(true);
+        toast.error('Connection error. Please check your internet connection and try again.');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -90,6 +103,16 @@ const Login = () => {
             <ShipTornadoLogo size={48} />
             <h2 className="text-2xl font-bold">Ship Tornado</h2>
           </div>
+          
+          {/* Connection error warning */}
+          {connectionError && (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <h3 className="font-medium text-yellow-900 mb-2">Connection Issue Detected</h3>
+              <p className="text-sm text-yellow-700">
+                Unable to connect to authentication service. Please check your internet connection.
+              </p>
+            </div>
+          )}
           
           {/* Default credentials info */}
           {defaultCredentials && (
