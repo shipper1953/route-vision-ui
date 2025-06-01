@@ -5,12 +5,13 @@ import { toast } from "sonner";
 
 /**
  * Links a shipment to an order
- * @param orderId The ID of the order to update
+ * @param orderId The ID of the order to update (can be string or number)
  * @param shipmentInfo The shipment info to link
  */
-export async function linkShipmentToOrder(orderId: string, shipmentInfo: ShipmentInfo): Promise<void> {
+export async function linkShipmentToOrder(orderId: string | number, shipmentInfo: ShipmentInfo): Promise<void> {
   try {
-    console.log(`Linking shipment to order ${orderId}:`, shipmentInfo);
+    const orderIdStr = String(orderId);
+    console.log(`Linking shipment to order ${orderIdStr}:`, shipmentInfo);
     
     // Find the shipment in the database by easypost_id
     const { data: shipment, error: shipmentError } = await supabase
@@ -29,11 +30,10 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
       console.log(`Found shipment in database with id: ${shipment.id}`);
       
       // Try to update order using multiple strategies
-      let updateResult = null;
-      let updateError = null;
+      let updateSuccess = false;
       
       // Strategy 1: Try with order_id_link (string field)
-      const searchId = orderId.startsWith('ORD-') ? orderId : `ORD-${orderId}`;
+      const searchId = orderIdStr.startsWith('ORD-') ? orderIdStr : `ORD-${orderIdStr}`;
       console.log("Attempting to update order with order_id_link:", searchId);
       
       const { error: linkError } = await supabase
@@ -45,42 +45,41 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
         .eq('order_id_link', searchId);
       
       if (!linkError) {
-        console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderId} via order_id_link and updated status to shipped`);
-        toast.success(`Order ${orderId} updated with shipment information and marked as shipped`);
-        return;
+        console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderIdStr} via order_id_link and updated status to shipped`);
+        toast.success(`Order ${orderIdStr} updated with shipment information and marked as shipped`);
+        updateSuccess = true;
       } else {
         console.warn("Failed to update via order_id_link:", linkError);
-        updateError = linkError;
       }
       
       // Strategy 2: Try with numeric order_id if the first strategy failed
-      const numericOrderId = orderId.replace('ORD-', '');
-      if (!isNaN(Number(numericOrderId))) {
-        console.log("Attempting to update order with numeric order_id:", numericOrderId);
-        
-        const { error: numericError } = await supabase
-          .from('orders')
-          .update({ 
-            shipment_id: shipment.id,
-            status: 'shipped'
-          })
-          .eq('order_id', parseInt(numericOrderId));
-        
-        if (!numericError) {
-          console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderId} via numeric order_id and updated status to shipped`);
-          toast.success(`Order ${orderId} updated with shipment information and marked as shipped`);
-          return;
-        } else {
-          console.error("Failed to update via numeric order_id:", numericError);
-          updateError = numericError;
+      if (!updateSuccess) {
+        const numericOrderId = orderIdStr.replace('ORD-', '');
+        if (!isNaN(Number(numericOrderId))) {
+          console.log("Attempting to update order with numeric order_id:", numericOrderId);
+          
+          const { error: numericError } = await supabase
+            .from('orders')
+            .update({ 
+              shipment_id: shipment.id,
+              status: 'shipped'
+            })
+            .eq('order_id', parseInt(numericOrderId));
+          
+          if (!numericError) {
+            console.log(`Successfully linked shipment ${shipmentInfo.id} to order ${orderIdStr} via numeric order_id and updated status to shipped`);
+            toast.success(`Order ${orderIdStr} updated with shipment information and marked as shipped`);
+            updateSuccess = true;
+          } else {
+            console.error("Failed to update via numeric order_id:", numericError);
+          }
         }
       }
       
-      // If both strategies failed, throw the last error
-      if (updateError) {
-        console.error("All update strategies failed. Last error:", updateError);
+      if (!updateSuccess) {
+        console.error("All update strategies failed for order:", orderIdStr);
         toast.error("Failed to update order with shipment information");
-        throw updateError;
+        throw new Error("Failed to update order with shipment information");
       }
       
     } else {
@@ -101,8 +100,8 @@ export async function linkShipmentToOrder(orderId: string, shipmentInfo: Shipmen
  * @returns The updated order
  * @deprecated Use linkShipmentToOrder instead
  */
-export async function updateOrderWithShipment(orderId: string, shipmentInfo: ShipmentInfo): Promise<OrderData> {
+export async function updateOrderWithShipment(orderId: string | number, shipmentInfo: ShipmentInfo): Promise<OrderData> {
   return linkShipmentToOrder(orderId, shipmentInfo).then(() => {
-    return { id: orderId } as OrderData;
+    return { id: String(orderId) } as OrderData;
   });
 }

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { ShipmentResponse, SmartRate, Rate } from '@/services/easypost';
 import { supabase } from '@/integrations/supabase/client';
+import { linkShipmentToOrder } from '@/services/orderShipmentService';
 
 export const useShipment = (orderId?: string | null) => {
   const [shipmentResponse, setShipmentResponse] = useState<ShipmentResponse | null>(null);
@@ -43,7 +44,7 @@ export const useShipment = (orderId?: string | null) => {
         body: { 
           shipmentId, 
           rateId,
-          orderId: orderId // Pass orderId to edge function
+          orderId: orderId ? String(orderId) : null // Ensure orderId is a string
         }
       });
 
@@ -57,6 +58,24 @@ export const useShipment = (orderId?: string | null) => {
       }
 
       console.log('Label purchased successfully:', data);
+      
+      // If we have an orderId, also try to link it to the order directly
+      if (orderId) {
+        try {
+          await linkShipmentToOrder(String(orderId), {
+            id: data.id,
+            carrier: data.selected_rate?.carrier || 'Unknown',
+            service: data.selected_rate?.service || 'Standard',
+            trackingNumber: data.tracking_code || 'Pending',
+            trackingUrl: data.tracker?.public_url || '#',
+            cost: parseFloat(data.selected_rate?.rate) || 0
+          });
+          console.log(`Successfully linked shipment to order ${orderId}`);
+        } catch (linkError) {
+          console.error('Error linking shipment to order:', linkError);
+          // Don't fail the whole operation if linking fails
+        }
+      }
       
       // Store in session storage for the shipments page
       sessionStorage.setItem('lastPurchasedLabel', JSON.stringify(data));

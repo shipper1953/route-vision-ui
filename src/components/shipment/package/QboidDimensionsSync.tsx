@@ -8,7 +8,7 @@ import { RefreshCw, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface QboidDimensionsSyncProps {
-  orderId?: string;
+  orderId?: string | number;
 }
 
 export const QboidDimensionsSync = ({ orderId }: QboidDimensionsSyncProps) => {
@@ -24,8 +24,13 @@ export const QboidDimensionsSync = ({ orderId }: QboidDimensionsSyncProps) => {
     try {
       console.log('Fetching latest Qboid dimensions for order:', orderId);
       
-      // Search for the most recent Qboid event for this order
-      const searchIds = [orderId, `ORD-${orderId}`, orderId.replace('ORD-', '')];
+      // Convert orderId to string and create search variants
+      const orderIdStr = String(orderId);
+      const searchIds = [
+        orderIdStr, 
+        `ORD-${orderIdStr}`, 
+        orderIdStr.startsWith('ORD-') ? orderIdStr.replace('ORD-', '') : orderIdStr
+      ];
       
       const { data: events, error } = await supabase
         .from('qboid_events')
@@ -44,9 +49,7 @@ export const QboidDimensionsSync = ({ orderId }: QboidDimensionsSyncProps) => {
       const matchingEvent = events?.find(event => {
         const eventData = event.data as any;
         return searchIds.some(id => 
-          eventData?.orderId === id || 
-          eventData?.barcode === id ||
-          String(eventData?.orderId) === String(id) ||
+          String(eventData?.orderId) === String(id) || 
           String(eventData?.barcode) === String(id)
         );
       });
@@ -83,6 +86,13 @@ export const QboidDimensionsSync = ({ orderId }: QboidDimensionsSyncProps) => {
 
     console.log('Setting up real-time listener for Qboid dimensions, order:', orderId);
     
+    const orderIdStr = String(orderId);
+    const searchIds = [
+      orderIdStr, 
+      `ORD-${orderIdStr}`, 
+      orderIdStr.startsWith('ORD-') ? orderIdStr.replace('ORD-', '') : orderIdStr
+    ];
+    
     const channel = supabase
       .channel('qboid-dimensions-realtime')
       .on(
@@ -97,13 +107,10 @@ export const QboidDimensionsSync = ({ orderId }: QboidDimensionsSyncProps) => {
           console.log('Real-time Qboid event received:', payload);
           
           const eventData = payload.new.data as any;
-          const searchIds = [orderId, `ORD-${orderId}`, orderId.replace('ORD-', '')];
           
           // Check if this event is for our order
           const isForThisOrder = searchIds.some(id => 
-            eventData?.orderId === id || 
-            eventData?.barcode === id ||
-            String(eventData?.orderId) === String(id) ||
+            String(eventData?.orderId) === String(id) || 
             String(eventData?.barcode) === String(id)
           );
           
