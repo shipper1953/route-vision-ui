@@ -24,7 +24,7 @@ export function ShipTornadoLogo({ className, size = 24, spin = false }: ShipTorn
                 height={baseSize} 
                 viewBox="0 0 24 24"
                 className={cn(
-                  "transition-all text-tms-navy", // Changed to use tms-navy instead of white
+                  "transition-all", // Removed the fixed tms-navy color
                   spin && "tornado-spin"
                 )}
                 fill="none"
