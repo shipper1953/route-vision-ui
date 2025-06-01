@@ -40,7 +40,7 @@ const CreateShipment = () => {
     setLabelData(result);
     setShowLabelDialog(true);
 
-    // Insert shipment to Supabase with correct data types (no upsert to avoid conflict)
+    // Insert shipment to Supabase with correct data types matching the schema
     if (result && result.id) {
       console.log("Preparing to save shipment to database with easypost_id:", result.id);
       
@@ -62,7 +62,8 @@ const CreateShipment = () => {
           weight: result.parcel?.weight || 0,
           weight_unit: result.parcel?.weight_unit || 'oz'
         }),
-        order_id: result.reference || orderId || null,
+        // Convert orderId to number if it's a numeric string, otherwise null
+        order_id: orderId && !isNaN(Number(orderId)) ? Number(orderId) : null,
         tracking_url: result.tracker?.public_url,
         created_at: new Date().toISOString(),
       };
