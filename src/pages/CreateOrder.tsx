@@ -10,15 +10,11 @@ import { OrderFormActions } from "@/components/order/OrderFormActions";
 import { orderFormSchema, OrderFormValues } from "@/types/order";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/context";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useCreateOrder } from "@/hooks/useCreateOrder";
 
 const CreateOrder = () => {
-  const { isAuthenticated, loading, user } = useAuth();
-  const navigate = useNavigate();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isAuthenticated, loading } = useAuth();
+  const { isSubmitting, onSubmit } = useCreateOrder();
 
   // Initialize the form with the correct type
   const form = useForm<OrderFormValues>({
@@ -39,53 +35,6 @@ const CreateOrder = () => {
       country: "US",
     },
   });
-
-  const onSubmit = async (values: OrderFormValues) => {
-    if (!user?.id) {
-      toast.error("You must be logged in to create an order");
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    // Generate a unique order ID
-    const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
-    
-    // Prepare order data for Supabase with correct types
-    const orderData = {
-      order_id: orderId, // Add the required order_id field
-      customer_name: values.customerName,
-      customer_company: values.customerCompany,
-      customer_email: values.customerEmail,
-      customer_phone: values.customerPhone,
-      required_delivery_date: values.requiredDeliveryDate ? values.requiredDeliveryDate.toISOString().split('T')[0] : null,
-      items: JSON.stringify([{ count: values.items, description: "Order items" }]), // Convert to JSON string
-      value: parseFloat(values.value) || 0,
-      shipping_address: JSON.stringify({
-        street1: values.street1,
-        street2: values.street2,
-        city: values.city,
-        state: values.state,
-        zip: values.zip,
-        country: values.country,
-      }),
-      status: "ready_to_ship",
-      user_id: user.id, // Set the user_id from authenticated user
-      created_at: new Date().toISOString(),
-    };
-
-    console.log("Creating order with data:", orderData);
-
-    const { error } = await supabase.from("orders").insert(orderData);
-    if (error) {
-      console.error("Supabase error:", error);
-      toast.error("Failed to create order: " + error.message);
-    } else {
-      toast.success("Order created successfully!");
-      navigate("/orders");
-    }
-    setIsSubmitting(false);
-  };
 
   if (loading) {
     return (
