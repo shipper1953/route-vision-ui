@@ -29,26 +29,32 @@ const handler = async (req: Request): Promise<Response> => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Send styled welcome email using Supabase's built-in email functionality
-    const { error } = await supabase.auth.admin.generateLink({
-      type: 'signup',
-      email: email,
-      options: {
-        redirectTo: `${req.headers.get('origin') || 'http://localhost:3000'}/`,
-        data: {
-          name: name,
-          email_confirm: true
-        }
-      }
-    });
+    // Auto-confirm the user's email since we want immediate access
+    const { data: user, error: getUserError } = await supabase.auth.admin.getUserByEmail(email);
+    
+    if (getUserError) {
+      console.error('Error getting user by email:', getUserError);
+      throw getUserError;
+    }
 
-    if (error) {
-      console.error('Error sending welcome email:', error);
-      throw error;
+    if (user?.user && !user.user.email_confirmed_at) {
+      console.log('Auto-confirming email for user:', email);
+      const { error: confirmError } = await supabase.auth.admin.updateUserById(
+        user.user.id,
+        { 
+          email_confirm: true,
+          user_metadata: { name: name }
+        }
+      );
+
+      if (confirmError) {
+        console.error('Error confirming user email:', confirmError);
+        throw confirmError;
+      }
     }
 
     return new Response(
-      JSON.stringify({ message: 'Welcome email sent successfully' }),
+      JSON.stringify({ message: 'User email confirmed successfully' }),
       {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },

@@ -201,12 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         console.log('Account created successfully for:', data.user.email);
         
-        // The database trigger will automatically:
-        // 1. Create user profile in users table
-        // 2. Assign to Demo company
-        // 3. Set role as company_admin
-        
-        // Send welcome email via edge function
+        // Send welcome email via edge function which will also auto-confirm the email
         try {
           const response = await supabase.functions.invoke('send-welcome-email', {
             body: {
@@ -217,6 +212,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (response.error) {
             console.warn('Failed to send welcome email:', response.error);
+          } else {
+            console.log('Welcome email sent and user confirmed');
           }
         } catch (emailError) {
           console.warn('Failed to send welcome email:', emailError);
