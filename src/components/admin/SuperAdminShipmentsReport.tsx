@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -162,8 +163,14 @@ export const SuperAdminShipmentsReport = () => {
     ? shipments 
     : shipments.filter(s => s.company_id === selectedCompany);
 
-  const uniqueCompanies = Array.from(new Set(shipments.map(s => ({ id: s.company_id, name: s.company_name }))))
-    .filter(c => c.id && c.id !== 'none');
+  // Create unique companies map to avoid duplicates
+  const uniqueCompaniesMap = new Map<string, { id: string; name: string }>();
+  shipments.forEach(s => {
+    if (s.company_id && s.company_id !== 'none') {
+      uniqueCompaniesMap.set(s.company_id, { id: s.company_id, name: s.company_name });
+    }
+  });
+  const uniqueCompanies = Array.from(uniqueCompaniesMap.values());
 
   const totalMetrics = {
     shipments: filteredShipments.length,
