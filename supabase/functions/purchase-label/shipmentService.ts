@@ -13,6 +13,24 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
 
   const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
+  // Get the user's company_id if userId is provided
+  let companyId = null;
+  if (userId) {
+    console.log("Looking up company_id for user:", userId);
+    const { data: userData, error: userError } = await supabaseClient
+      .from('users')
+      .select('company_id')
+      .eq('id', userId)
+      .maybeSingle();
+    
+    if (userError) {
+      console.error("Error looking up user company:", userError);
+    } else if (userData) {
+      companyId = userData.company_id;
+      console.log("Found company_id for user:", companyId);
+    }
+  }
+
   // Prepare shipment data with correct column names that match the database schema
   const shipmentData: any = {
     easypost_id: responseData.id,
@@ -34,11 +52,12 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
       weight_unit: responseData.parcel?.weight_unit || 'oz'
     }),
     created_at: new Date().toISOString(),
-    // Add user_id if provided
+    // Add user_id and company_id if available
     ...(userId && { user_id: userId }),
+    ...(companyId && { company_id: companyId }),
   };
 
-  console.log("Saving shipment to database with user_id:", userId);
+  console.log("Saving shipment to database with user_id:", userId, "and company_id:", companyId);
   console.log("Shipment data:", shipmentData);
   
   // First, check if the shipment exists using easypost_id
@@ -66,7 +85,7 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
     if (updateError) {
       console.error('Error updating existing shipment:', updateError);
     } else {
-      console.log('Existing shipment updated successfully with user_id:', userId);
+      console.log('Existing shipment updated successfully with user_id:', userId, 'and company_id:', companyId);
       finalShipmentId = updatedShipment?.id;
     }
   } else {
@@ -80,7 +99,7 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
     if (insertError) {
       console.error('Error inserting new shipment:', insertError);
     } else {
-      console.log('New shipment inserted successfully with user_id:', userId, newShipment);
+      console.log('New shipment inserted successfully with user_id:', userId, 'company_id:', companyId, newShipment);
       finalShipmentId = newShipment?.id;
     }
   }

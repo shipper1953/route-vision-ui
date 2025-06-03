@@ -47,12 +47,24 @@ export const SuperAdminShipmentsReport = () => {
     try {
       setLoading(true);
 
-      // Get all shipments with costs
+      // Get all shipments with costs - using a more comprehensive query
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
-        .select('*')
+        .select(`
+          *,
+          users!left (
+            company_id,
+            companies!left (
+              name,
+              markup_type,
+              markup_value
+            )
+          )
+        `)
         .not('cost', 'is', null)
         .order('created_at', { ascending: false });
+
+      console.log("Shipments query result:", { data: shipmentsData, error: shipmentsError });
 
       if (shipmentsError) throw shipmentsError;
 
@@ -63,48 +75,48 @@ export const SuperAdminShipmentsReport = () => {
         return;
       }
 
-      // Get all users to map user_id to company_id
-      const userIds = [...new Set(shipmentsData.map(s => s.user_id).filter(Boolean))];
-      
-      let usersData = [];
-      if (userIds.length > 0) {
-        const { data: users, error: usersError } = await supabase
-          .from('users')
-          .select('id, company_id')
-          .in('id', userIds);
+      // Get all companies for lookup
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('companies')
+        .select('id, name, markup_type, markup_value');
 
-        if (usersError) {
-          console.error('Error fetching users:', usersError);
-        } else {
-          usersData = users || [];
-        }
+      if (companiesError) {
+        console.error('Error fetching companies:', companiesError);
       }
 
-      // Get all companies
-      const companyIds = [...new Set(usersData.map(u => u.company_id).filter(Boolean))];
-      
-      let companiesData = [];
-      if (companyIds.length > 0) {
-        const { data: companies, error: companiesError } = await supabase
-          .from('companies')
-          .select('id, name, markup_type, markup_value')
-          .in('id', companyIds);
-
-        if (companiesError) {
-          console.error('Error fetching companies:', companiesError);
-        } else {
-          companiesData = companies || [];
-        }
-      }
-
-      // Create lookup maps
-      const userToCompanyMap = new Map(usersData.map(u => [u.id, u.company_id]));
-      const companyMap = new Map(companiesData.map(c => [c.id, c]));
+      const companyMap = new Map(companiesData?.map(c => [c.id, c]) || []);
 
       // Process shipments data to calculate original cost and profit
       const processedShipments: ShipmentReport[] = shipmentsData.map(shipment => {
-        const companyId = userToCompanyMap.get(shipment.user_id);
-        const companyData = companyId ? companyMap.get(companyId) : null;
+        // Get company info - either directly from shipment.company_id or through user relationship
+        let companyData = null;
+        let companyId = null;
+        let companyName = 'Unknown Company';
+
+        if (shipment.company_id) {
+          // Direct company_id on shipment
+          companyId = shipment.company_id;
+          companyData = companyMap.get(companyId);
+          companyName = companyData?.name || 'Unknown Company';
+        } else if (shipment.users && Array.isArray(shipment.users) && shipment.users[0]?.companies) {
+          // Company through user relationship (nested query result)
+          const userCompany = Array.isArray(shipment.users[0].companies) 
+            ? shipment.users[0].companies[0] 
+            : shipment.users[0].companies;
+          if (userCompany) {
+            companyId = shipment.users[0].company_id;
+            companyName = userCompany.name;
+            companyData = {
+              markup_type: userCompany.markup_type,
+              markup_value: userCompany.markup_value
+            };
+          }
+        } else if (shipment.users && shipment.users.company_id) {
+          // Single user object with company_id
+          companyId = shipment.users.company_id;
+          companyData = companyMap.get(companyId);
+          companyName = companyData?.name || 'Unknown Company';
+        }
         
         // Calculate original cost based on markup (reverse calculation)
         let originalCost = shipment.cost;
@@ -130,11 +142,12 @@ export const SuperAdminShipmentsReport = () => {
           original_cost: originalCost,
           profit: profit,
           created_at: shipment.created_at,
-          company_name: companyData?.name || 'Unknown Company',
+          company_name: companyName,
           company_id: String(companyId || '')
         };
       });
 
+      console.log(`Processed ${processedShipments.length} shipments`);
       setShipments(processedShipments);
 
       // Calculate company summaries
@@ -142,21 +155,23 @@ export const SuperAdminShipmentsReport = () => {
       
       processedShipments.forEach(shipment => {
         const key = shipment.company_id;
-        if (summaryMap.has(key)) {
-          const summary = summaryMap.get(key)!;
-          summary.total_shipments += 1;
-          summary.total_revenue += shipment.cost;
-          summary.total_cost += shipment.original_cost;
-          summary.total_profit += shipment.profit;
-        } else {
-          summaryMap.set(key, {
-            company_id: shipment.company_id,
-            company_name: shipment.company_name,
-            total_shipments: 1,
-            total_revenue: shipment.cost,
-            total_cost: shipment.original_cost,
-            total_profit: shipment.profit
-          });
+        if (key && key !== '') {
+          if (summaryMap.has(key)) {
+            const summary = summaryMap.get(key)!;
+            summary.total_shipments += 1;
+            summary.total_revenue += shipment.cost;
+            summary.total_cost += shipment.original_cost;
+            summary.total_profit += shipment.profit;
+          } else {
+            summaryMap.set(key, {
+              company_id: shipment.company_id,
+              company_name: shipment.company_name,
+              total_shipments: 1,
+              total_revenue: shipment.cost,
+              total_cost: shipment.original_cost,
+              total_profit: shipment.profit
+            });
+          }
         }
       });
 
@@ -174,7 +189,7 @@ export const SuperAdminShipmentsReport = () => {
     : shipments.filter(s => s.company_id === selectedCompany);
 
   const uniqueCompanies = Array.from(new Set(shipments.map(s => ({ id: s.company_id, name: s.company_name }))))
-    .filter(c => c.id);
+    .filter(c => c.id && c.id !== '');
 
   const totalMetrics = {
     shipments: filteredShipments.length,
