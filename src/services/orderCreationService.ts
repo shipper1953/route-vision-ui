@@ -28,7 +28,7 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
 
   const { data, error } = await supabase
     .from('orders')
-    .insert({
+    .insert([{
       customer_name: orderData.customerName,
       customer_company: orderData.customerCompany,
       customer_email: orderData.customerEmail,
@@ -42,7 +42,7 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
       user_id: user.id,
       company_id: userProfile.company_id,
       warehouse_id: defaultWarehouseId
-    })
+    }])
     .select()
     .single();
 
