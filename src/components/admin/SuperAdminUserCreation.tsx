@@ -22,6 +22,18 @@ interface DatabaseUser {
   warehouse_ids: any;
 }
 
+interface DatabaseCompany {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: any;
+  settings: any;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+}
+
 export const SuperAdminUserCreation = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -80,7 +92,21 @@ export const SuperAdminUserCreation = () => {
         .order('name');
 
       if (error) throw error;
-      setCompanies(data || []);
+      
+      // Transform database companies to Company format
+      const transformedCompanies: Company[] = (data as DatabaseCompany[])?.map(company => ({
+        id: company.id,
+        name: company.name,
+        email: company.email || undefined,
+        phone: company.phone || undefined,
+        address: company.address || undefined,
+        settings: company.settings,
+        created_at: company.created_at,
+        updated_at: company.updated_at,
+        is_active: company.is_active
+      })) || [];
+      
+      setCompanies(transformedCompanies);
     } catch (error) {
       console.error('Error fetching companies:', error);
       toast.error('Failed to fetch companies');
