@@ -77,6 +77,7 @@ export const ShipmentsTable = ({
             <TableHead>Shipment</TableHead>
             <TableHead>Tracking</TableHead>
             <TableHead>Carrier</TableHead>
+            <TableHead>Service</TableHead>
             <TableHead>Weight</TableHead>
             <TableHead>Route</TableHead>
             <TableHead>Ship Date</TableHead>
@@ -113,6 +114,7 @@ export const ShipmentsTable = ({
                   <span>{shipment.carrier}</span>
                 </div>
               </TableCell>
+              <TableCell>{shipment.service}</TableCell>
               <TableCell>{shipment.weight}</TableCell>
               <TableCell>
                 <div className="text-sm">
@@ -149,7 +151,7 @@ export const ShipmentsTable = ({
           
           {filteredShipments.length === 0 && (
             <TableRow>
-              <TableCell colSpan={9} className="h-24 text-center">
+              <TableCell colSpan={10} className="h-24 text-center">
                 No shipments found.
               </TableCell>
             </TableRow>

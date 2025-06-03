@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -46,7 +47,7 @@ export const SuperAdminShipmentsReport = () => {
     try {
       setLoading(true);
 
-      // First, get all shipments with costs
+      // Get all shipments with costs
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
         .select('*')
@@ -64,29 +65,41 @@ export const SuperAdminShipmentsReport = () => {
 
       // Get all users to map user_id to company_id
       const userIds = [...new Set(shipmentsData.map(s => s.user_id).filter(Boolean))];
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('id, company_id')
-        .in('id', userIds);
+      
+      let usersData = [];
+      if (userIds.length > 0) {
+        const { data: users, error: usersError } = await supabase
+          .from('users')
+          .select('id, company_id')
+          .in('id', userIds);
 
-      if (usersError) {
-        console.error('Error fetching users:', usersError);
+        if (usersError) {
+          console.error('Error fetching users:', usersError);
+        } else {
+          usersData = users || [];
+        }
       }
 
       // Get all companies
-      const companyIds = [...new Set(usersData?.map(u => u.company_id).filter(Boolean) || [])];
-      const { data: companiesData, error: companiesError } = await supabase
-        .from('companies')
-        .select('id, name, markup_type, markup_value')
-        .in('id', companyIds);
+      const companyIds = [...new Set(usersData.map(u => u.company_id).filter(Boolean))];
+      
+      let companiesData = [];
+      if (companyIds.length > 0) {
+        const { data: companies, error: companiesError } = await supabase
+          .from('companies')
+          .select('id, name, markup_type, markup_value')
+          .in('id', companyIds);
 
-      if (companiesError) {
-        console.error('Error fetching companies:', companiesError);
+        if (companiesError) {
+          console.error('Error fetching companies:', companiesError);
+        } else {
+          companiesData = companies || [];
+        }
       }
 
       // Create lookup maps
-      const userToCompanyMap = new Map(usersData?.map(u => [u.id, u.company_id]) || []);
-      const companyMap = new Map(companiesData?.map(c => [c.id, c]) || []);
+      const userToCompanyMap = new Map(usersData.map(u => [u.id, u.company_id]));
+      const companyMap = new Map(companiesData.map(c => [c.id, c]));
 
       // Process shipments data to calculate original cost and profit
       const processedShipments: ShipmentReport[] = shipmentsData.map(shipment => {
@@ -117,7 +130,7 @@ export const SuperAdminShipmentsReport = () => {
           original_cost: originalCost,
           profit: profit,
           created_at: shipment.created_at,
-          company_name: companyData?.name || 'Unknown',
+          company_name: companyData?.name || 'Unknown Company',
           company_id: String(companyId || '')
         };
       });
@@ -271,7 +284,8 @@ export const SuperAdminShipmentsReport = () => {
                 <TableRow>
                   <TableHead>Tracking #</TableHead>
                   <TableHead>Company</TableHead>
-                  <TableHead>Carrier/Service</TableHead>
+                  <TableHead>Carrier</TableHead>
+                  <TableHead>Service</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead className="text-right">Base Cost</TableHead>
@@ -286,7 +300,8 @@ export const SuperAdminShipmentsReport = () => {
                       {shipment.tracking_number || shipment.easypost_id}
                     </TableCell>
                     <TableCell>{shipment.company_name}</TableCell>
-                    <TableCell>{shipment.carrier} {shipment.service}</TableCell>
+                    <TableCell>{shipment.carrier}</TableCell>
+                    <TableCell>{shipment.service}</TableCell>
                     <TableCell>
                       <span className={`inline-block px-2 py-1 text-xs rounded-full ${
                         shipment.status === 'purchased' ? 'bg-green-100 text-green-800' :
