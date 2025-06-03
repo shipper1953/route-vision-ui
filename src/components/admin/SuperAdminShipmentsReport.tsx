@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -47,20 +46,10 @@ export const SuperAdminShipmentsReport = () => {
     try {
       setLoading(true);
 
-      // Get all shipments with costs - using a more comprehensive query
+      // First, get all shipments with costs
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
-        .select(`
-          *,
-          users!left (
-            company_id,
-            companies!left (
-              name,
-              markup_type,
-              markup_value
-            )
-          )
-        `)
+        .select('*')
         .not('cost', 'is', null)
         .order('created_at', { ascending: false });
 
@@ -86,6 +75,17 @@ export const SuperAdminShipmentsReport = () => {
 
       const companyMap = new Map(companiesData?.map(c => [c.id, c]) || []);
 
+      // Get all users to link shipments to companies through user_id
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, company_id');
+
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+      }
+
+      const userCompanyMap = new Map(usersData?.map(u => [u.id, u.company_id]) || []);
+
       // Process shipments data to calculate original cost and profit
       const processedShipments: ShipmentReport[] = shipmentsData.map(shipment => {
         // Get company info - either directly from shipment.company_id or through user relationship
@@ -98,24 +98,13 @@ export const SuperAdminShipmentsReport = () => {
           companyId = shipment.company_id;
           companyData = companyMap.get(companyId);
           companyName = companyData?.name || 'Unknown Company';
-        } else if (shipment.users && Array.isArray(shipment.users) && shipment.users[0]?.companies) {
-          // Company through user relationship (nested query result)
-          const userCompany = Array.isArray(shipment.users[0].companies) 
-            ? shipment.users[0].companies[0] 
-            : shipment.users[0].companies;
-          if (userCompany) {
-            companyId = shipment.users[0].company_id;
-            companyName = userCompany.name;
-            companyData = {
-              markup_type: userCompany.markup_type,
-              markup_value: userCompany.markup_value
-            };
+        } else if (shipment.user_id) {
+          // Get company through user relationship
+          companyId = userCompanyMap.get(shipment.user_id);
+          if (companyId) {
+            companyData = companyMap.get(companyId);
+            companyName = companyData?.name || 'Unknown Company';
           }
-        } else if (shipment.users && shipment.users.company_id) {
-          // Single user object with company_id
-          companyId = shipment.users.company_id;
-          companyData = companyMap.get(companyId);
-          companyName = companyData?.name || 'Unknown Company';
         }
         
         // Calculate original cost based on markup (reverse calculation)
