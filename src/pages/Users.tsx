@@ -31,7 +31,8 @@ type DatabaseUser = {
   email: string;
   role: string;
   password: string;
-  role_id: number;
+  company_id: string | null;
+  warehouse_ids: any;
 };
 
 type SupabaseUser = {
