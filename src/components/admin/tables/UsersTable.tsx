@@ -5,19 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserProfile, Company } from "@/types/auth";
 import { UserX } from "lucide-react";
+import { EditUserDialog } from "../dialogs/EditUserDialog";
 
 interface UsersTableProps {
   users: UserProfile[];
   companies: Company[];
   onUpdateUserRole: (userId: string, newRole: 'user' | 'company_admin' | 'super_admin') => void;
   onRemoveUserFromCompany: (userId: string) => void;
+  onUserUpdated: () => void;
 }
 
 export const UsersTable = ({ 
   users, 
   companies, 
   onUpdateUserRole, 
-  onRemoveUserFromCompany 
+  onRemoveUserFromCompany,
+  onUserUpdated
 }: UsersTableProps) => {
   const getCompanyName = (companyId?: string) => {
     if (!companyId) return 'No Company';
@@ -49,6 +52,11 @@ export const UsersTable = ({
             <TableCell>{getCompanyName(user.company_id)}</TableCell>
             <TableCell>
               <div className="flex items-center gap-2">
+                <EditUserDialog 
+                  user={user} 
+                  companies={companies} 
+                  onUserUpdated={onUserUpdated} 
+                />
                 <Select
                   value={user.role}
                   onValueChange={(newRole: 'user' | 'company_admin' | 'super_admin') => onUpdateUserRole(user.id, newRole)}

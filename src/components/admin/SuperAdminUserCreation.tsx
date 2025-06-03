@@ -35,6 +35,7 @@ export const SuperAdminUserCreation = () => {
           companies={companies}
           onUpdateUserRole={updateUserRole}
           onRemoveUserFromCompany={removeUserFromCompany}
+          onUserUpdated={fetchUsers}
         />
       </CardContent>
     </Card>
