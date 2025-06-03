@@ -1,3 +1,4 @@
+
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
@@ -9,15 +10,18 @@ interface NavItemProps {
   label: string;
   isCollapsed: boolean;
   adminOnly?: boolean;
+  superAdminOnly?: boolean;
 }
 
-export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false }: NavItemProps) => {
+export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false, superAdminOnly = false }: NavItemProps) => {
   const location = useLocation();
   const { setIsCollapsed } = useSidebar();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAuth();
   const isActive = location.pathname === to;
   
+  // Check permissions
   if (adminOnly && !isAdmin) return null;
+  if (superAdminOnly && !isSuperAdmin) return null;
 
   const handleClick = () => {
     // Collapse sidebar when option is selected

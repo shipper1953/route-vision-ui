@@ -5,7 +5,8 @@ import {
   Truck, 
   Users, 
   Settings, 
-  Shield
+  Shield,
+  Crown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
@@ -18,9 +19,9 @@ import { UserProfile } from "./sidebar/UserProfile";
 export function TmsSidebar() {
   const { isCollapsed, toggleSidebar, sidebarRef } = useSidebar();
 
-  // Handle click on open space when collapsed to expand
-  const handleSidebarClick = (e: React.MouseEvent) => {
-    if (isCollapsed && e.target === e.currentTarget) {
+  // Expand sidebar when clicking anywhere in it
+  const handleSidebarClick = () => {
+    if (isCollapsed) {
       toggleSidebar();
     }
   };
@@ -54,6 +55,7 @@ export function TmsSidebar() {
         <CreateMenu isCollapsed={isCollapsed} />
         <NavItem to="/users" icon={Users} label="Users" isCollapsed={isCollapsed} adminOnly={true} />
         <NavItem to="/admin" icon={Shield} label="Admin Panel" isCollapsed={isCollapsed} adminOnly={true} />
+        <NavItem to="/super-admin" icon={Crown} label="Super Admin Panel" isCollapsed={isCollapsed} superAdminOnly={true} />
         <NavItem to="/settings" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
       </div>
 

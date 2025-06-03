@@ -50,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (mounted) {
               try {
                 const profile = await fetchUserProfile(session.user.id);
+                console.log('Fetched user profile:', profile);
                 if (mounted) {
                   setUserProfile(profile);
                 }
@@ -93,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             try {
               await createUserProfile(session.user);
               const profile = await fetchUserProfile(session.user.id);
+              console.log('Auth state change - fetched profile:', profile);
               if (mounted) {
                 setUserProfile(profile);
               }
@@ -214,6 +216,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAdmin = userProfile?.role === 'company_admin' || userProfile?.role === 'super_admin';
   const isSuperAdmin = userProfile?.role === 'super_admin';
   const isCompanyAdmin = userProfile?.role === 'company_admin';
+
+  // Add debug logging for role computations
+  useEffect(() => {
+    console.log('Role computations:', {
+      userProfile: userProfile ? {
+        role: userProfile.role,
+        email: userProfile.email
+      } : null,
+      isAdmin,
+      isSuperAdmin,
+      isCompanyAdmin
+    });
+  }, [userProfile, isAdmin, isSuperAdmin, isCompanyAdmin]);
 
   const value = {
     user,

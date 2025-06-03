@@ -151,21 +151,6 @@ export type Database = {
         }
         Relationships: []
       }
-      roles: {
-        Row: {
-          description: string | null
-          id: number
-        }
-        Insert: {
-          description?: string | null
-          id?: never
-        }
-        Update: {
-          description?: string | null
-          id?: never
-        }
-        Relationships: []
-      }
       shipments: {
         Row: {
           actual_delivery_date: string | null
@@ -356,7 +341,6 @@ export type Database = {
           name: string
           password: string
           role: Database["public"]["Enums"]["app_role"] | null
-          role_id: number | null
           warehouse_ids: Json | null
         }
         Insert: {
@@ -366,7 +350,6 @@ export type Database = {
           name: string
           password: string
           role?: Database["public"]["Enums"]["app_role"] | null
-          role_id?: number | null
           warehouse_ids?: Json | null
         }
         Update: {
@@ -376,17 +359,9 @@ export type Database = {
           name?: string
           password?: string
           role?: Database["public"]["Enums"]["app_role"] | null
-          role_id?: number | null
           warehouse_ids?: Json | null
         }
         Relationships: [
-          {
-            foreignKeyName: "fk_role"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "roles"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "fk_users_company"
             columns: ["company_id"]

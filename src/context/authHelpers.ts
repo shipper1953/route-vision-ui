@@ -44,6 +44,8 @@ export const createUserProfile = async (user: User): Promise<void> => {
 
 export const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
+    console.log('Fetching user profile for userId:', userId);
+    
     const { data: profile, error } = await supabase
       .from('users')
       .select('*')
@@ -56,8 +58,11 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
     }
 
     if (!profile) {
+      console.warn('No profile found for user:', userId);
       return null;
     }
+
+    console.log('Raw profile data from database:', profile);
 
     // Transform database profile to UserProfile type
     const userProfile: UserProfile = {
@@ -73,6 +78,7 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
           : []
     };
 
+    console.log('Transformed user profile:', userProfile);
     return userProfile;
   } catch (error) {
     console.warn('Exception in fetchUserProfile:', error);

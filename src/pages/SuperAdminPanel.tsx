@@ -8,11 +8,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, Wallet } from "lucide-react";
 
 const SuperAdminPanel = () => {
-  const { isAuthenticated, isSuperAdmin, loading } = useAuth();
+  const { isAuthenticated, isSuperAdmin, loading, userProfile } = useAuth();
   const navigate = useNavigate();
+
+  // Add debug logging
+  useEffect(() => {
+    console.log('SuperAdminPanel - Auth state:', {
+      isAuthenticated,
+      isSuperAdmin,
+      loading,
+      userProfile: userProfile ? {
+        role: userProfile.role,
+        email: userProfile.email
+      } : null
+    });
+  }, [isAuthenticated, isSuperAdmin, loading, userProfile]);
 
   useEffect(() => {
     if (!loading && (!isAuthenticated || !isSuperAdmin)) {
+      console.log('SuperAdminPanel - Redirecting to login because:', {
+        notAuthenticated: !isAuthenticated,
+        notSuperAdmin: !isSuperAdmin,
+        loading
+      });
       navigate('/login');
     }
   }, [isAuthenticated, isSuperAdmin, loading, navigate]);
