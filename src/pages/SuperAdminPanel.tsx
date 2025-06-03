@@ -4,6 +4,7 @@ import { TmsLayout } from "@/components/layout/TmsLayout";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CompanyManagement } from "@/components/admin/CompanyManagement";
+import { SuperAdminUserCreation } from "@/components/admin/SuperAdminUserCreation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, Wallet } from "lucide-react";
 
@@ -97,6 +98,7 @@ const SuperAdminPanel = () => {
           </Card>
         </div>
 
+        <SuperAdminUserCreation />
         <CompanyManagement />
       </div>
     </TmsLayout>
