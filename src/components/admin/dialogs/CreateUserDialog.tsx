@@ -29,38 +29,27 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
     try {
       console.log('Creating user with data:', newUser);
       
-      // First create the auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: newUser.email,
-        password: Math.random().toString(36).slice(-8), // Temporary password
-        email_confirm: true,
-        user_metadata: {
-          name: newUser.name
-        }
-      });
-
-      console.log('Auth user creation result:', { authData, authError });
-
-      if (authError) throw authError;
-
-      // Then update the user profile with company assignment and role
-      const { error: profileError } = await supabase
+      // Create user record directly in the users table
+      const { data, error } = await supabase
         .from('users')
-        .update({
-          company_id: newUser.company_id === 'no_company' ? null : newUser.company_id,
+        .insert({
+          email: newUser.email,
+          name: newUser.name,
           role: newUser.role,
-          name: newUser.name
+          company_id: newUser.company_id === 'no_company' ? null : newUser.company_id,
+          password: '' // They'll set this on first login
         })
-        .eq('id', authData.user.id);
+        .select()
+        .single();
 
-      console.log('Profile update result:', { profileError });
+      console.log('User creation result:', { data, error });
 
-      if (profileError) throw profileError;
+      if (error) throw error;
 
       setNewUser({ email: '', name: '', role: 'user', company_id: 'no_company' });
       setIsOpen(false);
       onUserCreated();
-      toast.success('User created successfully');
+      toast.success('User created successfully. They will need to sign up with their email to set their password.');
     } catch (error) {
       console.error('Error creating user:', error);
       toast.error(`Failed to create user: ${error.message}`);

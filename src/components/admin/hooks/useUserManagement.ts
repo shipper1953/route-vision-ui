@@ -17,7 +17,7 @@ export const useUserManagement = () => {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('name', { ascending: true }); // Changed from created_at to name
 
       console.log('Users query result:', { data, error });
 
