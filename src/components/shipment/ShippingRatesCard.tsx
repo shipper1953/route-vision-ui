@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/context";
 import { supabase } from "@/integrations/supabase/client";
-import { Company } from "@/types/auth";
+import { Company, CompanyAddress } from "@/types/auth";
 import { applyMarkupToRates, MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
 
 interface ShippingRatesCardProps {
@@ -23,6 +23,23 @@ interface ShippingRatesCardProps {
   onBack: () => void;
   onBuyLabel: (shipmentId: string, rateId: string) => Promise<any>;
 }
+
+// Transform database company data to our Company type
+const transformCompanyData = (dbCompany: any): Company => {
+  return {
+    id: dbCompany.id,
+    name: dbCompany.name,
+    email: dbCompany.email,
+    phone: dbCompany.phone,
+    address: dbCompany.address as CompanyAddress | undefined,
+    settings: dbCompany.settings,
+    created_at: dbCompany.created_at,
+    updated_at: dbCompany.updated_at,
+    is_active: dbCompany.is_active,
+    markup_type: (dbCompany.markup_type as 'percentage' | 'fixed') || 'percentage',
+    markup_value: dbCompany.markup_value || 0
+  };
+};
 
 export const ShippingRatesCard = ({ 
   shipmentResponse, 
@@ -62,7 +79,10 @@ export const ShippingRatesCard = ({
           .single();
 
         if (error) throw error;
-        setCompany(data);
+        
+        // Transform the database data to match our Company type
+        const transformedCompany = transformCompanyData(data);
+        setCompany(transformedCompany);
       } catch (error) {
         console.error('Error fetching company for markup calculation:', error);
       }
