@@ -9,9 +9,7 @@ export const SuperAdminUserCreation = () => {
     users,
     companies,
     loading,
-    fetchUsers,
-    updateUserRole,
-    removeUserFromCompany
+    fetchUsers
   } = useUserManagement();
 
   if (loading) {
@@ -33,8 +31,6 @@ export const SuperAdminUserCreation = () => {
         <UsersTable
           users={users}
           companies={companies}
-          onUpdateUserRole={updateUserRole}
-          onRemoveUserFromCompany={removeUserFromCompany}
           onUserUpdated={fetchUsers}
         />
       </CardContent>

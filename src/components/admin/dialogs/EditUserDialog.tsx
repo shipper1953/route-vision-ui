@@ -21,7 +21,8 @@ export const EditUserDialog = ({ user, companies, onUserUpdated }: EditUserDialo
   const [editedUser, setEditedUser] = useState({
     name: user.name,
     email: user.email,
-    company_id: user.company_id || 'no_company'
+    company_id: user.company_id || 'no_company',
+    role: user.role
   });
 
   const updateUser = async () => {
@@ -33,7 +34,8 @@ export const EditUserDialog = ({ user, companies, onUserUpdated }: EditUserDialo
         .update({
           name: editedUser.name,
           email: editedUser.email,
-          company_id: editedUser.company_id === 'no_company' ? null : editedUser.company_id
+          company_id: editedUser.company_id === 'no_company' ? null : editedUser.company_id,
+          role: editedUser.role
         })
         .eq('id', user.id);
 
@@ -95,6 +97,22 @@ export const EditUserDialog = ({ user, companies, onUserUpdated }: EditUserDialo
                     {company.name}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="edit-role">Role</Label>
+            <Select 
+              value={editedUser.role} 
+              onValueChange={(value: 'user' | 'company_admin' | 'super_admin') => setEditedUser({ ...editedUser, role: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">User</SelectItem>
+                <SelectItem value="company_admin">Company Admin</SelectItem>
+                <SelectItem value="super_admin">Super Admin</SelectItem>
               </SelectContent>
             </Select>
           </div>
