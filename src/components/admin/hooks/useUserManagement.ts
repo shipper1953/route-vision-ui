@@ -12,10 +12,14 @@ export const useUserManagement = () => {
 
   const fetchUsers = async () => {
     try {
+      console.log('Fetching users from database...');
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
+
+      console.log('Users query result:', { data, error });
 
       if (error) throw error;
       
@@ -33,6 +37,7 @@ export const useUserManagement = () => {
             : []
       })) || [];
       
+      console.log('Transformed users:', transformedUsers);
       setUsers(transformedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -44,11 +49,15 @@ export const useUserManagement = () => {
 
   const fetchCompanies = async () => {
     try {
+      console.log('Fetching companies from database...');
+      
       const { data, error } = await supabase
         .from('companies')
         .select('*')
         .eq('is_active', true)
         .order('name');
+
+      console.log('Companies query result:', { data, error });
 
       if (error) throw error;
       
@@ -65,6 +74,7 @@ export const useUserManagement = () => {
         is_active: company.is_active
       })) || [];
       
+      console.log('Transformed companies:', transformedCompanies);
       setCompanies(transformedCompanies);
     } catch (error) {
       console.error('Error fetching companies:', error);
@@ -74,6 +84,8 @@ export const useUserManagement = () => {
 
   const updateUserRole = async (userId: string, newRole: 'user' | 'company_admin' | 'super_admin') => {
     try {
+      console.log('Updating user role:', { userId, newRole });
+      
       const { error } = await supabase
         .from('users')
         .update({ role: newRole })
@@ -94,6 +106,8 @@ export const useUserManagement = () => {
 
   const removeUserFromCompany = async (userId: string) => {
     try {
+      console.log('Removing user from company:', { userId });
+      
       const { error } = await supabase
         .from('users')
         .update({ company_id: null })

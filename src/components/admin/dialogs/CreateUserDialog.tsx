@@ -27,6 +27,8 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
 
   const createUser = async () => {
     try {
+      console.log('Creating user with data:', newUser);
+      
       // First create the auth user
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: newUser.email,
@@ -36,6 +38,8 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
           name: newUser.name
         }
       });
+
+      console.log('Auth user creation result:', { authData, authError });
 
       if (authError) throw authError;
 
@@ -49,6 +53,8 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
         })
         .eq('id', authData.user.id);
 
+      console.log('Profile update result:', { profileError });
+
       if (profileError) throw profileError;
 
       setNewUser({ email: '', name: '', role: 'user', company_id: '' });
@@ -57,7 +63,7 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
       toast.success('User created successfully');
     } catch (error) {
       console.error('Error creating user:', error);
-      toast.error('Failed to create user');
+      toast.error(`Failed to create user: ${error.message}`);
     }
   };
 
