@@ -10,6 +10,7 @@ const corsHeaders = {
 interface WelcomeEmailRequest {
   email: string;
   name: string;
+  userId: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -18,7 +19,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, name }: WelcomeEmailRequest = await req.json();
+    const { email, name, userId }: WelcomeEmailRequest = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -29,29 +30,26 @@ const handler = async (req: Request): Promise<Response> => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Auto-confirm the user's email since we want immediate access
-    const { data: user, error: getUserError } = await supabase.auth.admin.getUserByEmail(email);
+    console.log('Auto-confirming email for user:', email, 'with ID:', userId);
     
-    if (getUserError) {
-      console.error('Error getting user by email:', getUserError);
-      throw getUserError;
-    }
-
-    if (user?.user && !user.user.email_confirmed_at) {
-      console.log('Auto-confirming email for user:', email);
-      const { error: confirmError } = await supabase.auth.admin.updateUserById(
-        user.user.id,
-        { 
-          email_confirm: true,
-          user_metadata: { name: name }
+    // Auto-confirm the user's email using the admin API
+    const { error: confirmError } = await supabase.auth.admin.updateUserById(
+      userId,
+      { 
+        email_confirm: true,
+        user_metadata: { 
+          name: name,
+          email_confirmed: true 
         }
-      );
-
-      if (confirmError) {
-        console.error('Error confirming user email:', confirmError);
-        throw confirmError;
       }
+    );
+
+    if (confirmError) {
+      console.error('Error confirming user email:', confirmError);
+      throw confirmError;
     }
+
+    console.log('User email confirmed successfully for:', email);
 
     return new Response(
       JSON.stringify({ message: 'User email confirmed successfully' }),

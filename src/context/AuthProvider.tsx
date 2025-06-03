@@ -199,14 +199,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        console.log('Account created successfully for:', data.user.email);
+        console.log('Account created successfully for:', data.user.email, 'with ID:', data.user.id);
         
-        // Send welcome email via edge function which will also auto-confirm the email
+        // Send welcome email via edge function which will auto-confirm the email
         try {
           const response = await supabase.functions.invoke('send-welcome-email', {
             body: {
               email: data.user.email,
               name: name || email.split('@')[0],
+              userId: data.user.id,
             },
           });
           
