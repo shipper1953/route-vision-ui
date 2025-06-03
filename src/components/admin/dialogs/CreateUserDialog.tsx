@@ -22,7 +22,7 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
     email: '',
     name: '',
     role: 'user',
-    company_id: ''
+    company_id: 'no_company'
   });
 
   const createUser = async () => {
@@ -47,7 +47,7 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
       const { error: profileError } = await supabase
         .from('users')
         .update({
-          company_id: newUser.company_id || null,
+          company_id: newUser.company_id === 'no_company' ? null : newUser.company_id,
           role: newUser.role,
           name: newUser.name
         })
@@ -57,7 +57,7 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
 
       if (profileError) throw profileError;
 
-      setNewUser({ email: '', name: '', role: 'user', company_id: '' });
+      setNewUser({ email: '', name: '', role: 'user', company_id: 'no_company' });
       setIsOpen(false);
       onUserCreated();
       toast.success('User created successfully');
@@ -122,7 +122,7 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
                 <SelectValue placeholder="Select a company" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No Company</SelectItem>
+                <SelectItem value="no_company">No Company</SelectItem>
                 {companies.map((company) => (
                   <SelectItem key={company.id} value={company.id}>
                     {company.name}
