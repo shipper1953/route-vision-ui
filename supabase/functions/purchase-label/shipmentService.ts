@@ -17,6 +17,8 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
   let companyId = null;
   if (userId) {
     console.log("Looking up company_id for user:", userId);
+    
+    // First check the users table
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
       .select('company_id')
@@ -25,23 +27,36 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
     
     if (userError) {
       console.error("Error looking up user company:", userError);
-    } else if (userData) {
+    } else if (userData && userData.company_id) {
       companyId = userData.company_id;
       console.log("Found company_id for user:", companyId);
     } else {
-      console.log("User not found in users table:", userId);
-    }
-
-    // If no company_id found in users table, check if user exists in auth
-    if (!companyId) {
-      console.log("No company_id found, checking auth.users table...");
+      console.log("User found but no company_id set in users table:", userId);
+      
+      // If no company_id found in users table, check if user exists in auth and try to get from profile
+      console.log("Checking auth.users table for additional user data...");
       const { data: { user }, error: authError } = await supabaseClient.auth.admin.getUserById(userId);
       if (authError) {
         console.error("Error looking up auth user:", authError);
       } else if (user) {
-        console.log("User exists in auth but not in users table, creating profile...");
-        // User exists in auth but not in users table - this shouldn't happen with our trigger
-        // but let's handle it gracefully
+        console.log("User exists in auth, checking metadata for company info...");
+        // Check if company_id is in user metadata
+        if (user.user_metadata?.company_id) {
+          companyId = user.user_metadata.company_id;
+          console.log("Found company_id in user metadata:", companyId);
+          
+          // Update the users table with the company_id from metadata
+          const { error: updateError } = await supabaseClient
+            .from('users')
+            .update({ company_id: companyId })
+            .eq('id', userId);
+          
+          if (updateError) {
+            console.error("Error updating user company_id:", updateError);
+          } else {
+            console.log("Updated users table with company_id from metadata");
+          }
+        }
       }
     }
   }
@@ -89,10 +104,16 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
   let finalShipmentId = null;
   
   if (existingShipment) {
-    // Update existing shipment
+    // Update existing shipment, making sure to set company_id if we found one
+    const updateData = {
+      ...shipmentData,
+      // Always update company_id if we have one, even if shipment already exists
+      ...(companyId && { company_id: companyId })
+    };
+    
     const { data: updatedShipment, error: updateError } = await supabaseClient
       .from('shipments')
-      .update(shipmentData)
+      .update(updateData)
       .eq('easypost_id', responseData.id)
       .select('id')
       .single();

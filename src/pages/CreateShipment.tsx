@@ -7,12 +7,14 @@ import { useState, useEffect } from "react";
 import { ShippingLabelDialog } from "@/components/shipment/ShippingLabelDialog";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context";
 import { toast } from "sonner";
 
 const CreateShipment = () => {
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('orderId');
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
 
   const {
     shipmentResponse,
@@ -27,6 +29,16 @@ const CreateShipment = () => {
   const [labelData, setLabelData] = useState<any>(null);
   const [showLabelDialog, setShowLabelDialog] = useState(false);
 
+  // Log user context for debugging
+  useEffect(() => {
+    console.log("CreateShipment - User Profile:", userProfile);
+    if (userProfile?.company_id) {
+      console.log("User has company_id:", userProfile.company_id);
+    } else {
+      console.log("User does not have company_id assigned");
+    }
+  }, [userProfile]);
+
   // Log when shipmentResponse changes to debug
   useEffect(() => {
     if (shipmentResponse) {
@@ -37,6 +49,7 @@ const CreateShipment = () => {
   // Function to handle successful label purchase and verify database save
   const handleLabelPurchased = async (result: any) => {
     console.log("Label purchased successfully:", result);
+    console.log("User context during label purchase:", userProfile);
     setLabelData(result);
     setShowLabelDialog(true);
 
@@ -52,7 +65,7 @@ const CreateShipment = () => {
       for (let attempt = 0; attempt < 3; attempt++) {
         const { data: existingShipment, error: checkError } = await supabase
           .from('shipments')
-          .select('*')
+          .select('*, company_id')
           .eq('easypost_id', result.id)
           .maybeSingle();
 
@@ -60,7 +73,13 @@ const CreateShipment = () => {
           console.error("Error checking shipment in database:", checkError);
         } else if (existingShipment) {
           console.log("✅ Shipment confirmed in database:", existingShipment);
-          toast.success("Shipment successfully saved to database!");
+          if (existingShipment.company_id) {
+            console.log("✅ Shipment has company_id:", existingShipment.company_id);
+            toast.success("Shipment successfully saved with company assignment!");
+          } else {
+            console.warn("⚠️ Shipment saved but no company_id assigned");
+            toast.warning("Shipment saved but no company assignment found");
+          }
           shipmentFound = true;
           break;
         } else if (attempt < 2) {
@@ -94,6 +113,9 @@ const CreateShipment = () => {
         <div>
           <h1 className="text-2xl font-bold text-tms-blue">Create Shipment</h1>
           <p className="text-muted-foreground">Create a new shipment with SmartRate</p>
+          {userProfile?.company_id && (
+            <p className="text-sm text-green-600 mt-1">Company: {userProfile.company_id}</p>
+          )}
         </div>
       </div>
 

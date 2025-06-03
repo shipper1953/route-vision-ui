@@ -7,6 +7,7 @@ import easyPostService from "@/services/easypost";
 import { validatePackageDimensions } from "../helpers/formValidation";
 import { buildShipmentData } from "../helpers/shipmentDataBuilder";
 import { findRecommendedRateByDate, findMostEconomicalRate } from "../helpers/rateSelectionHelpers";
+import { useAuth } from "@/context";
 
 interface UseShipmentSubmissionProps {
   loading: boolean;
@@ -20,11 +21,13 @@ export const useShipmentSubmission = ({
   onShipmentCreated 
 }: UseShipmentSubmissionProps) => {
   const form = useFormContext<ShipmentForm>();
+  const { userProfile } = useAuth();
 
   const handleFormSubmit = async () => {
     try {
       const data = form.getValues();
       console.log("Form submitted with data:", data);
+      console.log("User profile during submission:", userProfile);
       
       // Validate package dimensions and weight
       if (!validatePackageDimensions(data)) {
@@ -36,10 +39,11 @@ export const useShipmentSubmission = ({
       
       const shipmentData = buildShipmentData(data);
       console.log("Creating shipment with data:", shipmentData);
+      console.log("User company_id:", userProfile?.company_id);
       
       const response = await easyPostService.createShipment(shipmentData);
       
-      // Store the shipment ID in the form context
+      // Store the shipment ID and user context in the form
       form.setValue("shipmentId", response.id);
       
       if (!response.rates?.length && !response.smartRates?.length) {

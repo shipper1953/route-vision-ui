@@ -1,5 +1,6 @@
 
 import { ShipmentForm } from "@/types/shipment";
+import { useAuth } from "@/context";
 
 export function buildShipmentData(data: ShipmentForm) {
   // Include order ID in the shipment reference if available
