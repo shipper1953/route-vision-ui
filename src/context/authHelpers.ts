@@ -1,115 +1,113 @@
-import { User } from '@supabase/supabase-js';
+
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile } from '@/types/auth';
 
-export const createUserProfile = async (user: User): Promise<void> => {
-  try {
-    console.log('Creating user profile for:', user.email);
-    
-    // Check if profile already exists
-    const { data: existingProfile } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (existingProfile) {
-      console.log('User profile already exists');
-      return;
-    }
-
-    // Check if there's already a user with this email (to avoid duplicate email constraint)
-    const { data: existingEmail } = await supabase
-      .from('users')
-      .select('id, email')
-      .eq('email', user.email)
-      .maybeSingle();
-
-    if (existingEmail) {
-      console.log('User with this email already exists, updating with correct user ID');
-      // Update the existing record with the correct user ID
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ id: user.id })
-        .eq('email', user.email);
-      
-      if (updateError) {
-        console.error('Error updating existing user profile:', updateError);
-      } else {
-        console.log('User profile updated successfully');
-      }
-      return;
-    }
-
-    // Create new profile with required password field (empty since auth is handled by Supabase)
-    const { error: insertError } = await supabase
-      .from('users')
-      .insert({
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-        password: '', // Required field but managed by Supabase auth
-        role: 'user'
-      });
-
-    if (insertError) {
-      console.error('Error creating user profile:', insertError);
-      // Don't throw error, just log it - profile creation shouldn't block login
-    } else {
-      console.log('User profile created successfully');
-    }
-  } catch (error) {
-    console.error('Error in createUserProfile:', error);
-    // Don't throw error - profile creation shouldn't block login
-  }
-};
-
 export const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  console.log('Fetching user profile for userId:', userId);
+  
   try {
-    console.log('Fetching user profile for userId:', userId);
-    
-    const { data: profile, error } = await supabase
+    const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('id', userId)
-      .maybeSingle();
+      .single();
 
     if (error) {
-      console.warn('Error fetching user profile:', error);
-      return null;
+      if (error.code === 'PGRST116') {
+        console.warn('No profile found for user:', userId);
+        
+        // Try to create a profile for this user if they don't have one
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.id === userId) {
+          console.log('Attempting to create profile for existing user');
+          await createUserProfile(user);
+          
+          // Try to fetch the profile again
+          const { data: newData, error: newError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+            
+          if (newError) {
+            console.error('Failed to fetch newly created profile:', newError);
+            return null;
+          }
+          
+          return newData;
+        }
+        return null;
+      }
+      throw error;
     }
 
-    if (!profile) {
-      console.warn('No profile found for user:', userId);
-      return null;
-    }
-
-    console.log('Raw profile data from database:', profile);
-
-    // Transform database profile to UserProfile type
-    const userProfile: UserProfile = {
-      id: profile.id,
-      email: profile.email,
-      name: profile.name,
-      role: profile.role,
-      company_id: profile.company_id,
-      warehouse_ids: Array.isArray(profile.warehouse_ids) 
-        ? profile.warehouse_ids 
-        : typeof profile.warehouse_ids === 'string' 
-          ? JSON.parse(profile.warehouse_ids)
-          : []
-    };
-
-    console.log('Transformed user profile:', userProfile);
-    return userProfile;
+    return data;
   } catch (error) {
-    console.warn('Exception in fetchUserProfile:', error);
+    console.error('Error fetching user profile:', error);
     return null;
   }
 };
 
-export const clearAuthStorage = (): void => {
-  console.log('Clearing auth storage...');
-  localStorage.clear();
-  sessionStorage.clear();
+export const createUserProfile = async (user: any): Promise<UserProfile | null> => {
+  try {
+    console.log('Creating user profile for:', user.email);
+    
+    // Get Demo company ID
+    const { data: demoCompany, error: companyError } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('name', 'Demo')
+      .single();
+      
+    if (companyError) {
+      console.error('Error finding Demo company:', companyError);
+      return null;
+    }
+    
+    // Get Demo warehouse ID
+    const { data: demoWarehouse, error: warehouseError } = await supabase
+      .from('warehouses')
+      .select('id')
+      .eq('company_id', demoCompany.id)
+      .eq('is_default', true)
+      .single();
+      
+    if (warehouseError) {
+      console.warn('No default warehouse found for Demo company');
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .insert([{
+        id: user.id,
+        name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+        email: user.email,
+        password: '',
+        role: 'company_admin',
+        company_id: demoCompany.id,
+        warehouse_ids: demoWarehouse ? [demoWarehouse.id] : []
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating user profile:', error);
+      return null;
+    }
+
+    console.log('User profile created successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in createUserProfile:', error);
+    return null;
+  }
+};
+
+export const clearAuthStorage = () => {
+  try {
+    localStorage.removeItem('supabase.auth.token');
+    sessionStorage.removeItem('supabase.auth.token');
+  } catch (error) {
+    console.warn('Error clearing auth storage:', error);
+  }
 };

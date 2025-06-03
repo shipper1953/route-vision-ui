@@ -1,84 +1,80 @@
 
-import { OrderData } from "@/types/orderTypes";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { OrderData } from "@/types/orderTypes";
 
-/**
- * Creates a new order
- * @param orderData The order data to create
- * @returns The created order
- */
-export async function createOrder(orderData: Omit<OrderData, 'id'>): Promise<OrderData> {
-  // Check if user is authenticated with our mock auth system
-  const token = localStorage.getItem('token');
+export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<OrderData> => {
+  console.log("Creating order with data:", orderData);
   
-  if (!token) {
-    throw new Error("No authentication token found");
+  // Get current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    throw new Error("User must be authenticated to create orders");
   }
 
-  // Simulate API delay for better UX
-  await new Promise(resolve => setTimeout(resolve, 600));
-  
-  // Generate a new order ID
-  const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
-  
-  // Create the new order with the generated ID
-  const newOrder: OrderData = {
-    ...orderData,
-    id: orderId,
-    status: "ready_to_ship" // Ensure new orders are set to ready_to_ship
-  };
-  
-  // Store the order in Supabase
-  try {
-    console.log("Saving order to Supabase:", {
-      order_id: orderId, // Use the string ID as order_id
-      items: JSON.stringify([{ count: newOrder.items, description: "Order items" }]),
-      value: parseFloat(newOrder.value),
-      shipping_address: JSON.stringify(newOrder.shippingAddress),
-      customer_name: newOrder.customerName,
-      customer_company: newOrder.customerCompany,
-      customer_email: newOrder.customerEmail,
-      customer_phone: newOrder.customerPhone,
-      order_date: newOrder.orderDate,
-      required_delivery_date: newOrder.requiredDeliveryDate,
-      status: newOrder.status
-    });
-    
-    const { data, error } = await supabase
-      .from('orders')
-      .insert({
-        order_id: orderId, // Use the string ID directly
-        items: JSON.stringify([{ count: newOrder.items, description: "Order items" }]),
-        value: parseFloat(newOrder.value),
-        shipping_address: JSON.stringify(newOrder.shippingAddress),
-        customer_name: newOrder.customerName,
-        customer_company: newOrder.customerCompany,
-        customer_email: newOrder.customerEmail,
-        customer_phone: newOrder.customerPhone,
-        order_date: newOrder.orderDate,
-        required_delivery_date: newOrder.requiredDeliveryDate,
-        status: newOrder.status
-        // Temporarily omitting user_id since we're using mock auth
-      })
-      .select()
-      .single();
+  // Get user's profile to get company_id
+  const { data: userProfile, error: profileError } = await supabase
+    .from('users')
+    .select('company_id, warehouse_ids')
+    .eq('id', user.id)
+    .single();
 
-    if (error) {
-      console.error("Failed to store order in Supabase:", error);
-      toast.error("Failed to create order in database");
-      throw error;
-    } else {
-      console.log("Order successfully stored in Supabase:", data);
-      toast.success(`Order ${orderId} created successfully!`);
+  if (profileError || !userProfile?.company_id) {
+    throw new Error("User profile not found or not assigned to a company");
+  }
+
+  // Get default warehouse ID from user's warehouse_ids array
+  const warehouseIds = Array.isArray(userProfile.warehouse_ids) ? userProfile.warehouse_ids : [];
+  const defaultWarehouseId = warehouseIds.length > 0 ? warehouseIds[0] : null;
+
+  // Generate order ID
+  const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  const { data, error } = await supabase
+    .from('orders')
+    .insert([{
+      order_id: orderId,
+      customer_name: orderData.customerName,
+      customer_company: orderData.customerCompany,
+      customer_email: orderData.customerEmail,
+      customer_phone: orderData.customerPhone,
+      order_date: orderData.orderDate,
+      required_delivery_date: orderData.requiredDeliveryDate,
+      status: orderData.status,
+      items: [{ count: orderData.items, description: "Items" }], // Convert number to items array
+      value: orderData.value,
+      shipping_address: orderData.shippingAddress,
+      user_id: user.id,
+      company_id: userProfile.company_id,
+      warehouse_id: defaultWarehouseId
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error creating order:", error);
+    throw new Error(`Failed to create order: ${error.message}`);
+  }
+
+  console.log("Order created successfully:", data);
+
+  // Convert back to OrderData format
+  return {
+    id: data.id.toString(),
+    customerName: data.customer_name || '',
+    customerCompany: data.customer_company || undefined,
+    customerEmail: data.customer_email || undefined,
+    customerPhone: data.customer_phone || undefined,
+    orderDate: data.order_date || '',
+    requiredDeliveryDate: data.required_delivery_date || '',
+    status: data.status || 'processing',
+    items: Array.isArray(data.items) ? data.items.length : 1,
+    value: data.value?.toString() || '0',
+    shippingAddress: data.shipping_address || {
+      street1: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'US'
     }
-  } catch (err) {
-    console.error("Error storing order in Supabase:", err);
-    throw err;
-  }
-  
-  console.log("New order created:", orderId);
-  
-  // Return the new order
-  return newOrder;
-}
+  };
+};

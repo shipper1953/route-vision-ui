@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,20 +44,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('Found existing session for:', session.user.email);
           setUser(session.user);
           
-          // Try to fetch user profile in background
-          setTimeout(async () => {
+          // Try to fetch user profile
+          try {
+            const profile = await fetchUserProfile(session.user.id);
+            console.log('Fetched user profile:', profile);
             if (mounted) {
-              try {
-                const profile = await fetchUserProfile(session.user.id);
-                console.log('Fetched user profile:', profile);
-                if (mounted) {
-                  setUserProfile(profile);
-                }
-              } catch (error) {
-                console.error('Error fetching user profile:', error);
-              }
+              setUserProfile(profile);
             }
-          }, 0);
+          } catch (error) {
+            console.error('Error fetching user profile during init:', error);
+          }
         } else if (mounted) {
           console.log('No existing session found');
           clearAuthState();
@@ -138,7 +133,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.user) {
         console.log('Login successful for:', data.user.email);
-        // Don't set user state here - let the auth state change handler do it
         toast.success('Login successful');
       }
     } catch (error: any) {
@@ -163,7 +157,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
       
-      // clearAuthState will be called by the auth state change handler
       toast.success('Logged out successfully');
     } catch (error: any) {
       console.error('Logout failed:', error);
@@ -218,7 +211,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (emailError) {
           console.warn('Failed to send welcome email:', emailError);
-          // Don't fail the signup process if email fails
         }
         
         toast.success('Account created successfully! You can now log in.');
@@ -233,7 +225,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Alias for signup to match component expectations
   const signUp = async (email: string, password: string, options?: { name: string }) => {
     return signup(email, password, options?.name);
   };
