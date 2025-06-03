@@ -42,46 +42,23 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
       setIsCreating(true);
       console.log('Creating user with data:', newUser);
       
-      // Create user using Supabase Auth Admin API with immediate activation
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: newUser.email,
-        password: newUser.password,
-        email_confirm: true, // Immediately confirm the email
-        user_metadata: {
+      // Call the edge function to create the user with service role permissions
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newUser.email,
+          password: newUser.password,
           name: newUser.name,
+          role: newUser.role,
+          company_id: newUser.company_id === 'no_company' ? null : newUser.company_id,
         },
       });
 
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw authError;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
       }
 
-      console.log('User created in auth system:', authData.user?.id);
-
-      // Wait a moment for the trigger to potentially create the user profile
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Update the user's profile with role and company assignment
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .upsert({
-            id: authData.user.id,
-            name: newUser.name,
-            email: newUser.email,
-            role: newUser.role,
-            company_id: newUser.company_id === 'no_company' ? null : newUser.company_id,
-            password: '', // Password is managed by Supabase auth
-          }, {
-            onConflict: 'id'
-          });
-
-        if (profileError) {
-          console.error('Profile error:', profileError);
-          throw profileError;
-        }
-      }
+      console.log('User created successfully:', data);
 
       setNewUser({ email: '', name: '', role: 'user', company_id: 'no_company', password: '' });
       setIsOpen(false);
