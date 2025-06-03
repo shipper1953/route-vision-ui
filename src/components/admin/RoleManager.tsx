@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/context";
 
 interface User {
   id: string;
@@ -33,12 +34,16 @@ interface User {
 }
 
 export const RoleManager = () => {
+  const { isSuperAdmin } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    // Only super admins can access role management
+    if (isSuperAdmin) {
+      fetchUsers();
+    }
+  }, [isSuperAdmin]);
 
   const fetchUsers = async () => {
     try {
@@ -78,6 +83,11 @@ export const RoleManager = () => {
     }
   };
 
+  // Only super admins can see this component
+  if (!isSuperAdmin) {
+    return null;
+  }
+
   if (loading) {
     return <div>Loading users...</div>;
   }
@@ -85,7 +95,7 @@ export const RoleManager = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>User Role Management</CardTitle>
+        <CardTitle>Global User Role Management</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>

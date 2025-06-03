@@ -23,7 +23,7 @@ interface DatabaseUser {
   name: string;
   role: 'user' | 'company_admin' | 'super_admin';
   company_id: string;
-  warehouse_ids: any; // This will be Json from database
+  warehouse_ids: any;
 }
 
 export const UserManagement = ({ companyId }: UserManagementProps) => {
@@ -160,7 +160,7 @@ export const UserManagement = ({ companyId }: UserManagementProps) => {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>User Management</CardTitle>
+          <CardTitle>Company User Management</CardTitle>
           <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -170,7 +170,7 @@ export const UserManagement = ({ companyId }: UserManagementProps) => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Invite New User</DialogTitle>
+                <DialogTitle>Invite New User to Company</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
