@@ -18,41 +18,80 @@ interface CreateUserDialogProps {
 
 export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [newUser, setNewUser] = useState<NewUserForm>({
+  const [isCreating, setIsCreating] = useState(false);
+  const [newUser, setNewUser] = useState<NewUserForm & { password: string }>({
     email: '',
     name: '',
     role: 'user',
-    company_id: 'no_company'
+    company_id: 'no_company',
+    password: ''
   });
 
+  const generatePassword = () => {
+    const password = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
+    setNewUser({ ...newUser, password });
+  };
+
   const createUser = async () => {
+    if (!newUser.email || !newUser.name || !newUser.password) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
     try {
+      setIsCreating(true);
       console.log('Creating user with data:', newUser);
       
-      // Create user record directly in the users table
-      const { data, error } = await supabase
-        .from('users')
-        .insert({
-          email: newUser.email,
+      // Create user using Supabase Auth Admin API with immediate activation
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: newUser.email,
+        password: newUser.password,
+        email_confirm: true, // Immediately confirm the email
+        user_metadata: {
           name: newUser.name,
-          role: newUser.role,
-          company_id: newUser.company_id === 'no_company' ? null : newUser.company_id,
-          password: '' // They'll set this on first login
-        })
-        .select()
-        .single();
+        },
+      });
 
-      console.log('User creation result:', { data, error });
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw authError;
+      }
 
-      if (error) throw error;
+      console.log('User created in auth system:', authData.user?.id);
 
-      setNewUser({ email: '', name: '', role: 'user', company_id: 'no_company' });
+      // Wait a moment for the trigger to potentially create the user profile
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Update the user's profile with role and company assignment
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('users')
+          .upsert({
+            id: authData.user.id,
+            name: newUser.name,
+            email: newUser.email,
+            role: newUser.role,
+            company_id: newUser.company_id === 'no_company' ? null : newUser.company_id,
+            password: '', // Password is managed by Supabase auth
+          }, {
+            onConflict: 'id'
+          });
+
+        if (profileError) {
+          console.error('Profile error:', profileError);
+          throw profileError;
+        }
+      }
+
+      setNewUser({ email: '', name: '', role: 'user', company_id: 'no_company', password: '' });
       setIsOpen(false);
       onUserCreated();
-      toast.success('User created successfully. They will need to sign up with their email to set their password.');
-    } catch (error) {
+      toast.success(`User created successfully! Password: ${newUser.password}`);
+    } catch (error: any) {
       console.error('Error creating user:', error);
       toast.error(`Failed to create user: ${error.message}`);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -64,29 +103,47 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
           Create User
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Create New User</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email *</Label>
             <Input
               id="email"
               type="email"
               value={newUser.email}
               onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
               placeholder="Enter user email"
+              required
             />
           </div>
           <div>
-            <Label htmlFor="name">Full Name</Label>
+            <Label htmlFor="name">Full Name *</Label>
             <Input
               id="name"
               value={newUser.name}
               onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
               placeholder="Enter full name"
+              required
             />
+          </div>
+          <div>
+            <Label htmlFor="password">Password *</Label>
+            <div className="flex gap-2">
+              <Input
+                id="password"
+                type="text"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                placeholder="Enter password"
+                required
+              />
+              <Button type="button" variant="outline" onClick={generatePassword}>
+                Generate
+              </Button>
+            </div>
           </div>
           <div>
             <Label htmlFor="role">Role</Label>
@@ -120,8 +177,8 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={createUser} className="w-full">
-            Create User
+          <Button onClick={createUser} className="w-full" disabled={isCreating}>
+            {isCreating ? "Creating..." : "Create User"}
           </Button>
         </div>
       </DialogContent>
