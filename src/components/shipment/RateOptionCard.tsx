@@ -4,6 +4,7 @@ import { Truck, Clock, Shield, CheckCircle, DollarSign } from "lucide-react";
 import { SmartRate, Rate } from "@/services/easypost";
 import { MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/context";
 
 interface RateOptionCardProps {
   rate: SmartRate | Rate | MarkedUpRate | MarkedUpSmartRate;
@@ -18,6 +19,8 @@ export const RateOptionCard = ({
   isRecommended,
   onSelect 
 }: RateOptionCardProps) => {
+  const { isSuperAdmin } = useAuth();
+  
   // Check if rate is a SmartRate by looking for SmartRate-specific properties
   const isSmartRate = 'delivery_accuracy' in rate || 'delivery_date_guaranteed' in rate;
   
@@ -129,8 +132,12 @@ export const RateOptionCard = ({
           <div className="font-bold text-lg text-tms-blue">
             ${parseFloat(rate.rate).toFixed(2)}
           </div>
-          {hasMarkup && (rate as MarkedUpRate).markup_applied > 0 && (
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
+          <div className="text-xs text-muted-foreground">
+            Shipping Cost
+          </div>
+          {/* Only show base rate info to super admins */}
+          {isSuperAdmin && hasMarkup && (rate as MarkedUpRate).markup_applied > 0 && (
+            <div className="text-xs text-orange-600 flex items-center gap-1 mt-1">
               <DollarSign className="h-3 w-3" />
               Base: ${parseFloat((rate as MarkedUpRate).original_rate).toFixed(2)}
             </div>

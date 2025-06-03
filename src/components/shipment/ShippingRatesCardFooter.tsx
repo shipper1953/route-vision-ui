@@ -71,7 +71,7 @@ export const ShippingRatesCardFooter = ({
         ) : (
           <>
             <Package className="w-4 h-4" />
-            Buy Label
+            Buy Shipping Label
             {selectedRate && <span className="ml-1">${parseFloat(selectedRate.rate).toFixed(2)}</span>}
           </>
         )}

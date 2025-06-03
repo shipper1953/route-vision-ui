@@ -5,8 +5,10 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CompanyManagement } from "@/components/admin/CompanyManagement";
 import { SuperAdminUserCreation } from "@/components/admin/SuperAdminUserCreation";
+import { SuperAdminShipmentsReport } from "@/components/admin/SuperAdminShipmentsReport";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Wallet } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Building2, Users, Wallet, Package } from "lucide-react";
 
 const SuperAdminPanel = () => {
   const { isAuthenticated, isSuperAdmin, loading, userProfile } = useAuth();
@@ -98,8 +100,25 @@ const SuperAdminPanel = () => {
           </Card>
         </div>
 
-        <SuperAdminUserCreation />
-        <CompanyManagement />
+        <Tabs defaultValue="users" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="companies">Companies</TabsTrigger>
+            <TabsTrigger value="shipments">Shipments Report</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="users" className="space-y-4">
+            <SuperAdminUserCreation />
+          </TabsContent>
+          
+          <TabsContent value="companies" className="space-y-4">
+            <CompanyManagement />
+          </TabsContent>
+          
+          <TabsContent value="shipments" className="space-y-4">
+            <SuperAdminShipmentsReport />
+          </TabsContent>
+        </Tabs>
       </div>
     </TmsLayout>
   );
