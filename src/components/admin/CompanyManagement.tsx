@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -35,7 +36,9 @@ const transformCompanyData = (dbCompany: any): Company => {
     settings: dbCompany.settings,
     created_at: dbCompany.created_at,
     updated_at: dbCompany.updated_at,
-    is_active: dbCompany.is_active
+    is_active: dbCompany.is_active,
+    markup_type: dbCompany.markup_type || 'percentage',
+    markup_value: dbCompany.markup_value || 0
   };
 };
 
@@ -43,10 +46,14 @@ export const CompanyManagement = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [newCompany, setNewCompany] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    markup_type: 'percentage' as 'percentage' | 'fixed',
+    markup_value: 0
   });
 
   useEffect(() => {
@@ -86,12 +93,42 @@ export const CompanyManagement = () => {
       // Transform the new company data and add to state
       const transformedCompany = transformCompanyData(data);
       setCompanies([transformedCompany, ...companies]);
-      setNewCompany({ name: '', email: '', phone: '' });
+      setNewCompany({ name: '', email: '', phone: '', markup_type: 'percentage', markup_value: 0 });
       setIsCreateDialogOpen(false);
       toast.success('Company created successfully');
     } catch (error) {
       console.error('Error creating company:', error);
       toast.error('Failed to create company');
+    }
+  };
+
+  const updateCompany = async () => {
+    if (!editingCompany) return;
+
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({
+          name: editingCompany.name,
+          email: editingCompany.email,
+          phone: editingCompany.phone,
+          markup_type: editingCompany.markup_type,
+          markup_value: editingCompany.markup_value,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingCompany.id);
+
+      if (error) throw error;
+
+      setCompanies(companies.map(company => 
+        company.id === editingCompany.id ? editingCompany : company
+      ));
+      setIsEditDialogOpen(false);
+      setEditingCompany(null);
+      toast.success('Company updated successfully');
+    } catch (error) {
+      console.error('Error updating company:', error);
+      toast.error('Failed to update company');
     }
   };
 
@@ -115,6 +152,11 @@ export const CompanyManagement = () => {
       console.error('Error updating company status:', error);
       toast.error('Failed to update company status');
     }
+  };
+
+  const handleEditClick = (company: Company) => {
+    setEditingCompany({ ...company });
+    setIsEditDialogOpen(true);
   };
 
   if (loading) {
@@ -166,6 +208,35 @@ export const CompanyManagement = () => {
                     placeholder="Enter phone number"
                   />
                 </div>
+                <div>
+                  <Label htmlFor="markup_type">Markup Type</Label>
+                  <Select 
+                    value={newCompany.markup_type} 
+                    onValueChange={(value: 'percentage' | 'fixed') => setNewCompany({ ...newCompany, markup_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select markup type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Percentage (%)</SelectItem>
+                      <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="markup_value">
+                    Markup Value {newCompany.markup_type === 'percentage' ? '(%)' : '($)'}
+                  </Label>
+                  <Input
+                    id="markup_value"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newCompany.markup_value}
+                    onChange={(e) => setNewCompany({ ...newCompany, markup_value: parseFloat(e.target.value) || 0 })}
+                    placeholder={newCompany.markup_type === 'percentage' ? "Enter percentage" : "Enter fixed amount"}
+                  />
+                </div>
                 <Button onClick={createCompany} className="w-full">
                   Create Company
                 </Button>
@@ -181,6 +252,8 @@ export const CompanyManagement = () => {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
+              <TableHead>Markup Type</TableHead>
+              <TableHead>Markup Value</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Actions</TableHead>
@@ -192,6 +265,17 @@ export const CompanyManagement = () => {
                 <TableCell className="font-medium">{company.name}</TableCell>
                 <TableCell>{company.email || 'N/A'}</TableCell>
                 <TableCell>{company.phone || 'N/A'}</TableCell>
+                <TableCell>
+                  <Badge variant="outline">
+                    {company.markup_type === 'percentage' ? 'Percentage' : 'Fixed'}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {company.markup_type === 'percentage' 
+                    ? `${company.markup_value || 0}%` 
+                    : `$${(company.markup_value || 0).toFixed(2)}`
+                  }
+                </TableCell>
                 <TableCell>
                   <Badge variant={company.is_active ? 'default' : 'secondary'}>
                     {company.is_active ? 'Active' : 'Inactive'}
@@ -208,7 +292,11 @@ export const CompanyManagement = () => {
                     <Button size="sm" variant="outline">
                       <Wallet className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="outline">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleEditClick(company)}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button 
@@ -224,6 +312,79 @@ export const CompanyManagement = () => {
             ))}
           </TableBody>
         </Table>
+
+        {/* Edit Company Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Company</DialogTitle>
+            </DialogHeader>
+            {editingCompany && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="edit-name">Company Name</Label>
+                  <Input
+                    id="edit-name"
+                    value={editingCompany.name}
+                    onChange={(e) => setEditingCompany({ ...editingCompany, name: e.target.value })}
+                    placeholder="Enter company name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editingCompany.email || ''}
+                    onChange={(e) => setEditingCompany({ ...editingCompany, email: e.target.value })}
+                    placeholder="Enter company email"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-phone">Phone</Label>
+                  <Input
+                    id="edit-phone"
+                    value={editingCompany.phone || ''}
+                    onChange={(e) => setEditingCompany({ ...editingCompany, phone: e.target.value })}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-markup_type">Markup Type</Label>
+                  <Select 
+                    value={editingCompany.markup_type || 'percentage'} 
+                    onValueChange={(value: 'percentage' | 'fixed') => setEditingCompany({ ...editingCompany, markup_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select markup type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Percentage (%)</SelectItem>
+                      <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="edit-markup_value">
+                    Markup Value {editingCompany.markup_type === 'percentage' ? '(%)' : '($)'}
+                  </Label>
+                  <Input
+                    id="edit-markup_value"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editingCompany.markup_value || 0}
+                    onChange={(e) => setEditingCompany({ ...editingCompany, markup_value: parseFloat(e.target.value) || 0 })}
+                    placeholder={editingCompany.markup_type === 'percentage' ? "Enter percentage" : "Enter fixed amount"}
+                  />
+                </div>
+                <Button onClick={updateCompany} className="w-full">
+                  Update Company
+                </Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
