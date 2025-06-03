@@ -56,6 +56,40 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
           } else {
             console.log("Updated users table with company_id from metadata");
           }
+        } else {
+          // If no company found anywhere, create a default company for this user
+          console.log("No company found for user, creating default company...");
+          
+          const { data: newCompany, error: companyError } = await supabaseClient
+            .from('companies')
+            .insert({
+              name: `${user.email} Company`,
+              email: user.email,
+              is_active: true,
+              markup_type: 'percentage',
+              markup_value: 0.00
+            })
+            .select('id')
+            .single();
+          
+          if (companyError) {
+            console.error("Error creating default company:", companyError);
+          } else if (newCompany) {
+            companyId = newCompany.id;
+            console.log("Created default company with ID:", companyId);
+            
+            // Update the user with the new company_id
+            const { error: updateUserError } = await supabaseClient
+              .from('users')
+              .update({ company_id: companyId })
+              .eq('id', userId);
+            
+            if (updateUserError) {
+              console.error("Error updating user with new company_id:", updateUserError);
+            } else {
+              console.log("Updated user with new company_id:", companyId);
+            }
+          }
         }
       }
     }

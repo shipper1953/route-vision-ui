@@ -1,4 +1,3 @@
-
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile } from '@/types/auth';
@@ -16,6 +15,29 @@ export const createUserProfile = async (user: User): Promise<void> => {
 
     if (existingProfile) {
       console.log('User profile already exists');
+      return;
+    }
+
+    // Check if there's already a user with this email (to avoid duplicate email constraint)
+    const { data: existingEmail } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', user.email)
+      .maybeSingle();
+
+    if (existingEmail) {
+      console.log('User with this email already exists, updating with correct user ID');
+      // Update the existing record with the correct user ID
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ id: user.id })
+        .eq('email', user.email);
+      
+      if (updateError) {
+        console.error('Error updating existing user profile:', updateError);
+      } else {
+        console.log('User profile updated successfully');
+      }
       return;
     }
 
