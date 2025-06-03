@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -47,38 +46,57 @@ export const SuperAdminShipmentsReport = () => {
     try {
       setLoading(true);
 
-      // Fetch shipments with company information
+      // First, get all shipments with costs
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
-        .select(`
-          id,
-          easypost_id,
-          tracking_number,
-          carrier,
-          service,
-          status,
-          cost,
-          created_at,
-          user_id,
-          users!inner(company_id, companies!inner(name))
-        `)
+        .select('*')
         .not('cost', 'is', null)
         .order('created_at', { ascending: false });
 
       if (shipmentsError) throw shipmentsError;
 
+      if (!shipmentsData?.length) {
+        console.log("No shipments found");
+        setShipments([]);
+        setCompanySummaries([]);
+        return;
+      }
+
+      // Get all users to map user_id to company_id
+      const userIds = [...new Set(shipmentsData.map(s => s.user_id).filter(Boolean))];
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, company_id')
+        .in('id', userIds);
+
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+      }
+
+      // Get all companies
+      const companyIds = [...new Set(usersData?.map(u => u.company_id).filter(Boolean) || [])];
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('companies')
+        .select('id, name, markup_type, markup_value')
+        .in('id', companyIds);
+
+      if (companiesError) {
+        console.error('Error fetching companies:', companiesError);
+      }
+
+      // Create lookup maps
+      const userToCompanyMap = new Map(usersData?.map(u => [u.id, u.company_id]) || []);
+      const companyMap = new Map(companiesData?.map(c => [c.id, c]) || []);
+
       // Process shipments data to calculate original cost and profit
-      const processedShipments: ShipmentReport[] = shipmentsData?.map(shipment => {
-        // Get company data from the nested query
-        const companyData = (shipment.users as any)?.companies;
-        const company = (shipment.users as any);
+      const processedShipments: ShipmentReport[] = shipmentsData.map(shipment => {
+        const companyId = userToCompanyMap.get(shipment.user_id);
+        const companyData = companyId ? companyMap.get(companyId) : null;
         
         // Calculate original cost based on markup (reverse calculation)
         let originalCost = shipment.cost;
         let profit = 0;
 
-        // Note: This is a simplified calculation. In a real scenario, you'd want to store
-        // the original cost when the shipment is created to avoid calculation errors
         if (companyData?.markup_type && companyData?.markup_value) {
           if (companyData.markup_type === 'percentage') {
             originalCost = shipment.cost / (1 + (companyData.markup_value / 100));
@@ -89,7 +107,7 @@ export const SuperAdminShipmentsReport = () => {
         }
 
         return {
-          id: String(shipment.id), // Convert to string to match interface
+          id: String(shipment.id),
           easypost_id: shipment.easypost_id || '',
           tracking_number: shipment.tracking_number || '',
           carrier: shipment.carrier,
@@ -100,9 +118,9 @@ export const SuperAdminShipmentsReport = () => {
           profit: profit,
           created_at: shipment.created_at,
           company_name: companyData?.name || 'Unknown',
-          company_id: String(company?.company_id || '') // Convert to string
+          company_id: String(companyId || '')
         };
-      }) || [];
+      });
 
       setShipments(processedShipments);
 
