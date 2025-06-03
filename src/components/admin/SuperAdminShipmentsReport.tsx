@@ -89,7 +89,7 @@ export const SuperAdminShipmentsReport = () => {
         }
 
         return {
-          id: shipment.id,
+          id: String(shipment.id), // Convert to string to match interface
           easypost_id: shipment.easypost_id || '',
           tracking_number: shipment.tracking_number || '',
           carrier: shipment.carrier,
@@ -100,7 +100,7 @@ export const SuperAdminShipmentsReport = () => {
           profit: profit,
           created_at: shipment.created_at,
           company_name: companyData?.name || 'Unknown',
-          company_id: company?.company_id || ''
+          company_id: String(company?.company_id || '') // Convert to string
         };
       }) || [];
 
