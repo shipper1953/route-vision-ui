@@ -36,7 +36,6 @@ serve(async (req) => {
     const { data: shipmentsData, error: shipmentsError } = await supabaseAdmin
       .from('shipments')
       .select('*')
-      .not('cost', 'is', null)
       .order('created_at', { ascending: false });
 
     console.log("Service role shipments query result:", { data: shipmentsData, error: shipmentsError });
