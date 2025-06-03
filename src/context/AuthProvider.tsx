@@ -92,7 +92,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTimeout(async () => {
           if (mounted) {
             try {
-              await createUserProfile(session.user);
               const profile = await fetchUserProfile(session.user.id);
               console.log('Auth state change - fetched profile:', profile);
               if (mounted) {
@@ -180,7 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      console.log('Creating account for:', email);
+      console.log('Creating account for:', email, 'with name:', name);
       
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -189,7 +188,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           data: {
             name: name || email.split('@')[0],
           },
-          // Auto-confirm the account
           emailRedirectTo: `${window.location.origin}/`,
         },
       });
@@ -203,18 +201,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         console.log('Account created successfully for:', data.user.email);
         
+        // The database trigger will automatically:
+        // 1. Create user profile in users table
+        // 2. Assign to Demo company
+        // 3. Set role as company_admin
+        
         // Send welcome email via edge function
         try {
-          await fetch('/api/send-welcome-email', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+          const response = await supabase.functions.invoke('send-welcome-email', {
+            body: {
               email: data.user.email,
               name: name || email.split('@')[0],
-            }),
+            },
           });
+          
+          if (response.error) {
+            console.warn('Failed to send welcome email:', response.error);
+          }
         } catch (emailError) {
           console.warn('Failed to send welcome email:', emailError);
           // Don't fail the signup process if email fails
