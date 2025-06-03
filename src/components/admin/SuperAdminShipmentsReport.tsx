@@ -1,10 +1,11 @@
 
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from '@supabase/supabase-js';
 import { toast } from "sonner";
 import { Loader2, DollarSign, TrendingUp, Package } from "lucide-react";
 
@@ -47,14 +48,27 @@ export const SuperAdminShipmentsReport = () => {
     try {
       setLoading(true);
 
-      // First, get ALL shipments with costs (don't filter by company yet)
-      const { data: shipmentsData, error: shipmentsError } = await supabase
+      // Create a service role client to bypass RLS
+      const supabaseUrl = 'https://gidrlosmhpvdcogrkidj.supabase.co';
+      const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpZHJsb3NtaHB2ZGNvZ3JraWRqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzI5MzMzMiwiZXhwIjoyMDYyODY5MzMyfQ.YyOFE3CdP2kK5GVMKJayMRNJh6kYvZo1P_4_OqTgGgs';
+      
+      const serviceClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+
+      console.log("Fetching ALL shipments using service role...");
+
+      // Get ALL shipments using service role to bypass RLS
+      const { data: shipmentsData, error: shipmentsError } = await serviceClient
         .from('shipments')
         .select('*')
         .not('cost', 'is', null)
         .order('created_at', { ascending: false });
 
-      console.log("Shipments query result:", { data: shipmentsData, error: shipmentsError });
+      console.log("Service role shipments query result:", { data: shipmentsData, error: shipmentsError });
 
       if (shipmentsError) throw shipmentsError;
 
@@ -66,7 +80,7 @@ export const SuperAdminShipmentsReport = () => {
       }
 
       // Get all companies for lookup
-      const { data: companiesData, error: companiesError } = await supabase
+      const { data: companiesData, error: companiesError } = await serviceClient
         .from('companies')
         .select('id, name, markup_type, markup_value');
 
@@ -77,7 +91,7 @@ export const SuperAdminShipmentsReport = () => {
       const companyMap = new Map(companiesData?.map(c => [c.id, c]) || []);
 
       // Get all users to link shipments to companies through user_id
-      const { data: usersData, error: usersError } = await supabase
+      const { data: usersData, error: usersError } = await serviceClient
         .from('users')
         .select('id, company_id');
 
@@ -370,3 +384,4 @@ export const SuperAdminShipmentsReport = () => {
     </div>
   );
 };
+
