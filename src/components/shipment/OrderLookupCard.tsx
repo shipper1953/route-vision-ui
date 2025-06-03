@@ -36,6 +36,9 @@ export const OrderLookupCard = ({ setOrderLookupComplete }: OrderLookupCardProps
   const handleOrderSelected = async (order: OrderData) => {
     console.log("Order selected from autocomplete:", order);
     
+    // Set the orderBarcode field to display the order ID
+    form.setValue("orderBarcode", order.id);
+    
     // Update form with customer data
     form.setValue("toName", order.customerName);
     form.setValue("toCompany", order.customerCompany || "");

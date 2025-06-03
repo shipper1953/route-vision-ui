@@ -35,9 +35,6 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
         loadedOrderIdRef.current = orderIdFromUrl; // Mark this order as being loaded
         console.log(`Loading order ${orderIdFromUrl} from URL...`);
         
-        // Set the orderBarcode field (which is what OrderLookupCard uses)
-        form.setValue("orderBarcode", orderIdFromUrl);
-        
         const order = await fetchOrderById(orderIdFromUrl);
         
         if (!order) {
@@ -47,6 +44,9 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
         }
         
         console.log("Order loaded from URL:", order);
+        
+        // Set the orderBarcode field to display the order ID
+        form.setValue("orderBarcode", order.id);
         
         // Update form with customer data
         form.setValue("toName", order.customerName);

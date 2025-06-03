@@ -37,7 +37,7 @@ export const useOrderAutocomplete = () => {
   const handleSelect = useCallback((order: OrderData, onOrderSelected: (order: OrderData) => void) => {
     console.log("Order selected:", order);
     setSelectedOrderId(order.id);
-    setInputValue(order.id);
+    setInputValue(order.id); // Display the order ID in the input
     setOpen(false);
     onOrderSelected(order);
   }, []);
