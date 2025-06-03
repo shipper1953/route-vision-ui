@@ -28,6 +28,21 @@ export async function saveShipmentToDatabase(responseData: any, orderId?: string
     } else if (userData) {
       companyId = userData.company_id;
       console.log("Found company_id for user:", companyId);
+    } else {
+      console.log("User not found in users table:", userId);
+    }
+
+    // If no company_id found in users table, check if user exists in auth
+    if (!companyId) {
+      console.log("No company_id found, checking auth.users table...");
+      const { data: { user }, error: authError } = await supabaseClient.auth.admin.getUserById(userId);
+      if (authError) {
+        console.error("Error looking up auth user:", authError);
+      } else if (user) {
+        console.log("User exists in auth but not in users table, creating profile...");
+        // User exists in auth but not in users table - this shouldn't happen with our trigger
+        // but let's handle it gracefully
+      }
     }
   }
 

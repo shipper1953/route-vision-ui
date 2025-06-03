@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -46,7 +47,7 @@ export const SuperAdminShipmentsReport = () => {
     try {
       setLoading(true);
 
-      // First, get all shipments with costs
+      // First, get ALL shipments with costs (don't filter by company yet)
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
         .select('*')
@@ -91,7 +92,7 @@ export const SuperAdminShipmentsReport = () => {
         // Get company info - either directly from shipment.company_id or through user relationship
         let companyData = null;
         let companyId = null;
-        let companyName = 'Unknown Company';
+        let companyName = 'No Company';
 
         if (shipment.company_id) {
           // Direct company_id on shipment
@@ -104,7 +105,11 @@ export const SuperAdminShipmentsReport = () => {
           if (companyId) {
             companyData = companyMap.get(companyId);
             companyName = companyData?.name || 'Unknown Company';
+          } else {
+            companyName = 'No Company';
           }
+        } else {
+          companyName = 'No Company';
         }
         
         // Calculate original cost based on markup (reverse calculation)
@@ -132,7 +137,7 @@ export const SuperAdminShipmentsReport = () => {
           profit: profit,
           created_at: shipment.created_at,
           company_name: companyName,
-          company_id: String(companyId || '')
+          company_id: String(companyId || 'none')
         };
       });
 
@@ -143,24 +148,22 @@ export const SuperAdminShipmentsReport = () => {
       const summaryMap = new Map<string, CompanySummary>();
       
       processedShipments.forEach(shipment => {
-        const key = shipment.company_id;
-        if (key && key !== '') {
-          if (summaryMap.has(key)) {
-            const summary = summaryMap.get(key)!;
-            summary.total_shipments += 1;
-            summary.total_revenue += shipment.cost;
-            summary.total_cost += shipment.original_cost;
-            summary.total_profit += shipment.profit;
-          } else {
-            summaryMap.set(key, {
-              company_id: shipment.company_id,
-              company_name: shipment.company_name,
-              total_shipments: 1,
-              total_revenue: shipment.cost,
-              total_cost: shipment.original_cost,
-              total_profit: shipment.profit
-            });
-          }
+        const key = shipment.company_id !== 'none' ? shipment.company_id : 'none';
+        if (summaryMap.has(key)) {
+          const summary = summaryMap.get(key)!;
+          summary.total_shipments += 1;
+          summary.total_revenue += shipment.cost;
+          summary.total_cost += shipment.original_cost;
+          summary.total_profit += shipment.profit;
+        } else {
+          summaryMap.set(key, {
+            company_id: shipment.company_id,
+            company_name: shipment.company_name,
+            total_shipments: 1,
+            total_revenue: shipment.cost,
+            total_cost: shipment.original_cost,
+            total_profit: shipment.profit
+          });
         }
       });
 
@@ -178,7 +181,7 @@ export const SuperAdminShipmentsReport = () => {
     : shipments.filter(s => s.company_id === selectedCompany);
 
   const uniqueCompanies = Array.from(new Set(shipments.map(s => ({ id: s.company_id, name: s.company_name }))))
-    .filter(c => c.id && c.id !== '');
+    .filter(c => c.id && c.id !== 'none');
 
   const totalMetrics = {
     shipments: filteredShipments.length,
@@ -261,6 +264,7 @@ export const SuperAdminShipmentsReport = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Companies</SelectItem>
+            <SelectItem value="none">No Company</SelectItem>
             {uniqueCompanies.map(company => (
               <SelectItem key={company.id} value={company.id}>
                 {company.name}
