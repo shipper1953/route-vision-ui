@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,19 @@ import { Plus, CreditCard, TrendingUp, TrendingDown } from "lucide-react";
 
 interface WalletManagementProps {
   companyId?: string;
+}
+
+interface DatabaseTransaction {
+  id: string;
+  wallet_id: string;
+  company_id: string;
+  amount: number;
+  type: string; // This comes as string from database
+  description?: string;
+  reference_id?: string;
+  reference_type?: string;
+  created_at: string;
+  created_by?: string;
 }
 
 export const WalletManagement = ({ companyId }: WalletManagementProps) => {
@@ -59,7 +71,14 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
         .limit(50);
 
       if (error) throw error;
-      setTransactions(data || []);
+      
+      // Transform database transactions to match our type
+      const transformedTransactions: Transaction[] = (data as DatabaseTransaction[])?.map(transaction => ({
+        ...transaction,
+        type: transaction.type as 'credit' | 'debit' | 'refund' // Cast to proper type
+      })) || [];
+      
+      setTransactions(transformedTransactions);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast.error('Failed to fetch transactions');

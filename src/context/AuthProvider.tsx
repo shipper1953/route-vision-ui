@@ -210,8 +210,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return signup(email, password, options?.name);
   };
 
-  // Compute isAdmin based on user profile
-  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+  // Compute isAdmin based on user profile - updated to match new role system
+  const isAdmin = userProfile?.role === 'company_admin' || userProfile?.role === 'super_admin';
   const isSuperAdmin = userProfile?.role === 'super_admin';
   const isCompanyAdmin = userProfile?.role === 'company_admin';
 

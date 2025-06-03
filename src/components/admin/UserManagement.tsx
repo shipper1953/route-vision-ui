@@ -11,10 +11,19 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { UserProfile } from "@/types/auth";
-import { Plus, Edit, UserX } from "lucide-react";
+import { Plus, UserX } from "lucide-react";
 
 interface UserManagementProps {
   companyId?: string;
+}
+
+interface DatabaseUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'user' | 'company_admin' | 'super_admin';
+  company_id: string;
+  warehouse_ids: any; // This will be Json from database
 }
 
 export const UserManagement = ({ companyId }: UserManagementProps) => {
@@ -42,7 +51,22 @@ export const UserManagement = ({ companyId }: UserManagementProps) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setUsers(data || []);
+      
+      // Transform database users to UserProfile format
+      const transformedUsers: UserProfile[] = (data as DatabaseUser[])?.map(user => ({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        company_id: user.company_id,
+        warehouse_ids: Array.isArray(user.warehouse_ids) 
+          ? user.warehouse_ids 
+          : typeof user.warehouse_ids === 'string' 
+            ? JSON.parse(user.warehouse_ids)
+            : []
+      })) || [];
+      
+      setUsers(transformedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Failed to fetch users');

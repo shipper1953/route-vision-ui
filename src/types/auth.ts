@@ -31,11 +31,20 @@ export interface Company {
   name: string;
   email?: string;
   phone?: string;
-  address?: any;
+  address?: CompanyAddress;
   settings?: any;
   created_at: string;
   updated_at: string;
   is_active: boolean;
+}
+
+export interface CompanyAddress {
+  street1: string;
+  street2: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
 }
 
 export interface Warehouse {

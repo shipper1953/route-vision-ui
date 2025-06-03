@@ -14,7 +14,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   Select,
@@ -30,7 +29,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: "user" | "admin";
+  role: "user" | "company_admin" | "super_admin";
 }
 
 export const RoleManager = () => {
@@ -58,7 +57,7 @@ export const RoleManager = () => {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: "user" | "admin") => {
+  const updateUserRole = async (userId: string, newRole: "user" | "company_admin" | "super_admin") => {
     try {
       const { error } = await supabase
         .from('users')
@@ -104,21 +103,22 @@ export const RoleManager = () => {
                 <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>
-                  <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                  <Badge variant={user.role === 'super_admin' ? 'default' : 'secondary'}>
                     {user.role}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <Select
                     value={user.role}
-                    onValueChange={(newRole: "user" | "admin") => updateUserRole(user.id, newRole)}
+                    onValueChange={(newRole: "user" | "company_admin" | "super_admin") => updateUserRole(user.id, newRole)}
                   >
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="user">User</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="company_admin">Company Admin</SelectItem>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
                     </SelectContent>
                   </Select>
                 </TableCell>

@@ -55,7 +55,25 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
       return null;
     }
 
-    return profile;
+    if (!profile) {
+      return null;
+    }
+
+    // Transform database profile to UserProfile type
+    const userProfile: UserProfile = {
+      id: profile.id,
+      email: profile.email,
+      name: profile.name,
+      role: profile.role,
+      company_id: profile.company_id,
+      warehouse_ids: Array.isArray(profile.warehouse_ids) 
+        ? profile.warehouse_ids 
+        : typeof profile.warehouse_ids === 'string' 
+          ? JSON.parse(profile.warehouse_ids)
+          : []
+    };
+
+    return userProfile;
   } catch (error) {
     console.warn('Exception in fetchUserProfile:', error);
     return null;

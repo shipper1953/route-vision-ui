@@ -1,13 +1,11 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Company } from "@/types/auth";
+import { Company, CompanyAddress } from "@/types/auth";
 
 interface CompanyProfileProps {
   companyId?: string;
@@ -28,7 +26,7 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
       state: '',
       zip: '',
       country: 'US'
-    }
+    } as CompanyAddress
   });
 
   useEffect(() => {
@@ -50,11 +48,14 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
       if (error) throw error;
       
       setCompany(data);
+      
+      // Safely handle the address field from database
+      const addressData = data.address as CompanyAddress | null;
       setFormData({
         name: data.name || '',
         email: data.email || '',
         phone: data.phone || '',
-        address: data.address || {
+        address: addressData || {
           street1: '',
           street2: '',
           city: '',

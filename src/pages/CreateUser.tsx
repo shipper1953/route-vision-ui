@@ -42,7 +42,7 @@ const userSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
-  role: z.enum(['admin', 'user'], {
+  role: z.enum(['company_admin', 'user', 'super_admin'], {
     required_error: "Please select a role",
   }),
   sendInvitation: z.boolean().default(true),
@@ -242,7 +242,8 @@ const CreateUser = () => {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="super_admin">Super Admin</SelectItem>
+                        <SelectItem value="company_admin">Company Admin</SelectItem>
                         <SelectItem value="user">User</SelectItem>
                       </SelectContent>
                     </Select>
