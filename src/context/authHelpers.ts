@@ -34,10 +34,12 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
             return null;
           }
           
-          // Convert warehouse_ids from Json to string[]
+          // Convert warehouse_ids from Json to string[] with proper type casting
           return {
             ...newData,
-            warehouse_ids: Array.isArray(newData.warehouse_ids) ? newData.warehouse_ids : []
+            warehouse_ids: Array.isArray(newData.warehouse_ids) 
+              ? (newData.warehouse_ids as string[])
+              : []
           };
         }
         return null;
@@ -45,10 +47,12 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
       throw error;
     }
 
-    // Convert warehouse_ids from Json to string[]
+    // Convert warehouse_ids from Json to string[] with proper type casting
     return {
       ...data,
-      warehouse_ids: Array.isArray(data.warehouse_ids) ? data.warehouse_ids : []
+      warehouse_ids: Array.isArray(data.warehouse_ids) 
+        ? (data.warehouse_ids as string[])
+        : []
     };
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -105,10 +109,12 @@ export const createUserProfile = async (user: any): Promise<UserProfile | null> 
 
     console.log('User profile created successfully:', data);
     
-    // Convert warehouse_ids from Json to string[]
+    // Convert warehouse_ids from Json to string[] with proper type casting
     return {
       ...data,
-      warehouse_ids: Array.isArray(data.warehouse_ids) ? data.warehouse_ids : []
+      warehouse_ids: Array.isArray(data.warehouse_ids) 
+        ? (data.warehouse_ids as string[])
+        : []
     };
   } catch (error) {
     console.error('Error in createUserProfile:', error);

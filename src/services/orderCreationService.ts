@@ -26,13 +26,9 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
   const warehouseIds = Array.isArray(userProfile.warehouse_ids) ? userProfile.warehouse_ids : [];
   const defaultWarehouseId = warehouseIds.length > 0 ? warehouseIds[0] : null;
 
-  // Generate order ID
-  const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
   const { data, error } = await supabase
     .from('orders')
     .insert({
-      order_id: orderId,
       customer_name: orderData.customerName,
       customer_company: orderData.customerCompany,
       customer_email: orderData.customerEmail,
