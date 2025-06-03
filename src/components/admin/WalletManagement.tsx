@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Wallet, Transaction } from "@/types/auth";
 import { Plus, CreditCard, TrendingUp, TrendingDown } from "lucide-react";
+import { StripePaymentDialog } from "./StripePaymentDialog";
 
 interface WalletManagementProps {
   companyId?: string;
@@ -33,12 +34,26 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddFundsDialogOpen, setIsAddFundsDialogOpen] = useState(false);
+  const [isStripeDialogOpen, setIsStripeDialogOpen] = useState(false);
   const [addFundsAmount, setAddFundsAmount] = useState('');
 
   useEffect(() => {
     if (companyId) {
       fetchWallet();
       fetchTransactions();
+    }
+
+    // Check for successful payment from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'true') {
+      toast.success('Payment successful! Your wallet will be updated shortly.');
+      // Refresh wallet data
+      setTimeout(() => {
+        fetchWallet();
+        fetchTransactions();
+      }, 2000);
+    } else if (urlParams.get('canceled') === 'true') {
+      toast.error('Payment was canceled.');
     }
   }, [companyId]);
 
@@ -191,16 +206,25 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Wallet Management</CardTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsAddFundsDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Manual Add
+              </Button>
+              <Button onClick={() => setIsStripeDialogOpen(true)}>
+                <CreditCard className="h-4 w-4 mr-2" />
+                Add Funds
+              </Button>
+            </div>
+            
+            {/* Manual add funds dialog */}
             <Dialog open={isAddFundsDialogOpen} onOpenChange={setIsAddFundsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Funds
-                </Button>
-              </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add Funds to Wallet</DialogTitle>
+                  <DialogTitle>Add Funds Manually</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
@@ -226,7 +250,7 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
             Add funds to your wallet to pay for shipping labels and services. 
-            Funds are deducted automatically when you purchase shipping labels.
+            Use Stripe for secure credit card or bank account payments.
           </p>
           
           <div className="text-lg font-semibold">
@@ -283,6 +307,13 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
           )}
         </CardContent>
       </Card>
+
+      <StripePaymentDialog
+        open={isStripeDialogOpen}
+        onOpenChange={setIsStripeDialogOpen}
+        companyId={companyId}
+        currentBalance={wallet?.balance || 0}
+      />
     </div>
   );
 };
