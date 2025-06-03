@@ -211,12 +211,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Compute isAdmin based on user profile
-  const isAdmin = userProfile?.role === 'admin';
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+  const isSuperAdmin = userProfile?.role === 'super_admin';
+  const isCompanyAdmin = userProfile?.role === 'company_admin';
 
   const value = {
     user,
     isAuthenticated: !!user,
     isAdmin,
+    isSuperAdmin,
+    isCompanyAdmin,
+    userProfile,
     loading,
     error,
     login,

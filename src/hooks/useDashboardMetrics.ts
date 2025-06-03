@@ -14,7 +14,7 @@ interface DashboardMetrics {
 }
 
 export const useDashboardMetrics = (): DashboardMetrics => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalOrders: 0,
     activeShipments: 0,
@@ -27,46 +27,46 @@ export const useDashboardMetrics = (): DashboardMetrics => {
 
   useEffect(() => {
     const fetchMetrics = async () => {
-      if (!user?.id) {
+      if (!user?.id || !userProfile?.company_id) {
         setMetrics(prev => ({ ...prev, loading: false }));
         return;
       }
 
       try {
-        // Get total orders
+        // Get total orders for the company
         const { count: totalOrders } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id);
+          .eq('company_id', userProfile.company_id);
 
-        // Get active shipments (created, in_transit, etc)
+        // Get active shipments (created, in_transit, etc) for the company
         const { count: activeShipments } = await supabase
           .from('shipments')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
+          .eq('company_id', userProfile.company_id)
           .in('status', ['created', 'in_transit', 'pre_transit']);
 
-        // Get orders ready to ship
+        // Get orders ready to ship for the company
         const { count: ordersToShip } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
+          .eq('company_id', userProfile.company_id)
           .eq('status', 'ready_to_ship');
 
-        // Get delivered shipments today
+        // Get delivered shipments today for the company
         const today = new Date().toISOString().split('T')[0];
         const { count: deliveredToday } = await supabase
           .from('shipments')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
+          .eq('company_id', userProfile.company_id)
           .eq('status', 'delivered')
           .gte('actual_delivery_date', today);
 
-        // Calculate on-time delivery rate
+        // Calculate on-time delivery rate for the company
         const { data: deliveredShipments } = await supabase
           .from('shipments')
           .select('actual_delivery_date, estimated_delivery_date')
-          .eq('user_id', user.id)
+          .eq('company_id', userProfile.company_id)
           .eq('status', 'delivered')
           .not('actual_delivery_date', 'is', null)
           .not('estimated_delivery_date', 'is', null);
@@ -84,11 +84,11 @@ export const useDashboardMetrics = (): DashboardMetrics => {
           ? Math.round((onTimeCount / deliveredShipments.length) * 100)
           : 0;
 
-        // Calculate total revenue from orders
+        // Calculate total revenue from orders for the company
         const { data: orderValues } = await supabase
           .from('orders')
           .select('value')
-          .eq('user_id', user.id);
+          .eq('company_id', userProfile.company_id);
 
         const totalRevenue = orderValues?.reduce((sum, order) => 
           sum + (Number(order.value) || 0), 0) || 0;
@@ -110,7 +110,7 @@ export const useDashboardMetrics = (): DashboardMetrics => {
     };
 
     fetchMetrics();
-  }, [user?.id]);
+  }, [user?.id, userProfile?.company_id]);
 
   return metrics;
 };

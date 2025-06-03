@@ -9,9 +9,11 @@ import EditOrder from "./pages/EditOrder";
 import Shipments from "./pages/Shipments";
 import CreateShipment from "./pages/CreateShipment";
 import Settings from "./pages/Settings";
-import Users from "./pages/Users";
-import CreateUser from "./pages/CreateUser";
 import AdminPanel from "./pages/AdminPanel";
+import SuperAdminPanel from "./pages/SuperAdminPanel";
+import CompanyAdminPanel from "./pages/CompanyAdminPanel";
+import CreateUser from "./pages/CreateUser";
+import Users from "./pages/Users";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -52,20 +54,24 @@ export const router = createBrowserRouter([
     element: <Settings />,
   },
   {
-    path: "/users",
-    element: <Users />,
+    path: "/admin",
+    element: <AdminPanel />,
+  },
+  {
+    path: "/super-admin",
+    element: <SuperAdminPanel />,
+  },
+  {
+    path: "/company-admin",
+    element: <CompanyAdminPanel />,
   },
   {
     path: "/users/new",
     element: <CreateUser />,
   },
   {
-    path: "/create-user",
-    element: <CreateUser />,
-  },
-  {
-    path: "/admin",
-    element: <AdminPanel />,
+    path: "/users",
+    element: <Users />,
   },
   {
     path: "*",

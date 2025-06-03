@@ -9,8 +9,45 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      companies: {
+        Row: {
+          address: Json | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          phone: string | null
+          settings: Json | null
+          updated_at: string
+        }
+        Insert: {
+          address?: Json | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          phone?: string | null
+          settings?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          address?: Json | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          phone?: string | null
+          settings?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
+          company_id: string | null
           created_at: string | null
           customer_company: string | null
           customer_email: string | null
@@ -27,8 +64,10 @@ export type Database = {
           status: string | null
           user_id: string | null
           value: number
+          warehouse_id: string | null
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           customer_company?: string | null
           customer_email?: string | null
@@ -45,8 +84,10 @@ export type Database = {
           status?: string | null
           user_id?: string | null
           value?: number
+          warehouse_id?: string | null
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           customer_company?: string | null
           customer_email?: string | null
@@ -63,8 +104,23 @@ export type Database = {
           status?: string | null
           user_id?: string | null
           value?: number
+          warehouse_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_orders_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_orders_warehouse"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_shipment_id_fkey"
             columns: ["shipment_id"]
@@ -99,17 +155,14 @@ export type Database = {
         Row: {
           description: string | null
           id: number
-          name: Database["public"]["Enums"]["app_role"]
         }
         Insert: {
           description?: string | null
           id?: never
-          name: Database["public"]["Enums"]["app_role"]
         }
         Update: {
           description?: string | null
           id?: never
-          name?: Database["public"]["Enums"]["app_role"]
         }
         Relationships: []
       }
@@ -117,6 +170,7 @@ export type Database = {
         Row: {
           actual_delivery_date: string | null
           carrier: string
+          company_id: string | null
           cost: number | null
           created_at: string | null
           easypost_id: string | null
@@ -132,11 +186,13 @@ export type Database = {
           tracking_number: string | null
           tracking_url: string | null
           user_id: string | null
+          warehouse_id: string | null
           weight: string | null
         }
         Insert: {
           actual_delivery_date?: string | null
           carrier: string
+          company_id?: string | null
           cost?: number | null
           created_at?: string | null
           easypost_id?: string | null
@@ -152,11 +208,13 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           user_id?: string | null
+          warehouse_id?: string | null
           weight?: string | null
         }
         Update: {
           actual_delivery_date?: string | null
           carrier?: string
+          company_id?: string | null
           cost?: number | null
           created_at?: string | null
           easypost_id?: string | null
@@ -172,9 +230,25 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           user_id?: string | null
+          warehouse_id?: string | null
           weight?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_shipments_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_shipments_warehouse"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shipping_rates: {
         Row: {
@@ -220,30 +294,90 @@ export type Database = {
           },
         ]
       }
+      transactions: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          reference_id: string | null
+          reference_type: string | null
+          type: string
+          wallet_id: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          type: string
+          wallet_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          type?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_transactions_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transactions_wallet"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
+          company_id: string | null
           email: string
           id: string
           name: string
           password: string
-          role: Database["public"]["Enums"]["app_role"]
+          role: Database["public"]["Enums"]["app_role"] | null
           role_id: number | null
+          warehouse_ids: Json | null
         }
         Insert: {
+          company_id?: string | null
           email: string
           id?: string
           name: string
           password: string
-          role: Database["public"]["Enums"]["app_role"]
+          role?: Database["public"]["Enums"]["app_role"] | null
           role_id?: number | null
+          warehouse_ids?: Json | null
         }
         Update: {
+          company_id?: string | null
           email?: string
           id?: string
           name?: string
           password?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role?: Database["public"]["Enums"]["app_role"] | null
           role_id?: number | null
+          warehouse_ids?: Json | null
         }
         Relationships: [
           {
@@ -254,11 +388,84 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "users_role_fkey"
-            columns: ["role"]
+            foreignKeyName: "fk_users_company"
+            columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: "roles"
-            referencedColumns: ["name"]
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallets: {
+        Row: {
+          balance: number | null
+          company_id: string
+          created_at: string
+          currency: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number | null
+          company_id: string
+          created_at?: string
+          currency?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number | null
+          company_id?: string
+          created_at?: string
+          currency?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_wallets_company"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouses: {
+        Row: {
+          address: Json
+          company_id: string
+          created_at: string
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          address: Json
+          company_id: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          address?: Json
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_warehouses_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -337,20 +544,9 @@ export type Database = {
         Args: { indexid: unknown }
         Returns: boolean
       }
-      index_advisor: {
-        Args: { query: string }
-        Returns: {
-          startup_cost_before: Json
-          startup_cost_after: Json
-          total_cost_before: Json
-          total_cost_after: Json
-          index_statements: string[]
-          errors: string[]
-        }[]
-      }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "super_admin" | "company_admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -466,7 +662,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["super_admin", "company_admin", "user"],
     },
   },
 } as const
