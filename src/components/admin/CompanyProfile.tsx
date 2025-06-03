@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,21 @@ import { Company, CompanyAddress } from "@/types/auth";
 interface CompanyProfileProps {
   companyId?: string;
 }
+
+// Transform database company data to our Company type
+const transformCompanyData = (dbCompany: any): Company => {
+  return {
+    id: dbCompany.id,
+    name: dbCompany.name,
+    email: dbCompany.email,
+    phone: dbCompany.phone,
+    address: dbCompany.address as CompanyAddress | undefined,
+    settings: dbCompany.settings,
+    created_at: dbCompany.created_at,
+    updated_at: dbCompany.updated_at,
+    is_active: dbCompany.is_active
+  };
+};
 
 export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
   const [company, setCompany] = useState<Company | null>(null);
@@ -47,14 +63,16 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
 
       if (error) throw error;
       
-      setCompany(data);
+      // Transform the database data to match our Company type
+      const transformedCompany = transformCompanyData(data);
+      setCompany(transformedCompany);
       
       // Safely handle the address field from database
-      const addressData = data.address as CompanyAddress | null;
+      const addressData = transformedCompany.address;
       setFormData({
-        name: data.name || '',
-        email: data.email || '',
-        phone: data.phone || '',
+        name: transformedCompany.name || '',
+        email: transformedCompany.email || '',
+        phone: transformedCompany.phone || '',
         address: addressData || {
           street1: '',
           street2: '',
@@ -81,7 +99,7 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          address: formData.address,
+          address: formData.address as any, // Cast to any for database storage
           updated_at: new Date().toISOString()
         })
         .eq('id', companyId);

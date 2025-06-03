@@ -21,8 +21,23 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Company } from "@/types/auth";
+import { Company, CompanyAddress } from "@/types/auth";
 import { Plus, Edit, Trash2, Users, Wallet } from "lucide-react";
+
+// Transform database company data to our Company type
+const transformCompanyData = (dbCompany: any): Company => {
+  return {
+    id: dbCompany.id,
+    name: dbCompany.name,
+    email: dbCompany.email,
+    phone: dbCompany.phone,
+    address: dbCompany.address as CompanyAddress | undefined,
+    settings: dbCompany.settings,
+    created_at: dbCompany.created_at,
+    updated_at: dbCompany.updated_at,
+    is_active: dbCompany.is_active
+  };
+};
 
 export const CompanyManagement = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -46,7 +61,10 @@ export const CompanyManagement = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCompanies(data || []);
+      
+      // Transform the database data to match our Company type
+      const transformedCompanies = (data || []).map(transformCompanyData);
+      setCompanies(transformedCompanies);
     } catch (error) {
       console.error('Error fetching companies:', error);
       toast.error('Failed to fetch companies');
@@ -65,7 +83,9 @@ export const CompanyManagement = () => {
 
       if (error) throw error;
 
-      setCompanies([data, ...companies]);
+      // Transform the new company data and add to state
+      const transformedCompany = transformCompanyData(data);
+      setCompanies([transformedCompany, ...companies]);
       setNewCompany({ name: '', email: '', phone: '' });
       setIsCreateDialogOpen(false);
       toast.success('Company created successfully');
