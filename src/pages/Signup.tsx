@@ -52,7 +52,7 @@ const Signup = () => {
     setIsLoading(true);
     try {
       await signUp(data.email, data.password, { name: data.name });
-      toast.success('Account created successfully! Please check your email for verification.');
+      toast.success('Account created successfully! You are now logged in as a Company Admin.');
       navigate('/');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Signup failed';
@@ -72,6 +72,9 @@ const Signup = () => {
         </div>
         <div className="text-white max-w-md">
           <p className="text-xl opacity-90">Join Ship Tornado to manage your shipments</p>
+          <p className="text-sm opacity-75 mt-4">
+            New accounts are automatically set up as Company Admins with access to our Demo company for testing.
+          </p>
         </div>
       </div>
 
@@ -87,6 +90,9 @@ const Signup = () => {
           <div className="mb-6">
             <h2 className="text-2xl font-bold">Create Account</h2>
             <p className="text-muted-foreground">Get started with Ship Tornado</p>
+            <p className="text-sm text-tms-navy mt-2">
+              Your account will be activated immediately with Company Admin access.
+            </p>
           </div>
 
           <Form {...form}>

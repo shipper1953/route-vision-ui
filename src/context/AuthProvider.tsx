@@ -180,6 +180,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
+      console.log('Creating account for:', email);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -187,18 +189,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           data: {
             name: name || email.split('@')[0],
           },
+          // Auto-confirm the account
+          emailRedirectTo: `${window.location.origin}/`,
         },
       });
 
       if (error) {
+        console.error('Signup error:', error);
         setError(error.message);
         throw error;
       }
 
       if (data.user) {
-        toast.success('Account created successfully');
+        console.log('Account created successfully for:', data.user.email);
+        
+        // Send welcome email via edge function
+        try {
+          await fetch('/api/send-welcome-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: data.user.email,
+              name: name || email.split('@')[0],
+            }),
+          });
+        } catch (emailError) {
+          console.warn('Failed to send welcome email:', emailError);
+          // Don't fail the signup process if email fails
+        }
+        
+        toast.success('Account created successfully! You can now log in.');
       }
     } catch (error: any) {
+      console.error('Signup failed:', error);
       setError(error.message);
       toast.error(error.message || 'Signup failed');
       throw error;
