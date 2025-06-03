@@ -1,11 +1,12 @@
 
 import { useState } from "react";
-import { Truck, Clock, Shield, CheckCircle } from "lucide-react";
+import { Truck, Clock, Shield, CheckCircle, DollarSign } from "lucide-react";
 import { SmartRate, Rate } from "@/services/easypost";
+import { MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
 import { Badge } from "@/components/ui/badge";
 
 interface RateOptionCardProps {
-  rate: SmartRate | Rate;
+  rate: SmartRate | Rate | MarkedUpRate | MarkedUpSmartRate;
   isSelected: boolean;
   isRecommended: boolean;
   onSelect: (rate: SmartRate | Rate) => void;
@@ -19,6 +20,9 @@ export const RateOptionCard = ({
 }: RateOptionCardProps) => {
   // Check if rate is a SmartRate by looking for SmartRate-specific properties
   const isSmartRate = 'delivery_accuracy' in rate || 'delivery_date_guaranteed' in rate;
+  
+  // Check if rate has markup applied
+  const hasMarkup = 'original_rate' in rate && 'markup_applied' in rate;
   
   const getDeliveryAccuracyLabel = (accuracy?: string) => {
     switch (accuracy) {
@@ -121,8 +125,16 @@ export const RateOptionCard = ({
           </div>
         )}
         
-        <div className="text-right font-bold text-lg text-tms-blue">
-          ${parseFloat(rate.rate).toFixed(2)}
+        <div className="text-right">
+          <div className="font-bold text-lg text-tms-blue">
+            ${parseFloat(rate.rate).toFixed(2)}
+          </div>
+          {hasMarkup && (rate as MarkedUpRate).markup_applied > 0 && (
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <DollarSign className="h-3 w-3" />
+              Base: ${parseFloat((rate as MarkedUpRate).original_rate).toFixed(2)}
+            </div>
+          )}
         </div>
       </div>
     </div>

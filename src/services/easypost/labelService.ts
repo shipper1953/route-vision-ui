@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { getOriginalRateAmount } from "@/utils/rateMarkupUtils";
 
 export class LabelService {
   private apiKey: string;

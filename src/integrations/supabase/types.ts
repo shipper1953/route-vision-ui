@@ -16,6 +16,8 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          markup_type: string | null
+          markup_value: number | null
           name: string
           phone: string | null
           settings: Json | null
@@ -27,6 +29,8 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          markup_type?: string | null
+          markup_value?: number | null
           name: string
           phone?: string | null
           settings?: Json | null
@@ -38,6 +42,8 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          markup_type?: string | null
+          markup_value?: number | null
           name?: string
           phone?: string | null
           settings?: Json | null

@@ -1,9 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Company, CompanyAddress } from "@/types/auth";
@@ -23,7 +23,9 @@ const transformCompanyData = (dbCompany: any): Company => {
     settings: dbCompany.settings,
     created_at: dbCompany.created_at,
     updated_at: dbCompany.updated_at,
-    is_active: dbCompany.is_active
+    is_active: dbCompany.is_active,
+    markup_type: dbCompany.markup_type || 'percentage',
+    markup_value: dbCompany.markup_value || 0
   };
 };
 
@@ -35,6 +37,8 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
     name: '',
     email: '',
     phone: '',
+    markup_type: 'percentage' as 'percentage' | 'fixed',
+    markup_value: 0,
     address: {
       street1: '',
       street2: '',
@@ -73,6 +77,8 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
         name: transformedCompany.name || '',
         email: transformedCompany.email || '',
         phone: transformedCompany.phone || '',
+        markup_type: transformedCompany.markup_type || 'percentage',
+        markup_value: transformedCompany.markup_value || 0,
         address: addressData || {
           street1: '',
           street2: '',
@@ -99,6 +105,8 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
+          markup_type: formData.markup_type,
+          markup_value: formData.markup_value,
           address: formData.address as any, // Cast to any for database storage
           updated_at: new Date().toISOString()
         })
@@ -157,6 +165,52 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               />
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Rate Markup Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="markup_type">Markup Type</Label>
+              <Select 
+                value={formData.markup_type} 
+                onValueChange={(value: 'percentage' | 'fixed') => setFormData({ ...formData, markup_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select markup type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percentage">Percentage (%)</SelectItem>
+                  <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="markup_value">
+                Markup Value {formData.markup_type === 'percentage' ? '(%)' : '($)'}
+              </Label>
+              <Input
+                id="markup_value"
+                type="number"
+                step="0.01"
+                min="0"
+                max={formData.markup_type === 'percentage' ? "100" : undefined}
+                value={formData.markup_value}
+                onChange={(e) => setFormData({ ...formData, markup_value: parseFloat(e.target.value) || 0 })}
+                placeholder={formData.markup_type === 'percentage' ? "Enter percentage (0-100)" : "Enter fixed amount"}
+              />
+            </div>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {formData.markup_type === 'percentage' 
+              ? `A ${formData.markup_value}% markup will be applied to all shipping rates.`
+              : `A $${formData.markup_value.toFixed(2)} markup will be added to all shipping rates.`
+            }
           </div>
         </CardContent>
       </Card>

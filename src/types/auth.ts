@@ -1,4 +1,3 @@
-
 import { User } from '@supabase/supabase-js';
 
 export interface AuthContextType {
@@ -36,6 +35,8 @@ export interface Company {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  markup_type?: 'percentage' | 'fixed';
+  markup_value?: number;
 }
 
 export interface CompanyAddress {

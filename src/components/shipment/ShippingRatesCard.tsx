@@ -8,8 +8,12 @@ import { ShippingRatesCardHeader } from "./ShippingRatesCardHeader";
 import { RatesList } from "./RatesList";
 import { ShippingRatesCardFooter } from "./ShippingRatesCardFooter";
 import { useFormContext } from "react-hook-form";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/context";
+import { supabase } from "@/integrations/supabase/client";
+import { Company } from "@/types/auth";
+import { applyMarkupToRates, MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
 
 interface ShippingRatesCardProps {
   shipmentResponse: ShipmentResponse;
@@ -28,6 +32,10 @@ export const ShippingRatesCard = ({
   onBack,
   onBuyLabel
 }: ShippingRatesCardProps) => {
+  const { userProfile } = useAuth();
+  const [company, setCompany] = useState<Company | null>(null);
+  const [markedUpRates, setMarkedUpRates] = useState<(MarkedUpRate | MarkedUpSmartRate)[]>([]);
+  
   // Get form context from parent component
   const form = useFormContext();
   
@@ -41,6 +49,37 @@ export const ShippingRatesCard = ({
     shipmentResponse.smartRates : 
     (shipmentResponse?.rates?.length ? shipmentResponse.rates : []);
 
+  // Fetch company data for markup calculation
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (!userProfile?.company_id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', userProfile.company_id)
+          .single();
+
+        if (error) throw error;
+        setCompany(data);
+      } catch (error) {
+        console.error('Error fetching company for markup calculation:', error);
+      }
+    };
+
+    fetchCompany();
+  }, [userProfile?.company_id]);
+
+  // Apply markup to rates when company data or rates change
+  useEffect(() => {
+    if (availableRates.length > 0) {
+      const ratesWithMarkup = applyMarkupToRates(availableRates, company);
+      setMarkedUpRates(ratesWithMarkup);
+      console.log('Applied markup to rates:', ratesWithMarkup);
+    }
+  }, [availableRates, company]);
+
   // Alert user if no rates are available
   useEffect(() => {
     if (!availableRates.length) {
@@ -48,10 +87,14 @@ export const ShippingRatesCard = ({
     } else {
       // If we have rates and a recommended rate is available but not selected, select it
       if (recommendedRate && !selectedRate) {
-        setSelectedRate(recommendedRate);
+        // Find the marked up version of the recommended rate
+        const markedUpRecommended = markedUpRates.find(rate => rate.id === recommendedRate.id);
+        if (markedUpRecommended) {
+          setSelectedRate(markedUpRecommended);
+        }
       }
     }
-  }, [availableRates.length, recommendedRate, selectedRate, setSelectedRate]);
+  }, [availableRates.length, recommendedRate, selectedRate, setSelectedRate, markedUpRates]);
   
   // If there's no form context, render without FormProvider
   return (
@@ -59,9 +102,9 @@ export const ShippingRatesCard = ({
       <ShippingRatesCardHeader />
       
       <CardContent>
-        {availableRates.length > 0 ? (
+        {markedUpRates.length > 0 ? (
           <RatesList 
-            rates={availableRates as (SmartRate | Rate)[]}
+            rates={markedUpRates as (SmartRate | Rate)[]}
             selectedRate={selectedRate}
             recommendedRate={recommendedRate}
             setSelectedRate={setSelectedRate}
