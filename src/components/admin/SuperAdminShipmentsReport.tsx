@@ -1,11 +1,9 @@
-
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, DollarSign, TrendingUp, Package } from "lucide-react";
 
@@ -48,57 +46,27 @@ export const SuperAdminShipmentsReport = () => {
     try {
       setLoading(true);
 
-      // Create a service role client to bypass RLS
-      const supabaseUrl = 'https://gidrlosmhpvdcogrkidj.supabase.co';
-      const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpZHJsb3NtaHB2ZGNvZ3JraWRqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzI5MzMzMiwiZXhwIjoyMDYyODY5MzMyfQ.YyOFE3CdP2kK5GVMKJayMRNJh6kYvZo1P_4_OqTgGgs';
-      
-      const serviceClient = createClient(supabaseUrl, supabaseServiceKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      });
+      console.log("Fetching ALL shipments using edge function...");
 
-      console.log("Fetching ALL shipments using service role...");
+      // Use an edge function to fetch all shipments with service role privileges
+      const { data: response, error: functionError } = await supabase.functions.invoke('get-all-shipments-admin');
 
-      // Get ALL shipments using service role to bypass RLS
-      const { data: shipmentsData, error: shipmentsError } = await serviceClient
-        .from('shipments')
-        .select('*')
-        .not('cost', 'is', null)
-        .order('created_at', { ascending: false });
+      console.log("Edge function response:", { data: response, error: functionError });
 
-      console.log("Service role shipments query result:", { data: shipmentsData, error: shipmentsError });
+      if (functionError) throw functionError;
 
-      if (shipmentsError) throw shipmentsError;
-
-      if (!shipmentsData?.length) {
+      if (!response?.shipments?.length) {
         console.log("No shipments found");
         setShipments([]);
         setCompanySummaries([]);
         return;
       }
 
-      // Get all companies for lookup
-      const { data: companiesData, error: companiesError } = await serviceClient
-        .from('companies')
-        .select('id, name, markup_type, markup_value');
-
-      if (companiesError) {
-        console.error('Error fetching companies:', companiesError);
-      }
+      const shipmentsData = response.shipments;
+      const companiesData = response.companies || [];
+      const usersData = response.users || [];
 
       const companyMap = new Map(companiesData?.map(c => [c.id, c]) || []);
-
-      // Get all users to link shipments to companies through user_id
-      const { data: usersData, error: usersError } = await serviceClient
-        .from('users')
-        .select('id, company_id');
-
-      if (usersError) {
-        console.error('Error fetching users:', usersError);
-      }
-
       const userCompanyMap = new Map(usersData?.map(u => [u.id, u.company_id]) || []);
 
       // Process shipments data to calculate original cost and profit
@@ -384,4 +352,3 @@ export const SuperAdminShipmentsReport = () => {
     </div>
   );
 };
-
