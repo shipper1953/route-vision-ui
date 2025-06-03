@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -211,6 +212,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (emailError) {
           console.warn('Failed to send welcome email:', emailError);
+        }
+        
+        // If the user wasn't auto-confirmed, we should still create their profile manually
+        if (!data.user.email_confirmed_at) {
+          console.log('User not auto-confirmed, creating profile manually...');
+          try {
+            await createUserProfile(data.user);
+          } catch (profileError) {
+            console.warn('Failed to create user profile manually:', profileError);
+          }
         }
         
         toast.success('Account created successfully! You can now log in.');
