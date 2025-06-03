@@ -34,14 +34,22 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
             return null;
           }
           
-          return newData;
+          // Convert warehouse_ids from Json to string[]
+          return {
+            ...newData,
+            warehouse_ids: Array.isArray(newData.warehouse_ids) ? newData.warehouse_ids : []
+          };
         }
         return null;
       }
       throw error;
     }
 
-    return data;
+    // Convert warehouse_ids from Json to string[]
+    return {
+      ...data,
+      warehouse_ids: Array.isArray(data.warehouse_ids) ? data.warehouse_ids : []
+    };
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
@@ -96,7 +104,12 @@ export const createUserProfile = async (user: any): Promise<UserProfile | null> 
     }
 
     console.log('User profile created successfully:', data);
-    return data;
+    
+    // Convert warehouse_ids from Json to string[]
+    return {
+      ...data,
+      warehouse_ids: Array.isArray(data.warehouse_ids) ? data.warehouse_ids : []
+    };
   } catch (error) {
     console.error('Error in createUserProfile:', error);
     return null;

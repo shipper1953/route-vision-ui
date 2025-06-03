@@ -31,7 +31,7 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
 
   const { data, error } = await supabase
     .from('orders')
-    .insert([{
+    .insert({
       order_id: orderId,
       customer_name: orderData.customerName,
       customer_company: orderData.customerCompany,
@@ -46,7 +46,7 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
       user_id: user.id,
       company_id: userProfile.company_id,
       warehouse_id: defaultWarehouseId
-    }])
+    })
     .select()
     .single();
 
@@ -57,7 +57,17 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
 
   console.log("Order created successfully:", data);
 
-  // Convert back to OrderData format
+  // Convert back to OrderData format with proper type handling
+  const shippingAddress = typeof data.shipping_address === 'object' && data.shipping_address !== null
+    ? data.shipping_address as any
+    : {
+        street1: '',
+        city: '',
+        state: '',
+        zip: '',
+        country: 'US'
+      };
+
   return {
     id: data.id.toString(),
     customerName: data.customer_name || '',
@@ -69,12 +79,6 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
     status: data.status || 'processing',
     items: Array.isArray(data.items) ? data.items.length : 1,
     value: data.value?.toString() || '0',
-    shippingAddress: data.shipping_address || {
-      street1: '',
-      city: '',
-      state: '',
-      zip: '',
-      country: 'US'
-    }
+    shippingAddress: shippingAddress
   };
 };
