@@ -17,17 +17,19 @@ export const useDefaultAddressValues = () => {
         
         // First try to get user's assigned warehouse
         if (userProfile.warehouse_ids && Array.isArray(userProfile.warehouse_ids) && userProfile.warehouse_ids.length > 0) {
-          warehouseId = userProfile.warehouse_ids[0];
+          warehouseId = String(userProfile.warehouse_ids[0]);
         } else {
           // Fall back to company default warehouse
-          const { data: defaultWarehouse } = await supabase
+          const { data: defaultWarehouse, error: defaultError } = await supabase
             .from('warehouses')
             .select('id')
             .eq('company_id', userProfile.company_id)
             .eq('is_default', true)
-            .single();
+            .maybeSingle();
           
-          if (defaultWarehouse) {
+          if (defaultError) {
+            console.error("Error fetching default warehouse:", defaultError);
+          } else if (defaultWarehouse) {
             warehouseId = defaultWarehouse.id;
           }
         }
@@ -37,9 +39,11 @@ export const useDefaultAddressValues = () => {
             .from('warehouses')
             .select('name, address')
             .eq('id', warehouseId)
-            .single();
+            .maybeSingle();
 
-          if (!error && warehouse?.address) {
+          if (error) {
+            console.error("Error fetching warehouse details:", error);
+          } else if (warehouse?.address) {
             console.log("Loaded warehouse address:", warehouse);
             setWarehouseAddress({
               name: warehouse.name,

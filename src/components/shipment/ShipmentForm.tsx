@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ShipmentFormTabs } from "@/components/shipment/ShipmentFormTabs";
@@ -16,14 +16,11 @@ interface ShipmentFormProps {
 export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   const [loading, setLoading] = useState(false);
   const [orderLookupComplete, setOrderLookupComplete] = useState(false);
-  const { getDefaultShippingAddress } = useDefaultAddressValues();
+  const { getDefaultShippingAddress, warehouseAddress } = useDefaultAddressValues();
   
   const form = useForm<ShipmentFormType>({
     resolver: zodResolver(shipmentSchema),
     defaultValues: {
-      // Load default shipping address from profile settings
-      ...getDefaultShippingAddress(),
-      
       // Default values for recipient
       toName: "",
       toStreet1: "",
@@ -41,8 +38,33 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       orderId: "",
       requiredDeliveryDate: "",
       shipmentId: "",
+      
+      // These will be set when warehouse data loads
+      fromName: "",
+      fromCompany: "",
+      fromStreet1: "",
+      fromStreet2: "",
+      fromCity: "",
+      fromState: "",
+      fromZip: "",
+      fromCountry: "US",
+      fromPhone: "",
+      fromEmail: "",
     }
   });
+
+  // Update form with warehouse address when it loads
+  useEffect(() => {
+    if (warehouseAddress) {
+      const defaultAddress = getDefaultShippingAddress();
+      console.log("Setting default warehouse address in form:", defaultAddress);
+      
+      // Set all the "from" address fields
+      Object.entries(defaultAddress).forEach(([key, value]) => {
+        form.setValue(key as keyof ShipmentFormType, value);
+      });
+    }
+  }, [warehouseAddress, getDefaultShippingAddress, form]);
   
   return (
     <FormProvider {...form}>
