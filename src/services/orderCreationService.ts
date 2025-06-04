@@ -2,7 +2,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { OrderData } from "@/types/orderTypes";
 
-export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<OrderData> => {
+interface CreateOrderInput extends Omit<OrderData, 'id'> {
+  warehouseId?: string;
+}
+
+export const createOrder = async (orderData: CreateOrderInput): Promise<OrderData> => {
   console.log("Creating order with data:", orderData);
   
   // Get current user
@@ -11,7 +15,7 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
     throw new Error("User must be authenticated to create orders");
   }
 
-  // Get user's profile to get company_id and warehouse info
+  // Get user's profile to get company_id
   const { data: userProfile, error: profileError } = await supabase
     .from('users')
     .select('company_id, warehouse_ids')
@@ -22,12 +26,16 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
     throw new Error("User profile not found or not assigned to a company");
   }
 
-  // Get default warehouse ID from user's warehouse_ids array
-  const warehouseIds = Array.isArray(userProfile.warehouse_ids) ? userProfile.warehouse_ids : [];
-  const defaultWarehouseId = warehouseIds.length > 0 ? warehouseIds[0] : null;
+  // Use the provided warehouse ID or fall back to user's assigned warehouse or company default
+  let finalWarehouseId = orderData.warehouseId;
+  
+  if (!finalWarehouseId) {
+    // Get warehouse from user's warehouse_ids array
+    const warehouseIds = Array.isArray(userProfile.warehouse_ids) ? userProfile.warehouse_ids : [];
+    finalWarehouseId = warehouseIds.length > 0 ? warehouseIds[0] : null;
+  }
 
-  // If no warehouse assigned to user, get the default warehouse for the company
-  let finalWarehouseId = defaultWarehouseId;
+  // If still no warehouse, get the default warehouse for the company
   if (!finalWarehouseId) {
     const { data: defaultWarehouse, error: warehouseError } = await supabase
       .from('warehouses')
@@ -43,7 +51,7 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
   }
 
   if (!finalWarehouseId) {
-    throw new Error("No warehouse available for this user or company");
+    throw new Error("No warehouse available for this user or company. Please contact your administrator to set up a warehouse.");
   }
 
   // Generate a unique order ID
@@ -66,6 +74,8 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
     company_id: userProfile.company_id,
     warehouse_id: finalWarehouseId
   };
+
+  console.log("Creating order with warehouse_id:", finalWarehouseId);
 
   const { data, error } = await supabase
     .from('orders')

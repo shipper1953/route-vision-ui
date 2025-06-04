@@ -6,15 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form } from "@/components/ui/form";
 import { CustomerInfoSection } from "@/components/order/CustomerInfoSection";
 import { ShippingAddressSection } from "@/components/order/ShippingAddressSection";
+import { WarehouseSelectionSection } from "@/components/order/WarehouseSelectionSection";
 import { OrderFormActions } from "@/components/order/OrderFormActions";
 import { orderFormSchema, OrderFormValues } from "@/types/order";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/context";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
+import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
+import { useEffect } from "react";
 
 const CreateOrder = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, userProfile } = useAuth();
   const { isSubmitting, onSubmit } = useCreateOrder();
+  const { warehouseAddress } = useDefaultAddressValues();
 
   // Initialize the form with the correct type
   const form = useForm<OrderFormValues>({
@@ -33,8 +37,16 @@ const CreateOrder = () => {
       state: "",
       zip: "",
       country: "US",
+      warehouseId: "",
     },
   });
+
+  // Set default warehouse when warehouse address is loaded
+  useEffect(() => {
+    if (warehouseAddress && userProfile?.warehouse_ids && Array.isArray(userProfile.warehouse_ids) && userProfile.warehouse_ids.length > 0) {
+      form.setValue("warehouseId", userProfile.warehouse_ids[0]);
+    }
+  }, [warehouseAddress, userProfile?.warehouse_ids, form]);
 
   if (loading) {
     return (
@@ -82,6 +94,7 @@ const CreateOrder = () => {
                 <CustomerInfoSection />
                 <ShippingAddressSection />
               </div>
+              <WarehouseSelectionSection />
               <OrderFormActions isSubmitting={isSubmitting} />
             </form>
           </Form>

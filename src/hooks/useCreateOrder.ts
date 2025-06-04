@@ -17,6 +17,11 @@ export const useCreateOrder = () => {
       return;
     }
 
+    if (!data.warehouseId) {
+      toast.error("Please select a warehouse");
+      return;
+    }
+
     setIsSubmitting(true);
     console.log("Order form data:", data);
     
@@ -35,6 +40,7 @@ export const useCreateOrder = () => {
         status: "ready_to_ship",
         items: data.items,
         value: data.value,
+        warehouseId: data.warehouseId, // Pass the selected warehouse ID
         shippingAddress: {
           street1: data.street1,
           street2: data.street2 || undefined,
