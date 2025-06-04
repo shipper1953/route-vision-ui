@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Company, CompanyAddress } from "@/types/auth";
+import { useAuth } from "@/context";
 
 interface CompanyProfileProps {
   companyId?: string;
@@ -30,6 +31,7 @@ const transformCompanyData = (dbCompany: any): Company => {
 };
 
 export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
+  const { isSuperAdmin } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,17 +101,24 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
   const saveCompany = async () => {
     setSaving(true);
     try {
+      // Only include markup fields in update if user is super admin
+      const updateData: any = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address as any,
+        updated_at: new Date().toISOString()
+      };
+
+      // Only super admins can update markup settings
+      if (isSuperAdmin) {
+        updateData.markup_type = formData.markup_type;
+        updateData.markup_value = formData.markup_value;
+      }
+
       const { error } = await supabase
         .from('companies')
-        .update({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          markup_type: formData.markup_type,
-          markup_value: formData.markup_value,
-          address: formData.address as any, // Cast to any for database storage
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', companyId);
 
       if (error) throw error;
@@ -169,51 +178,54 @@ export const CompanyProfile = ({ companyId }: CompanyProfileProps) => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Rate Markup Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="markup_type">Markup Type</Label>
-              <Select 
-                value={formData.markup_type} 
-                onValueChange={(value: 'percentage' | 'fixed') => setFormData({ ...formData, markup_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select markup type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="percentage">Percentage (%)</SelectItem>
-                  <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
-                </SelectContent>
-              </Select>
+      {/* Only show markup settings to super admins */}
+      {isSuperAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Rate Markup Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="markup_type">Markup Type</Label>
+                <Select 
+                  value={formData.markup_type} 
+                  onValueChange={(value: 'percentage' | 'fixed') => setFormData({ ...formData, markup_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select markup type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Percentage (%)</SelectItem>
+                    <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="markup_value">
+                  Markup Value {formData.markup_type === 'percentage' ? '(%)' : '($)'}
+                </Label>
+                <Input
+                  id="markup_value"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={formData.markup_type === 'percentage' ? "100" : undefined}
+                  value={formData.markup_value}
+                  onChange={(e) => setFormData({ ...formData, markup_value: parseFloat(e.target.value) || 0 })}
+                  placeholder={formData.markup_type === 'percentage' ? "Enter percentage (0-100)" : "Enter fixed amount"}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="markup_value">
-                Markup Value {formData.markup_type === 'percentage' ? '(%)' : '($)'}
-              </Label>
-              <Input
-                id="markup_value"
-                type="number"
-                step="0.01"
-                min="0"
-                max={formData.markup_type === 'percentage' ? "100" : undefined}
-                value={formData.markup_value}
-                onChange={(e) => setFormData({ ...formData, markup_value: parseFloat(e.target.value) || 0 })}
-                placeholder={formData.markup_type === 'percentage' ? "Enter percentage (0-100)" : "Enter fixed amount"}
-              />
+            <div className="text-sm text-muted-foreground">
+              {formData.markup_type === 'percentage' 
+                ? `A ${formData.markup_value}% markup will be applied to all shipping rates.`
+                : `A $${formData.markup_value.toFixed(2)} markup will be added to all shipping rates.`
+              }
             </div>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {formData.markup_type === 'percentage' 
-              ? `A ${formData.markup_value}% markup will be applied to all shipping rates.`
-              : `A $${formData.markup_value.toFixed(2)} markup will be added to all shipping rates.`
-            }
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
