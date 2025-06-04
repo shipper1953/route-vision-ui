@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context";
+import { useState } from "react";
 
 interface NavItemProps {
   to: string;
@@ -17,6 +18,7 @@ export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false,
   const location = useLocation();
   const { setIsCollapsed } = useSidebar();
   const { isAdmin, isSuperAdmin } = useAuth();
+  const [isHovered, setIsHovered] = useState(false);
   const isActive = location.pathname === to;
   
   // Check permissions
@@ -29,7 +31,11 @@ export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false,
   };
   
   return (
-    <div className="relative group">
+    <div 
+      className="relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <NavLink 
         to={to} 
         onClick={handleClick}
@@ -48,9 +54,10 @@ export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false,
       </NavLink>
       
       {/* Tooltip for collapsed state */}
-      {isCollapsed && (
-        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-3 py-2 bg-popover text-popover-foreground text-sm rounded-md border shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+      {isCollapsed && isHovered && (
+        <div className="fixed bg-gray-900 text-white px-3 py-2 rounded-md text-sm whitespace-nowrap pointer-events-none z-[9999] shadow-lg border">
           {label}
+          <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
         </div>
       )}
     </div>
