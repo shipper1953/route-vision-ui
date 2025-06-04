@@ -1,4 +1,3 @@
-
 import { OrderData } from "@/types/orderTypes";
 import { useNavigate } from "react-router-dom";
 import { Truck, Edit, Barcode } from "lucide-react";
@@ -31,7 +30,7 @@ export const OrdersTable = ({
 
   const handleCreateShipmentForOrder = (orderId: string) => {
     // Navigate to create shipment page with the order ID using the correct route
-    navigate(`/shipments/new?orderId=${orderId}`);
+    navigate(`/shipments/create?orderId=${orderId}`);
   };
 
   const handleEditOrder = (orderId: string) => {
