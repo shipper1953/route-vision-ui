@@ -27,12 +27,12 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
   }
 
   // Use the provided warehouse ID or fall back to user's assigned warehouse or company default
-  let finalWarehouseId = orderData.warehouseId;
+  let finalWarehouseId: string | null = orderData.warehouseId || null;
   
   if (!finalWarehouseId) {
-    // Get warehouse from user's warehouse_ids array
+    // Get warehouse from user's warehouse_ids array - properly handle Json type
     const warehouseIds = Array.isArray(userProfile.warehouse_ids) ? userProfile.warehouse_ids : [];
-    finalWarehouseId = warehouseIds.length > 0 ? warehouseIds[0] : null;
+    finalWarehouseId = warehouseIds.length > 0 ? String(warehouseIds[0]) : null;
   }
 
   // If still no warehouse, get the default warehouse for the company
