@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context";
+import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 
 interface NavItemProps {
   to: string;
@@ -29,21 +30,24 @@ export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false,
   };
   
   return (
-    <NavLink 
-      to={to} 
-      onClick={handleClick}
-      className={({ isActive }) => 
-        cn(
-          "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
-          isCollapsed ? "justify-center" : "",
-          isActive 
-            ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-            : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
-        )
-      }
-    >
-      <Icon size={20} />
-      {!isCollapsed && <span>{label}</span>}
-    </NavLink>
+    <SidebarMenuItem>
+      <SidebarMenuButton 
+        asChild 
+        isActive={isActive}
+        tooltip={label}
+      >
+        <NavLink 
+          to={to} 
+          onClick={handleClick}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+            isCollapsed ? "justify-center" : ""
+          )}
+        >
+          <Icon size={20} />
+          {!isCollapsed && <span>{label}</span>}
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 };
