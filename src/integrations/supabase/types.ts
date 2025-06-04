@@ -68,7 +68,7 @@ export type Database = {
           shipment_id: number | null
           shipping_address: Json | null
           status: string | null
-          user_id: string | null
+          user_id: string
           value: number
           warehouse_id: string | null
         }
@@ -88,7 +88,7 @@ export type Database = {
           shipment_id?: number | null
           shipping_address?: Json | null
           status?: string | null
-          user_id?: string | null
+          user_id: string
           value?: number
           warehouse_id?: string | null
         }
@@ -108,7 +108,7 @@ export type Database = {
           shipment_id?: number | null
           shipping_address?: Json | null
           status?: string | null
-          user_id?: string | null
+          user_id?: string
           value?: number
           warehouse_id?: string | null
         }
@@ -176,7 +176,7 @@ export type Database = {
           status: string
           tracking_number: string | null
           tracking_url: string | null
-          user_id: string | null
+          user_id: string
           warehouse_id: string | null
           weight: string | null
         }
@@ -198,7 +198,7 @@ export type Database = {
           status?: string
           tracking_number?: string | null
           tracking_url?: string | null
-          user_id?: string | null
+          user_id: string
           warehouse_id?: string | null
           weight?: string | null
         }
@@ -220,7 +220,7 @@ export type Database = {
           status?: string
           tracking_number?: string | null
           tracking_url?: string | null
-          user_id?: string | null
+          user_id?: string
           warehouse_id?: string | null
           weight?: string | null
         }
