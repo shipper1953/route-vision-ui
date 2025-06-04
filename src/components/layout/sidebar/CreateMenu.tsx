@@ -43,20 +43,20 @@ export const CreateMenu = ({ isCollapsed }: CreateMenuProps) => {
         className="bg-popover border border-border w-48"
       >
         <DropdownMenuItem asChild>
-          <NavLink to="/orders/new" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
+          <NavLink to="/orders/create" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
             <Package size={16} />
             <span>Create Order</span>
           </NavLink>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <NavLink to="/shipments/new" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
+          <NavLink to="/shipments/create" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
             <Truck size={16} />
             <span>Create Shipment</span>
           </NavLink>
         </DropdownMenuItem>
         {isAdmin && (
           <DropdownMenuItem asChild>
-            <NavLink to="/users/new" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
+            <NavLink to="/users/create" onClick={handleMenuItemClick} className="flex items-center gap-2 cursor-pointer">
               <Users size={16} />
               <span>Create User</span>
             </NavLink>
