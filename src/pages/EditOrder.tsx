@@ -1,18 +1,49 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { TmsLayout } from "@/components/layout/TmsLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { Form } from "@/components/ui/form";
+import { CustomerInfoSection } from "@/components/order/CustomerInfoSection";
+import { ShippingAddressSection } from "@/components/order/ShippingAddressSection";
+import { WarehouseSelectionSection } from "@/components/order/WarehouseSelectionSection";
 import { fetchOrderById, OrderData } from "@/services/orderService";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { toast } from "sonner";
+import { orderFormSchema, OrderFormValues } from "@/types/order";
+import { useUpdateOrder } from "@/hooks/useUpdateOrder";
 
 const EditOrder = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isSubmitting, onSubmit } = useUpdateOrder(id || "");
+
+  // Initialize the form
+  const form = useForm<OrderFormValues>({
+    resolver: zodResolver(orderFormSchema),
+    defaultValues: {
+      customerName: "",
+      customerCompany: "",
+      customerEmail: "",
+      customerPhone: "",
+      requiredDeliveryDate: undefined,
+      items: 1,
+      value: "",
+      street1: "",
+      street2: "",
+      city: "",
+      state: "",
+      zip: "",
+      country: "US",
+      warehouseId: "",
+    },
+  });
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -38,6 +69,26 @@ const EditOrder = () => {
         }
         
         setOrder(orderData);
+
+        // Pre-populate the form with existing order data
+        form.setValue("customerName", orderData.customerName);
+        form.setValue("customerCompany", orderData.customerCompany || "");
+        form.setValue("customerEmail", orderData.customerEmail || "");
+        form.setValue("customerPhone", orderData.customerPhone || "");
+        form.setValue("requiredDeliveryDate", new Date(orderData.requiredDeliveryDate));
+        form.setValue("items", orderData.items);
+        form.setValue("value", orderData.value);
+        
+        // Set shipping address
+        if (orderData.shippingAddress) {
+          form.setValue("street1", orderData.shippingAddress.street1 || "");
+          form.setValue("street2", orderData.shippingAddress.street2 || "");
+          form.setValue("city", orderData.shippingAddress.city || "");
+          form.setValue("state", orderData.shippingAddress.state || "");
+          form.setValue("zip", orderData.shippingAddress.zip || "");
+          form.setValue("country", orderData.shippingAddress.country || "US");
+        }
+        
       } catch (error) {
         console.error("Error loading order:", error);
         toast.error("Failed to load order");
@@ -48,7 +99,7 @@ const EditOrder = () => {
     };
 
     loadOrder();
-  }, [id, navigate]);
+  }, [id, navigate, form]);
 
   if (loading) {
     return (
@@ -66,7 +117,7 @@ const EditOrder = () => {
 
   return (
     <TmsLayout>
-      <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -77,42 +128,43 @@ const EditOrder = () => {
             <ArrowLeft className="h-4 w-4" />
             Back to Orders
           </Button>
-          <h1 className="text-2xl font-semibold">Edit Order {order.id}</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-tms-blue">Edit Order {order.id}</h1>
+            <p className="text-muted-foreground">Update the order details below</p>
+          </div>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Order Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Order editing functionality will be implemented here.
-              </p>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <strong>Customer:</strong> {order.customerName}
-                </div>
-                <div>
-                  <strong>Status:</strong> {order.status}
-                </div>
-                <div>
-                  <strong>Order Date:</strong> {new Date(order.orderDate).toLocaleDateString()}
-                </div>
-                <div>
-                  <strong>Required Delivery:</strong> {new Date(order.requiredDeliveryDate).toLocaleDateString()}
-                </div>
-                <div>
-                  <strong>Items:</strong> {order.items}
-                </div>
-                <div>
-                  <strong>Value:</strong> ${order.value}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Edit Order</CardTitle>
+          <CardDescription>Update the order details below.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <CustomerInfoSection />
+                <ShippingAddressSection />
+              </div>
+              <WarehouseSelectionSection />
+              
+              <div className="flex justify-end gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => navigate("/orders")}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting} className="bg-tms-blue hover:bg-tms-blue-400">
+                  {isSubmitting ? "Updating..." : "Update Order"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </TmsLayout>
   );
 };
