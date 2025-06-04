@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Card, 
@@ -24,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Company, CompanyAddress } from "@/types/auth";
 import { Plus, Edit, Trash2, Users, Wallet } from "lucide-react";
+import { CompanyWalletDialog } from "./dialogs/CompanyWalletDialog";
 
 // Transform database company data to our Company type
 const transformCompanyData = (dbCompany: any): Company => {
@@ -47,7 +47,9 @@ export const CompanyManagement = () => {
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [newCompany, setNewCompany] = useState({
     name: '',
     email: '',
@@ -157,6 +159,11 @@ export const CompanyManagement = () => {
   const handleEditClick = (company: Company) => {
     setEditingCompany({ ...company });
     setIsEditDialogOpen(true);
+  };
+
+  const handleWalletClick = (company: Company) => {
+    setSelectedCompany(company);
+    setIsWalletDialogOpen(true);
   };
 
   if (loading) {
@@ -289,7 +296,11 @@ export const CompanyManagement = () => {
                     <Button size="sm" variant="outline">
                       <Users className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="outline">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleWalletClick(company)}
+                    >
                       <Wallet className="h-4 w-4" />
                     </Button>
                     <Button 
@@ -385,6 +396,13 @@ export const CompanyManagement = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Company Wallet Dialog */}
+        <CompanyWalletDialog
+          open={isWalletDialogOpen}
+          onOpenChange={setIsWalletDialogOpen}
+          company={selectedCompany}
+        />
       </CardContent>
     </Card>
   );
