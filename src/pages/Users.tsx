@@ -10,7 +10,7 @@ import { UsersTable } from "@/components/users/UsersTable";
 import { useUsers } from "@/hooks/useUsers";
 
 const Users = () => {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isSuperAdmin, loading: authLoading, userProfile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const { users, loading, error } = useUsers();
 
@@ -36,6 +36,28 @@ const Users = () => {
     user.role?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const getCardTitle = () => {
+    if (isSuperAdmin) {
+      return "All Users";
+    }
+    return "Company Users";
+  };
+
+  const getCardDescription = () => {
+    if (loading) {
+      return "Loading users...";
+    }
+    if (error) {
+      return error;
+    }
+    
+    const baseText = `Showing ${filteredUsers.length} of ${users.length} users`;
+    if (isSuperAdmin) {
+      return `${baseText} across all companies`;
+    }
+    return `${baseText} in your company`;
+  };
+
   return (
     <TmsLayout>
       <UsersHeader />
@@ -43,18 +65,14 @@ const Users = () => {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex justify-between items-center">
-            <CardTitle>All Users</CardTitle>
+            <CardTitle>{getCardTitle()}</CardTitle>
             <UsersSearch 
               searchTerm={searchTerm} 
               onSearchChange={setSearchTerm} 
             />
           </div>
           <CardDescription>
-            {loading
-              ? "Loading users..."
-              : error
-                ? error
-                : `Showing ${filteredUsers.length} of ${users.length} users`}
+            {getCardDescription()}
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context";
 
 interface DatabaseUser {
   id: string;
@@ -22,6 +23,7 @@ interface User {
 }
 
 export const useUsers = () => {
+  const { userProfile, isSuperAdmin } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,26 +32,45 @@ export const useUsers = () => {
     const fetchUsers = async () => {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase.from('users').select('*');
-      if (error) {
+      
+      try {
+        let query = supabase.from('users').select('*');
+        
+        // If not super admin, filter by company
+        if (!isSuperAdmin && userProfile?.company_id) {
+          query = query.eq('company_id', userProfile.company_id);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          setError("Failed to fetch users.");
+          setUsers([]);
+        } else {
+          // Transform database users to match User interface
+          const transformedUsers: User[] = (data || []).map((user: DatabaseUser) => ({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            status: 'active', // Default status since it's not in database
+            lastLogin: 'Never' // Default lastLogin since it's not in database
+          }));
+          setUsers(transformedUsers);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
         setError("Failed to fetch users.");
         setUsers([]);
-      } else {
-        // Transform database users to match User interface
-        const transformedUsers: User[] = (data || []).map((user: DatabaseUser) => ({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          status: 'active', // Default status since it's not in database
-          lastLogin: 'Never' // Default lastLogin since it's not in database
-        }));
-        setUsers(transformedUsers);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    fetchUsers();
-  }, []);
+    
+    if (userProfile) {
+      fetchUsers();
+    }
+  }, [userProfile, isSuperAdmin]);
 
   return { users, loading, error };
 };
