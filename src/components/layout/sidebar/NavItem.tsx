@@ -3,7 +3,6 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context";
-import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 
 interface NavItemProps {
   to: string;
@@ -30,24 +29,30 @@ export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false,
   };
   
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton 
-        asChild 
-        isActive={isActive}
-        tooltip={label}
-      >
-        <NavLink 
-          to={to} 
-          onClick={handleClick}
-          className={cn(
+    <div className="relative group">
+      <NavLink 
+        to={to} 
+        onClick={handleClick}
+        className={({ isActive }) => 
+          cn(
             "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
-            isCollapsed ? "justify-center" : ""
-          )}
-        >
-          <Icon size={20} />
-          {!isCollapsed && <span>{label}</span>}
-        </NavLink>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
+            isCollapsed ? "justify-center" : "",
+            isActive 
+              ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+              : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
+          )
+        }
+      >
+        <Icon size={20} />
+        {!isCollapsed && <span>{label}</span>}
+      </NavLink>
+      
+      {/* Tooltip for collapsed state */}
+      {isCollapsed && (
+        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+          {label}
+        </div>
+      )}
+    </div>
   );
 };
