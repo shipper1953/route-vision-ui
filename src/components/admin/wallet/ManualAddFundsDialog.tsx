@@ -25,6 +25,44 @@ export const ManualAddFundsDialog = ({
 }: ManualAddFundsDialogProps) => {
   const [addFundsAmount, setAddFundsAmount] = useState('');
 
+  const ensureWalletExists = async () => {
+    if (!companyId) {
+      throw new Error('Company ID is required');
+    }
+
+    // Check if wallet exists
+    const { data: existingWallet, error: fetchError } = await supabase
+      .from('wallets')
+      .select('*')
+      .eq('company_id', companyId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      throw fetchError;
+    }
+
+    if (existingWallet) {
+      return existingWallet;
+    }
+
+    // Create wallet if it doesn't exist
+    const { data: newWallet, error: createError } = await supabase
+      .from('wallets')
+      .insert([{
+        company_id: companyId,
+        balance: 0,
+        currency: 'USD'
+      }])
+      .select()
+      .single();
+
+    if (createError) {
+      throw createError;
+    }
+
+    return newWallet;
+  };
+
   const addFunds = async () => {
     try {
       const amount = parseFloat(addFundsAmount);
@@ -33,11 +71,14 @@ export const ManualAddFundsDialog = ({
         return;
       }
 
+      // Ensure wallet exists
+      const currentWallet = await ensureWalletExists();
+
       // Add transaction record
       const { error: transactionError } = await supabase
         .from('transactions')
         .insert([{
-          wallet_id: wallet?.id,
+          wallet_id: currentWallet.id,
           company_id: companyId,
           amount,
           type: 'credit',
@@ -48,11 +89,11 @@ export const ManualAddFundsDialog = ({
       if (transactionError) throw transactionError;
 
       // Update wallet balance
-      const newBalance = (wallet?.balance || 0) + amount;
+      const newBalance = (currentWallet.balance || 0) + amount;
       const { error: walletError } = await supabase
         .from('wallets')
         .update({ balance: newBalance })
-        .eq('id', wallet?.id);
+        .eq('id', currentWallet.id);
 
       if (walletError) throw walletError;
 

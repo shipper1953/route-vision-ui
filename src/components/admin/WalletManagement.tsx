@@ -59,13 +59,32 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
         .from('wallets')
         .select('*')
         .eq('company_id', companyId)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         throw error;
       }
       
-      setWallet(data);
+      if (!data) {
+        // Create wallet if it doesn't exist
+        const { data: newWallet, error: createError } = await supabase
+          .from('wallets')
+          .insert([{
+            company_id: companyId,
+            balance: 0,
+            currency: 'USD'
+          }])
+          .select()
+          .single();
+
+        if (createError) {
+          throw createError;
+        }
+
+        setWallet(newWallet);
+      } else {
+        setWallet(data);
+      }
     } catch (error) {
       console.error('Error fetching wallet:', error);
       toast.error('Failed to fetch wallet information');

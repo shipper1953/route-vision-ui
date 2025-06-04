@@ -99,6 +99,33 @@ serve(async (req) => {
         status: 500,
       })
     }
+
+    // Get user's company and wallet info using service role client
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    )
+
+    // Get user's company_id
+    const { data: userData, error: userError } = await supabaseService
+      .from('users')
+      .select('company_id')
+      .eq('id', user.id)
+      .single()
+
+    if (userError || !userData?.company_id) {
+      console.error('Failed to get user company:', userError)
+      return new Response(JSON.stringify({
+        error: 'User company not found',
+        details: 'Unable to determine user company'
+      }), {
+        headers,
+        status: 400,
+      })
+    }
+
+    console.log('User company_id:', userData.company_id)
     
     // Call EasyPost API to purchase the label
     console.log('Calling EasyPost API...')
@@ -142,6 +169,81 @@ serve(async (req) => {
     const purchaseResponse = await response.json()
     console.log('Label purchased successfully from EasyPost:', purchaseResponse.id)
     
+    const labelCost = parseFloat(purchaseResponse.selected_rate?.rate || '0')
+    console.log('Label cost:', labelCost)
+
+    // Check wallet balance and deduct funds
+    if (labelCost > 0) {
+      const { data: wallet, error: walletError } = await supabaseService
+        .from('wallets')
+        .select('id, balance')
+        .eq('company_id', userData.company_id)
+        .single()
+
+      if (walletError || !wallet) {
+        console.error('Wallet not found or error:', walletError)
+        return new Response(JSON.stringify({
+          error: 'Wallet not found',
+          details: 'Company wallet not available'
+        }), {
+          headers,
+          status: 400,
+        })
+      }
+
+      if (wallet.balance < labelCost) {
+        console.error('Insufficient funds:', { balance: wallet.balance, cost: labelCost })
+        return new Response(JSON.stringify({
+          error: 'Insufficient funds',
+          details: `Required: $${labelCost.toFixed(2)}, Available: $${wallet.balance.toFixed(2)}`
+        }), {
+          headers,
+          status: 400,
+        })
+      }
+
+      // Deduct funds from wallet
+      const newBalance = wallet.balance - labelCost
+      const { error: updateError } = await supabaseService
+        .from('wallets')
+        .update({ balance: newBalance })
+        .eq('id', wallet.id)
+
+      if (updateError) {
+        console.error('Failed to update wallet balance:', updateError)
+        return new Response(JSON.stringify({
+          error: 'Failed to update wallet',
+          details: 'Could not deduct funds from wallet'
+        }), {
+          headers,
+          status: 500,
+        })
+      }
+
+      // Record the transaction
+      const { error: transactionError } = await supabaseService
+        .from('transactions')
+        .insert([{
+          wallet_id: wallet.id,
+          company_id: userData.company_id,
+          amount: -labelCost,
+          type: 'debit',
+          description: 'Shipping label purchase',
+          reference_id: purchaseResponse.id,
+          reference_type: 'shipping_label',
+          created_by: user.id
+        }])
+
+      if (transactionError) {
+        console.error('Failed to record transaction:', transactionError)
+        // Don't fail the whole operation for transaction recording failure
+      } else {
+        console.log('Transaction recorded successfully')
+      }
+
+      console.log(`Deducted $${labelCost} from wallet. New balance: $${newBalance}`)
+    }
+    
     // Save shipment to database with user_id
     try {
       const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, user.id)
@@ -149,7 +251,7 @@ serve(async (req) => {
       // If we have an orderId, link the shipment to the order
       if (orderId && finalShipmentId) {
         try {
-          const linkSuccess = await linkShipmentToOrder(supabaseClient, orderId, finalShipmentId)
+          const linkSuccess = await linkShipmentToOrder(supabaseService, orderId, finalShipmentId)
           if (linkSuccess) {
             console.log(`✓ Successfully linked shipment ${purchaseResponse.id} to order ${orderId}`)
           } else {
