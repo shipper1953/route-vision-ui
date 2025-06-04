@@ -1,22 +1,23 @@
+import {
+  createBrowserRouter,
+} from "react-router-dom";
+import Index from "@/pages/Index";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
+import Orders from "@/pages/Orders";
+import CreateOrder from "@/pages/CreateOrder";
+import EditOrder from "@/pages/EditOrder";
+import Shipments from "@/pages/Shipments";
+import CreateShipment from "@/pages/CreateShipment";
+import Users from "@/pages/Users";
+import CreateUser from "@/pages/CreateUser";
+import Settings from "@/pages/Settings";
+import AdminPanel from "@/pages/AdminPanel";
+import SuperAdminPanel from "@/pages/SuperAdminPanel";
+import CompanyAdminPanel from "@/pages/CompanyAdminPanel";
+import NotFound from "@/pages/NotFound";
 
-import { createBrowserRouter } from "react-router-dom";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Orders from "./pages/Orders";
-import CreateOrder from "./pages/CreateOrder";
-import EditOrder from "./pages/EditOrder";
-import Shipments from "./pages/Shipments";
-import CreateShipment from "./pages/CreateShipment";
-import Settings from "./pages/Settings";
-import AdminPanel from "./pages/AdminPanel";
-import SuperAdminPanel from "./pages/SuperAdminPanel";
-import CompanyAdminPanel from "./pages/CompanyAdminPanel";
-import CreateUser from "./pages/CreateUser";
-import Users from "./pages/Users";
-import NotFound from "./pages/NotFound";
-
-export const router = createBrowserRouter([
+const router = createBrowserRouter([
   {
     path: "/",
     element: <Index />,
@@ -26,7 +27,7 @@ export const router = createBrowserRouter([
     element: <Login />,
   },
   {
-    path: "/signup",
+    path: "/signup", 
     element: <Signup />,
   },
   {
@@ -34,7 +35,7 @@ export const router = createBrowserRouter([
     element: <Orders />,
   },
   {
-    path: "/orders/new",
+    path: "/orders/create",
     element: <CreateOrder />,
   },
   {
@@ -46,8 +47,16 @@ export const router = createBrowserRouter([
     element: <Shipments />,
   },
   {
-    path: "/shipments/new",
+    path: "/shipments/create",
     element: <CreateShipment />,
+  },
+  {
+    path: "/users",
+    element: <Users />,
+  },
+  {
+    path: "/users/create",
+    element: <CreateUser />,
   },
   {
     path: "/settings",
@@ -66,15 +75,9 @@ export const router = createBrowserRouter([
     element: <CompanyAdminPanel />,
   },
   {
-    path: "/users/new",
-    element: <CreateUser />,
-  },
-  {
-    path: "/users",
-    element: <Users />,
-  },
-  {
     path: "*",
     element: <NotFound />,
   },
 ]);
+
+export default router;
