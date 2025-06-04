@@ -1,178 +1,113 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { ShipmentData } from './types.ts'
 
-export async function saveShipmentToDatabase(responseData: any, orderId?: string | null, userId?: string | null) {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+export async function saveShipmentToDatabase(purchaseResponse: any, orderId: string | null, userId: string) {
+  console.log("Saving shipment to database with user_id:", userId);
   
-  if (!supabaseServiceKey) {
-    console.log("No service role key available, skipping database save");
-    return { finalShipmentId: null, supabaseClient: null };
+  const supabaseService = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    { auth: { persistSession: false } }
+  );
+
+  // Get user's company_id for proper assignment
+  const { data: userProfile, error: userError } = await supabaseService
+    .from('users')
+    .select('company_id')
+    .eq('id', userId)
+    .single();
+
+  if (userError || !userProfile?.company_id) {
+    console.error("Could not get user company_id:", userError);
+    throw new Error("User profile not found or not assigned to a company");
   }
 
-  const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+  const companyId = userProfile.company_id;
+  console.log("Found company_id for user:", companyId);
 
-  // Get the user's company_id if userId is provided
-  let companyId = null;
-  if (userId) {
-    console.log("Looking up company_id for user:", userId);
+  // Get warehouse_id from order if available
+  let warehouseId = null;
+  if (orderId) {
+    const { data: orderData } = await supabaseService
+      .from('orders')
+      .select('warehouse_id')
+      .eq('order_id', orderId)
+      .single();
     
-    // First check the users table
-    const { data: userData, error: userError } = await supabaseClient
+    if (orderData?.warehouse_id) {
+      warehouseId = orderData.warehouse_id;
+      console.log("Using warehouse from order:", warehouseId);
+    }
+  }
+
+  // If no warehouse from order, get user's default warehouse
+  if (!warehouseId) {
+    const { data: userData } = await supabaseService
       .from('users')
-      .select('company_id')
+      .select('warehouse_ids')
       .eq('id', userId)
-      .maybeSingle();
+      .single();
     
-    if (userError) {
-      console.error("Error looking up user company:", userError);
-    } else if (userData && userData.company_id) {
-      companyId = userData.company_id;
-      console.log("Found company_id for user:", companyId);
+    if (userData?.warehouse_ids && Array.isArray(userData.warehouse_ids) && userData.warehouse_ids.length > 0) {
+      warehouseId = userData.warehouse_ids[0];
+      console.log("Using user's warehouse:", warehouseId);
     } else {
-      console.log("User found but no company_id set in users table:", userId);
+      // Fall back to company default warehouse
+      const { data: defaultWarehouse } = await supabaseService
+        .from('warehouses')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('is_default', true)
+        .single();
       
-      // If no company_id found in users table, check if user exists in auth and try to get from profile
-      console.log("Checking auth.users table for additional user data...");
-      const { data: { user }, error: authError } = await supabaseClient.auth.admin.getUserById(userId);
-      if (authError) {
-        console.error("Error looking up auth user:", authError);
-      } else if (user) {
-        console.log("User exists in auth, checking metadata for company info...");
-        // Check if company_id is in user metadata
-        if (user.user_metadata?.company_id) {
-          companyId = user.user_metadata.company_id;
-          console.log("Found company_id in user metadata:", companyId);
-          
-          // Update the users table with the company_id from metadata
-          const { error: updateError } = await supabaseClient
-            .from('users')
-            .update({ company_id: companyId })
-            .eq('id', userId);
-          
-          if (updateError) {
-            console.error("Error updating user company_id:", updateError);
-          } else {
-            console.log("Updated users table with company_id from metadata");
-          }
-        } else {
-          // If no company found anywhere, create a default company for this user
-          console.log("No company found for user, creating default company...");
-          
-          const { data: newCompany, error: companyError } = await supabaseClient
-            .from('companies')
-            .insert({
-              name: `${user.email} Company`,
-              email: user.email,
-              is_active: true,
-              markup_type: 'percentage',
-              markup_value: 0.00
-            })
-            .select('id')
-            .single();
-          
-          if (companyError) {
-            console.error("Error creating default company:", companyError);
-          } else if (newCompany) {
-            companyId = newCompany.id;
-            console.log("Created default company with ID:", companyId);
-            
-            // Update the user with the new company_id
-            const { error: updateUserError } = await supabaseClient
-              .from('users')
-              .update({ company_id: companyId })
-              .eq('id', userId);
-            
-            if (updateUserError) {
-              console.error("Error updating user with new company_id:", updateUserError);
-            } else {
-              console.log("Updated user with new company_id:", companyId);
-            }
-          }
-        }
+      if (defaultWarehouse) {
+        warehouseId = defaultWarehouse.id;
+        console.log("Using company default warehouse:", warehouseId);
       }
     }
   }
 
-  // Prepare shipment data with correct column names that match the database schema
-  const shipmentData: any = {
-    easypost_id: responseData.id,
-    tracking_number: responseData.tracking_code,
-    carrier: responseData.selected_rate?.carrier || 'Unknown',
-    service: responseData.selected_rate?.service || 'Standard',
+  const shipmentData = {
+    easypost_id: purchaseResponse.id,
+    tracking_number: purchaseResponse.tracking_code,
+    carrier: purchaseResponse.selected_rate?.carrier,
+    service: purchaseResponse.selected_rate?.service,
     status: 'purchased',
-    label_url: responseData.postage_label?.label_url,
-    tracking_url: responseData.tracker?.public_url,
-    cost: parseFloat(responseData.selected_rate?.rate) || 0,
-    weight: String(parseFloat(responseData.parcel?.weight) || 0),
+    label_url: purchaseResponse.postage_label?.label_url,
+    tracking_url: purchaseResponse.tracker?.public_url,
+    cost: parseFloat(purchaseResponse.selected_rate?.rate || '0'),
+    weight: purchaseResponse.parcel?.weight?.toString(),
     package_dimensions: JSON.stringify({
-      length: responseData.parcel?.length || 0,
-      width: responseData.parcel?.width || 0,
-      height: responseData.parcel?.height || 0
+      length: purchaseResponse.parcel?.length,
+      width: purchaseResponse.parcel?.width,
+      height: purchaseResponse.parcel?.height,
     }),
     package_weights: JSON.stringify({
-      weight: responseData.parcel?.weight || 0,
-      weight_unit: responseData.parcel?.weight_unit || 'oz'
+      weight: purchaseResponse.parcel?.weight,
+      weight_unit: 'oz'
     }),
-    created_at: new Date().toISOString(),
-    // Add user_id and company_id if available
-    ...(userId && { user_id: userId }),
-    ...(companyId && { company_id: companyId }),
+    created_at: purchaseResponse.created_at,
+    user_id: userId,
+    company_id: companyId,
+    warehouse_id: warehouseId
   };
 
-  console.log("Saving shipment to database with user_id:", userId, "and company_id:", companyId);
   console.log("Shipment data:", shipmentData);
-  
-  // First, check if the shipment exists using easypost_id
-  const { data: existingShipment, error: fetchError } = await supabaseClient
+
+  const { data: newShipment, error: insertError } = await supabaseService
     .from('shipments')
-    .select('*')
-    .eq('easypost_id', responseData.id)
-    .maybeSingle();
-    
-  if (fetchError) {
-    console.error("Error checking existing shipment:", fetchError);
-  }
-  
-  let finalShipmentId = null;
-  
-  if (existingShipment) {
-    // Update existing shipment, making sure to set company_id if we found one
-    const updateData = {
-      ...shipmentData,
-      // Always update company_id if we have one, even if shipment already exists
-      ...(companyId && { company_id: companyId })
-    };
-    
-    const { data: updatedShipment, error: updateError } = await supabaseClient
-      .from('shipments')
-      .update(updateData)
-      .eq('easypost_id', responseData.id)
-      .select('id')
-      .single();
-      
-    if (updateError) {
-      console.error('Error updating existing shipment:', updateError);
-    } else {
-      console.log('Existing shipment updated successfully with user_id:', userId, 'and company_id:', companyId);
-      finalShipmentId = updatedShipment?.id;
-    }
-  } else {
-    // Insert new shipment using service role (bypasses RLS)
-    const { data: newShipment, error: insertError } = await supabaseClient
-      .from('shipments')
-      .insert(shipmentData)
-      .select('id')
-      .single();
-      
-    if (insertError) {
-      console.error('Error inserting new shipment:', insertError);
-    } else {
-      console.log('New shipment inserted successfully with user_id:', userId, 'company_id:', companyId, newShipment);
-      finalShipmentId = newShipment?.id;
-    }
+    .insert(shipmentData)
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error("Error inserting shipment:", insertError);
+    throw new Error(`Failed to save shipment: ${insertError.message}`);
   }
 
-  return { finalShipmentId, supabaseClient };
+  console.log("New shipment inserted successfully with user_id:", userId, "company_id:", companyId, "warehouse_id:", warehouseId, newShipment);
+
+  return {
+    finalShipmentId: newShipment.id
+  };
 }

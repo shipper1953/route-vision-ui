@@ -11,7 +11,7 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
     throw new Error("User must be authenticated to create orders");
   }
 
-  // Get user's profile to get company_id
+  // Get user's profile to get company_id and warehouse info
   const { data: userProfile, error: profileError } = await supabase
     .from('users')
     .select('company_id, warehouse_ids')
@@ -25,6 +25,26 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
   // Get default warehouse ID from user's warehouse_ids array
   const warehouseIds = Array.isArray(userProfile.warehouse_ids) ? userProfile.warehouse_ids : [];
   const defaultWarehouseId = warehouseIds.length > 0 ? warehouseIds[0] : null;
+
+  // If no warehouse assigned to user, get the default warehouse for the company
+  let finalWarehouseId = defaultWarehouseId;
+  if (!finalWarehouseId) {
+    const { data: defaultWarehouse, error: warehouseError } = await supabase
+      .from('warehouses')
+      .select('id')
+      .eq('company_id', userProfile.company_id)
+      .eq('is_default', true)
+      .single();
+    
+    if (!warehouseError && defaultWarehouse) {
+      finalWarehouseId = defaultWarehouse.id;
+      console.log("Using company default warehouse:", finalWarehouseId);
+    }
+  }
+
+  if (!finalWarehouseId) {
+    throw new Error("No warehouse available for this user or company");
+  }
 
   // Generate a unique order ID
   const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -44,7 +64,7 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
     shipping_address: orderData.shippingAddress,
     user_id: user.id,
     company_id: userProfile.company_id,
-    warehouse_id: defaultWarehouseId
+    warehouse_id: finalWarehouseId
   };
 
   const { data, error } = await supabase
@@ -58,7 +78,7 @@ export const createOrder = async (orderData: Omit<OrderData, 'id'>): Promise<Ord
     throw new Error(`Failed to create order: ${error.message}`);
   }
 
-  console.log("Order created successfully:", data);
+  console.log("Order created successfully with warehouse:", data.warehouse_id);
 
   // Convert back to OrderData format with proper type handling
   const shippingAddress = typeof data.shipping_address === 'object' && data.shipping_address !== null

@@ -1,11 +1,18 @@
 
 import { ShipmentForm } from "@/types/shipment";
-import { useAuth } from "@/context";
 
 export function buildShipmentData(data: ShipmentForm) {
   // Include order ID in the shipment reference if available
   const orderReference = data.orderId || data.orderBarcode || null;
   console.log("Using order reference for shipment:", orderReference);
+  console.log("Building shipment with warehouse from address:", {
+    name: data.fromName,
+    company: data.fromCompany,
+    street1: data.fromStreet1,
+    city: data.fromCity,
+    state: data.fromState,
+    zip: data.fromZip
+  });
   
   return {
     from_address: {
