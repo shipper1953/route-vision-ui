@@ -9,6 +9,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Package } from "lucide-react";
 
 const CreateShipment = () => {
   const [searchParams] = useSearchParams();
@@ -112,7 +114,15 @@ const CreateShipment = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-tms-blue">Create Shipment</h1>
-          <p className="text-muted-foreground">Create a new shipment with SmartRate</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-muted-foreground">Create a new shipment with SmartRate</p>
+            {orderId && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Package className="h-3 w-3" />
+                Order: {orderId}
+              </Badge>
+            )}
+          </div>
           {userProfile?.company_id && (
             <p className="text-sm text-green-600 mt-1">Company: {userProfile.company_id}</p>
           )}
