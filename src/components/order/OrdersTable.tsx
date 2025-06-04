@@ -34,8 +34,8 @@ export const OrdersTable = ({
   };
 
   const handleEditOrder = (orderId: string) => {
-    // Navigate to edit order page
-    navigate(`/edit-order/${orderId}`);
+    // Navigate to edit order page using the correct route pattern
+    navigate(`/orders/${orderId}/edit`);
   };
 
   const handlePrintBarcode = (orderId: string) => {

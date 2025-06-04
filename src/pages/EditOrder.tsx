@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
@@ -10,14 +9,14 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { toast } from "sonner";
 
 const EditOrder = () => {
-  const { orderId } = useParams<{ orderId: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadOrder = async () => {
-      if (!orderId) {
+      if (!id) {
         toast.error("Invalid order ID");
         navigate("/orders");
         return;
@@ -25,7 +24,7 @@ const EditOrder = () => {
 
       try {
         setLoading(true);
-        const orderData = await fetchOrderById(orderId);
+        const orderData = await fetchOrderById(id);
         if (!orderData) {
           toast.error("Order not found");
           navigate("/orders");
@@ -49,7 +48,7 @@ const EditOrder = () => {
     };
 
     loadOrder();
-  }, [orderId, navigate]);
+  }, [id, navigate]);
 
   if (loading) {
     return (
