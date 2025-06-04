@@ -1,277 +1,91 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { saveShipmentToDatabase } from './shipmentService.ts'
 import { linkShipmentToOrder } from './orderService.ts'
+import { purchaseShippingLabel } from './easypostService.ts'
+import { corsHeaders, handleCorsPreflightRequest, createErrorResponse, createSuccessResponse } from './corsUtils.ts'
+import { authenticateUser, getUserCompany } from './authService.ts'
+import { processWalletPayment } from './walletService.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
 
 console.log('EasyPost API key available in purchase-label function:', easyPostApiKey ? 'YES' : 'NO')
 
 serve(async (req) => {
-  // Set up CORS headers
-  const headers = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  }
-
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers, status: 204 })
+    return handleCorsPreflightRequest();
   }
 
   try {
     console.log('Processing purchase-label request...')
     
-    // Get the JWT token from the Authorization header
-    const authHeader = req.headers.get('Authorization')
-    console.log('Auth header present:', authHeader ? 'YES' : 'NO')
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    console.log('Auth header present:', authHeader ? 'YES' : 'NO');
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('Invalid or missing authorization header')
-      return new Response(JSON.stringify({ 
-        error: 'Missing authorization header',
-        details: 'Please ensure you are logged in' 
-      }), {
-        headers,
-        status: 401,
-      })
-    }
+    const user = await authenticateUser(authHeader);
+    const companyId = await getUserCompany(user.id);
+    console.log('User company_id:', companyId);
 
-    // Create Supabase client 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    )
-    
-    // Extract and verify the JWT token
-    const jwt = authHeader.replace('Bearer ', '')
-    console.log('JWT token length:', jwt.length)
-    
-    // Use getUser with the JWT token to verify authentication
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(jwt)
-    
-    if (authError) {
-      console.error('JWT verification error:', authError)
-      return new Response(JSON.stringify({ 
-        error: 'Authentication failed', 
-        details: authError.message 
-      }), {
-        headers,
-        status: 401,
-      })
-    }
-    
-    if (!user) {
-      console.error('No user found in JWT token')
-      return new Response(JSON.stringify({ 
-        error: 'User not found',
-        details: 'Invalid authentication token' 
-      }), {
-        headers,
-        status: 401,
-      })
-    }
-
-    console.log('User authenticated successfully:', user.email, 'User ID:', user.id)
-
-    const { shipmentId, rateId, orderId } = await req.json()
+    // Parse request body
+    const { shipmentId, rateId, orderId } = await req.json();
     
     if (!shipmentId || !rateId) {
-      return new Response(JSON.stringify({
-        error: 'Missing required parameters: shipmentId and rateId are required',
-      }), {
-        headers,
-        status: 400,
-      })
+      return createErrorResponse('Missing required parameters: shipmentId and rateId are required', null, 400);
     }
     
-    console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}` + (orderId ? ` for order ${orderId}` : '') + ` for user ${user.id}`)
+    console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}` + (orderId ? ` for order ${orderId}` : '') + ` for user ${user.id}`);
     
     if (!easyPostApiKey) {
-      return new Response(JSON.stringify({
-        error: 'EasyPost API key not configured',
-        details: 'Please ensure EASYPOST_API_KEY is set in environment variables'
-      }), {
-        headers,
-        status: 500,
-      })
+      return createErrorResponse('EasyPost API key not configured', 'Please ensure EASYPOST_API_KEY is set in environment variables', 500);
     }
 
-    // Get user's company and wallet info using service role client
-    const supabaseService = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false } }
-    )
-
-    // Get user's company_id
-    const { data: userData, error: userError } = await supabaseService
-      .from('users')
-      .select('company_id')
-      .eq('id', user.id)
-      .single()
-
-    if (userError || !userData?.company_id) {
-      console.error('Failed to get user company:', userError)
-      return new Response(JSON.stringify({
-        error: 'User company not found',
-        details: 'Unable to determine user company'
-      }), {
-        headers,
-        status: 400,
-      })
-    }
-
-    console.log('User company_id:', userData.company_id)
+    // Purchase label from EasyPost
+    console.log('Calling EasyPost API...');
+    const purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, easyPostApiKey);
+    console.log('Label purchased successfully from EasyPost:', purchaseResponse.id);
     
-    // Call EasyPost API to purchase the label
-    console.log('Calling EasyPost API...')
-    const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${easyPostApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        rate: { id: rateId }
-      }),
-    })
-    
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error('EasyPost API error:', errorData)
-      
-      // Provide more specific error messages
-      let errorMessage = 'EasyPost API error'
-      if (errorData.error?.message) {
-        errorMessage = errorData.error.message
-      } else if (response.status === 422) {
-        errorMessage = 'Invalid shipment or rate data. Please check your shipment configuration.'
-      } else if (response.status === 401) {
-        errorMessage = 'Invalid EasyPost API key. Please check your configuration.'
-      } else if (response.status === 404) {
-        errorMessage = 'Shipment or rate not found. The shipment may have expired.'
-      }
-      
-      return new Response(JSON.stringify({
-        error: errorMessage,
-        details: errorData,
-        statusCode: response.status
-      }), {
-        headers,
-        status: response.status,
-      })
-    }
-    
-    const purchaseResponse = await response.json()
-    console.log('Label purchased successfully from EasyPost:', purchaseResponse.id)
-    
-    const labelCost = parseFloat(purchaseResponse.selected_rate?.rate || '0')
-    console.log('Label cost:', labelCost)
+    const labelCost = parseFloat(purchaseResponse.selected_rate?.rate || '0');
+    console.log('Label cost:', labelCost);
 
-    // Check wallet balance and deduct funds
-    if (labelCost > 0) {
-      const { data: wallet, error: walletError } = await supabaseService
-        .from('wallets')
-        .select('id, balance')
-        .eq('company_id', userData.company_id)
-        .single()
-
-      if (walletError || !wallet) {
-        console.error('Wallet not found or error:', walletError)
-        return new Response(JSON.stringify({
-          error: 'Wallet not found',
-          details: 'Company wallet not available'
-        }), {
-          headers,
-          status: 400,
-        })
-      }
-
-      if (wallet.balance < labelCost) {
-        console.error('Insufficient funds:', { balance: wallet.balance, cost: labelCost })
-        return new Response(JSON.stringify({
-          error: 'Insufficient funds',
-          details: `Required: $${labelCost.toFixed(2)}, Available: $${wallet.balance.toFixed(2)}`
-        }), {
-          headers,
-          status: 400,
-        })
-      }
-
-      // Deduct funds from wallet
-      const newBalance = wallet.balance - labelCost
-      const { error: updateError } = await supabaseService
-        .from('wallets')
-        .update({ balance: newBalance })
-        .eq('id', wallet.id)
-
-      if (updateError) {
-        console.error('Failed to update wallet balance:', updateError)
-        return new Response(JSON.stringify({
-          error: 'Failed to update wallet',
-          details: 'Could not deduct funds from wallet'
-        }), {
-          headers,
-          status: 500,
-        })
-      }
-
-      // Record the transaction
-      const { error: transactionError } = await supabaseService
-        .from('transactions')
-        .insert([{
-          wallet_id: wallet.id,
-          company_id: userData.company_id,
-          amount: -labelCost,
-          type: 'debit',
-          description: 'Shipping label purchase',
-          reference_id: purchaseResponse.id,
-          reference_type: 'shipping_label',
-          created_by: user.id
-        }])
-
-      if (transactionError) {
-        console.error('Failed to record transaction:', transactionError)
-        // Don't fail the whole operation for transaction recording failure
-      } else {
-        console.log('Transaction recorded successfully')
-      }
-
-      console.log(`Deducted $${labelCost} from wallet. New balance: $${newBalance}`)
-    }
+    // Process wallet payment
+    await processWalletPayment(companyId, labelCost, user.id, purchaseResponse.id);
     
     // Save shipment to database with user_id
     try {
-      const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, user.id)
+      const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, user.id);
       
       // If we have an orderId, link the shipment to the order
       if (orderId && finalShipmentId) {
         try {
-          const linkSuccess = await linkShipmentToOrder(supabaseService, orderId, finalShipmentId)
+          const supabaseService = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+            { auth: { persistSession: false } }
+          );
+          
+          const linkSuccess = await linkShipmentToOrder(supabaseService, orderId, finalShipmentId);
           if (linkSuccess) {
-            console.log(`✓ Successfully linked shipment ${purchaseResponse.id} to order ${orderId}`)
+            console.log(`✓ Successfully linked shipment ${purchaseResponse.id} to order ${orderId}`);
           } else {
-            console.error(`✗ Failed to link shipment ${purchaseResponse.id} to order ${orderId}`)
+            console.error(`✗ Failed to link shipment ${purchaseResponse.id} to order ${orderId}`);
           }
         } catch (linkError) {
-          console.error('Error linking shipment to order:', linkError)
+          console.error('Error linking shipment to order:', linkError);
           // Don't fail the whole operation if linking fails
         }
       } else {
-        console.log('No orderId or finalShipmentId for linking:', { orderId, finalShipmentId })
+        console.log('No orderId or finalShipmentId for linking:', { orderId, finalShipmentId });
       }
     } catch (dbError) {
-      console.error('Database save error:', dbError)
+      console.error('Database save error:', dbError);
       // Don't fail the label purchase if database save fails
     }
     
     // Update shipment status in database using authenticated client
     try {
-      // Create a new Supabase client with the user's JWT for database operations
       const authenticatedClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -280,7 +94,7 @@ serve(async (req) => {
             headers: { Authorization: authHeader },
           },
         }
-      )
+      );
       
       const { error: updateError } = await authenticatedClient
         .from('shipments')
@@ -290,29 +104,22 @@ serve(async (req) => {
           tracking_number: purchaseResponse.tracking_code,
         })
         .eq('easypost_id', shipmentId)
-        .eq('user_id', user.id)
+        .eq('user_id', user.id);
       
       if (updateError) {
-        console.error('Error updating shipment in database:', updateError)
+        console.error('Error updating shipment in database:', updateError);
       } else {
-        console.log('Successfully updated shipment status in database')
+        console.log('Successfully updated shipment status in database');
       }
     } catch (updateErr) {
-      console.error('Failed to update shipment status:', updateErr)
+      console.error('Failed to update shipment status:', updateErr);
     }
     
-    console.log('Returning successful response')
-    return new Response(JSON.stringify(purchaseResponse), { headers })
+    console.log('Returning successful response');
+    return createSuccessResponse(purchaseResponse);
     
   } catch (err) {
-    console.error('Error processing request:', err)
-    return new Response(JSON.stringify({ 
-      error: 'Internal server error', 
-      details: err.message,
-      stack: err.stack 
-    }), {
-      headers,
-      status: 500,
-    })
+    console.error('Error processing request:', err);
+    return createErrorResponse('Internal server error', err.message, 500);
   }
 })
