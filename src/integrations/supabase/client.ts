@@ -2,17 +2,18 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Get Supabase URL and key from environment variables only
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Get Supabase URL and key from environment variables
+// Use the actual variable names from env.local
+const SUPABASE_URL = import.meta.env.REACT_APP_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.REACT_APP_SUPABASE_ANON_KEY;
 
 // Validate that required environment variables are present
 if (!SUPABASE_URL) {
-  throw new Error('Missing VITE_SUPABASE_URL environment variable');
+  throw new Error('Missing REACT_APP_SUPABASE_URL environment variable');
 }
 
 if (!SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable');
+  throw new Error('Missing REACT_APP_SUPABASE_ANON_KEY environment variable');
 }
 
 // Log whether we have valid Supabase credentials (without exposing actual values)
