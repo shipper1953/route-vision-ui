@@ -11,12 +11,12 @@ const transformCompanyData = (dbCompany: any): Company => {
     name: dbCompany.name,
     email: dbCompany.email,
     phone: dbCompany.phone,
-    address: dbCompany.address,
+    address: dbCompany.address ? (dbCompany.address as unknown as Company['address']) : undefined,
     settings: dbCompany.settings,
     created_at: dbCompany.created_at,
     updated_at: dbCompany.updated_at,
     is_active: dbCompany.is_active,
-    markup_type: dbCompany.markup_type || 'percentage',
+    markup_type: (dbCompany.markup_type as 'percentage' | 'fixed') || 'percentage',
     markup_value: dbCompany.markup_value || 0
   };
 };
@@ -30,6 +30,7 @@ export const useCompanyManagement = () => {
       console.log('Fetching companies...');
       setLoading(true);
       
+      // Remove any filters to get ALL companies
       const { data, error } = await supabase
         .from('companies')
         .select('*')
@@ -42,8 +43,12 @@ export const useCompanyManagement = () => {
         throw error;
       }
       
+      // Add more detailed logging
+      console.log('Raw company data from database:', data);
+      
       const transformedCompanies = (data || []).map(transformCompanyData);
       console.log('Transformed companies:', transformedCompanies);
+      
       setCompanies(transformedCompanies);
     } catch (error) {
       console.error('Error fetching companies:', error);
