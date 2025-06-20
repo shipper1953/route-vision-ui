@@ -26,38 +26,36 @@ export const InviteUserDialog = ({ companyId, onUserInvited }: InviteUserDialogP
   const inviteUser = async () => {
     try {
       setIsInviting(true);
+      console.log('Inviting user with data:', { ...newUser, companyId });
       
-      // First create the auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: newUser.email,
-        password: Math.random().toString(36).slice(-8), // Temporary password
-        email_confirm: true,
-        user_metadata: {
-          name: newUser.name
-        }
+      // Generate a temporary password
+      const tempPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
+      
+      // Call the edge function to create the user with service role permissions
+      const { data: result, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newUser.email,
+          password: tempPassword,
+          name: newUser.name,
+          role: newUser.role,
+          company_id: companyId,
+        },
       });
 
-      if (authError) throw authError;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
 
-      // Then update the user profile with company assignment
-      const { error: profileError } = await supabase
-        .from('users')
-        .update({
-          company_id: companyId,
-          role: newUser.role,
-          name: newUser.name
-        })
-        .eq('id', authData.user.id);
-
-      if (profileError) throw profileError;
-
+      console.log('User invited successfully:', result);
+      
       setNewUser({ email: '', name: '', role: 'user' });
       setIsOpen(false);
       onUserInvited();
       toast.success('User invited successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error inviting user:', error);
-      toast.error('Failed to invite user');
+      toast.error(`Failed to invite user: ${error.message}`);
     } finally {
       setIsInviting(false);
     }
