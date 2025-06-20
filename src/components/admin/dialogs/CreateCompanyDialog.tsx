@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Company } from "@/types/auth";
@@ -76,6 +76,9 @@ export const CreateCompanyDialog = ({ onCompanyCreated }: CreateCompanyDialogPro
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New Company</DialogTitle>
+          <DialogDescription>
+            Add a new company to the system with their basic information and markup settings.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>

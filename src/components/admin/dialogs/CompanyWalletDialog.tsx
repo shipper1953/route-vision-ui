@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WalletManagement } from "../WalletManagement";
 import { Company } from "@/types/auth";
 
@@ -22,6 +22,9 @@ export const CompanyWalletDialog = ({
           <DialogTitle>
             Wallet Management - {company?.name || 'Company'}
           </DialogTitle>
+          <DialogDescription>
+            Manage wallet balance, transactions, and payment methods for this company.
+          </DialogDescription>
         </DialogHeader>
         {company && (
           <WalletManagement companyId={company.id} />
