@@ -46,7 +46,7 @@ export const CreateCompanyDialog = ({ onCompanyCreated }: CreateCompanyDialogPro
         name: data.name,
         email: data.email,
         phone: data.phone,
-        address: data.address as Company['address'],
+        address: data.address ? (data.address as unknown as Company['address']) : undefined,
         settings: data.settings,
         created_at: data.created_at,
         updated_at: data.updated_at,
