@@ -19,8 +19,7 @@ export const useCompanyUsers = (companyId?: string) => {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false });
+        .eq('company_id', companyId);
 
       if (error) throw error;
       
