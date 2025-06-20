@@ -64,15 +64,24 @@ export const CompanyManagement = () => {
 
   const fetchCompanies = async () => {
     try {
+      console.log('Fetching companies...');
+      setLoading(true);
+      
       const { data, error } = await supabase
         .from('companies')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      console.log('Companies fetch result:', { data, error });
+
+      if (error) {
+        console.error('Error fetching companies:', error);
+        throw error;
+      }
       
       // Transform the database data to match our Company type
       const transformedCompanies = (data || []).map(transformCompanyData);
+      console.log('Transformed companies:', transformedCompanies);
       setCompanies(transformedCompanies);
     } catch (error) {
       console.error('Error fetching companies:', error);
@@ -84,14 +93,21 @@ export const CompanyManagement = () => {
 
   const createCompany = async () => {
     try {
+      console.log('Creating company:', newCompany);
+      
       const { data, error } = await supabase
         .from('companies')
         .insert([newCompany])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating company:', error);
+        throw error;
+      }
 
+      console.log('Company created:', data);
+      
       // Transform the new company data and add to state
       const transformedCompany = transformCompanyData(data);
       setCompanies([transformedCompany, ...companies]);
@@ -167,14 +183,28 @@ export const CompanyManagement = () => {
   };
 
   if (loading) {
-    return <div>Loading companies...</div>;
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tms-navy mr-4"></div>
+            <p>Loading companies...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Company Management</CardTitle>
+          <div>
+            <CardTitle>Company Management</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              {companies.length} companies found
+            </p>
+          </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -253,76 +283,82 @@ export const CompanyManagement = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Markup Type</TableHead>
-              <TableHead>Markup Value</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {companies.map((company) => (
-              <TableRow key={company.id}>
-                <TableCell className="font-medium">{company.name}</TableCell>
-                <TableCell>{company.email || 'N/A'}</TableCell>
-                <TableCell>{company.phone || 'N/A'}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">
-                    {company.markup_type === 'percentage' ? 'Percentage' : 'Fixed'}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {company.markup_type === 'percentage' 
-                    ? `${company.markup_value || 0}%` 
-                    : `$${(company.markup_value || 0).toFixed(2)}`
-                  }
-                </TableCell>
-                <TableCell>
-                  <Badge variant={company.is_active ? 'default' : 'secondary'}>
-                    {company.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {new Date(company.created_at).toLocaleDateString()}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline">
-                      <Users className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleWalletClick(company)}
-                    >
-                      <Wallet className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleEditClick(company)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant={company.is_active ? "destructive" : "default"}
-                      onClick={() => toggleCompanyStatus(company.id, company.is_active)}
-                    >
-                      {company.is_active ? <Trash2 className="h-4 w-4" /> : 'Activate'}
-                    </Button>
-                  </div>
-                </TableCell>
+        {companies.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No companies found. Create your first company to get started.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Markup Type</TableHead>
+                <TableHead>Markup Value</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {companies.map((company) => (
+                <TableRow key={company.id}>
+                  <TableCell className="font-medium">{company.name}</TableCell>
+                  <TableCell>{company.email || 'N/A'}</TableCell>
+                  <TableCell>{company.phone || 'N/A'}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {company.markup_type === 'percentage' ? 'Percentage' : 'Fixed'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {company.markup_type === 'percentage' 
+                      ? `${company.markup_value || 0}%` 
+                      : `$${(company.markup_value || 0).toFixed(2)}`
+                    }
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={company.is_active ? 'default' : 'secondary'}>
+                      {company.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(company.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline">
+                        <Users className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleWalletClick(company)}
+                      >
+                        <Wallet className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleEditClick(company)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant={company.is_active ? "destructive" : "default"}
+                        onClick={() => toggleCompanyStatus(company.id, company.is_active)}
+                      >
+                        {company.is_active ? <Trash2 className="h-4 w-4" /> : 'Activate'}
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
 
         {/* Edit Company Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
