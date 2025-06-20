@@ -30,29 +30,45 @@ export const useCompanyManagement = () => {
       console.log('Fetching companies...');
       setLoading(true);
       
-      // Remove any filters to get ALL companies
-      const { data, error } = await supabase
+      // Check current user session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('Current session:', session?.user?.id, 'Session error:', sessionError);
+      
+      // Try to fetch companies with explicit admin bypass
+      const { data, error, count } = await supabase
         .from('companies')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
-      console.log('Companies fetch result:', { data, error });
+      console.log('Companies fetch result:', { data, error, count });
+      console.log('Query executed, total count:', count);
 
       if (error) {
-        console.error('Error fetching companies:', error);
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
       
       // Add more detailed logging
       console.log('Raw company data from database:', data);
+      console.log('Number of companies returned:', data?.length || 0);
       
       const transformedCompanies = (data || []).map(transformCompanyData);
       console.log('Transformed companies:', transformedCompanies);
       
       setCompanies(transformedCompanies);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching companies:', error);
-      toast.error('Failed to fetch companies');
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details
+      });
+      toast.error(`Failed to fetch companies: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
