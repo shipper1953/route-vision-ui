@@ -87,74 +87,32 @@ const CreateUser = () => {
       setIsSubmitting(true);
       console.log('Creating user with data:', data);
       
-      // Create user account using Supabase Auth Admin API
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: data.email,
-        password: Math.random().toString(36).slice(-8), // Temporary password
-        email_confirm: !data.sendInvitation, // Auto-confirm if not sending invitation
-        user_metadata: {
-          first_name: data.firstName,
-          last_name: data.lastName,
+      // Generate a temporary password
+      const tempPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
+      
+      // Call the edge function to create the user with service role permissions
+      const { data: result, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: data.email,
+          password: tempPassword,
           name: `${data.firstName} ${data.lastName}`,
+          role: data.role,
+          company_id: null, // No company assignment by default
         },
       });
 
-      if (authError) {
-        console.error("Auth error:", authError);
-        toast.error("Failed to create user: " + authError.message);
-        return;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
       }
 
-      console.log('User created in auth:', authData.user?.id);
-
-      // Wait a moment for the trigger to create the user in the users table
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Now update the user's role using the service role
-      if (authData.user) {
-        console.log('Updating user role to:', data.role);
-        
-        // First check if the user exists in the users table
-        const { data: existingUser, error: checkError } = await supabase
-          .from('users')
-          .select('id, role')
-          .eq('id', authData.user.id)
-          .single();
-
-        console.log('Existing user check:', existingUser, checkError);
-
-        if (checkError && checkError.code !== 'PGRST116') {
-          console.error("Error checking existing user:", checkError);
-        }
-
-        // Update or insert the user with the correct role
-        const { data: updateData, error: updateError } = await supabase
-          .from('users')
-          .upsert({
-            id: authData.user.id,
-            name: `${data.firstName} ${data.lastName}`,
-            email: data.email,
-            role: data.role,
-            password: '', // Password is managed by Supabase auth
-          }, {
-            onConflict: 'id'
-          });
-
-        console.log('Role update result:', updateData, updateError);
-
-        if (updateError) {
-          console.error("Failed to update user role:", updateError);
-          toast.error("User created but failed to set role: " + updateError.message);
-        } else {
-          console.log('User role updated successfully');
-        }
-      }
+      console.log('User created successfully:', result);
       
-      toast.success("User created successfully!");
+      toast.success(`User created successfully! ${data.sendInvitation ? 'Invitation sent.' : `Temporary password: ${tempPassword}`}`);
       navigate("/users");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating user:", error);
-      toast.error("Failed to create user");
+      toast.error(`Failed to create user: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
