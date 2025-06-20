@@ -46,12 +46,12 @@ export const CreateCompanyDialog = ({ onCompanyCreated }: CreateCompanyDialogPro
         name: data.name,
         email: data.email,
         phone: data.phone,
-        address: data.address,
+        address: data.address as Company['address'],
         settings: data.settings,
         created_at: data.created_at,
         updated_at: data.updated_at,
         is_active: data.is_active,
-        markup_type: data.markup_type || 'percentage',
+        markup_type: (data.markup_type as 'percentage' | 'fixed') || 'percentage',
         markup_value: data.markup_value || 0
       };
       
