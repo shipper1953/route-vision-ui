@@ -512,7 +512,7 @@ export type Database = {
     Functions: {
       get_current_user_role: {
         Args: Record<PropertyKey, never>
-        Returns: string
+        Returns: Database["public"]["Enums"]["app_role"]
       }
       hypopg: {
         Args: Record<PropertyKey, never>

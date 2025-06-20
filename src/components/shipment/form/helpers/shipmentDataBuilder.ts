@@ -46,7 +46,13 @@ export function buildShipmentData(data: ShipmentForm) {
       weight: data.weight
     },
     options: {
-      smartrate_accuracy: 'percentile_95'
+      // Use high accuracy SmartRate for best delivery date predictions
+      smartrate_accuracy: 'percentile_90',
+      currency: 'USD',
+      delivery_confirmation: 'NO_SIGNATURE',
+      // Add additional options that can help with SmartRate availability
+      label_format: 'PDF',
+      label_size: '4x6'
     },
     // Include order reference for linking
     reference: orderReference
