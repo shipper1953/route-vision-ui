@@ -34,18 +34,18 @@ export const TmsSidebar = () => {
     <div
       ref={sidebarRef}
       className={cn(
-        "fixed left-0 top-0 z-40 h-full bg-white border-r border-gray-200 transition-all duration-300 ease-in-out flex flex-col",
+        "fixed left-0 top-0 z-40 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out flex flex-col",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        {!isCollapsed && <h2 className="text-lg font-semibold text-tms-blue">Navigation</h2>}
+      <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
+        {!isCollapsed && <h2 className="text-lg font-semibold text-sidebar-foreground">Navigation</h2>}
         <Button
           variant="ghost"
           size="sm"
           onClick={toggleSidebar}
-          className="h-8 w-8 p-0"
+          className="h-8 w-8 p-0 text-sidebar-foreground hover:bg-sidebar-accent"
         >
           {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
@@ -62,9 +62,9 @@ export const TmsSidebar = () => {
           
           {(isAdmin || isSuperAdmin) && (
             <>
-              <Separator className="my-4" />
+              <Separator className="my-4 bg-sidebar-border" />
               <div className="px-2 py-1">
-                {!isCollapsed && <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</h3>}
+                {!isCollapsed && <h3 className="text-xs font-semibold text-sidebar-primary uppercase tracking-wider">Admin</h3>}
               </div>
               <NavItem icon={Users} label="Users" to="/users" isCollapsed={isCollapsed} />
               {isAdmin && <NavItem icon={Shield} label="Company Admin" to="/company-admin" isCollapsed={isCollapsed} />}
@@ -72,14 +72,14 @@ export const TmsSidebar = () => {
             </>
           )}
           
-          <Separator className="my-4" />
+          <Separator className="my-4 bg-sidebar-border" />
           <CreateMenu isCollapsed={isCollapsed} />
           <NavItem icon={Settings} label="Settings" to="/settings" isCollapsed={isCollapsed} />
         </div>
       </ScrollArea>
 
       {/* Footer */}
-      <div className="border-t border-gray-200 p-2">
+      <div className="border-t border-sidebar-border p-2">
         <UserProfile isCollapsed={isCollapsed} />
         <LogoutButton isCollapsed={isCollapsed} />
       </div>
