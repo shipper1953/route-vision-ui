@@ -1,4 +1,5 @@
 
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { ProfileForm } from "@/components/settings/ProfileForm";
@@ -7,6 +8,9 @@ import { SecurityPlaceholder } from "@/components/settings/SecurityPlaceholder";
 import { CartonizationSettings } from "@/components/settings/CartonizationSettings";
 
 const Settings = () => {
+  const [searchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'profile';
+
   return (
     <TmsLayout>
       <div className="space-y-6">
@@ -17,13 +21,12 @@ const Settings = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+        <Tabs value={activeTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="packaging">Packaging</TabsTrigger>
-            <TabsTrigger value="cartonization">Cartonization</TabsTrigger>
+            <TabsTrigger value="cartonization">Packaging</TabsTrigger>
           </TabsList>
           
           <TabsContent value="profile" className="space-y-4">
@@ -36,10 +39,6 @@ const Settings = () => {
           
           <TabsContent value="security" className="space-y-4">
             <SecurityPlaceholder />
-          </TabsContent>
-          
-          <TabsContent value="packaging" className="space-y-4">
-            <CartonizationSettings />
           </TabsContent>
           
           <TabsContent value="cartonization" className="space-y-4">

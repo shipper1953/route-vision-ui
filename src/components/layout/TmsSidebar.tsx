@@ -1,71 +1,88 @@
 
-import { 
-  Home, 
-  Package, 
-  Truck, 
-  Users, 
-  Settings, 
-  Shield,
-  Crown,
-  Archive
-} from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
-import { useSidebar } from "@/context/SidebarContext";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { NavItem } from "./sidebar/NavItem";
-import { LogoutButton } from "./sidebar/LogoutButton";
-import { CreateMenu } from "./sidebar/CreateMenu";
 import { UserProfile } from "./sidebar/UserProfile";
+import { CreateMenu } from "./sidebar/CreateMenu";
+import { LogoutButton } from "./sidebar/LogoutButton";
+import { PackagingInventoryNavItem } from "./sidebar/PackagingInventoryNavItem";
+import { useSidebar } from "@/context/SidebarContext";
+import { 
+  Home,
+  Package,
+  Truck,
+  ShoppingCart,
+  Users,
+  Settings,
+  BarChart3,
+  Shield
+} from "lucide-react";
+import { useAuth } from "@/context";
 
-export function TmsSidebar() {
+export const TmsSidebar = () => {
   const { isCollapsed, toggleSidebar, sidebarRef } = useSidebar();
+  const { userProfile } = useAuth();
 
-  // Expand sidebar when clicking anywhere in it
-  const handleSidebarClick = () => {
-    if (isCollapsed) {
-      toggleSidebar();
-    }
-  };
+  const isAdmin = userProfile?.role === 'admin';
+  const isSuperAdmin = userProfile?.role === 'superadmin';
 
   return (
-    <div 
+    <div
       ref={sidebarRef}
-      onClick={handleSidebarClick}
       className={cn(
-        "h-screen flex flex-col bg-sidebar fixed left-0 top-0 z-40 transition-all duration-300 cursor-pointer",
+        "fixed left-0 top-0 z-40 h-full bg-white border-r border-gray-200 transition-all duration-300 ease-in-out flex flex-col",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="flex items-center justify-between p-4">
-        {!isCollapsed ? (
-          <div className="flex items-center gap-2">
-            <ShipTornadoLogo className="text-white" size={32} />
-            <span className="text-white font-semibold text-lg">Ship Tornado</span>
-          </div>
-        ) : (
-          <div className="w-full flex justify-center">
-            <ShipTornadoLogo className="text-white" size={28} spin={false} />
-          </div>
-        )}
+      {/* Header */}
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+        {!isCollapsed && <h2 className="text-lg font-semibold text-tms-blue">Navigation</h2>}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleSidebar}
+          className="h-8 w-8 p-0"
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
       </div>
 
-      <div className="flex-1 overflow-auto py-4 px-2 flex flex-col gap-1">
-        <NavItem to="/" icon={Home} label="Dashboard" isCollapsed={isCollapsed} />
-        <NavItem to="/orders" icon={Package} label="Orders" isCollapsed={isCollapsed} />
-        <NavItem to="/shipments" icon={Truck} label="Shipments" isCollapsed={isCollapsed} />
-        <NavItem to="/items" icon={Archive} label="Item Master" isCollapsed={isCollapsed} />
-        <CreateMenu isCollapsed={isCollapsed} />
-        <NavItem to="/users" icon={Users} label="Users" isCollapsed={isCollapsed} adminOnly={true} />
-        <NavItem to="/admin" icon={Shield} label="Admin Panel" isCollapsed={isCollapsed} adminOnly={true} />
-        <NavItem to="/super-admin" icon={Crown} label="Super Admin Panel" isCollapsed={isCollapsed} superAdminOnly={true} />
-        <NavItem to="/settings" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
-      </div>
+      {/* Navigation */}
+      <ScrollArea className="flex-1 px-2 py-4">
+        <div className="space-y-2">
+          <NavItem icon={Home} label="Dashboard" to="/" />
+          <NavItem icon={ShoppingCart} label="Orders" to="/orders" />
+          <NavItem icon={Truck} label="Shipments" to="/shipments" />
+          <NavItem icon={Package} label="Item Master" to="/item-master" />
+          <PackagingInventoryNavItem />
+          
+          {(isAdmin || isSuperAdmin) && (
+            <>
+              <Separator className="my-4" />
+              <div className="px-2 py-1">
+                {!isCollapsed && <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</h3>}
+              </div>
+              <NavItem icon={Users} label="Users" to="/users" />
+              {isAdmin && <NavItem icon={Shield} label="Company Admin" to="/company-admin" />}
+              {isSuperAdmin && <NavItem icon={BarChart3} label="Super Admin" to="/super-admin" />}
+            </>
+          )}
+          
+          <Separator className="my-4" />
+          <CreateMenu />
+          <NavItem icon={Settings} label="Settings" to="/settings" />
+        </div>
+      </ScrollArea>
 
-      <div className="p-2">
-        <LogoutButton isCollapsed={isCollapsed} />
+      {/* Footer */}
+      <div className="border-t border-gray-200 p-2">
+        <UserProfile />
+        <LogoutButton />
       </div>
-      
-      <UserProfile isCollapsed={isCollapsed} />
     </div>
   );
-}
+};
