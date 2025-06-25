@@ -27,8 +27,8 @@ export const TmsSidebar = () => {
   const { isCollapsed, toggleSidebar, sidebarRef } = useSidebar();
   const { userProfile } = useAuth();
 
-  const isAdmin = userProfile?.role === 'admin';
-  const isSuperAdmin = userProfile?.role === 'superadmin';
+  const isAdmin = userProfile?.role === 'company_admin';
+  const isSuperAdmin = userProfile?.role === 'super_admin';
 
   return (
     <div
@@ -54,10 +54,10 @@ export const TmsSidebar = () => {
       {/* Navigation */}
       <ScrollArea className="flex-1 px-2 py-4">
         <div className="space-y-2">
-          <NavItem icon={Home} label="Dashboard" to="/" />
-          <NavItem icon={ShoppingCart} label="Orders" to="/orders" />
-          <NavItem icon={Truck} label="Shipments" to="/shipments" />
-          <NavItem icon={Package} label="Item Master" to="/item-master" />
+          <NavItem icon={Home} label="Dashboard" to="/" isCollapsed={isCollapsed} />
+          <NavItem icon={ShoppingCart} label="Orders" to="/orders" isCollapsed={isCollapsed} />
+          <NavItem icon={Truck} label="Shipments" to="/shipments" isCollapsed={isCollapsed} />
+          <NavItem icon={Package} label="Item Master" to="/item-master" isCollapsed={isCollapsed} />
           <PackagingInventoryNavItem />
           
           {(isAdmin || isSuperAdmin) && (
@@ -66,22 +66,22 @@ export const TmsSidebar = () => {
               <div className="px-2 py-1">
                 {!isCollapsed && <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</h3>}
               </div>
-              <NavItem icon={Users} label="Users" to="/users" />
-              {isAdmin && <NavItem icon={Shield} label="Company Admin" to="/company-admin" />}
-              {isSuperAdmin && <NavItem icon={BarChart3} label="Super Admin" to="/super-admin" />}
+              <NavItem icon={Users} label="Users" to="/users" isCollapsed={isCollapsed} />
+              {isAdmin && <NavItem icon={Shield} label="Company Admin" to="/company-admin" isCollapsed={isCollapsed} />}
+              {isSuperAdmin && <NavItem icon={BarChart3} label="Super Admin" to="/super-admin" isCollapsed={isCollapsed} />}
             </>
           )}
           
           <Separator className="my-4" />
-          <CreateMenu />
-          <NavItem icon={Settings} label="Settings" to="/settings" />
+          <CreateMenu isCollapsed={isCollapsed} />
+          <NavItem icon={Settings} label="Settings" to="/settings" isCollapsed={isCollapsed} />
         </div>
       </ScrollArea>
 
       {/* Footer */}
       <div className="border-t border-gray-200 p-2">
-        <UserProfile />
-        <LogoutButton />
+        <UserProfile isCollapsed={isCollapsed} />
+        <LogoutButton isCollapsed={isCollapsed} />
       </div>
     </div>
   );
