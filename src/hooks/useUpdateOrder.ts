@@ -5,11 +5,13 @@ import { toast } from "sonner";
 import { OrderFormValues } from "@/types/order";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context";
+import { useItemMaster } from "@/hooks/useItemMaster";
 
 export const useUpdateOrder = (orderId: string) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
+  const { items } = useItemMaster();
 
   const onSubmit = async (data: OrderFormValues) => {
     if (!user?.id) {
@@ -29,6 +31,28 @@ export const useUpdateOrder = (orderId: string) => {
       // Format the date for the API
       const formattedDate = data.requiredDeliveryDate.toISOString().split('T')[0];
       
+      // Calculate total items count and value from orderItems array
+      const totalItems = data.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+      const totalValue = data.orderItems.reduce((sum, item) => sum + (item.quantity * (item.unitPrice || 0)), 0);
+      
+      // Prepare order items with item details for dimensions
+      const orderItemsWithDetails = data.orderItems.map(orderItem => {
+        const itemDetails = items.find(item => item.id === orderItem.itemId);
+        return {
+          itemId: orderItem.itemId,
+          quantity: orderItem.quantity,
+          unitPrice: orderItem.unitPrice || 0,
+          name: itemDetails?.name || 'Unknown Item',
+          sku: itemDetails?.sku || '',
+          dimensions: itemDetails ? {
+            length: itemDetails.length,
+            width: itemDetails.width,
+            height: itemDetails.height,
+            weight: itemDetails.weight
+          } : null
+        };
+      });
+      
       // Update the order in the database
       const { error } = await supabase
         .from('orders')
@@ -38,8 +62,8 @@ export const useUpdateOrder = (orderId: string) => {
           customer_email: data.customerEmail || null,
           customer_phone: data.customerPhone || null,
           required_delivery_date: formattedDate,
-          items: [{ count: data.items, description: "Items" }],
-          value: parseFloat(data.value) || 0,
+          items: orderItemsWithDetails, // Store detailed items array
+          value: totalValue,
           shipping_address: {
             street1: data.street1,
             street2: data.street2 || undefined,

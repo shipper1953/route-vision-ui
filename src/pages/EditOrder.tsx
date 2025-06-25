@@ -10,6 +10,7 @@ import { ArrowLeft } from "lucide-react";
 import { Form } from "@/components/ui/form";
 import { CustomerInfoSection } from "@/components/order/CustomerInfoSection";
 import { ShippingAddressSection } from "@/components/order/ShippingAddressSection";
+import { OrderItemsSection } from "@/components/order/OrderItemsSection";
 import { WarehouseSelectionSection } from "@/components/order/WarehouseSelectionSection";
 import { fetchOrderById, OrderData } from "@/services/orderService";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -33,8 +34,7 @@ const EditOrder = () => {
       customerEmail: "",
       customerPhone: "",
       requiredDeliveryDate: undefined,
-      items: 1,
-      value: "",
+      orderItems: [],
       street1: "",
       street2: "",
       city: "",
@@ -76,8 +76,10 @@ const EditOrder = () => {
         form.setValue("customerEmail", orderData.customerEmail || "");
         form.setValue("customerPhone", orderData.customerPhone || "");
         form.setValue("requiredDeliveryDate", new Date(orderData.requiredDeliveryDate));
-        form.setValue("items", orderData.items);
-        form.setValue("value", orderData.value);
+        
+        // Convert legacy items data to orderItems array if needed
+        // For now, initialize with empty array - this could be enhanced to parse existing items
+        form.setValue("orderItems", []);
         
         // Set shipping address
         if (orderData.shippingAddress) {
@@ -147,6 +149,7 @@ const EditOrder = () => {
                 <CustomerInfoSection />
                 <ShippingAddressSection />
               </div>
+              <OrderItemsSection />
               <WarehouseSelectionSection />
               
               <div className="flex justify-end gap-3">
