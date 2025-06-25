@@ -95,6 +95,39 @@ export const useCartonization = () => {
     }];
   };
 
+  const createItemsFromOrderData = (orderItems: any[], masterItems: any[]): Item[] => {
+    if (!orderItems || orderItems.length === 0) {
+      return [];
+    }
+
+    return orderItems.map((orderItem, index) => {
+      const masterItem = masterItems.find(item => item.id === orderItem.itemId);
+      
+      if (masterItem) {
+        return {
+          id: `order-item-${index}`,
+          name: masterItem.name,
+          length: masterItem.length,
+          width: masterItem.width,
+          height: masterItem.height,
+          weight: masterItem.weight,
+          quantity: orderItem.quantity || 1
+        };
+      } else {
+        // Fallback item if no master item found
+        return {
+          id: `order-item-${index}`,
+          name: `Order Item ${index + 1}`,
+          length: 6, // Default dimensions
+          width: 4,
+          height: 2,
+          weight: 1,
+          quantity: orderItem.quantity || 1
+        };
+      }
+    }).filter(item => item); // Remove any null items
+  };
+
   const updateBoxInventory = (boxId: string, newStock: number) => {
     setBoxes(prev => prev.map(box => 
       box.id === boxId ? { ...box, inStock: newStock } : box
@@ -105,6 +138,7 @@ export const useCartonization = () => {
     boxes,
     setBoxes,
     createItemsFromShipmentData,
+    createItemsFromOrderData,
     updateBoxInventory
   };
 };
