@@ -45,11 +45,18 @@ export const ManualAddFundsDialog = ({
       return existingWallet;
     }
 
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     // Create wallet if it doesn't exist
     const { data: newWallet, error: createError } = await supabase
       .from('wallets')
       .insert([{
         company_id: companyId,
+        user_id: user.id,
         balance: 0,
         currency: 'USD'
       }])

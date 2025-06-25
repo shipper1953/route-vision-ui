@@ -27,6 +27,13 @@ export const PackageDetailsSection = () => {
   
   const handleOptimizePackaging = () => {
     const formData = form.getValues();
+    
+    // Validate that all required fields are present
+    if (!formData.length || !formData.width || !formData.height || !formData.weight) {
+      toast.error('Please enter package dimensions and weight first');
+      return;
+    }
+
     const items = createItemsFromShipmentData({
       length: formData.length,
       width: formData.width,
@@ -84,7 +91,18 @@ export const PackageDetailsSection = () => {
       <CartonizationDialog
         isOpen={showCartonization}
         onClose={() => setShowCartonization(false)}
-        items={createItemsFromShipmentData(form.getValues())}
+        items={(() => {
+          const formData = form.getValues();
+          if (formData.length && formData.width && formData.height && formData.weight) {
+            return createItemsFromShipmentData({
+              length: formData.length,
+              width: formData.width,
+              height: formData.height,
+              weight: formData.weight
+            });
+          }
+          return [];
+        })()}
         availableBoxes={boxes}
         onSelectBox={handleSelectBox}
       />
