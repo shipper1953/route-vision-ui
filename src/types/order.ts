@@ -1,6 +1,12 @@
 
 import { z } from "zod";
 
+export const orderItemSchema = z.object({
+  itemId: z.string().min(1, "Item selection is required"),
+  quantity: z.number().min(1, "Quantity must be at least 1"),
+  unitPrice: z.number().optional(),
+});
+
 export const orderFormSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
   customerCompany: z.string().optional(),
@@ -9,8 +15,7 @@ export const orderFormSchema = z.object({
   requiredDeliveryDate: z.date({
     required_error: "Required delivery date is required",
   }),
-  items: z.number().min(1, "At least 1 item is required"),
-  value: z.string().min(1, "Order value is required"),
+  orderItems: z.array(orderItemSchema).min(1, "At least one item is required"),
   street1: z.string().min(1, "Address line 1 is required"),
   street2: z.string().optional(),
   city: z.string().min(1, "City is required"),
@@ -21,3 +26,4 @@ export const orderFormSchema = z.object({
 });
 
 export type OrderFormValues = z.infer<typeof orderFormSchema>;
+export type OrderItem = z.infer<typeof orderItemSchema>;

@@ -2,8 +2,23 @@
 import { supabase } from "@/integrations/supabase/client";
 import { OrderData } from "@/types/orderTypes";
 
+interface OrderItemWithDetails {
+  itemId: string;
+  quantity: number;
+  unitPrice: number;
+  name: string;
+  sku: string;
+  dimensions?: {
+    length: number;
+    width: number;
+    height: number;
+    weight: number;
+  };
+}
+
 interface CreateOrderInput extends Omit<OrderData, 'id'> {
   warehouseId?: string;
+  orderItems?: OrderItemWithDetails[];
 }
 
 export const createOrder = async (orderData: CreateOrderInput): Promise<OrderData> => {
@@ -57,6 +72,18 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
   // Generate a unique order ID
   const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
+  // Prepare items data - include both legacy format and detailed items
+  const itemsData = orderData.orderItems && orderData.orderItems.length > 0 
+    ? orderData.orderItems.map(item => ({
+        itemId: item.itemId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        name: item.name,
+        sku: item.sku,
+        dimensions: item.dimensions
+      }))
+    : [{ count: orderData.items, description: "Items" }];
+
   // Use any type to bypass TypeScript issues with generated types
   const orderRecord: any = {
     order_id: orderId,
@@ -67,7 +94,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
     order_date: orderData.orderDate,
     required_delivery_date: orderData.requiredDeliveryDate,
     status: orderData.status,
-    items: [{ count: orderData.items, description: "Items" }],
+    items: itemsData,
     value: parseFloat(orderData.value) || 0,
     shipping_address: orderData.shippingAddress,
     user_id: user.id,

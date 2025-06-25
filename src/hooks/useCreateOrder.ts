@@ -5,11 +5,13 @@ import { toast } from "sonner";
 import { OrderFormValues } from "@/types/order";
 import { createOrder } from "@/services/orderCreationService";
 import { useAuth } from "@/context";
+import { useItemMaster } from "@/hooks/useItemMaster";
 
 export const useCreateOrder = () => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
+  const { items } = useItemMaster();
 
   const onSubmit = async (data: OrderFormValues) => {
     if (!user?.id) {
@@ -22,12 +24,39 @@ export const useCreateOrder = () => {
       return;
     }
 
+    if (data.orderItems.length === 0) {
+      toast.error("Please add at least one item to the order");
+      return;
+    }
+
     setIsSubmitting(true);
     console.log("Order form data:", data);
     
     try {
       // Format the date for the API
       const formattedDate = data.requiredDeliveryDate.toISOString().split('T')[0];
+      
+      // Calculate total items count and value
+      const totalItems = data.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+      const totalValue = data.orderItems.reduce((sum, item) => sum + (item.quantity * (item.unitPrice || 0)), 0);
+      
+      // Prepare order items with item details for dimensions
+      const orderItemsWithDetails = data.orderItems.map(orderItem => {
+        const itemDetails = items.find(item => item.id === orderItem.itemId);
+        return {
+          itemId: orderItem.itemId,
+          quantity: orderItem.quantity,
+          unitPrice: orderItem.unitPrice || 0,
+          name: itemDetails?.name || 'Unknown Item',
+          sku: itemDetails?.sku || '',
+          dimensions: itemDetails ? {
+            length: itemDetails.length,
+            width: itemDetails.width,
+            height: itemDetails.height,
+            weight: itemDetails.weight
+          } : null
+        };
+      });
       
       // Create the order using the proper service
       const newOrder = await createOrder({
@@ -38,9 +67,10 @@ export const useCreateOrder = () => {
         orderDate: new Date().toISOString().split('T')[0], // Today's date
         requiredDeliveryDate: formattedDate,
         status: "ready_to_ship",
-        items: data.items,
-        value: data.value,
+        items: totalItems,
+        value: totalValue.toString(),
         warehouseId: data.warehouseId, // Pass the selected warehouse ID
+        orderItems: orderItemsWithDetails, // Include detailed items for cartonization
         shippingAddress: {
           street1: data.street1,
           street2: data.street2 || undefined,

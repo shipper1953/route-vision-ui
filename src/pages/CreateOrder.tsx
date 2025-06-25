@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form } from "@/components/ui/form";
 import { CustomerInfoSection } from "@/components/order/CustomerInfoSection";
 import { ShippingAddressSection } from "@/components/order/ShippingAddressSection";
+import { OrderItemsSection } from "@/components/order/OrderItemsSection";
 import { WarehouseSelectionSection } from "@/components/order/WarehouseSelectionSection";
 import { OrderFormActions } from "@/components/order/OrderFormActions";
 import { orderFormSchema, OrderFormValues } from "@/types/order";
@@ -29,8 +30,7 @@ const CreateOrder = () => {
       customerEmail: "",
       customerPhone: "",
       requiredDeliveryDate: undefined,
-      items: 1,
-      value: "",
+      orderItems: [],
       street1: "",
       street2: "",
       city: "",
@@ -78,14 +78,14 @@ const CreateOrder = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-tms-blue">Create Order</h1>
-          <p className="text-muted-foreground">Add a new customer order</p>
+          <p className="text-muted-foreground">Add a new customer order with items</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>New Order</CardTitle>
-          <CardDescription>Enter the order details below.</CardDescription>
+          <CardDescription>Enter the order details and select items from your catalog.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -94,6 +94,7 @@ const CreateOrder = () => {
                 <CustomerInfoSection />
                 <ShippingAddressSection />
               </div>
+              <OrderItemsSection />
               <WarehouseSelectionSection />
               <OrderFormActions isSubmitting={isSubmitting} />
             </form>
