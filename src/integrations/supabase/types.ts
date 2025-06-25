@@ -406,6 +406,7 @@ export type Database = {
           currency: string | null
           id: string
           updated_at: string
+          user_id: string
         }
         Insert: {
           balance?: number | null
@@ -414,6 +415,7 @@ export type Database = {
           currency?: string | null
           id?: string
           updated_at?: string
+          user_id: string
         }
         Update: {
           balance?: number | null
@@ -422,6 +424,7 @@ export type Database = {
           currency?: string | null
           id?: string
           updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -487,78 +490,12 @@ export type Database = {
       }
     }
     Views: {
-      hypopg_hidden_indexes: {
-        Row: {
-          am_name: unknown | null
-          index_name: unknown | null
-          indexrelid: unknown | null
-          is_hypo: boolean | null
-          schema_name: unknown | null
-          table_name: unknown | null
-        }
-        Relationships: []
-      }
-      hypopg_list_indexes: {
-        Row: {
-          am_name: unknown | null
-          index_name: string | null
-          indexrelid: unknown | null
-          schema_name: unknown | null
-          table_name: unknown | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
-      }
-      hypopg: {
-        Args: Record<PropertyKey, never>
-        Returns: Record<string, unknown>[]
-      }
-      hypopg_create_index: {
-        Args: { sql_order: string }
-        Returns: Record<string, unknown>[]
-      }
-      hypopg_drop_index: {
-        Args: { indexid: unknown }
-        Returns: boolean
-      }
-      hypopg_get_indexdef: {
-        Args: { indexid: unknown }
-        Returns: string
-      }
-      hypopg_hidden_indexes: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          indexid: unknown
-        }[]
-      }
-      hypopg_hide_index: {
-        Args: { indexid: unknown }
-        Returns: boolean
-      }
-      hypopg_relation_size: {
-        Args: { indexid: unknown }
-        Returns: number
-      }
-      hypopg_reset: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      hypopg_reset_index: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      hypopg_unhide_all_indexes: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      hypopg_unhide_index: {
-        Args: { indexid: unknown }
-        Returns: boolean
       }
     }
     Enums: {
