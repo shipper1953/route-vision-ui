@@ -53,7 +53,7 @@ const router = createBrowserRouter([
     element: <CreateShipment />,
   },
   {
-    path: "/items",
+    path: "/item-master",
     element: <ItemMaster />,
   },
   {
