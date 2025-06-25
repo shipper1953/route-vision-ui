@@ -1,3 +1,4 @@
+
 import {
   createBrowserRouter,
 } from "react-router-dom";
@@ -9,6 +10,7 @@ import CreateOrder from "@/pages/CreateOrder";
 import EditOrder from "@/pages/EditOrder";
 import Shipments from "@/pages/Shipments";
 import CreateShipment from "@/pages/CreateShipment";
+import ItemMaster from "@/pages/ItemMaster";
 import Users from "@/pages/Users";
 import CreateUser from "@/pages/CreateUser";
 import Settings from "@/pages/Settings";
@@ -49,6 +51,10 @@ const router = createBrowserRouter([
   {
     path: "/shipments/create",
     element: <CreateShipment />,
+  },
+  {
+    path: "/items",
+    element: <ItemMaster />,
   },
   {
     path: "/users",

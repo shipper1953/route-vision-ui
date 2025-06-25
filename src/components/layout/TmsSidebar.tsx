@@ -6,7 +6,8 @@ import {
   Users, 
   Settings, 
   Shield,
-  Crown
+  Crown,
+  Archive
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
@@ -52,6 +53,7 @@ export function TmsSidebar() {
         <NavItem to="/" icon={Home} label="Dashboard" isCollapsed={isCollapsed} />
         <NavItem to="/orders" icon={Package} label="Orders" isCollapsed={isCollapsed} />
         <NavItem to="/shipments" icon={Truck} label="Shipments" isCollapsed={isCollapsed} />
+        <NavItem to="/items" icon={Archive} label="Item Master" isCollapsed={isCollapsed} />
         <CreateMenu isCollapsed={isCollapsed} />
         <NavItem to="/users" icon={Users} label="Users" isCollapsed={isCollapsed} adminOnly={true} />
         <NavItem to="/admin" icon={Shield} label="Admin Panel" isCollapsed={isCollapsed} adminOnly={true} />
