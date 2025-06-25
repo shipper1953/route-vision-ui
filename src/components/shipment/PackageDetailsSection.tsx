@@ -36,10 +36,11 @@ export const PackageDetailsSection = () => {
         try {
           console.log("Loading order items for cartonization:", orderId);
           const orderData = await fetchOrderById(orderId);
-          if (orderData && orderData.items) {
+          if (orderData && orderData.items && Array.isArray(orderData.items)) {
             console.log("Order items loaded:", orderData.items);
             setOrderItems(orderData.items);
           } else {
+            console.log("No items found or items is not an array:", orderData?.items);
             setOrderItems([]);
           }
         } catch (error) {
