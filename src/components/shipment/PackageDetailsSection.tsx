@@ -26,7 +26,7 @@ export const PackageDetailsSection = () => {
   const orderId = form.getValues("orderId");
   const [showCartonization, setShowCartonization] = useState(false);
   const [orderItems, setOrderItems] = useState<any[]>([]);
-  const { boxes, createItemsFromShipmentData } = useCartonization();
+  const { boxes, createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
   
   // Load order items when component mounts or orderId changes
@@ -39,10 +39,15 @@ export const PackageDetailsSection = () => {
           if (orderData && orderData.items) {
             console.log("Order items loaded:", orderData.items);
             setOrderItems(orderData.items);
+          } else {
+            setOrderItems([]);
           }
         } catch (error) {
           console.error("Error loading order items:", error);
+          setOrderItems([]);
         }
+      } else {
+        setOrderItems([]);
       }
     };
     
@@ -54,39 +59,11 @@ export const PackageDetailsSection = () => {
     console.log("Order items:", orderItems);
     console.log("Master items:", masterItems);
     
-    // First try to create items from order data
     let items: any[] = [];
     
     if (orderItems && orderItems.length > 0) {
       // Convert order items to cartonization items using Item Master data
-      items = orderItems.map((orderItem, index) => {
-        const masterItem = masterItems.find(item => item.id === orderItem.itemId);
-        
-        if (masterItem) {
-          console.log(`Found master item for order item ${index}:`, masterItem);
-          return {
-            id: `order-item-${index}`,
-            name: masterItem.name,
-            length: masterItem.length,
-            width: masterItem.width,
-            height: masterItem.height,
-            weight: masterItem.weight,
-            quantity: orderItem.quantity || 1
-          };
-        } else {
-          console.warn(`No master item found for order item:`, orderItem);
-          // Fallback to basic item if no master data found
-          return {
-            id: `order-item-${index}`,
-            name: `Item ${index + 1}`,
-            length: 6, // Default dimensions
-            width: 4,
-            height: 2,
-            weight: 1,
-            quantity: orderItem.quantity || 1
-          };
-        }
-      }).filter(item => item); // Remove any null items
+      items = createItemsFromOrderData(orderItems, masterItems);
     }
     
     // If no order items, fall back to form dimensions
@@ -95,12 +72,15 @@ export const PackageDetailsSection = () => {
       
       if (formData.length && formData.width && formData.height && formData.weight) {
         console.log("Using form dimensions for cartonization");
-        items = createItemsFromShipmentData({
+        items = [{
+          id: '1',
+          name: 'Shipment Item',
           length: formData.length,
           width: formData.width,
           height: formData.height,
-          weight: formData.weight
-        });
+          weight: formData.weight,
+          quantity: 1
+        }];
       }
     }
 
@@ -159,33 +139,21 @@ export const PackageDetailsSection = () => {
         items={(() => {
           // Build items for the dialog when it opens
           if (orderItems && orderItems.length > 0) {
-            return orderItems.map((orderItem, index) => {
-              const masterItem = masterItems.find(item => item.id === orderItem.itemId);
-              
-              if (masterItem) {
-                return {
-                  id: `order-item-${index}`,
-                  name: masterItem.name,
-                  length: masterItem.length,
-                  width: masterItem.width,
-                  height: masterItem.height,
-                  weight: masterItem.weight,
-                  quantity: orderItem.quantity || 1
-                };
-              }
-              return null;
-            }).filter(item => item !== null);
+            return createItemsFromOrderData(orderItems, masterItems);
           }
           
           // Fallback to form data
           const formData = form.getValues();
           if (formData.length && formData.width && formData.height && formData.weight) {
-            return createItemsFromShipmentData({
+            return [{
+              id: '1',
+              name: 'Shipment Item',
               length: formData.length,
               width: formData.width,
               height: formData.height,
-              weight: formData.weight
-            });
+              weight: formData.weight,
+              quantity: 1
+            }];
           }
           
           return [];
