@@ -24,9 +24,12 @@ export const useOrderAutocomplete = () => {
 
   // Filter orders based on input value
   const filteredOrders = useMemo(() => {
-    if (!inputValue.trim()) return readyToShipOrders;
+    // Ensure inputValue is a string and handle undefined/null cases
+    const searchValue = typeof inputValue === 'string' ? inputValue.trim() : '';
     
-    const searchTerm = inputValue.toLowerCase();
+    if (!searchValue) return readyToShipOrders;
+    
+    const searchTerm = searchValue.toLowerCase();
     return readyToShipOrders.filter(order => {
       const orderId = String(order.id || '').toLowerCase();
       const customerName = String(order.customerName || '').toLowerCase();
@@ -43,8 +46,10 @@ export const useOrderAutocomplete = () => {
   }, []);
 
   const handleInputChange = useCallback((value: string) => {
-    setInputValue(value);
-    setOpen(!!value.trim());
+    // Ensure we always set a string value
+    const stringValue = typeof value === 'string' ? value : '';
+    setInputValue(stringValue);
+    setOpen(!!stringValue.trim());
   }, []);
 
   const handleInputFocus = useCallback(() => {
