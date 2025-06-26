@@ -26,7 +26,7 @@ const Settings = () => {
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="packaging">Packaging</TabsTrigger>
+            <TabsTrigger value="packaging">Tornado Pack</TabsTrigger>
           </TabsList>
           
           <TabsContent value="profile" className="space-y-4">
