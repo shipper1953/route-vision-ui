@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { EasyPostService } from '@/services/easypost';
+import easyPostService from '@/services/easypost';
 import { LabelService } from '@/services/easypost/labelService';
 import { linkShipmentToOrder } from '@/services/orderShipmentLinking';
 
