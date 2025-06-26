@@ -1,13 +1,19 @@
 
+import { useState } from "react";
 import { useCartonization } from "@/hooks/useCartonization";
 import { useBoxOrderStats } from "@/hooks/useBoxOrderStats";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const CartonizationSettings = () => {
   const { boxStats, loading } = useBoxOrderStats();
+  const [expandedBoxId, setExpandedBoxId] = useState<string | null>(null);
+
+  const toggleExpanded = (boxId: string) => {
+    setExpandedBoxId(expandedBoxId === boxId ? null : boxId);
+  };
 
   return (
     <div className="space-y-6">
@@ -18,7 +24,7 @@ export const CartonizationSettings = () => {
             Box Demand Ranking
           </CardTitle>
           <CardDescription>
-            Boxes ranked by number of open orders recommending their use
+            Boxes ranked by number of open orders recommending their use. Click on a box to see the recommended orders.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -45,35 +51,67 @@ export const CartonizationSettings = () => {
                 </p>
               ) : (
                 boxStats.map((boxStat, index) => (
-                  <div key={boxStat.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/20 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center justify-center w-12 h-12 bg-tms-blue/10 rounded-lg">
-                        <span className="text-tms-blue font-semibold">#{index + 1}</span>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold">{boxStat.name}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {boxStat.length}" × {boxStat.width}" × {boxStat.height}" • 
-                          Max {boxStat.maxWeight} lbs • ${boxStat.cost.toFixed(2)}
-                        </p>
-                        <div className="flex gap-2 mt-1">
-                          <Badge variant="secondary">
-                            {boxStat.type.replace('_', ' ').toUpperCase()}
-                          </Badge>
-                          <Badge variant={boxStat.inStock > 0 ? "default" : "destructive"}>
-                            {boxStat.inStock} in stock
-                          </Badge>
+                  <div key={boxStat.id} className="border rounded-lg">
+                    <div 
+                      className="flex items-center justify-between p-4 hover:bg-muted/20 transition-colors cursor-pointer"
+                      onClick={() => toggleExpanded(boxStat.id)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-12 h-12 bg-tms-blue/10 rounded-lg">
+                          <span className="text-tms-blue font-semibold">#{index + 1}</span>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold">{boxStat.name}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {boxStat.length}" × {boxStat.width}" × {boxStat.height}" • 
+                            Max {boxStat.maxWeight} lbs • ${boxStat.cost.toFixed(2)}
+                          </p>
+                          <div className="flex gap-2 mt-1">
+                            <Badge variant="secondary">
+                              {boxStat.type.replace('_', ' ').toUpperCase()}
+                            </Badge>
+                            <Badge variant={boxStat.inStock > 0 ? "default" : "destructive"}>
+                              {boxStat.inStock} in stock
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-tms-blue">
-                        {boxStat.recommendedOrderCount}
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-tms-blue">
+                            {boxStat.recommendedOrderCount}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {boxStat.recommendedOrderCount === 1 ? 'order' : 'orders'}
+                          </div>
+                        </div>
+                        {boxStat.recommendedOrderCount > 0 && (
+                          expandedBoxId === boxStat.id ? 
+                            <ChevronDown className="h-5 w-5 text-muted-foreground" /> :
+                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                        )}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {boxStat.recommendedOrderCount === 1 ? 'order' : 'orders'}
-                      </div>
                     </div>
+                    
+                    {expandedBoxId === boxStat.id && boxStat.recommendedOrders.length > 0 && (
+                      <div className="border-t bg-muted/10 p-4">
+                        <h5 className="font-medium text-sm text-muted-foreground mb-3">
+                          Recommended Orders ({boxStat.recommendedOrders.length})
+                        </h5>
+                        <div className="space-y-2">
+                          {boxStat.recommendedOrders.map((orderId) => (
+                            <div key={orderId} className="flex items-center gap-2 text-sm">
+                              <Badge variant="outline" className="font-mono">
+                                {orderId}
+                              </Badge>
+                              <span className="text-muted-foreground">
+                                Order recommended for this box
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
