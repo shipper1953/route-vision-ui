@@ -79,7 +79,7 @@ export const useBoxOrderStats = () => {
     };
 
     calculateBoxStats();
-  }, [boxes, createItemsFromOrderData]);
+  }, [boxes]); // Removed createItemsFromOrderData from dependencies to prevent infinite loop
 
   return { boxStats, loading };
 };
