@@ -1,6 +1,6 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AddressFormGrid } from "@/components/shipment/AddressFormGrid";
+import { AddressFormSection } from "@/components/shipment/AddressFormSection";
 import { PackageDetailsSection } from "@/components/shipment/PackageDetailsSection";
 import { ShippingOptionsSection } from "@/components/shipment/ShippingOptionsSection";
 
@@ -18,7 +18,16 @@ export const ShipmentFormTabs = ({ orderItems = [] }: ShipmentFormTabsProps) => 
       </TabsList>
       
       <TabsContent value="addresses" className="space-y-6">
-        <AddressFormGrid prefix="" />
+        <AddressFormSection 
+          type="from" 
+          title="From Address" 
+          description="Sender information and address"
+        />
+        <AddressFormSection 
+          type="to" 
+          title="To Address" 
+          description="Recipient information and address"
+        />
       </TabsContent>
       
       <TabsContent value="package" className="space-y-6">

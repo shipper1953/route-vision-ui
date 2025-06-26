@@ -3,13 +3,6 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { 
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { 
   Card, 
   CardContent, 
   CardHeader, 
@@ -76,29 +69,10 @@ const Orders = () => {
               <LoadingSpinner size={24} />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Required Delivery</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Shipment Details</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <OrdersTable 
-                  orders={orders}
-                  filteredOrders={filteredOrders}
-                  highlightedOrderId={highlightedOrderId}
-                  isLoading={loading}
-                />
-              </TableBody>
-            </Table>
+            <OrdersTable 
+              orders={filteredOrders}
+              loading={loading}
+            />
           )}
         </CardContent>
       </Card>
