@@ -4,12 +4,12 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { NavItem } from "./sidebar/NavItem";
 import { UserProfile } from "./sidebar/UserProfile";
 import { CreateMenu } from "./sidebar/CreateMenu";
 import { LogoutButton } from "./sidebar/LogoutButton";
 import { PackagingInventoryNavItem } from "./sidebar/PackagingInventoryNavItem";
+import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 import { useSidebar } from "@/context/SidebarContext";
 import { 
   Home,
@@ -38,17 +38,22 @@ export const TmsSidebar = () => {
         isCollapsed ? "w-16" : "w-64"
       )}
     >
-      {/* Header */}
-      <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
-        {!isCollapsed && <h2 className="text-lg font-semibold text-sidebar-foreground">Navigation</h2>}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleSidebar}
-          className="h-8 w-8 p-0 text-sidebar-foreground hover:bg-sidebar-accent"
-        >
-          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </Button>
+      {/* Header with Ship Tornado Logo - clickable to toggle */}
+      <div 
+        className="p-4 border-b border-sidebar-border flex items-center justify-center cursor-pointer hover:bg-sidebar-accent/20 transition-colors"
+        onClick={toggleSidebar}
+      >
+        <div className="flex items-center gap-3">
+          <ShipTornadoLogo 
+            size={24} 
+            className="text-sidebar-foreground flex-shrink-0" 
+          />
+          {!isCollapsed && (
+            <span className="text-lg font-semibold text-sidebar-foreground">
+              Ship Tornado
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Navigation */}

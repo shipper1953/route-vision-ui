@@ -18,7 +18,7 @@ export const ShipmentFormTabs = ({ orderItems = [] }: ShipmentFormTabsProps) => 
       </TabsList>
       
       <TabsContent value="addresses" className="space-y-6">
-        <AddressFormGrid />
+        <AddressFormGrid prefix="" />
       </TabsContent>
       
       <TabsContent value="package" className="space-y-6">

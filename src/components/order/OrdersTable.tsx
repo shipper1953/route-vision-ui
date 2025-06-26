@@ -1,197 +1,276 @@
-import { OrderData } from "@/types/orderTypes";
-import { useNavigate } from "react-router-dom";
-import { Truck, Edit, Barcode } from "lucide-react";
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { OrderStatus } from "./OrderStatus";
-import { OrderShipmentInfo } from "./OrderShipmentInfo";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon, Search, Filter, Download, Eye, Truck, Package } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { OrderData, OrderItem } from "@/types/orderTypes";
+import { useNavigate } from "react-router-dom";
 
 interface OrdersTableProps {
   orders: OrderData[];
-  filteredOrders: OrderData[];
-  highlightedOrderId: string | null;
-  isLoading: boolean;
+  loading?: boolean;
 }
 
-export const OrdersTable = ({ 
-  orders, 
-  filteredOrders, 
-  highlightedOrderId, 
-  isLoading 
-}: OrdersTableProps) => {
+// Helper function to render items properly
+const renderOrderItems = (items: OrderItem[] | number) => {
+  if (typeof items === 'number') {
+    return `${items} items`;
+  }
+  
+  if (Array.isArray(items)) {
+    return `${items.length} items`;
+  }
+  
+  return '0 items';
+};
+
+export const OrdersTable = ({ orders, loading = false }: OrdersTableProps) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<Date>();
+  const [dateTo, setDateTo] = useState<Date>();
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const navigate = useNavigate();
 
-  const handleCreateShipmentForOrder = (orderId: string) => {
-    // Navigate to create shipment page with the order ID using the correct route
-    navigate(`/shipments/create?orderId=${orderId}`);
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      const matchesSearch = 
+        order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.customerEmail && order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesStatus = statusFilter === "all" || order.status.toLowerCase() === statusFilter.toLowerCase();
+      
+      const orderDate = new Date(order.orderDate);
+      const matchesDateFrom = !dateFrom || orderDate >= dateFrom;
+      const matchesDateTo = !dateTo || orderDate <= dateTo;
+      
+      return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo;
+    });
+  }, [orders, searchTerm, statusFilter, dateFrom, dateTo]);
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'secondary';
+      case 'processing':
+        return 'default';
+      case 'shipped':
+        return 'default';
+      case 'delivered':
+        return 'default';
+      case 'cancelled':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
   };
 
-  const handleEditOrder = (orderId: string) => {
-    // Navigate to edit order page using the correct route pattern
-    navigate(`/orders/${orderId}/edit`);
-  };
-
-  const handlePrintBarcode = (orderId: string) => {
-    // Create a new window for printing the barcode
-    const printWindow = window.open('', '_blank', 'width=400,height=200');
-    if (!printWindow) return;
-
-    // HTML content for the Code 39 barcode label (3x1 inch)
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Barcode Label - ${orderId}</title>
-          <style>
-            @page {
-              size: 3in 1in;
-              margin: 0;
-            }
-            body {
-              margin: 0;
-              padding: 4px;
-              font-family: Arial, sans-serif;
-              width: 3in;
-              height: 1in;
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
-              align-items: center;
-              box-sizing: border-box;
-              background: white;
-            }
-            .barcode {
-              font-family: "Libre Barcode 39", "Libre Barcode 39 Text", monospace;
-              font-size: 32px;
-              letter-spacing: 2px;
-              margin-bottom: 2px;
-              line-height: 1;
-              text-align: center;
-              width: 100%;
-            }
-            .order-id {
-              font-size: 10px;
-              font-weight: bold;
-              text-align: center;
-              margin-top: 2px;
-            }
-            @media print {
-              body {
-                background: white !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-            }
-          </style>
-          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&family=Libre+Barcode+39+Text&display=swap" rel="stylesheet">
-        </head>
-        <body>
-          <div class="barcode">*${orderId}*</div>
-          <div class="order-id">${orderId}</div>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    
-    // Wait for fonts to load then print
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 1000);
-    };
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <TableRow>
-        <TableCell colSpan={9} className="h-24 text-center">
-          Loading orders...
-        </TableCell>
-      </TableRow>
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tms-blue"></div>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
-
-  if (filteredOrders.length === 0) {
-    return (
-      <TableRow>
-        <TableCell colSpan={9} className="h-24 text-center">
-          {orders.length === 0 ? 
-            "No orders found in database. Create your first order!" : 
-            "No orders match your search criteria."}
-        </TableCell>
-      </TableRow>
-    );
-  }
-
-  console.log("Rendering orders table with", filteredOrders.length, "filtered orders");
 
   return (
-    <>
-      {filteredOrders.map((order) => (
-        <TableRow 
-          key={order.id} 
-          className={highlightedOrderId === order.id ? "bg-blue-50" : ""}
-        >
-          <TableCell className="font-medium">{order.id}</TableCell>
-          <TableCell>{order.customerName}</TableCell>
-          <TableCell>{new Date(order.orderDate).toLocaleDateString()}</TableCell>
-          <TableCell>{new Date(order.requiredDeliveryDate).toLocaleDateString()}</TableCell>
-          <TableCell>{order.items}</TableCell>
-          <TableCell>
-            <OrderStatus status={order.status} />
-          </TableCell>
-          <TableCell>
-            <OrderShipmentInfo shipment={order.shipment} />
-          </TableCell>
-          <TableCell className="text-right">${order.value}</TableCell>
-          <TableCell>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm">Details</Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => handlePrintBarcode(order.id)}
-                className="flex items-center gap-1"
-              >
-                <Barcode className="h-3.5 w-3.5" />
-                Print
-              </Button>
-              {order.status === 'ready_to_ship' && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleEditOrder(order.id)}
-                  className="flex items-center gap-1"
-                >
-                  <Edit className="h-3.5 w-3.5" />
-                  Edit
-                </Button>
-              )}
-              {(order.status === 'ready_to_ship' || order.status === 'processing') && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleCreateShipmentForOrder(order.id)}
-                  className="flex items-center gap-1"
-                >
-                  <Truck className="h-3.5 w-3.5" />
-                  Ship
-                </Button>
-              )}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>Orders</span>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filters
+            </Button>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {/* Search and basic filters */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search orders by customer, ID, or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="shipped">Shipped</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Advanced filters */}
+          {showAdvancedFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div>
+                <Label>Date From</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateFrom && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFrom ? format(dateFrom, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <Label>Date To</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateTo && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateTo ? format(dateTo, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          )}
+
+          {/* Orders table */}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead>Value</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No orders found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.id}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{order.customerName}</div>
+                          {order.customerEmail && (
+                            <div className="text-sm text-muted-foreground">{order.customerEmail}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{format(new Date(order.orderDate), "MMM dd, yyyy")}</TableCell>
+                      <TableCell>{renderOrderItems(order.items)}</TableCell>
+                      <TableCell>{order.value}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusBadgeVariant(order.status)}>
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/orders/${order.id}`)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/orders/${order.id}/edit`)}
+                          >
+                            <Package className="h-4 w-4" />
+                          </Button>
+                          {order.status !== 'shipped' && order.status !== 'delivered' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate('/shipments/create', { 
+                                state: { orderId: order.id } 
+                              })}
+                            >
+                              <Truck className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
