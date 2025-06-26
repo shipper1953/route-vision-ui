@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { getOriginalRateAmount } from "@/utils/rateMarkupUtils";
 
@@ -12,12 +11,12 @@ export class LabelService {
     this.useEdgeFunctions = !apiKey;
   }
 
-  async purchaseLabel(shipmentId: string, rateId: string): Promise<any> {
+  async purchaseLabel(shipmentId: string, rateId: string, orderId?: string | null): Promise<any> {
     try {
-      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`);
+      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''}`);
       
       if (this.useEdgeFunctions) {
-        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId);
+        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId);
       }
       
       return this.purchaseLabelDirectly(shipmentId, rateId);
@@ -27,12 +26,17 @@ export class LabelService {
     }
   }
 
-  private async purchaseLabelViaEdgeFunction(shipmentId: string, rateId: string): Promise<any> {
+  private async purchaseLabelViaEdgeFunction(shipmentId: string, rateId: string, orderId?: string | null): Promise<any> {
+    const requestBody: any = { shipmentId, rateId };
+    
+    // Include orderId if provided
+    if (orderId) {
+      requestBody.orderId = orderId;
+      console.log('Including orderId in edge function request:', orderId);
+    }
+
     const { data, error } = await supabase.functions.invoke('purchase-label', {
-      body: { shipmentId, rateId },
-      headers: {
-        Authorization: undefined
-      }
+      body: requestBody
     });
     
     if (error) {

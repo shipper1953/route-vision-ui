@@ -1,31 +1,26 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ShipmentResponse, SmartRate, Rate } from '@/services/easypost';
-import { supabase } from '@/integrations/supabase/client';
-import { linkShipmentToOrder } from '@/services/orderShipmentService';
+import { EasyPostService } from '@/services/easypost';
+import { LabelService } from '@/services/easypost/labelService';
+import { linkShipmentToOrder } from '@/services/orderShipmentLinking';
 
-export const useShipment = (orderId?: string | null) => {
-  const [shipmentResponse, setShipmentResponse] = useState<ShipmentResponse | null>(null);
-  const [selectedRate, setSelectedRate] = useState<SmartRate | Rate | null>(null);
-  const [recommendedRate, setRecommendedRate] = useState<SmartRate | Rate | null>(null);
+export const useShipment = (initialOrderId?: string | null) => {
+  const [shipmentResponse, setShipmentResponse] = useState<any>(null);
+  const [selectedRate, setSelectedRate] = useState<any>(null);
+  const [recommendedRate, setRecommendedRate] = useState<any>(null);
 
-  const handleShipmentCreated = (response: ShipmentResponse) => {
-    console.log("Shipment created:", response);
+  const handleShipmentCreated = (response: any) => {
+    console.log('Shipment created:', response);
     setShipmentResponse(response);
     
-    // Set recommended rate if smartRates are available
-    if (response.smartRates && response.smartRates.length > 0) {
-      const recommended = response.smartRates[0];
-      setRecommendedRate(recommended);
-      setSelectedRate(recommended);
-    } else if (response.rates && response.rates.length > 0) {
-      // Fall back to regular rates
-      const cheapest = response.rates.reduce((prev, current) => 
-        parseFloat(current.rate) < parseFloat(prev.rate) ? current : prev
+    // Find and set recommended rate
+    if (response.rates?.length > 0) {
+      const cheapestRate = response.rates.reduce((prev: any, current: any) => 
+        (parseFloat(prev.rate) < parseFloat(current.rate)) ? prev : current
       );
-      setRecommendedRate(cheapest);
-      setSelectedRate(cheapest);
+      setRecommendedRate(cheapestRate);
+      setSelectedRate(cheapestRate);
     }
   };
 
@@ -35,105 +30,40 @@ export const useShipment = (orderId?: string | null) => {
     setRecommendedRate(null);
   };
 
-  const purchaseLabel = async (shipmentId: string, rateId: string): Promise<any> => {
+  const purchaseLabel = async (shipmentId: string, rateId: string) => {
     try {
-      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}`, orderId ? `for order ${orderId}` : '');
+      console.log('Purchasing label with orderId:', initialOrderId);
+      const labelService = new LabelService('');
       
-      // Get the current session and validate it thoroughly
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Call the edge function with orderId if available
+      const result = await labelService.purchaseLabel(shipmentId, rateId, initialOrderId);
       
-      console.log('Session check:', {
-        hasSession: !!session,
-        hasUser: !!session?.user,
-        hasAccessToken: !!session?.access_token,
-        userEmail: session?.user?.email,
-        sessionError: sessionError
-      });
+      console.log('Label purchase result:', result);
       
-      if (sessionError) {
-        console.error('Session error:', sessionError);
-        throw new Error(`Session error: ${sessionError.message}`);
-      }
-      
-      if (!session) {
-        console.error('No session found');
-        throw new Error('No active session found. Please log in again.');
-      }
-      
-      if (!session.access_token) {
-        console.error('No access token in session');
-        throw new Error('No valid authentication token. Please log out and log back in.');
-      }
-      
-      if (!session.user) {
-        console.error('No user in session');
-        throw new Error('No user found in session. Please log in again.');
-      }
-      
-      console.log('Session validation passed for user:', session.user.email);
-      
-      // Call the Edge Function with explicit authorization
-      console.log('Calling purchase-label Edge Function...');
-      const { data, error } = await supabase.functions.invoke('purchase-label', {
-        body: { 
-          shipmentId, 
-          rateId,
-          orderId: orderId ? String(orderId) : null
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
-
-      if (error) {
-        console.error('Edge Function error:', error);
-        
-        // Check for specific error types
-        if (error.message.includes('Auth session missing') || error.message.includes('Unauthorized')) {
-          throw new Error('Authentication failed. Please log out and log back in.');
-        }
-        
-        throw new Error(error.message || 'Failed to purchase label');
-      }
-
-      if (!data) {
-        throw new Error('No data returned from purchase-label function');
-      }
-
-      console.log('Label purchased successfully:', data);
-      
-      // If we have an orderId, also try to link it to the order directly
-      if (orderId) {
+      // If we have an orderId and the edge function didn't handle linking, try client-side linking
+      if (initialOrderId && result) {
         try {
-          await linkShipmentToOrder(String(orderId), {
-            id: data.id,
-            carrier: data.selected_rate?.carrier || 'Unknown',
-            service: data.selected_rate?.service || 'Standard',
-            trackingNumber: data.tracking_code || 'Pending',
-            trackingUrl: data.tracker?.public_url || '#',
-            cost: parseFloat(data.selected_rate?.rate) || 0
+          console.log('Attempting client-side order linking for order:', initialOrderId);
+          await linkShipmentToOrder(initialOrderId, {
+            id: result.id,
+            carrier: result.selected_rate?.carrier || 'Unknown',
+            service: result.selected_rate?.service || 'Unknown',
+            trackingNumber: result.tracking_code || '',
+            trackingUrl: result.tracker?.public_url || '',
+            cost: parseFloat(result.selected_rate?.rate || '0'),
+            labelUrl: result.postage_label?.label_url
           });
-          console.log(`Successfully linked shipment to order ${orderId}`);
+          console.log('Client-side order linking successful');
         } catch (linkError) {
-          console.error('Error linking shipment to order:', linkError);
-          // Don't fail the whole operation if linking fails
+          console.error('Client-side order linking failed:', linkError);
+          // Don't fail the whole operation for linking issues
         }
       }
       
-      // Store in session storage for the shipments page
-      sessionStorage.setItem('lastPurchasedLabel', JSON.stringify(data));
-      
-      // Show success message
-      if (orderId) {
-        toast.success(`Label purchased and linked to order ${orderId}`);
-      } else {
-        toast.success('Label purchased successfully');
-      }
-      
-      return data;
+      return result;
     } catch (error) {
       console.error('Error purchasing label:', error);
-      toast.error('Failed to purchase shipping label');
+      toast.error('Failed to purchase label');
       throw error;
     }
   };
@@ -145,6 +75,6 @@ export const useShipment = (orderId?: string | null) => {
     setSelectedRate,
     handleShipmentCreated,
     resetShipment,
-    purchaseLabel,
+    purchaseLabel
   };
 };

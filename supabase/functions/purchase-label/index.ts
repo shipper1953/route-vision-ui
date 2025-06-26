@@ -36,7 +36,7 @@ serve(async (req) => {
       return createErrorResponse('Missing required parameters: shipmentId and rateId are required', null, 400);
     }
     
-    console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}` + (orderId ? ` for order ${orderId}` : '') + ` for user ${user.id}`);
+    console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} for user ${user.id}`);
     
     if (!easyPostApiKey) {
       return createErrorResponse('EasyPost API key not configured', 'Please ensure EASYPOST_API_KEY is set in environment variables', 500);
@@ -54,34 +54,38 @@ serve(async (req) => {
     await processWalletPayment(companyId, labelCost, user.id, purchaseResponse.id);
     
     // Save shipment to database with user_id
+    let finalShipmentId = null;
     try {
-      const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, user.id);
-      
-      // If we have an orderId, link the shipment to the order
-      if (orderId && finalShipmentId) {
-        try {
-          const supabaseService = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-            { auth: { persistSession: false } }
-          );
-          
-          const linkSuccess = await linkShipmentToOrder(supabaseService, orderId, finalShipmentId);
-          if (linkSuccess) {
-            console.log(`✓ Successfully linked shipment ${purchaseResponse.id} to order ${orderId}`);
-          } else {
-            console.error(`✗ Failed to link shipment ${purchaseResponse.id} to order ${orderId}`);
-          }
-        } catch (linkError) {
-          console.error('Error linking shipment to order:', linkError);
-          // Don't fail the whole operation if linking fails
-        }
-      } else {
-        console.log('No orderId or finalShipmentId for linking:', { orderId, finalShipmentId });
-      }
+      const saveResult = await saveShipmentToDatabase(purchaseResponse, orderId, user.id);
+      finalShipmentId = saveResult.finalShipmentId;
+      console.log('Shipment saved with ID:', finalShipmentId);
     } catch (dbError) {
       console.error('Database save error:', dbError);
       // Don't fail the label purchase if database save fails
+    }
+    
+    // If we have an orderId, link the shipment to the order
+    if (orderId && finalShipmentId) {
+      try {
+        console.log(`Attempting to link order ${orderId} to shipment ${finalShipmentId}`);
+        const supabaseService = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          { auth: { persistSession: false } }
+        );
+        
+        const linkSuccess = await linkShipmentToOrder(supabaseService, orderId, finalShipmentId);
+        if (linkSuccess) {
+          console.log(`✅ Successfully linked shipment ${purchaseResponse.id} to order ${orderId}`);
+        } else {
+          console.error(`❌ Failed to link shipment ${purchaseResponse.id} to order ${orderId}`);
+        }
+      } catch (linkError) {
+        console.error('Error linking shipment to order:', linkError);
+        // Don't fail the whole operation if linking fails
+      }
+    } else {
+      console.log('Skipping order linking - missing data:', { orderId, finalShipmentId });
     }
     
     // Update shipment status in database using authenticated client
