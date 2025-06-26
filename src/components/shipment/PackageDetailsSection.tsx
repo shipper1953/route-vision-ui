@@ -18,7 +18,7 @@ import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { useCartonization } from "@/hooks/useCartonization";
 import { useItemMaster } from "@/hooks/useItemMaster";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Package, Calculator } from "lucide-react";
 import { toast } from "sonner";
 import { CartonizationEngine, CartonizationResult } from "@/services/cartonization/cartonizationEngine";
@@ -36,10 +36,22 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
   const [boxUtilization, setBoxUtilization] = useState<number>(0);
   const { boxes, createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
+  
+  // Use ref to track if we've already calculated for these items
+  const calculatedItemsRef = useRef<string>('');
+  const hasSetFormValuesRef = useRef(false);
 
   // Calculate recommended box when order items are available
   useEffect(() => {
     if (orderItems && orderItems.length > 0 && masterItems.length > 0) {
+      // Create a unique key for the current items to prevent recalculation
+      const itemsKey = JSON.stringify(orderItems.map(item => item.itemId).sort());
+      
+      // Only calculate if we haven't already calculated for these exact items
+      if (calculatedItemsRef.current === itemsKey) {
+        return;
+      }
+      
       console.log("Calculating recommended box for order items:", orderItems);
       
       const items = createItemsFromOrderData(orderItems, masterItems);
@@ -52,20 +64,34 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
           setRecommendedBox(result.recommendedBox);
           setBoxUtilization(result.utilization);
           
-          // Auto-populate form with recommended box dimensions
-          form.setValue("length", result.recommendedBox.length);
-          form.setValue("width", result.recommendedBox.width);
-          form.setValue("height", result.recommendedBox.height);
+          // Only auto-populate form once to prevent infinite loop
+          if (!hasSetFormValuesRef.current) {
+            form.setValue("length", result.recommendedBox.length);
+            form.setValue("width", result.recommendedBox.width);
+            form.setValue("height", result.recommendedBox.height);
+            
+            // Calculate total weight from items
+            const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+            form.setValue("weight", totalWeight);
+            
+            hasSetFormValuesRef.current = true;
+            toast.success(`Recommended box: ${result.recommendedBox.name}`);
+          }
           
-          // Calculate total weight from items
-          const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-          form.setValue("weight", totalWeight);
-          
-          toast.success(`Recommended box: ${result.recommendedBox.name}`);
+          // Mark these items as calculated
+          calculatedItemsRef.current = itemsKey;
         }
       }
     }
-  }, [orderItems, masterItems, boxes, createItemsFromOrderData, form]);
+  }, [orderItems, masterItems, boxes, createItemsFromOrderData]); // Removed form from dependencies
+
+  // Reset when orderItems change significantly
+  useEffect(() => {
+    const itemsKey = JSON.stringify(orderItems.map(item => item.itemId).sort());
+    if (calculatedItemsRef.current !== itemsKey) {
+      hasSetFormValuesRef.current = false;
+    }
+  }, [orderItems]);
   
   const handleOptimizePackaging = () => {
     console.log("Optimize packaging clicked");
