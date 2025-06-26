@@ -1,36 +1,16 @@
 
-import { BoxInventoryManager } from "@/components/cartonization/BoxInventoryManager";
 import { useCartonization } from "@/hooks/useCartonization";
 import { useBoxOrderStats } from "@/hooks/useBoxOrderStats";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const CartonizationSettings = () => {
-  const { boxes, setBoxes } = useCartonization();
   const { boxStats, loading } = useBoxOrderStats();
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-tms-blue" />
-            Tornado Pack
-          </CardTitle>
-          <CardDescription>
-            Smart packaging recommendations and inventory management
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            View your packaging inventory ranked by demand from open orders. The cartonization 
-            engine analyzes your orders and recommends the most cost-effective packaging options.
-          </p>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -61,7 +41,7 @@ export const CartonizationSettings = () => {
             <div className="space-y-4">
               {boxStats.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
-                  No box inventory found. Add some boxes below to get started.
+                  No box inventory found. Add some boxes in the Box Inventory Management tab to get started.
                 </p>
               ) : (
                 boxStats.map((boxStat, index) => (
@@ -101,11 +81,6 @@ export const CartonizationSettings = () => {
           )}
         </CardContent>
       </Card>
-      
-      <BoxInventoryManager 
-        boxes={boxes} 
-        onBoxesChange={setBoxes} 
-      />
     </div>
   );
 };

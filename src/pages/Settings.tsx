@@ -2,14 +2,14 @@
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TmsLayout } from "@/components/layout/TmsLayout";
-import { ProfileForm } from "@/components/settings/ProfileForm";
-import { NotificationsForm } from "@/components/settings/NotificationsForm";
-import { SecurityPlaceholder } from "@/components/settings/SecurityPlaceholder";
 import { CartonizationSettings } from "@/components/settings/CartonizationSettings";
+import { BoxInventoryManager } from "@/components/cartonization/BoxInventoryManager";
+import { useCartonization } from "@/hooks/useCartonization";
 
 const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'box-demand';
+  const { boxes, setBoxes } = useCartonization();
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
@@ -45,10 +45,10 @@ const Settings = () => {
           </TabsContent>
           
           <TabsContent value="box-inventory" className="space-y-4">
-            <div className="text-center py-8">
-              <h3 className="text-lg font-semibold mb-2">Box Inventory Management</h3>
-              <p className="text-muted-foreground">Manage your packaging inventory and stock levels</p>
-            </div>
+            <BoxInventoryManager 
+              boxes={boxes} 
+              onBoxesChange={setBoxes} 
+            />
           </TabsContent>
           
           <TabsContent value="packaging-rules" className="space-y-4">
