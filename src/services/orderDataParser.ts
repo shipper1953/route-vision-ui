@@ -16,7 +16,7 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
     console.log("Items is already an array:", rawItems);
     return rawItems.map((item: any) => ({
       itemId: item.itemId || item.id || `item-${Math.random()}`,
-      quantity: item.quantity || 1,
+      quantity: item.quantity || item.count || 1,
       unitPrice: item.unitPrice || item.price,
       name: item.name || item.description,
       sku: item.sku,
@@ -73,8 +73,26 @@ export const parseParcelInfo = (qboidData: any) => {
 };
 
 export const parseShippingAddress = (addressData: any) => {
+  // Check if addressData is a string that needs parsing
+  if (typeof addressData === 'string') {
+    try {
+      addressData = JSON.parse(addressData);
+    } catch (error) {
+      console.error("Error parsing address JSON:", error);
+      return {
+        street1: "",
+        street2: "",
+        city: "",
+        state: "",
+        zip: "",
+        country: "US"
+      };
+    }
+  }
+
+  // Now check if it's a valid object with required fields
   if (!addressData || typeof addressData !== 'object') {
-    console.warn("Invalid address data:", addressData);
+    console.warn("Invalid address data - not an object:", addressData);
     return {
       street1: "",
       street2: "",
@@ -111,7 +129,7 @@ export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
   console.log("Parsed items for order:", supabaseOrder.id, parsedItems);
 
   return {
-    id: supabaseOrder.id,
+    id: String(supabaseOrder.id), // Always convert to string for consistency
     customerName: supabaseOrder.customer_name || "",
     customerCompany: supabaseOrder.customer_company || "",
     customerPhone: supabaseOrder.customer_phone || "",
