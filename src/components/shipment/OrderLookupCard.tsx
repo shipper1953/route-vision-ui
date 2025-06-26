@@ -36,6 +36,7 @@ export const OrderLookupCard = ({ setOrderLookupComplete, setOrderItems }: Order
 
   const handleOrderSelected = async (order: OrderData) => {
     console.log("Order selected from autocomplete:", order);
+    console.log("Order items in handleOrderSelected:", order.items);
     
     // Set the orderBarcode field to display the order ID
     form.setValue("orderBarcode", order.id);
@@ -70,16 +71,16 @@ export const OrderLookupCard = ({ setOrderLookupComplete, setOrderItems }: Order
     form.setValue("orderId", order.id);
     form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
     
-    // Pass order items to parent component if items exist
-    if (order.items && Array.isArray(order.items)) {
-      console.log("OrderLookupCard - Setting order items for packaging optimization:", order.items);
+    // Pass order items to parent component - CRITICAL FIX
+    console.log("OrderLookupCard handleOrderSelected - Raw order.items:", order.items);
+    console.log("OrderLookupCard handleOrderSelected - Type of order.items:", typeof order.items);
+    console.log("OrderLookupCard handleOrderSelected - Array.isArray(order.items):", Array.isArray(order.items));
+    
+    if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+      console.log("OrderLookupCard handleOrderSelected - Setting order items for packaging optimization:", order.items);
       setOrderItems(order.items);
     } else {
-      console.log("OrderLookupCard - No valid items array found in order:", {
-        hasItems: !!order.items,
-        itemsType: typeof order.items,
-        itemsValue: order.items
-      });
+      console.log("OrderLookupCard handleOrderSelected - No valid items array found in order, setting empty array");
       setOrderItems([]);
     }
     

@@ -45,6 +45,7 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
         }
         
         console.log("Order loaded from URL:", order);
+        console.log("Order items found in URL load:", order.items);
         
         // Set the orderBarcode field to display the order ID
         form.setValue("orderBarcode", order.id);
@@ -83,12 +84,16 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
         form.setValue("orderId", order.id);
         form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
         
-        // Pass order items to parent component if items exist
-        if (order.items && Array.isArray(order.items)) {
-          console.log("OrderLookupSection - Setting order items for packaging optimization:", order.items);
+        // Pass order items to parent component - CRITICAL FIX
+        console.log("OrderLookupSection URL load - Raw order.items:", order.items);
+        console.log("OrderLookupSection URL load - Type of order.items:", typeof order.items);
+        console.log("OrderLookupSection URL load - Array.isArray(order.items):", Array.isArray(order.items));
+        
+        if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+          console.log("OrderLookupSection URL load - Setting order items for packaging optimization:", order.items);
           setOrderItems(order.items);
         } else {
-          console.log("OrderLookupSection - No valid items array found in order:", order.items);
+          console.log("OrderLookupSection URL load - No valid items array found in order, setting empty array");
           setOrderItems([]);
         }
         
