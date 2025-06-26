@@ -9,7 +9,7 @@ import { ShipmentForm } from "@/types/shipment";
 
 interface OrderLookupSectionProps {
   setOrderLookupComplete: (value: boolean) => void;
-  setOrderItems?: (items: any[]) => void;
+  setOrderItems: (items: any[]) => void;
 }
 
 export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: OrderLookupSectionProps) => {
@@ -84,9 +84,12 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
         form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
         
         // Pass order items to parent component if items exist
-        if (order.items && Array.isArray(order.items) && setOrderItems) {
-          console.log("Setting order items for packaging optimization:", order.items);
+        if (order.items && Array.isArray(order.items)) {
+          console.log("OrderLookupSection - Setting order items for packaging optimization:", order.items);
           setOrderItems(order.items);
+        } else {
+          console.log("OrderLookupSection - No valid items array found in order:", order.items);
+          setOrderItems([]);
         }
         
         toast.success("Order information loaded successfully");

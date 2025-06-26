@@ -27,7 +27,7 @@ import { OrderData } from "@/types/orderTypes";
 
 interface OrderLookupCardProps {
   setOrderLookupComplete: (value: boolean) => void;
-  setOrderItems?: (items: any[]) => void;
+  setOrderItems: (items: any[]) => void;
 }
 
 export const OrderLookupCard = ({ setOrderLookupComplete, setOrderItems }: OrderLookupCardProps) => {
@@ -70,16 +70,17 @@ export const OrderLookupCard = ({ setOrderLookupComplete, setOrderItems }: Order
     form.setValue("orderId", order.id);
     form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
     
-    // Pass order items to parent component if items exist and setOrderItems is available
-    if (order.items && Array.isArray(order.items) && setOrderItems) {
+    // Pass order items to parent component if items exist
+    if (order.items && Array.isArray(order.items)) {
       console.log("OrderLookupCard - Setting order items for packaging optimization:", order.items);
       setOrderItems(order.items);
     } else {
-      console.log("OrderLookupCard - No items found or setOrderItems not available:", {
-        hasItems: order.items && Array.isArray(order.items),
-        itemsLength: Array.isArray(order.items) ? order.items.length : 'not array',
-        hasSetOrderItems: !!setOrderItems
+      console.log("OrderLookupCard - No valid items array found in order:", {
+        hasItems: !!order.items,
+        itemsType: typeof order.items,
+        itemsValue: order.items
       });
+      setOrderItems([]);
     }
     
     toast.success("Order information loaded");
