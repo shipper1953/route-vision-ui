@@ -7,6 +7,14 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
   try {
     console.log(`Fetching order by ID: ${orderId}`);
     
+    // Convert orderId to number since the database id column is bigint
+    const orderIdNumber = parseInt(orderId, 10);
+    
+    if (isNaN(orderIdNumber)) {
+      console.error(`Invalid order ID format: ${orderId}`);
+      return null;
+    }
+    
     const { data: order, error } = await supabase
       .from('orders')
       .select(`
@@ -19,7 +27,7 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
           order_id
         )
       `)
-      .eq('id', orderId)
+      .eq('id', orderIdNumber)
       .maybeSingle();
 
     if (error) {
