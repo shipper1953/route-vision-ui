@@ -16,6 +16,7 @@ interface ShipmentFormProps {
 export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   const [loading, setLoading] = useState(false);
   const [orderLookupComplete, setOrderLookupComplete] = useState(false);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
   const { getDefaultShippingAddress, warehouseAddress } = useDefaultAddressValues();
   
   const form = useForm<ShipmentFormType>({
@@ -80,10 +81,13 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   
   return (
     <FormProvider {...form}>
-      <OrderLookupSection setOrderLookupComplete={setOrderLookupComplete} />
+      <OrderLookupSection 
+        setOrderLookupComplete={setOrderLookupComplete} 
+        setOrderItems={setOrderItems}
+      />
       
       <form onSubmit={form.handleSubmit(() => {})} className="space-y-8">
-        <ShipmentFormTabs />
+        <ShipmentFormTabs orderItems={orderItems} />
         
         <ShipmentFormSubmission 
           loading={loading}

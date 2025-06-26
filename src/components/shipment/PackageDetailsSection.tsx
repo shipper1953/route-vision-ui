@@ -16,48 +16,24 @@ import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { useCartonization } from "@/hooks/useCartonization";
 import { useItemMaster } from "@/hooks/useItemMaster";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Package, Calculator } from "lucide-react";
 import { toast } from "sonner";
-import { fetchOrderById } from "@/services/orderFetchService";
 
-export const PackageDetailsSection = () => {
+interface PackageDetailsSectionProps {
+  orderItems?: any[];
+}
+
+export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSectionProps) => {
   const form = useFormContext<ShipmentForm>();
   const orderId = form.getValues("orderId");
   const [showCartonization, setShowCartonization] = useState(false);
-  const [orderItems, setOrderItems] = useState<any[]>([]);
   const { boxes, createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
   
-  // Load order items when component mounts or orderId changes
-  useEffect(() => {
-    const loadOrderItems = async () => {
-      if (orderId) {
-        try {
-          console.log("Loading order items for cartonization:", orderId);
-          const orderData = await fetchOrderById(orderId);
-          if (orderData && orderData.items && Array.isArray(orderData.items)) {
-            console.log("Order items loaded:", orderData.items);
-            setOrderItems(orderData.items);
-          } else {
-            console.log("No items found or items is not an array:", orderData?.items);
-            setOrderItems([]);
-          }
-        } catch (error) {
-          console.error("Error loading order items:", error);
-          setOrderItems([]);
-        }
-      } else {
-        setOrderItems([]);
-      }
-    };
-    
-    loadOrderItems();
-  }, [orderId]);
-  
   const handleOptimizePackaging = () => {
     console.log("Optimize packaging clicked");
-    console.log("Order items:", orderItems);
+    console.log("Order items from props:", orderItems);
     console.log("Master items:", masterItems);
     
     let items: any[] = [];
@@ -111,6 +87,11 @@ export const PackageDetailsSection = () => {
           <div>
             <CardTitle>Package Details</CardTitle>
             <CardDescription>Enter the package dimensions and weight</CardDescription>
+            {orderItems.length > 0 && (
+              <p className="text-sm text-green-600 mt-1">
+                {orderItems.length} items loaded from order for packaging optimization
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button

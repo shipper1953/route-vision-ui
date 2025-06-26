@@ -29,6 +29,20 @@ export interface ShipmentInfo {
   cost?: number | string;
 }
 
+export interface OrderItem {
+  itemId: string;
+  quantity: number;
+  unitPrice?: number;
+  name?: string;
+  sku?: string;
+  dimensions?: {
+    length: number;
+    width: number;
+    height: number;
+    weight: number;
+  };
+}
+
 export interface OrderData {
   id: string;
   customerName: string;
@@ -38,7 +52,7 @@ export interface OrderData {
   orderDate: string;
   requiredDeliveryDate: string;
   status: string;
-  items: number;
+  items: OrderItem[] | number; // Can be array of items or just a count
   value: string;
   shippingAddress: OrderAddress;
   parcelInfo?: ParcelInfo; // This would come from the Qboid scanning system

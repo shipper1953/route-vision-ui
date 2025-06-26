@@ -9,9 +9,10 @@ import { ShipmentForm } from "@/types/shipment";
 
 interface OrderLookupSectionProps {
   setOrderLookupComplete: (value: boolean) => void;
+  setOrderItems?: (items: any[]) => void;
 }
 
-export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectionProps) => {
+export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: OrderLookupSectionProps) => {
   const [loading, setLoading] = useState(false);
   const form = useFormContext<ShipmentForm>();
   const [searchParams] = useSearchParams();
@@ -82,6 +83,12 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
         form.setValue("orderId", order.id);
         form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
         
+        // Pass order items to parent component if items exist
+        if (order.items && Array.isArray(order.items) && setOrderItems) {
+          console.log("Setting order items for packaging optimization:", order.items);
+          setOrderItems(order.items);
+        }
+        
         toast.success("Order information loaded successfully");
         setOrderLookupComplete(true);
       } catch (error) {
@@ -95,7 +102,7 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
     }
     
     loadOrderFromId();
-  }, [orderIdFromUrl, form, setOrderLookupComplete]);
+  }, [orderIdFromUrl, form, setOrderLookupComplete, setOrderItems]);
   
   // Reset the loaded order ref when orderIdFromUrl changes to a different order
   useEffect(() => {
@@ -106,6 +113,9 @@ export const OrderLookupSection = ({ setOrderLookupComplete }: OrderLookupSectio
   }, [orderIdFromUrl]);
   
   return (
-    <OrderLookupCard setOrderLookupComplete={setOrderLookupComplete} />
+    <OrderLookupCard 
+      setOrderLookupComplete={setOrderLookupComplete} 
+      setOrderItems={setOrderItems}
+    />
   );
 };

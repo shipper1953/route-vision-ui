@@ -27,9 +27,10 @@ import { OrderData } from "@/types/orderTypes";
 
 interface OrderLookupCardProps {
   setOrderLookupComplete: (value: boolean) => void;
+  setOrderItems?: (items: any[]) => void;
 }
 
-export const OrderLookupCard = ({ setOrderLookupComplete }: OrderLookupCardProps) => {
+export const OrderLookupCard = ({ setOrderLookupComplete, setOrderItems }: OrderLookupCardProps) => {
   const [lookupLoading, setLookupLoading] = useState(false);
   const form = useFormContext<ShipmentForm>();
 
@@ -68,6 +69,12 @@ export const OrderLookupCard = ({ setOrderLookupComplete }: OrderLookupCardProps
     // Set order details
     form.setValue("orderId", order.id);
     form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
+    
+    // Pass order items to parent component if items exist
+    if (order.items && Array.isArray(order.items) && setOrderItems) {
+      console.log("Setting order items for packaging optimization:", order.items);
+      setOrderItems(order.items);
+    }
     
     toast.success("Order information loaded");
     setOrderLookupComplete(true);
