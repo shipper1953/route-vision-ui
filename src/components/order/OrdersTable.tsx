@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,11 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Search, Filter, Download, Eye, Truck, Package } from "lucide-react";
+import { CalendarIcon, Search, Filter, Download, Eye, Truck, Package, Box } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { OrderData, OrderItem } from "@/types/orderTypes";
 import { useNavigate } from "react-router-dom";
+import { useCartonization } from "@/hooks/useCartonization";
+import { CartonizationEngine } from "@/services/cartonization/cartonizationEngine";
 
 interface OrdersTableProps {
   orders: OrderData[];
@@ -39,6 +42,29 @@ export const OrdersTable = ({ orders, loading = false }: OrdersTableProps) => {
   const [dateTo, setDateTo] = useState<Date>();
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const navigate = useNavigate();
+  const { boxes, createItemsFromOrderData } = useCartonization();
+
+  // Function to get recommended box for an order
+  const getRecommendedBox = (order: OrderData) => {
+    if (order.status !== 'ready_to_ship') return null;
+    
+    // Check if order.items is an array and has items
+    if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+      // Create items from order data (using empty master items array for now)
+      const items = createItemsFromOrderData(order.items, []);
+      
+      if (items.length > 0) {
+        const engine = new CartonizationEngine(boxes);
+        const result = engine.calculateOptimalBox(items);
+        
+        if (result && result.recommendedBox) {
+          return result.recommendedBox;
+        }
+      }
+    }
+    
+    return null;
+  };
 
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
@@ -130,6 +156,7 @@ export const OrdersTable = ({ orders, loading = false }: OrdersTableProps) => {
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="ready_to_ship">Ready to Ship</SelectItem>
                 <SelectItem value="shipped">Shipped</SelectItem>
                 <SelectItem value="delivered">Delivered</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -204,67 +231,87 @@ export const OrdersTable = ({ orders, loading = false }: OrdersTableProps) => {
                   <TableHead>Items</TableHead>
                   <TableHead>Value</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Recommended Box</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No orders found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredOrders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.id}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{order.customerName}</div>
-                          {order.customerEmail && (
-                            <div className="text-sm text-muted-foreground">{order.customerEmail}</div>
+                  filteredOrders.map((order) => {
+                    const recommendedBox = getRecommendedBox(order);
+                    
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">{order.id}</TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{order.customerName}</div>
+                            {order.customerEmail && (
+                              <div className="text-sm text-muted-foreground">{order.customerEmail}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{format(new Date(order.orderDate), "MMM dd, yyyy")}</TableCell>
+                        <TableCell>{renderOrderItems(order.items)}</TableCell>
+                        <TableCell>{order.value}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(order.status)}>
+                            {order.status.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {recommendedBox ? (
+                            <div className="flex items-center gap-2">
+                              <Box className="h-4 w-4 text-tms-blue" />
+                              <div className="text-sm">
+                                <div className="font-medium">{recommendedBox.name}</div>
+                                <div className="text-muted-foreground">
+                                  {recommendedBox.length}" × {recommendedBox.width}" × {recommendedBox.height}"
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{format(new Date(order.orderDate), "MMM dd, yyyy")}</TableCell>
-                      <TableCell>{renderOrderItems(order.items)}</TableCell>
-                      <TableCell>{order.value}</TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(order.status)}>
-                          {order.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate(`/orders/${order.id}`)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate(`/orders/${order.id}/edit`)}
-                          >
-                            <Package className="h-4 w-4" />
-                          </Button>
-                          {order.status !== 'shipped' && order.status !== 'delivered' && (
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => navigate('/shipments/create', { 
-                                state: { orderId: order.id } 
-                              })}
+                              onClick={() => navigate(`/orders/${order.id}`)}
                             >
-                              <Truck className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(`/orders/${order.id}/edit`)}
+                            >
+                              <Package className="h-4 w-4" />
+                            </Button>
+                            {order.status !== 'shipped' && order.status !== 'delivered' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate('/shipments/create', { 
+                                  state: { orderId: order.id } 
+                                })}
+                              >
+                                <Truck className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
