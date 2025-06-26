@@ -38,7 +38,8 @@ export const useBoxOrderStats = () => {
 
         // Calculate recommendations for each open order
         for (const order of openOrders) {
-          if (order.items && order.items.length > 0) {
+          // Check if order.items is an array and has items
+          if (order.items && Array.isArray(order.items) && order.items.length > 0) {
             // Create items from order data (using empty master items array for now)
             const items = createItemsFromOrderData(order.items, []);
             
