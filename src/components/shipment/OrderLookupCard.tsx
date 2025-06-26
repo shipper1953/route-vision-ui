@@ -70,10 +70,16 @@ export const OrderLookupCard = ({ setOrderLookupComplete, setOrderItems }: Order
     form.setValue("orderId", order.id);
     form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
     
-    // Pass order items to parent component if items exist
+    // Pass order items to parent component if items exist and setOrderItems is available
     if (order.items && Array.isArray(order.items) && setOrderItems) {
-      console.log("Setting order items for packaging optimization:", order.items);
+      console.log("OrderLookupCard - Setting order items for packaging optimization:", order.items);
       setOrderItems(order.items);
+    } else {
+      console.log("OrderLookupCard - No items found or setOrderItems not available:", {
+        hasItems: order.items && Array.isArray(order.items),
+        itemsLength: Array.isArray(order.items) ? order.items.length : 'not array',
+        hasSetOrderItems: !!setOrderItems
+      });
     }
     
     toast.success("Order information loaded");

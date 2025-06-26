@@ -78,6 +78,11 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       console.log("Warehouse address not yet available:", warehouseAddress);
     }
   }, [warehouseAddress, form, getDefaultShippingAddress]);
+
+  // Debug log to track orderItems state changes
+  useEffect(() => {
+    console.log("ShipmentForm - orderItems updated:", orderItems);
+  }, [orderItems]);
   
   return (
     <FormProvider {...form}>
