@@ -150,7 +150,7 @@ export const PackagingAlgorithm = ({ parameters, onParametersChange }: Packaging
             <Slider
               value={[parameters.dimensionalWeightFactor]}
               onValueChange={(value) => handleSliderChange('dimensionalWeightFactor', value)}
-              max={200
+              max={200}
               min={100}
               step={1}
               className="w-full"
