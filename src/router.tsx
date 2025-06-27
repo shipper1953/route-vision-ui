@@ -8,6 +8,7 @@ import Signup from "@/pages/Signup";
 import Orders from "@/pages/Orders";
 import CreateOrder from "@/pages/CreateOrder";
 import EditOrder from "@/pages/EditOrder";
+import OrderDetails from "@/pages/OrderDetails";
 import Shipments from "@/pages/Shipments";
 import CreateShipment from "@/pages/CreateShipment";
 import ItemMaster from "@/pages/ItemMaster";
@@ -39,6 +40,10 @@ const router = createBrowserRouter([
   {
     path: "/orders/create",
     element: <CreateOrder />,
+  },
+  {
+    path: "/orders/:id",
+    element: <OrderDetails />,
   },
   {
     path: "/orders/:id/edit",
