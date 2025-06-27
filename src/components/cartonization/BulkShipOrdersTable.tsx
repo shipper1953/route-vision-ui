@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,11 +19,20 @@ interface OrderForShipping {
   recommendedService?: string;
 }
 
+interface ShippingResult {
+  orderId: string;
+  success: boolean;
+  trackingNumber?: string;
+  labelUrl?: string;
+  cost?: number;
+  error?: string;
+}
+
 interface BulkShipOrdersTableProps {
   boxName: string;
   boxDimensions: string;
   orders: OrderForShipping[];
-  onBulkShip: (selectedOrders: OrderForShipping[]) => Promise<any>;
+  onBulkShip: (selectedOrders: OrderForShipping[]) => Promise<ShippingResult[]>;
 }
 
 export const BulkShipOrdersTable = ({ boxName, boxDimensions, orders, onBulkShip }: BulkShipOrdersTableProps) => {
@@ -64,23 +74,43 @@ export const BulkShipOrdersTable = ({ boxName, boxDimensions, orders, onBulkShip
     setIsShipping(true);
     try {
       const ordersToShip = orders.filter(order => selectedOrders.has(order.id));
-      const result = await onBulkShip(ordersToShip);
+      console.log('Calling bulk ship for orders:', ordersToShip.map(o => o.id));
       
-      // Mock shipping labels for demonstration
-      // In a real implementation, this would come from the shipping service response
-      const mockLabels = ordersToShip.map(order => ({
-        orderId: order.id,
-        labelUrl: "data:application/pdf;base64,JVBERi0xLjQKJeLjz9MKNSAwIG9iago8PAovU3VidHlwZSAvRm9ybQovQ...", // Mock PDF
-        trackingNumber: `1Z${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-        carrier: "UPS",
-        service: order.recommendedService || "Ground"
-      }));
+      const results = await onBulkShip(ordersToShip);
+      console.log('Bulk shipping results:', results);
+      
+      // Filter successful shipments and create label data
+      const successfulResults = results.filter(result => result.success && result.labelUrl);
+      
+      if (successfulResults.length > 0) {
+        const labels = successfulResults.map(result => {
+          const order = ordersToShip.find(o => o.id === result.orderId);
+          return {
+            orderId: result.orderId,
+            labelUrl: result.labelUrl!,
+            trackingNumber: result.trackingNumber || 'N/A',
+            carrier: 'UPS', // This would come from the shipping service response
+            service: order?.recommendedService || 'Ground'
+          };
+        });
 
-      setShipmentLabels(mockLabels);
-      setShowLabelsDialog(true);
+        setShipmentLabels(labels);
+        setShowLabelsDialog(true);
+        
+        toast.success(`Successfully created ${successfulResults.length} shipping labels`);
+      }
       
-      toast.success(`Successfully initiated shipping for ${ordersToShip.length} orders`);
-      setSelectedOrders(new Set()); // Clear selection after successful shipping
+      const failedResults = results.filter(result => !result.success);
+      if (failedResults.length > 0) {
+        toast.error(`Failed to ship ${failedResults.length} orders`);
+        failedResults.forEach(result => {
+          console.error(`Order ${result.orderId} failed:`, result.error);
+        });
+      }
+      
+      // Clear selection after processing
+      setSelectedOrders(new Set());
+      
     } catch (error) {
       console.error('Bulk shipping error:', error);
       toast.error("Failed to initiate bulk shipping. Please try again.");

@@ -4,6 +4,8 @@ import { fetchOrders } from "@/services/orderService";
 import { useCartonization } from "@/hooks/useCartonization";
 import { CartonizationEngine } from "@/services/cartonization/cartonizationEngine";
 import { Box } from "@/services/cartonization/cartonizationEngine";
+import { ShipmentService } from "@/services/easypost/shipmentService";
+import { LabelService } from "@/services/easypost/labelService";
 import { toast } from "sonner";
 
 interface OrderForShipping {
@@ -19,6 +21,15 @@ interface OrderForShipping {
 interface BoxShippingGroup {
   box: Box;
   orders: OrderForShipping[];
+}
+
+interface ShippingResult {
+  orderId: string;
+  success: boolean;
+  trackingNumber?: string;
+  labelUrl?: string;
+  cost?: number;
+  error?: string;
 }
 
 export const useBulkShipping = () => {
@@ -113,29 +124,119 @@ export const useBulkShipping = () => {
     loadShippingGroups();
   }, [boxes]);
 
-  const handleBulkShip = async (orders: OrderForShipping[]) => {
-    console.log('Bulk shipping orders:', orders);
+  const handleBulkShip = async (orders: OrderForShipping[]): Promise<ShippingResult[]> => {
+    console.log('Starting bulk shipping for orders:', orders.map(o => o.id));
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const shipmentService = new ShipmentService(''); // Will use edge functions
+    const labelService = new LabelService(''); // Will use edge functions
+    const results: ShippingResult[] = [];
+
+    for (const order of orders) {
+      try {
+        console.log(`Processing order ${order.id}...`);
+        
+        // Create shipment data
+        const shipmentData = {
+          to_address: {
+            name: order.customerName,
+            street1: order.shippingAddress?.street1 || order.shippingAddress?.address1 || '',
+            street2: order.shippingAddress?.street2 || order.shippingAddress?.address2 || '',
+            city: order.shippingAddress?.city || '',
+            state: order.shippingAddress?.state || '',
+            zip: order.shippingAddress?.zip || order.shippingAddress?.zipCode || '',
+            country: order.shippingAddress?.country || 'US',
+            phone: order.shippingAddress?.phone || ''
+          },
+          from_address: {
+            name: 'Ship Tornado',
+            company: 'Ship Tornado',
+            street1: '123 Warehouse St',
+            city: 'Austin',
+            state: 'TX',
+            zip: '78701',
+            country: 'US',
+            phone: '555-0123'
+          },
+          parcel: {
+            length: order.recommendedBox.length,
+            width: order.recommendedBox.width,
+            height: order.recommendedBox.height,
+            weight: Math.max(1, order.items.reduce((total, item) => {
+              const itemWeight = parseFloat(item.weight?.toString() || '0');
+              const quantity = parseInt(item.quantity?.toString() || '1');
+              return total + (itemWeight * quantity);
+            }, 0))
+          },
+          options: {
+            label_format: 'PDF'
+          }
+        };
+
+        // Create shipment
+        const shipmentResponse = await shipmentService.createShipment(shipmentData);
+        console.log(`Shipment created for order ${order.id}:`, shipmentResponse.id);
+
+        // Find best rate based on recommended service
+        let selectedRate = null;
+        const allRates = [...(shipmentResponse.rates || []), ...(shipmentResponse.smartRates || [])];
+        
+        if (allRates.length > 0) {
+          // Try to find rate matching recommended service
+          selectedRate = allRates.find(rate => 
+            rate.service?.toLowerCase().includes(order.recommendedService?.toLowerCase() || 'ground')
+          );
+          
+          // If no matching service, use cheapest rate
+          if (!selectedRate) {
+            selectedRate = allRates.reduce((cheapest, rate) => 
+              parseFloat(rate.rate) < parseFloat(cheapest.rate) ? rate : cheapest
+            );
+          }
+        }
+
+        if (!selectedRate) {
+          throw new Error('No shipping rates available');
+        }
+
+        // Purchase label
+        const labelResponse = await labelService.purchaseLabel(
+          shipmentResponse.id,
+          selectedRate.id,
+          order.id
+        );
+
+        console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
+
+        results.push({
+          orderId: order.id,
+          success: true,
+          trackingNumber: labelResponse.tracking_code,
+          labelUrl: labelResponse.postage_label?.label_url,
+          cost: parseFloat(selectedRate.rate)
+        });
+
+      } catch (error) {
+        console.error(`Error processing order ${order.id}:`, error);
+        results.push({
+          orderId: order.id,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    const successfulShipments = results.filter(r => r.success);
+    const failedShipments = results.filter(r => !r.success);
+
+    if (successfulShipments.length > 0) {
+      toast.success(`Successfully shipped ${successfulShipments.length} orders`);
+    }
     
-    // In a real application, you would:
-    // 1. Create shipments for each order using your shipping service
-    // 2. Purchase shipping labels
-    // 3. Update order statuses
-    // 4. Return the shipping results with label URLs
-    
-    // Mock successful shipping result
-    const shippingResults = orders.map(order => ({
-      orderId: order.id,
-      success: true,
-      trackingNumber: `1Z${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      labelUrl: `https://example.com/label/${order.id}.pdf`, // This would be the actual label URL
-      cost: 8.50 + Math.random() * 5 // Mock shipping cost
-    }));
-    
-    toast.success(`Bulk shipping initiated for ${orders.length} orders`);
-    return shippingResults;
+    if (failedShipments.length > 0) {
+      toast.error(`Failed to ship ${failedShipments.length} orders`);
+    }
+
+    return results;
   };
 
   return {
