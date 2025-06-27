@@ -6,7 +6,7 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
   let foundOrder = null;
   
   // Strategy 1: Try exact match on order_id field
-  console.log(`Strategy 1: Searching for order with exact order_id: "${orderId}"`);
+  console.log(`📝 Strategy 1: Searching for order with exact order_id: "${orderId}"`);
   const { data: orderByOrderId, error: searchError1 } = await supabaseClient
     .from('orders')
     .select('id, order_id, customer_name, status')
@@ -22,7 +22,7 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
   
   // Strategy 2: If not found and orderId is numeric, try by id field
   if (!foundOrder && !isNaN(Number(orderId))) {
-    console.log(`Strategy 2: Searching for order with numeric id: ${orderId}`);
+    console.log(`📝 Strategy 2: Searching for order with numeric id: ${orderId}`);
     const { data: orderById, error: searchError2 } = await supabaseClient
       .from('orders')
       .select('id, order_id, customer_name, status')
@@ -39,7 +39,7 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
   
   // Strategy 3: Try case-insensitive search on order_id
   if (!foundOrder) {
-    console.log(`Strategy 3: Searching for order with case-insensitive order_id: "${orderId}"`);
+    console.log(`📝 Strategy 3: Searching for order with case-insensitive order_id: "${orderId}"`);
     const { data: orderByCaseInsensitive, error: searchError3 } = await supabaseClient
       .from('orders')
       .select('id, order_id, customer_name, status')
@@ -71,7 +71,7 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
         status: 'shipped'
       })
       .eq('id', foundOrder.id)
-      .select();
+      .select('id, order_id, status, shipment_id');
     
     if (!updateError && updatedOrder && updatedOrder.length > 0) {
       console.log(`✅ Successfully linked order ${orderId} to shipment ${finalShipmentId}:`, updatedOrder[0]);
@@ -86,9 +86,10 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
     const { data: debugOrders } = await supabaseClient
       .from('orders')
       .select('id, order_id, customer_name, status')
+      .order('id', { ascending: false })
       .limit(10);
     
-    console.log('📋 Available orders in database:');
+    console.log('📋 Recent orders in database:');
     if (debugOrders && debugOrders.length > 0) {
       debugOrders.forEach(order => {
         console.log(`  - ID: ${order.id}, order_id: "${order.order_id}", customer: ${order.customer_name}, status: ${order.status}`);
