@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -27,11 +26,9 @@ import { useAuth } from "@/context";
 export const TmsSidebar = () => {
   const { isCollapsed, toggleSidebar, sidebarRef } = useSidebar();
   const { userProfile } = useAuth();
-  const location = useLocation();
 
   const isAdmin = userProfile?.role === 'company_admin';
   const isSuperAdmin = userProfile?.role === 'super_admin';
-  const isItemMasterPage = location.pathname === '/item-master';
 
   return (
     <div
@@ -41,26 +38,19 @@ export const TmsSidebar = () => {
         isCollapsed ? "w-16" : "w-64"
       )}
     >
-      {/* Header with conditional logo - clickable to toggle */}
+      {/* Header with Ship Tornado Logo - clickable to toggle */}
       <div 
         className="p-4 border-b border-sidebar-border flex items-center justify-center cursor-pointer hover:bg-sidebar-accent/20 transition-colors"
         onClick={toggleSidebar}
       >
         <div className="flex items-center gap-3">
-          {isItemMasterPage ? (
-            <Package 
-              size={24} 
-              className="text-sidebar-foreground flex-shrink-0" 
-            />
-          ) : (
-            <ShipTornadoLogo 
-              size={24} 
-              className="text-sidebar-foreground flex-shrink-0" 
-            />
-          )}
+          <ShipTornadoLogo 
+            size={24} 
+            className="text-sidebar-foreground flex-shrink-0" 
+          />
           {!isCollapsed && (
             <span className="text-lg font-semibold text-sidebar-foreground">
-              {isItemMasterPage ? "Item Master" : "Ship Tornado"}
+              Ship Tornado
             </span>
           )}
         </div>
