@@ -1,3 +1,4 @@
+
 import { 
   Card, 
   CardHeader, 
@@ -6,6 +7,7 @@ import {
   CardContent
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { DimensionsSection } from "./package/DimensionsSection";
 import { WeightSection } from "./package/WeightSection";
 import { QboidStatusNotification } from "./package/QboidStatusNotification";
@@ -18,7 +20,7 @@ import { ShipmentForm } from "@/types/shipment";
 import { useCartonization } from "@/hooks/useCartonization";
 import { useItemMaster } from "@/hooks/useItemMaster";
 import { useState, useEffect, useRef } from "react";
-import { Package, Calculator, CheckCircle, Badge } from "lucide-react";
+import { Package, Calculator, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { CartonizationEngine, CartonizationResult } from "@/services/cartonization/cartonizationEngine";
 
