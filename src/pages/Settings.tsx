@@ -6,6 +6,7 @@ import { CartonizationSettings } from "@/components/settings/CartonizationSettin
 import { BoxInventoryManager } from "@/components/cartonization/BoxInventoryManager";
 import { CartonizationTestingEnvironment } from "@/components/cartonization/CartonizationTestingEnvironment";
 import { PackagingAlgorithm } from "@/components/cartonization/PackagingAlgorithm";
+import { BoxRecommendations } from "@/components/cartonization/BoxRecommendations";
 import { useCartonization } from "@/hooks/useCartonization";
 
 const Settings = () => {
@@ -31,10 +32,11 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="box-demand">Box Demand Planning</TabsTrigger>
             <TabsTrigger value="historical-usage">Historical Box Usage</TabsTrigger>
             <TabsTrigger value="box-inventory">Box Inventory Management</TabsTrigger>
+            <TabsTrigger value="box-recommendations">Box Recommendations</TabsTrigger>
             <TabsTrigger value="packaging-rules">Packaging Rules</TabsTrigger>
             <TabsTrigger value="testing">Rule Testing</TabsTrigger>
           </TabsList>
@@ -55,6 +57,10 @@ const Settings = () => {
               boxes={boxes} 
               onBoxesChange={setBoxes} 
             />
+          </TabsContent>
+          
+          <TabsContent value="box-recommendations" className="space-y-4">
+            <BoxRecommendations />
           </TabsContent>
           
           <TabsContent value="packaging-rules" className="space-y-4">
