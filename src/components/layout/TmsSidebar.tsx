@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import { useLocation } from "react-router-dom";
 import { 
   Home,
-  Package,
+  Database,
   Truck,
   ShoppingCart,
   Users,
@@ -62,7 +63,7 @@ export const TmsSidebar = () => {
           <NavItem icon={Home} label="Dashboard" to="/" isCollapsed={isCollapsed} />
           <NavItem icon={ShoppingCart} label="Orders" to="/orders" isCollapsed={isCollapsed} />
           <NavItem icon={Truck} label="Shipments" to="/shipments" isCollapsed={isCollapsed} />
-          <NavItem icon={Package} label="Item Master" to="/item-master" isCollapsed={isCollapsed} />
+          <NavItem icon={Database} label="Item Master" to="/item-master" isCollapsed={isCollapsed} />
           <PackagingInventoryNavItem />
           
           {(isAdmin || isSuperAdmin) && (
