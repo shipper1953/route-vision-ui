@@ -213,7 +213,7 @@ const OrderDetails = () => {
           )}
 
           {/* Shipment Information */}
-          {order.shipmentData && (
+          {order.shipment && (
             <Card>
               <CardHeader>
                 <CardTitle>Shipment Information</CardTitle>
@@ -221,20 +221,20 @@ const OrderDetails = () => {
               <CardContent className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Carrier</label>
-                  <p>{order.shipmentData.carrier}</p>
+                  <p>{order.shipment.carrier}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Service</label>
-                  <p>{order.shipmentData.service}</p>
+                  <p>{order.shipment.service}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Tracking Number</label>
-                  <p className="font-mono">{order.shipmentData.trackingNumber}</p>
+                  <p className="font-mono">{order.shipment.trackingNumber}</p>
                 </div>
-                {order.shipmentData.cost && (
+                {order.shipment.cost && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Shipping Cost</label>
-                    <p>${order.shipmentData.cost}</p>
+                    <p>${order.shipment.cost}</p>
                   </div>
                 )}
               </CardContent>
