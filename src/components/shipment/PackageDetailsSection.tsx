@@ -1,4 +1,3 @@
-
 import { 
   Card, 
   CardHeader, 
@@ -19,7 +18,7 @@ import { ShipmentForm } from "@/types/shipment";
 import { useCartonization } from "@/hooks/useCartonization";
 import { useItemMaster } from "@/hooks/useItemMaster";
 import { useState, useEffect, useRef } from "react";
-import { Package, Calculator } from "lucide-react";
+import { Package, Calculator, CheckCircle, Badge } from "lucide-react";
 import { toast } from "sonner";
 import { CartonizationEngine, CartonizationResult } from "@/services/cartonization/cartonizationEngine";
 
@@ -34,7 +33,8 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
   const [scannedItems, setScannedItems] = useState<any[]>([]);
   const [recommendedBox, setRecommendedBox] = useState<any>(null);
   const [boxUtilization, setBoxUtilization] = useState<number>(0);
-  const { boxes, createItemsFromOrderData } = useCartonization();
+  const [cartonizationResult, setCartonizationResult] = useState<CartonizationResult | null>(null);
+  const { boxes, parameters, createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
   
   // Use ref to track if we've already calculated for these items
@@ -56,13 +56,14 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
       
       const items = createItemsFromOrderData(orderItems, masterItems);
       if (items.length > 0) {
-        const engine = new CartonizationEngine(boxes);
+        const engine = new CartonizationEngine(boxes, parameters);
         const result = engine.calculateOptimalBox(items);
         
         if (result) {
           console.log("Recommended box calculated:", result);
           setRecommendedBox(result.recommendedBox);
           setBoxUtilization(result.utilization);
+          setCartonizationResult(result);
           
           // Only auto-populate form once to prevent infinite loop
           if (!hasSetFormValuesRef.current) {
@@ -75,7 +76,7 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
             form.setValue("weight", totalWeight);
             
             hasSetFormValuesRef.current = true;
-            toast.success(`Recommended box: ${result.recommendedBox.name}`);
+            toast.success(`Recommended ${result.recommendedBox.name} with ${result.confidence}% confidence`);
           }
           
           // Mark these items as calculated
@@ -83,7 +84,7 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
         }
       }
     }
-  }, [orderItems, masterItems, boxes, createItemsFromOrderData]); // Removed form from dependencies
+  }, [orderItems, masterItems, boxes, parameters, createItemsFromOrderData]); // Removed form from dependencies
 
   // Reset when orderItems change significantly
   useEffect(() => {
@@ -165,13 +166,79 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
         />
       )}
 
-      {/* Recommended Box Display */}
-      {recommendedBox && (
-        <RecommendedBoxDisplay
-          recommendedBox={recommendedBox}
-          utilization={boxUtilization}
-          onUseBox={handleUseRecommendedBox}
-        />
+      {/* Enhanced Recommended Box Display */}
+      {recommendedBox && cartonizationResult && (
+        <Card className="border-green-200 bg-green-50 mb-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-700">
+              <CheckCircle className="h-5 w-5" />
+              AI Recommended Package
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-semibold text-lg">{recommendedBox.name}</h4>
+                <p className="text-muted-foreground">
+                  Dimensions: {recommendedBox.length}" × {recommendedBox.width}" × {recommendedBox.height}"
+                </p>
+                <p className="text-muted-foreground">
+                  Max Weight: {recommendedBox.maxWeight} lbs
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="secondary">
+                    {recommendedBox.type.replace('_', ' ').toUpperCase()}
+                  </Badge>
+                  <Badge variant="outline">
+                    {recommendedBox.inStock} in stock
+                  </Badge>
+                  <Badge variant="default">
+                    {cartonizationResult.confidence}% confidence
+                  </Badge>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Space Utilization:</span>
+                  <span className={`font-semibold ${boxUtilization > 95 ? 'text-red-600' : boxUtilization > 80 ? 'text-green-600' : 'text-yellow-600'}`}>
+                    {boxUtilization.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Dimensional Weight:</span>
+                  <span className="font-semibold">{cartonizationResult.dimensionalWeight.toFixed(1)} lbs</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cost:</span>
+                  <span className="font-semibold">${recommendedBox.cost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Potential Savings:</span>
+                  <span className="font-semibold text-green-600">${cartonizationResult.savings.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <h5 className="font-medium mb-2">Rules Applied:</h5>
+              <div className="flex flex-wrap gap-1">
+                {cartonizationResult.rulesApplied.map((rule, index) => (
+                  <Badge key={index} variant="outline" className="text-xs">
+                    {rule}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <Button 
+              onClick={() => handleUseRecommendedBox(recommendedBox)}
+              className="w-full mt-4"
+              variant="default"
+            >
+              Use This Package
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       <Card>

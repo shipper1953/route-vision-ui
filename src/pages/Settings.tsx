@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { CartonizationSettings } from "@/components/settings/CartonizationSettings";
 import { BoxInventoryManager } from "@/components/cartonization/BoxInventoryManager";
+import { CartonizationTestingEnvironment } from "@/components/cartonization/CartonizationTestingEnvironment";
 import { useCartonization } from "@/hooks/useCartonization";
 
 const Settings = () => {
@@ -26,11 +27,12 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="box-demand">Box Demand Planning</TabsTrigger>
             <TabsTrigger value="historical-usage">Historical Box Usage</TabsTrigger>
             <TabsTrigger value="box-inventory">Box Inventory Management</TabsTrigger>
             <TabsTrigger value="packaging-rules">Packaging Rules</TabsTrigger>
+            <TabsTrigger value="testing">Rule Testing</TabsTrigger>
           </TabsList>
           
           <TabsContent value="box-demand" className="space-y-4">
@@ -56,6 +58,10 @@ const Settings = () => {
               <h3 className="text-lg font-semibold mb-2">Packaging Rules</h3>
               <p className="text-muted-foreground">Configure automated packaging selection rules</p>
             </div>
+          </TabsContent>
+          
+          <TabsContent value="testing" className="space-y-4">
+            <CartonizationTestingEnvironment />
           </TabsContent>
         </Tabs>
       </div>

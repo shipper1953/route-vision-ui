@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { Box, Item } from "@/services/cartonization/cartonizationEngine";
+import { Box, Item, CartonizationParameters } from "@/services/cartonization/cartonizationEngine";
 
 // Default box inventory - can be customized per user/company
 const DEFAULT_BOXES: Box[] = [
@@ -68,10 +67,27 @@ export const useCartonization = () => {
     return saved ? JSON.parse(saved) : DEFAULT_BOXES;
   });
 
-  // Save to localStorage whenever boxes change
+  const [parameters, setParameters] = useState<CartonizationParameters>(() => {
+    const saved = localStorage.getItem('cartonization_parameters');
+    return saved ? JSON.parse(saved) : {
+      fillRateThreshold: 75,
+      maxPackageWeight: 50,
+      dimensionalWeightFactor: 139,
+      packingEfficiency: 85,
+      allowPartialFill: true,
+      optimizeForCost: true,
+      optimizeForSpace: false
+    };
+  });
+
+  // Save to localStorage whenever boxes or parameters change
   useEffect(() => {
     localStorage.setItem('cartonization_boxes', JSON.stringify(boxes));
   }, [boxes]);
+
+  useEffect(() => {
+    localStorage.setItem('cartonization_parameters', JSON.stringify(parameters));
+  }, [parameters]);
 
   const createItemsFromShipmentData = (data: {
     length: number;
@@ -117,7 +133,9 @@ export const useCartonization = () => {
             width: masterItem.width,
             height: masterItem.height,
             weight: masterItem.weight,
-            quantity: orderItem.quantity || orderItem.count || 1
+            quantity: orderItem.quantity || orderItem.count || 1,
+            category: masterItem.category,
+            fragility: masterItem.fragility || 'low'
           };
         }
       }
@@ -142,7 +160,9 @@ export const useCartonization = () => {
           width: baseWidth,
           height: baseHeight,
           weight: baseWeight,
-          quantity: quantity
+          quantity: quantity,
+          category: 'general',
+          fragility: 'low'
         };
       }
       
@@ -157,9 +177,15 @@ export const useCartonization = () => {
     ));
   };
 
+  const updateParameters = (newParameters: Partial<CartonizationParameters>) => {
+    setParameters(prev => ({ ...prev, ...newParameters }));
+  };
+
   return {
     boxes,
     setBoxes,
+    parameters,
+    updateParameters,
     createItemsFromShipmentData,
     createItemsFromOrderData,
     updateBoxInventory
