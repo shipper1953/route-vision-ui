@@ -5,12 +5,13 @@ import { TmsLayout } from "@/components/layout/TmsLayout";
 import { CartonizationSettings } from "@/components/settings/CartonizationSettings";
 import { BoxInventoryManager } from "@/components/cartonization/BoxInventoryManager";
 import { CartonizationTestingEnvironment } from "@/components/cartonization/CartonizationTestingEnvironment";
+import { PackagingAlgorithm } from "@/components/cartonization/PackagingAlgorithm";
 import { useCartonization } from "@/hooks/useCartonization";
 
 const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'box-demand';
-  const { boxes, setBoxes } = useCartonization();
+  const { boxes, setBoxes, parameters, updateParameters } = useCartonization();
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
@@ -54,10 +55,10 @@ const Settings = () => {
           </TabsContent>
           
           <TabsContent value="packaging-rules" className="space-y-4">
-            <div className="text-center py-8">
-              <h3 className="text-lg font-semibold mb-2">Packaging Rules</h3>
-              <p className="text-muted-foreground">Configure automated packaging selection rules</p>
-            </div>
+            <PackagingAlgorithm 
+              parameters={parameters}
+              onParametersChange={updateParameters}
+            />
           </TabsContent>
           
           <TabsContent value="testing" className="space-y-4">
