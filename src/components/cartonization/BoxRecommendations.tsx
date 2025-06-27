@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +46,7 @@ export const BoxRecommendations = () => {
         setLoading(true);
         const orders = await fetchOrders();
         
-        // Filter for recent orders that need better packaging
+        // Filter for recent orders that need better packaging - fix the type checking here
         const recentOrders = orders.filter(order => 
           (order.status === 'ready_to_ship' || order.status === 'processing') &&
           order.items && Array.isArray(order.items) && order.items.length > 0
@@ -71,6 +70,11 @@ export const BoxRecommendations = () => {
 
         // Analyze each order
         for (const order of recentOrders) {
+          // Ensure items is an array before processing
+          if (!Array.isArray(order.items)) {
+            continue;
+          }
+          
           const items = createItemsFromOrderData(order.items, []);
           if (items.length === 0) continue;
 
