@@ -17,16 +17,7 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
     
     const { data: order, error } = await supabase
       .from('orders')
-      .select(`
-        *,
-        qboid_dimensions (
-          length,
-          width,
-          height,
-          weight,
-          order_id
-        )
-      `)
+      .select('*')
       .eq('id', orderIdNumber)
       .maybeSingle();
 
