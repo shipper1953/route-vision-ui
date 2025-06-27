@@ -17,6 +17,9 @@ const Settings = () => {
     setSearchParams({ tab: value });
   };
 
+  console.log('Settings - activeTab:', activeTab);
+  console.log('Settings - parameters:', parameters);
+
   return (
     <TmsLayout>
       <div className="space-y-6">
@@ -55,10 +58,13 @@ const Settings = () => {
           </TabsContent>
           
           <TabsContent value="packaging-rules" className="space-y-4">
-            <PackagingAlgorithm 
-              parameters={parameters}
-              onParametersChange={updateParameters}
-            />
+            <div className="p-4 border rounded-lg bg-background">
+              <h3 className="text-lg font-semibold mb-4">Packaging Algorithm Configuration</h3>
+              <PackagingAlgorithm 
+                parameters={parameters}
+                onParametersChange={updateParameters}
+              />
+            </div>
           </TabsContent>
           
           <TabsContent value="testing" className="space-y-4">
