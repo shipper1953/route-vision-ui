@@ -31,19 +31,21 @@ export const TmsSidebar = () => {
   const isAdmin = userProfile?.role === 'company_admin';
   const isSuperAdmin = userProfile?.role === 'super_admin';
 
+  const handleSidebarClick = () => {
+    toggleSidebar();
+  };
+
   return (
     <div
       ref={sidebarRef}
       className={cn(
-        "fixed left-0 top-0 z-40 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out flex flex-col",
+        "fixed left-0 top-0 z-40 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out flex flex-col cursor-pointer",
         isCollapsed ? "w-16" : "w-64"
       )}
+      onClick={handleSidebarClick}
     >
-      {/* Header with Ship Tornado Logo - clickable to toggle */}
-      <div 
-        className="p-4 border-b border-sidebar-border flex items-center justify-center cursor-pointer hover:bg-sidebar-accent/20 transition-colors"
-        onClick={toggleSidebar}
-      >
+      {/* Header with Ship Tornado Logo */}
+      <div className="p-4 border-b border-sidebar-border flex items-center justify-center">
         <div className="flex items-center gap-3">
           <ShipTornadoLogo 
             size={24} 
