@@ -59,9 +59,12 @@ export const useBulkShipping = () => {
                   });
                 }
                 
+                // Convert order value to number for comparison
+                const orderValue = parseFloat(order.value.toString()) || 0;
+                
                 // Determine recommended shipping service based on order value and delivery requirements
                 let recommendedService = 'Ground';
-                if (order.value > 500) {
+                if (orderValue > 500) {
                   recommendedService = 'Priority';
                 } else if (order.requiredDeliveryDate) {
                   const daysUntilRequired = Math.ceil(
@@ -80,7 +83,7 @@ export const useBulkShipping = () => {
                   id: order.id,
                   customerName: order.customerName,
                   items: order.items,
-                  value: parseFloat(order.value.toString()) || 0,
+                  value: orderValue,
                   shippingAddress: order.shippingAddress,
                   recommendedBox: result.recommendedBox,
                   recommendedService
