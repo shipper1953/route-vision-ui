@@ -131,9 +131,12 @@ export const useBulkShipping = () => {
     const labelService = new LabelService(''); // Will use edge functions
     const results: ShippingResult[] = [];
 
-    for (const order of orders) {
+    // Process orders one at a time to avoid rate limiting
+    for (let i = 0; i < orders.length; i++) {
+      const order = orders[i];
+      
       try {
-        console.log(`Processing order ${order.id}...`);
+        console.log(`Processing order ${order.id} (${i + 1}/${orders.length})...`);
         
         // Create shipment data
         const shipmentData = {
@@ -172,9 +175,25 @@ export const useBulkShipping = () => {
           }
         };
 
-        // Create shipment
-        const shipmentResponse = await shipmentService.createShipment(shipmentData);
-        console.log(`Shipment created for order ${order.id}:`, shipmentResponse.id);
+        // Create shipment with error handling
+        let shipmentResponse;
+        try {
+          shipmentResponse = await shipmentService.createShipment(shipmentData);
+          console.log(`Shipment created for order ${order.id}:`, shipmentResponse.id);
+        } catch (error: any) {
+          // Check if it's a rate limiting error
+          if (error.message?.includes('rate-limited') || error.message?.includes('RATE_LIMITED')) {
+            toast.error('API rate limit reached. Please wait a few minutes before trying again.');
+            results.push({
+              orderId: order.id,
+              success: false,
+              error: 'Rate limited - please try again later'
+            });
+            // Stop processing remaining orders to avoid further rate limiting
+            break;
+          }
+          throw error;
+        }
 
         // Find best rate based on recommended service
         let selectedRate = null;
@@ -198,22 +217,41 @@ export const useBulkShipping = () => {
           throw new Error('No shipping rates available');
         }
 
-        // Purchase label
-        const labelResponse = await labelService.purchaseLabel(
-          shipmentResponse.id,
-          selectedRate.id,
-          order.id
-        );
+        // Purchase label with error handling
+        try {
+          const labelResponse = await labelService.purchaseLabel(
+            shipmentResponse.id,
+            selectedRate.id,
+            order.id
+          );
 
-        console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
+          console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
 
-        results.push({
-          orderId: order.id,
-          success: true,
-          trackingNumber: labelResponse.tracking_code,
-          labelUrl: labelResponse.postage_label?.label_url,
-          cost: parseFloat(selectedRate.rate)
-        });
+          results.push({
+            orderId: order.id,
+            success: true,
+            trackingNumber: labelResponse.tracking_code,
+            labelUrl: labelResponse.postage_label?.label_url,
+            cost: parseFloat(selectedRate.rate)
+          });
+        } catch (labelError: any) {
+          // Handle rate limiting on label purchase
+          if (labelError.message?.includes('rate-limited') || labelError.message?.includes('RATE_LIMITED')) {
+            toast.error('API rate limit reached during label purchase. Please wait a few minutes before trying again.');
+            results.push({
+              orderId: order.id,
+              success: false,
+              error: 'Rate limited during label purchase - please try again later'
+            });
+            break;
+          }
+          throw labelError;
+        }
+
+        // Add delay between orders to prevent rate limiting (1 second)
+        if (i < orders.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
 
       } catch (error) {
         console.error(`Error processing order ${order.id}:`, error);
@@ -222,6 +260,11 @@ export const useBulkShipping = () => {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
+
+        // If we encounter errors, add a delay before the next order
+        if (i < orders.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
     }
 
@@ -233,7 +276,12 @@ export const useBulkShipping = () => {
     }
     
     if (failedShipments.length > 0) {
-      toast.error(`Failed to ship ${failedShipments.length} orders`);
+      const rateLimitedCount = failedShipments.filter(r => r.error?.includes('rate limit')).length;
+      if (rateLimitedCount > 0) {
+        toast.error(`${rateLimitedCount} orders failed due to rate limiting. Please wait and try again.`);
+      } else {
+        toast.error(`Failed to ship ${failedShipments.length} orders`);
+      }
     }
 
     return results;
