@@ -1,13 +1,12 @@
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Truck, Package } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Table, TableBody } from "@/components/ui/table";
 import { toast } from "sonner";
 import { BulkShippingLabelDialog } from "./BulkShippingLabelDialog";
+import { BulkShipControls } from "./table/BulkShipControls";
+import { BulkShipTableHeader } from "./table/BulkShipTableHeader";
+import { BulkShipTableRow } from "./table/BulkShipTableRow";
 
 interface OrderForShipping {
   id: string;
@@ -119,16 +118,6 @@ export const BulkShipOrdersTable = ({ boxName, boxDimensions, orders, onBulkShip
     }
   };
 
-  const getItemsDisplay = (items: any[]) => {
-    if (!Array.isArray(items) || items.length === 0) return "No items";
-    
-    return items.map((item, idx) => {
-      const name = item.name || item.description || `Item ${idx + 1}`;
-      const quantity = item.quantity || item.count || 1;
-      return `${name} (${quantity})`;
-    }).join(", ");
-  };
-
   if (orders.length === 0) {
     return null;
   }
@@ -137,83 +126,30 @@ export const BulkShipOrdersTable = ({ boxName, boxDimensions, orders, onBulkShip
     <>
       <Card className="mt-4">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-tms-blue" />
-              <CardTitle className="text-lg">
-                Orders for {boxName} ({boxDimensions})
-              </CardTitle>
-              <Badge variant="secondary">{orders.length} orders</Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {selectedOrders.size} selected
-              </span>
-              <Button 
-                onClick={handleBulkShip}
-                disabled={selectedOrders.size === 0 || isShipping}
-                size="sm"
-                className="gap-2"
-              >
-                <Truck className="h-4 w-4" />
-                {isShipping ? "Shipping..." : `Ship Selected (${selectedOrders.size})`}
-              </Button>
-            </div>
-          </div>
+          <BulkShipControls
+            boxName={boxName}
+            boxDimensions={boxDimensions}
+            orderCount={orders.length}
+            selectedCount={selectedOrders.size}
+            isShipping={isShipping}
+            onBulkShip={handleBulkShip}
+          />
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={selectedOrders.size === orders.length && orders.length > 0}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all orders"
-                  />
-                </TableHead>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Items/SKUs</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead>Service</TableHead>
-              </TableRow>
-            </TableHeader>
+            <BulkShipTableHeader
+              selectedCount={selectedOrders.size}
+              totalCount={orders.length}
+              onSelectAll={handleSelectAll}
+            />
             <TableBody>
               {orders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedOrders.has(order.id)}
-                      onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
-                      aria-label={`Select order ${order.id}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-mono">
-                      {order.id}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium">{order.customerName}</TableCell>
-                  <TableCell className="max-w-xs">
-                    <div className="text-sm text-muted-foreground truncate" title={getItemsDisplay(order.items)}>
-                      {getItemsDisplay(order.items)}
-                    </div>
-                  </TableCell>
-                  <TableCell>${order.value.toFixed(2)}</TableCell>
-                  <TableCell>
-                    {order.shippingAddress ? 
-                      `${order.shippingAddress.city}, ${order.shippingAddress.state}` : 
-                      'Unknown'
-                    }
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {order.recommendedService || 'Ground'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
+                <BulkShipTableRow
+                  key={order.id}
+                  order={order}
+                  isSelected={selectedOrders.has(order.id)}
+                  onSelectOrder={handleSelectOrder}
+                />
               ))}
             </TableBody>
           </Table>
