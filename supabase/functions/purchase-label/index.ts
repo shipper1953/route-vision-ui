@@ -39,6 +39,7 @@ serve(async (req) => {
     console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} for user ${user.id}`);
     
     if (!easyPostApiKey) {
+      console.error('EASYPOST_API_KEY environment variable not found');
       return createErrorResponse('EasyPost API key not configured', 'Please ensure EASYPOST_API_KEY is set in environment variables', 500);
     }
 
@@ -124,6 +125,12 @@ serve(async (req) => {
     
   } catch (err) {
     console.error('Error processing request:', err);
+    
+    // Handle rate limiting specifically
+    if (err.message?.includes('rate limit') || err.message?.includes('RATE_LIMITED')) {
+      return createErrorResponse('API rate limit exceeded', 'Please wait a few minutes before trying again', 429);
+    }
+    
     return createErrorResponse('Internal server error', err.message, 500);
   }
 })

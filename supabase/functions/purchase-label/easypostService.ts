@@ -33,6 +33,10 @@ export async function purchaseShippingLabel(shipmentId: string, rateId: string, 
       errorMessage = 'Invalid EasyPost API key. Please check your configuration.';
     } else if (response.status === 404) {
       errorMessage = 'Shipment or rate not found. The shipment may have expired.';
+    } else if (response.status === 429) {
+      errorMessage = 'API rate limit exceeded. Please wait a few minutes before trying again.';
+    } else if (responseText.includes('rate-limited') || responseText.includes('RATE_LIMITED')) {
+      errorMessage = 'API rate limit exceeded. Please wait a few minutes before trying again.';
     }
     
     throw new Error(errorMessage);
