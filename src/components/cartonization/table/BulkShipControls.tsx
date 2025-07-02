@@ -1,14 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, Truck } from "lucide-react";
+import { Package, Calculator } from "lucide-react";
 
 interface BulkShipControlsProps {
   boxName: string;
   boxDimensions: string;
   orderCount: number;
   selectedCount: number;
-  isShipping: boolean;
-  onBulkShip: () => void;
+  isFetchingRates: boolean;
+  onFetchRates: () => void;
 }
 
 export const BulkShipControls = ({
@@ -16,8 +16,8 @@ export const BulkShipControls = ({
   boxDimensions,
   orderCount,
   selectedCount,
-  isShipping,
-  onBulkShip
+  isFetchingRates,
+  onFetchRates
 }: BulkShipControlsProps) => {
   return (
     <div className="flex items-center justify-between">
@@ -33,13 +33,13 @@ export const BulkShipControls = ({
           {selectedCount} selected
         </span>
         <Button 
-          onClick={onBulkShip}
-          disabled={selectedCount === 0 || isShipping}
+          onClick={onFetchRates}
+          disabled={selectedCount === 0 || isFetchingRates}
           size="sm"
           className="gap-2"
         >
-          <Truck className="h-4 w-4" />
-          {isShipping ? "Shipping..." : `Ship Selected (${selectedCount})`}
+          <Calculator className="h-4 w-4" />
+          {isFetchingRates ? "Fetching Rates..." : `Fetch Rates (${selectedCount})`}
         </Button>
       </div>
     </div>

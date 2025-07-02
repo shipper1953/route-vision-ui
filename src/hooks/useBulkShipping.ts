@@ -32,6 +32,17 @@ interface ShippingResult {
   error?: string;
 }
 
+interface OrderWithRates extends OrderForShipping {
+  rates: Array<{
+    id: string;
+    carrier: string;
+    service: string;
+    rate: string;
+    delivery_days?: number;
+  }>;
+  selectedRateId?: string;
+}
+
 export const useBulkShipping = () => {
   const [boxShippingGroups, setBoxShippingGroups] = useState<BoxShippingGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +135,94 @@ export const useBulkShipping = () => {
     loadShippingGroups();
   }, [boxes]);
 
-  const handleBulkShip = async (orders: OrderForShipping[]): Promise<ShippingResult[]> => {
+  const handleFetchRates = async (orders: OrderForShipping[]): Promise<OrderWithRates[]> => {
+    console.log('Fetching rates for orders:', orders.map(o => o.id));
+    
+    const shipmentService = new ShipmentService(''); // Will use edge functions
+    const ordersWithRates: OrderWithRates[] = [];
+
+    // Process orders one at a time to get rates
+    for (let i = 0; i < orders.length; i++) {
+      const order = orders[i];
+      
+      try {
+        console.log(`Fetching rates for order ${order.id} (${i + 1}/${orders.length})...`);
+        
+        // Create shipment data
+        const shipmentData = {
+          to_address: {
+            name: order.customerName,
+            street1: order.shippingAddress?.street1 || order.shippingAddress?.address1 || '',
+            street2: order.shippingAddress?.street2 || order.shippingAddress?.address2 || '',
+            city: order.shippingAddress?.city || '',
+            state: order.shippingAddress?.state || '',
+            zip: order.shippingAddress?.zip || order.shippingAddress?.zipCode || '',
+            country: order.shippingAddress?.country || 'US',
+            phone: order.shippingAddress?.phone || ''
+          },
+          from_address: {
+            name: 'Ship Tornado',
+            company: 'Ship Tornado',
+            street1: '123 Warehouse St',
+            city: 'Austin',
+            state: 'TX',
+            zip: '78701',
+            country: 'US',
+            phone: '555-0123'
+          },
+          parcel: {
+            length: order.recommendedBox.length,
+            width: order.recommendedBox.width,
+            height: order.recommendedBox.height,
+            weight: Math.max(1, order.items.reduce((total, item) => {
+              const itemWeight = parseFloat(item.weight?.toString() || '0');
+              const quantity = parseInt(item.quantity?.toString() || '1');
+              return total + (itemWeight * quantity);
+            }, 0))
+          },
+          options: {
+            label_format: 'PDF'
+          }
+        };
+
+        // Create shipment to get rates
+        const shipmentResponse = await shipmentService.createShipment(shipmentData);
+        console.log(`Rates fetched for order ${order.id}:`, shipmentResponse.id);
+
+        // Process rates
+        const allRates = [...(shipmentResponse.rates || []), ...(shipmentResponse.smartRates || [])];
+        const processedRates = allRates.map(rate => ({
+          id: rate.id,
+          carrier: rate.carrier || 'Unknown',
+          service: rate.service || 'Standard',
+          rate: rate.rate || '0.00',
+          delivery_days: rate.delivery_days
+        }));
+
+        ordersWithRates.push({
+          ...order,
+          rates: processedRates
+        });
+
+        // Add delay between requests to prevent rate limiting
+        if (i < orders.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+      } catch (error) {
+        console.error(`Error fetching rates for order ${order.id}:`, error);
+        // Add order with empty rates on error
+        ordersWithRates.push({
+          ...order,
+          rates: []
+        });
+      }
+    }
+
+    return ordersWithRates;
+  };
+
+  const handleBulkShip = async (orders: OrderWithRates[]): Promise<ShippingResult[]> => {
     console.log('Starting bulk shipping for orders:', orders.map(o => o.id));
     
     const shipmentService = new ShipmentService(''); // Will use edge functions
@@ -290,6 +388,7 @@ export const useBulkShipping = () => {
   return {
     boxShippingGroups,
     loading,
+    handleFetchRates,
     handleBulkShip
   };
 };
