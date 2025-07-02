@@ -39,6 +39,7 @@ interface OrderWithRates extends OrderForShipping {
     service: string;
     rate: string;
     delivery_days?: number;
+    shipment_id?: string;
   }>;
   selectedRateId?: string;
 }
@@ -189,14 +190,15 @@ export const useBulkShipping = () => {
         const shipmentResponse = await shipmentService.createShipment(shipmentData);
         console.log(`Rates fetched for order ${order.id}:`, shipmentResponse.id);
 
-        // Process rates
+        // Process rates and include shipment ID
         const allRates = [...(shipmentResponse.rates || []), ...(shipmentResponse.smartRates || [])];
         const processedRates = allRates.map(rate => ({
           id: rate.id,
           carrier: rate.carrier || 'Unknown',
           service: rate.service || 'Standard',
           rate: rate.rate || '0.00',
-          delivery_days: rate.delivery_days
+          delivery_days: rate.delivery_days,
+          shipment_id: shipmentResponse.id // Store the shipment ID with each rate
         }));
 
         ordersWithRates.push({
@@ -225,7 +227,6 @@ export const useBulkShipping = () => {
   const handleBulkShip = async (orders: OrderWithRates[]): Promise<ShippingResult[]> => {
     console.log('Starting bulk shipping for orders:', orders.map(o => o.id));
     
-    const shipmentService = new ShipmentService(''); // Will use edge functions
     const labelService = new LabelService(''); // Will use edge functions
     const results: ShippingResult[] = [];
 
@@ -236,89 +237,96 @@ export const useBulkShipping = () => {
       try {
         console.log(`Processing order ${order.id} (${i + 1}/${orders.length})...`);
         
-        // Create shipment data
-        const shipmentData = {
-          to_address: {
-            name: order.customerName,
-            street1: order.shippingAddress?.street1 || order.shippingAddress?.address1 || '',
-            street2: order.shippingAddress?.street2 || order.shippingAddress?.address2 || '',
-            city: order.shippingAddress?.city || '',
-            state: order.shippingAddress?.state || '',
-            zip: order.shippingAddress?.zip || order.shippingAddress?.zipCode || '',
-            country: order.shippingAddress?.country || 'US',
-            phone: order.shippingAddress?.phone || ''
-          },
-          from_address: {
-            name: 'Ship Tornado',
-            company: 'Ship Tornado',
-            street1: '123 Warehouse St',
-            city: 'Austin',
-            state: 'TX',
-            zip: '78701',
-            country: 'US',
-            phone: '555-0123'
-          },
-          parcel: {
-            length: order.recommendedBox.length,
-            width: order.recommendedBox.width,
-            height: order.recommendedBox.height,
-            weight: Math.max(1, order.items.reduce((total, item) => {
-              const itemWeight = parseFloat(item.weight?.toString() || '0');
-              const quantity = parseInt(item.quantity?.toString() || '1');
-              return total + (itemWeight * quantity);
-            }, 0))
-          },
-          options: {
-            label_format: 'PDF'
-          }
-        };
-
-        // Create shipment with error handling
-        let shipmentResponse;
-        try {
-          shipmentResponse = await shipmentService.createShipment(shipmentData);
-          console.log(`Shipment created for order ${order.id}:`, shipmentResponse.id);
-        } catch (error: any) {
-          // Check if it's a rate limiting error
-          if (error.message?.includes('rate-limited') || error.message?.includes('RATE_LIMITED')) {
-            toast.error('API rate limit reached. Please wait a few minutes before trying again.');
-            results.push({
-              orderId: order.id,
-              success: false,
-              error: 'Rate limited - please try again later'
-            });
-            // Stop processing remaining orders to avoid further rate limiting
-            break;
-          }
-          throw error;
-        }
-
-        // Find best rate based on recommended service
-        let selectedRate = null;
-        const allRates = [...(shipmentResponse.rates || []), ...(shipmentResponse.smartRates || [])];
+        // Since we already have rates from the fetch rates step, we don't need to create a new shipment
+        // We need to use the existing shipment ID and selected rate
+        const selectedRate = order.rates?.find(r => r.id === order.selectedRateId);
         
-        if (allRates.length > 0) {
-          // Try to find rate matching recommended service
-          selectedRate = allRates.find(rate => 
-            rate.service?.toLowerCase().includes(order.recommendedService?.toLowerCase() || 'ground')
-          );
-          
-          // If no matching service, use cheapest rate
-          if (!selectedRate) {
-            selectedRate = allRates.reduce((cheapest, rate) => 
-              parseFloat(rate.rate) < parseFloat(cheapest.rate) ? rate : cheapest
-            );
-          }
+        if (!selectedRate) {
+          throw new Error('No rate selected for order');
         }
 
-        if (!selectedRate) {
-          throw new Error('No shipping rates available');
+        // The rates we have should include the shipment ID from when they were fetched
+        // If not, we need to create a new shipment
+        let shipmentId = selectedRate.shipment_id || null;
+        
+        if (!shipmentId) {
+          console.log(`Creating new shipment for order ${order.id} as no shipment ID found in rate`);
+          
+          // Need to create shipment if we don't have shipment ID
+          const shipmentService = new ShipmentService(''); // Will use edge functions
+          
+          const shipmentData = {
+            to_address: {
+              name: order.customerName,
+              street1: order.shippingAddress?.street1 || order.shippingAddress?.address1 || '',
+              street2: order.shippingAddress?.street2 || order.shippingAddress?.address2 || '',
+              city: order.shippingAddress?.city || '',
+              state: order.shippingAddress?.state || '',
+              zip: order.shippingAddress?.zip || order.shippingAddress?.zipCode || '',
+              country: order.shippingAddress?.country || 'US',
+              phone: order.shippingAddress?.phone || ''
+            },
+            from_address: {
+              name: 'Ship Tornado',
+              company: 'Ship Tornado',
+              street1: '123 Warehouse St',
+              city: 'Austin',
+              state: 'TX',
+              zip: '78701',
+              country: 'US',
+              phone: '555-0123'
+            },
+            parcel: {
+              length: order.recommendedBox.length,
+              width: order.recommendedBox.width,
+              height: order.recommendedBox.height,
+              weight: Math.max(1, order.items.reduce((total, item) => {
+                const itemWeight = parseFloat(item.weight?.toString() || '0');
+                const quantity = parseInt(item.quantity?.toString() || '1');
+                return total + (itemWeight * quantity);
+              }, 0))
+            },
+            options: {
+              label_format: 'PDF'
+            }
+          };
+
+          // Create shipment with error handling
+          try {
+            const shipmentResponse = await shipmentService.createShipment(shipmentData);
+            console.log(`Shipment created for order ${order.id}:`, shipmentResponse.id);
+            shipmentId = shipmentResponse.id;
+            
+            // Find the matching rate in the new shipment response
+            const allRates = [...(shipmentResponse.rates || []), ...(shipmentResponse.smartRates || [])];
+            const matchingRate = allRates.find(rate => 
+              rate.carrier === selectedRate.carrier && 
+              rate.service === selectedRate.service
+            ) || allRates[0]; // Fallback to first available rate
+            
+            if (matchingRate) {
+              selectedRate.id = matchingRate.id; // Update the rate ID to match the new shipment
+            }
+          } catch (error: any) {
+            // Check if it's a rate limiting error
+            if (error.message?.includes('rate-limited') || error.message?.includes('RATE_LIMITED')) {
+              toast.error('API rate limit reached. Please wait a few minutes before trying again.');
+              results.push({
+                orderId: order.id,
+                success: false,
+                error: 'Rate limited - please try again later'
+              });
+              // Stop processing remaining orders to avoid further rate limiting
+              break;
+            }
+            throw error;
+          }
         }
 
         // Purchase label with error handling
         try {
           const labelResponse = await labelService.purchaseLabel(
-            shipmentResponse.id,
+            shipmentId,
             selectedRate.id,
             order.id
           );
