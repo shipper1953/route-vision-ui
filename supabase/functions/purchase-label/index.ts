@@ -13,8 +13,13 @@ const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
 console.log('EasyPost API key available in purchase-label function:', easyPostApiKey ? 'YES' : 'NO')
 
 serve(async (req) => {
+  console.log('=== PURCHASE LABEL FUNCTION START ===');
+  console.log('Request method:', req.method);
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+  
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request');
     return handleCorsPreflightRequest();
   }
 
@@ -24,15 +29,28 @@ serve(async (req) => {
     // Authenticate user
     const authHeader = req.headers.get('Authorization');
     console.log('Auth header present:', authHeader ? 'YES' : 'NO');
+    console.log('Auth header value:', authHeader?.substring(0, 20) + '...');
     
     const user = await authenticateUser(authHeader);
+    console.log('User authenticated successfully:', user.id);
+    
     const companyId = await getUserCompany(user.id);
     console.log('User company_id:', companyId);
 
     // Parse request body
-    const { shipmentId, rateId, orderId } = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log('Request body parsed:', JSON.stringify(requestBody, null, 2));
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return createErrorResponse('Invalid JSON in request body', parseError.message, 400);
+    }
+    
+    const { shipmentId, rateId, orderId } = requestBody;
     
     if (!shipmentId || !rateId) {
+      console.error('Missing required parameters:', { shipmentId, rateId });
       return createErrorResponse('Missing required parameters: shipmentId and rateId are required', null, 400);
     }
     
@@ -42,6 +60,7 @@ serve(async (req) => {
       console.error('EASYPOST_API_KEY environment variable not found');
       return createErrorResponse('EasyPost API key not configured', 'Please ensure EASYPOST_API_KEY is set in environment variables', 500);
     }
+    console.log('EasyPost API key is configured');
 
     // Purchase label from EasyPost
     console.log('Calling EasyPost API...');
@@ -124,13 +143,20 @@ serve(async (req) => {
     return createSuccessResponse(purchaseResponse);
     
   } catch (err) {
-    console.error('Error processing request:', err);
+    console.error('=== ERROR IN PURCHASE LABEL FUNCTION ===');
+    console.error('Error type:', typeof err);
+    console.error('Error constructor:', err.constructor?.name);
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    console.error('Full error object:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     
     // Handle rate limiting specifically
     if (err.message?.includes('rate limit') || err.message?.includes('RATE_LIMITED')) {
+      console.log('Returning rate limit error response');
       return createErrorResponse('API rate limit exceeded', 'Please wait a few minutes before trying again', 429);
     }
     
+    console.log('Returning generic error response');
     return createErrorResponse('Internal server error', err.message, 500);
   }
 })
