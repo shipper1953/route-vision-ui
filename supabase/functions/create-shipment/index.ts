@@ -201,9 +201,17 @@ serve(async (req) => {
         if (authData?.user) {
           console.log('Authenticated user found, saving shipment to database')
           
+          // Get the user's company_id for proper data association
+          const { data: userData } = await supabaseClient
+            .from('users')
+            .select('company_id')
+            .eq('id', authData.user.id)
+            .single()
+          
           const shipmentDbData = {
             easypost_id: shipmentResponse.id,
             user_id: authData.user.id,
+            company_id: userData?.company_id || null,
             carrier: 'UPS', // Default carrier
             service: 'Ground', // Default service
             status: 'created',
