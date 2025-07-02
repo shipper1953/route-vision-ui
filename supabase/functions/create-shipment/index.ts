@@ -204,9 +204,9 @@ serve(async (req) => {
           const shipmentDbData = {
             easypost_id: shipmentResponse.id,
             user_id: authData.user.id,
+            carrier: 'UPS', // Default carrier
+            service: 'Ground', // Default service
             status: 'created',
-            from_address: JSON.stringify(shipmentData.from_address),
-            to_address: JSON.stringify(shipmentData.to_address),
             package_dimensions: JSON.stringify({
               length: shipmentData.parcel.length,
               width: shipmentData.parcel.width,
