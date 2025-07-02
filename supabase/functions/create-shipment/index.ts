@@ -36,6 +36,33 @@ serve(async (req) => {
 
     const { shipmentData } = await req.json()
     
+    console.log('Received shipment data:', JSON.stringify(shipmentData, null, 2))
+    
+    // Validate required shipment data
+    if (!shipmentData) {
+      console.error('No shipment data provided')
+      return new Response(JSON.stringify({
+        error: 'Missing shipment data'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+    
+    if (!shipmentData.to_address || !shipmentData.from_address || !shipmentData.parcel) {
+      console.error('Missing required shipment fields:', {
+        to_address: !!shipmentData.to_address,
+        from_address: !!shipmentData.from_address,
+        parcel: !!shipmentData.parcel
+      })
+      return new Response(JSON.stringify({
+        error: 'Missing required shipment fields (to_address, from_address, parcel)'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+    
     // Enhanced SmartRate configuration for better precision
     if (!shipmentData.options) {
       shipmentData.options = {}
