@@ -190,9 +190,9 @@ export const useBulkShipping = () => {
         const shipmentResponse = await shipmentService.createShipment(shipmentData);
         console.log(`Rates fetched for order ${order.id}:`, shipmentResponse.id);
 
-        // Process rates and include shipment ID
-        const allRates = [...(shipmentResponse.rates || []), ...(shipmentResponse.smartRates || [])];
-        const processedRates = allRates.map(rate => ({
+        // Process standard rates only
+        const rates = shipmentResponse.rates || [];
+        const processedRates = rates.map(rate => ({
           id: rate.id,
           carrier: rate.carrier || 'Unknown',
           service: rate.service || 'Standard',
@@ -298,7 +298,7 @@ export const useBulkShipping = () => {
             shipmentId = shipmentResponse.id;
             
             // Find the matching rate in the new shipment response
-            const allRates = [...(shipmentResponse.rates || []), ...(shipmentResponse.smartRates || [])];
+            const allRates = shipmentResponse.rates || [];
             const matchingRate = allRates.find(rate => 
               rate.carrier === selectedRate.carrier && 
               rate.service === selectedRate.service

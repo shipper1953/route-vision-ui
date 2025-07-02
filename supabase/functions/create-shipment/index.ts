@@ -63,25 +63,23 @@ serve(async (req) => {
       })
     }
     
-    // Enhanced SmartRate configuration for better precision
+    // Standard rate configuration
     if (!shipmentData.options) {
       shipmentData.options = {}
     }
     
-    // Use high accuracy SmartRate settings
-    shipmentData.options.smartrate_accuracy = 'percentile_90'
+    // Set standard options
     shipmentData.options.currency = 'USD'
     shipmentData.options.delivery_confirmation = 'NO_SIGNATURE'
     
-    console.log('Enhanced SmartRate configuration:', {
-      smartrate_accuracy: shipmentData.options.smartrate_accuracy,
+    console.log('Standard rate configuration:', {
       currency: shipmentData.options.currency,
       options: shipmentData.options
     })
     
-    console.log('Creating shipment with enhanced SmartRate data:', JSON.stringify(shipmentData, null, 2))
+    console.log('Creating shipment with standard rate data:', JSON.stringify(shipmentData, null, 2))
     
-    // Call EasyPost API to create shipment with SmartRates
+    // Call EasyPost API to create shipment with standard rates only
     const response = await fetch('https://api.easypost.com/v2/shipments', {
       method: 'POST',
       headers: {
@@ -89,11 +87,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        shipment: {
-          ...shipmentData,
-          // Explicitly request SmartRates in the shipment creation
-          smartrate_accuracy: shipmentData.options.smartrate_accuracy
-        }
+        shipment: shipmentData
       }),
     })
     
@@ -123,96 +117,19 @@ serve(async (req) => {
     
     console.log('EasyPost API Response Summary:')
     console.log('- Shipment ID:', shipmentResponse.id)
-    console.log('- SmartRates received:', shipmentResponse.smartRates ? shipmentResponse.smartRates.length : 0)
     console.log('- Standard Rates received:', shipmentResponse.rates ? shipmentResponse.rates.length : 0)
     
-    // If no SmartRates, try multiple approaches to get them
-    if ((!shipmentResponse.smartRates || shipmentResponse.smartRates.length === 0) && 
-        shipmentResponse.rates && shipmentResponse.rates.length > 0) {
-      
-      console.log('⚠️ NO SMARTRATES RETURNED - Attempting to retrieve SmartRates via separate calls')
-      
-      // Try different accuracy levels to get SmartRates
-      const accuracyLevels = ['percentile_90', 'percentile_85', 'percentile_75', 'percentile_95']
-      
-      for (const accuracy of accuracyLevels) {
-        try {
-          console.log(`Trying SmartRates with accuracy: ${accuracy}`)
-          
-          const smartRateResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentResponse.id}/smartrate`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${easyPostApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              smartrate_accuracy: accuracy
-            }),
-          })
-          
-          if (smartRateResponse.ok) {
-            const smartRateData = await smartRateResponse.json()
-            if (smartRateData.smartrates && smartRateData.smartrates.length > 0) {
-              shipmentResponse.smartRates = smartRateData.smartrates
-              console.log(`✅ Successfully retrieved SmartRates with ${accuracy}:`, smartRateData.smartrates.length)
-              break
-            }
-          } else {
-            const smartRateError = await smartRateResponse.json()
-            console.error(`SmartRate ${accuracy} error:`, smartRateError)
-          }
-        } catch (smartRateErr) {
-          console.error(`Error calling SmartRate ${accuracy}:`, smartRateErr)
-        }
-      }
-      
-      // If still no SmartRates, try the GET endpoint
-      if (!shipmentResponse.smartRates || shipmentResponse.smartRates.length === 0) {
-        try {
-          console.log('Trying SmartRates GET endpoint...')
-          const smartRateGetResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentResponse.id}/smartrates`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${easyPostApiKey}`,
-              'Content-Type': 'application/json',
-            }
-          })
-          
-          if (smartRateGetResponse.ok) {
-            const smartRateGetData = await smartRateGetResponse.json()
-            if (smartRateGetData.smartrates && smartRateGetData.smartrates.length > 0) {
-              shipmentResponse.smartRates = smartRateGetData.smartrates
-              console.log('✅ Successfully retrieved SmartRates via GET:', smartRateGetData.smartrates.length)
-            }
-          }
-        } catch (getErr) {
-          console.error('Error with SmartRates GET endpoint:', getErr)
-        }
-      }
+    if (!shipmentResponse.rates || shipmentResponse.rates.length === 0) {
+      console.log('⚠️ No rates available for this shipment')
+      return new Response(JSON.stringify({
+        error: 'No shipping rates available. Please check your package dimensions and addresses.'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
     }
     
-    // Final check and logging
-    if (shipmentResponse.smartRates && shipmentResponse.smartRates.length > 0) {
-      console.log('✅ FINAL RESULT: SmartRates available:', shipmentResponse.smartRates.length)
-      // Log some sample SmartRate data for debugging
-      shipmentResponse.smartRates.slice(0, 2).forEach((rate, index) => {
-        console.log(`SmartRate ${index + 1}:`, {
-          carrier: rate.carrier,
-          service: rate.service,
-          rate: rate.rate,
-          delivery_date: rate.delivery_date,
-          delivery_date_guaranteed: rate.delivery_date_guaranteed,
-          delivery_accuracy: rate.delivery_accuracy
-        })
-      })
-    } else {
-      console.log('⚠️ FINAL RESULT: No SmartRates available - using standard rates only')
-      console.log('This could indicate:')
-      console.log('  1. SmartRate not enabled for this EasyPost account')
-      console.log('  2. Account tier limitations')
-      console.log('  3. Address or package restrictions')
-      console.log('  4. Carrier availability issues')
-    }
+    console.log('✅ FINAL RESULT: Standard rates available:', shipmentResponse.rates.length)
     
     // Try to save to database if user is authenticated
     const authHeader = req.headers.get('Authorization')
@@ -251,7 +168,6 @@ serve(async (req) => {
               weight: shipmentData.parcel.weight,
               weight_unit: 'oz'
             }),
-            smartrates: shipmentResponse.smartRates ? JSON.stringify(shipmentResponse.smartRates) : null,
             rates: JSON.stringify(shipmentResponse.rates),
             created_at: new Date().toISOString(),
           }
@@ -273,7 +189,7 @@ serve(async (req) => {
       console.log('No authenticated user, skipping database save')
     }
     
-    console.log('Returning successful response with SmartRates:', shipmentResponse.smartRates?.length || 0)
+    console.log('Returning successful response with standard rates:', shipmentResponse.rates?.length || 0)
     return new Response(JSON.stringify(shipmentResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

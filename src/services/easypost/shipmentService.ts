@@ -22,20 +22,17 @@ export class ShipmentService {
     try {
       console.log('Creating shipment with data:', shipmentData);
 
-      // Enhanced SmartRate configuration for better results
+      // Standard rate configuration
       if (!shipmentData.options) {
         shipmentData.options = {};
       }
 
-      // Use higher accuracy for better delivery date predictions
-      shipmentData.options.smartrate_accuracy = 'percentile_90';
-      
-      // Add additional options to help get SmartRates
+      // Add standard options
       shipmentData.options.currency = 'USD';
       shipmentData.options.delivery_confirmation = 'NO_SIGNATURE';
 
-      console.log('Enhanced SmartRate configuration:', {
-        smartrate_accuracy: shipmentData.options.smartrate_accuracy,
+      console.log('Standard rate configuration:', {
+        currency: shipmentData.options.currency,
         options: shipmentData.options
       });
 
@@ -87,43 +84,9 @@ export class ShipmentService {
     }
 
     console.log('Shipment created via Edge Function:', data.id);
-    console.log('SmartRates returned:', data.smartRates?.length || 0);
     console.log('Standard rates returned:', data.rates?.length || 0);
 
-    // If we have SmartRates, try to get additional SmartRates with different accuracy levels
-    if (data.id && (!data.smartRates || data.smartRates.length === 0)) {
-      console.log('No SmartRates in initial response, attempting to fetch SmartRates separately...');
-      
-      try {
-        const { data: smartRateData, error: smartRateError } = await supabase.functions.invoke('get-smartrates', {
-          body: { 
-            shipmentId: data.id,
-            accuracy: 'percentile_90'
-          }
-        });
-
-        if (!smartRateError && smartRateData?.smartRates?.length > 0) {
-          console.log('✅ Successfully retrieved SmartRates via separate call:', smartRateData.smartRates.length);
-          data.smartRates = smartRateData.smartRates;
-        } else {
-          console.warn('⚠️ Still no SmartRates available after separate call');
-        }
-      } catch (smartRateErr) {
-        console.warn('Failed to fetch SmartRates separately:', smartRateErr);
-      }
-    }
-
-    // If no SmartRates but we have standard rates, log the issue
-    if ((!data.smartRates || data.smartRates.length === 0) && data.rates && data.rates.length > 0) {
-      console.warn('⚠️ SmartRates not available. Possible causes:');
-      console.warn('1. SmartRates not enabled for your EasyPost account');
-      console.warn('2. Your account tier may not support SmartRates');
-      console.warn('3. Address combination not supported for SmartRates');
-      console.warn('4. Package specifications outside SmartRate coverage');
-      console.warn('Falling back to standard rates.');
-    }
-
-    if (!data.rates?.length && !data.smartRates?.length) {
+    if (!data.rates?.length) {
       throw new Error('No shipping rates available. Please check your package dimensions and addresses.');
     }
 
@@ -170,38 +133,10 @@ export class ShipmentService {
     const shipmentResponse = await response.json();
 
     console.log('Shipment created successfully:');
-    console.log('- SmartRates:', shipmentResponse.smartRates ? shipmentResponse.smartRates.length : 0);
     console.log('- Standard rates:', shipmentResponse.rates ? shipmentResponse.rates.length : 0);
 
-    // If no SmartRates from initial call, try to get them separately
-    if ((!shipmentResponse.smartRates || shipmentResponse.smartRates.length === 0) &&
-        shipmentResponse.rates && shipmentResponse.rates.length > 0) {
-      
-      console.log('Attempting to fetch SmartRates separately for shipment:', shipmentResponse.id);
-      
-      try {
-        const smartRateResponse = await fetch(`${this.baseUrl}/shipments/${shipmentResponse.id}/smartrates`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
-          }
-        });
-        
-        if (smartRateResponse.ok) {
-          const smartRateData = await smartRateResponse.json();
-          if (smartRateData.smartrates && smartRateData.smartrates.length > 0) {
-            shipmentResponse.smartRates = smartRateData.smartrates;
-            console.log('✅ Successfully retrieved SmartRates via GET:', smartRateData.smartrates.length);
-          }
-        }
-      } catch (smartRateErr) {
-        console.warn('Failed to fetch SmartRates separately:', smartRateErr);
-      }
-    }
-
-    if ((!shipmentResponse.smartRates || shipmentResponse.smartRates.length === 0)) {
-      console.warn('⚠️ SmartRates not available - falling back to standard rates');
+    if (!shipmentResponse.rates || shipmentResponse.rates.length === 0) {
+      throw new Error('No shipping rates available. Please check your package dimensions and addresses.');
     }
 
     return shipmentResponse;
