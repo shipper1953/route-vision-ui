@@ -64,15 +64,22 @@ export const useBulkShipping = () => {
         const boxGroups = new Map<string, BoxShippingGroup>();
 
         for (const order of readyToShipOrders) {
+          console.log(`Processing order ${order.id} for cartonization:`, order);
+          
           // Only process orders with items
           if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+            console.log(`Order ${order.id} has ${order.items.length} items:`, order.items);
             const items = createItemsFromOrderData(order.items, []);
+            console.log(`Created cartonization items for order ${order.id}:`, items);
             
             if (items.length > 0) {
               const engine = new CartonizationEngine(boxes);
+              console.log(`Running cartonization for order ${order.id} with ${boxes.length} available boxes`);
               const result = engine.calculateOptimalBox(items);
+              console.log(`Cartonization result for order ${order.id}:`, result);
               
               if (result && result.recommendedBox) {
+                console.log(`✅ Found recommended box for order ${order.id}:`, result.recommendedBox.name);
                 const boxId = result.recommendedBox.id;
                 
                 if (!boxGroups.has(boxId)) {
@@ -113,8 +120,21 @@ export const useBulkShipping = () => {
                 };
 
                 boxGroups.get(boxId)!.orders.push(orderForShipping);
+              } else {
+                console.warn(`❌ No recommended box found for order ${order.id}. Cartonization failed.`);
+                console.warn(`Order details:`, { 
+                  orderId: order.id, 
+                  itemsCount: items.length, 
+                  boxesAvailable: boxes.length,
+                  totalWeight: items.reduce((sum, item) => sum + (item.weight * item.quantity), 0),
+                  totalVolume: items.reduce((sum, item) => sum + (item.length * item.width * item.height * item.quantity), 0)
+                });
               }
+            } else {
+              console.warn(`❌ No cartonization items created for order ${order.id}`);
             }
+          } else {
+            console.warn(`❌ Order ${order.id} has no items or items is not an array:`, order.items);
           }
         }
 
