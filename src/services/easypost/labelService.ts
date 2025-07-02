@@ -40,8 +40,11 @@ export class LabelService {
     });
     
     if (error) {
-      console.error('Edge Function error:', error);
+      console.error('Edge Function error details:', error);
+      console.error('Error message:', error.message);
+      console.error('Error context:', error.context);
       
+      // Check if it's a 422 error with detailed response
       if (error.message.includes('422')) {
         try {
           const errorDetails = JSON.parse(error.message.split('422 ')[1]);
@@ -53,7 +56,13 @@ export class LabelService {
         }
       }
       
-      throw new Error(error.message);
+      // Provide a more specific error message
+      let errorMessage = error.message;
+      if (error.message.includes('non-2xx status code')) {
+        errorMessage = 'Label purchase failed. Please check your shipment configuration and try again.';
+      }
+      
+      throw new Error(errorMessage);
     }
     
     this.storeLabelData(data);
