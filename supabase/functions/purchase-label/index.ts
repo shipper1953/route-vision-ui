@@ -156,6 +156,18 @@ serve(async (req) => {
       return createErrorResponse('API rate limit exceeded', 'Please wait a few minutes before trying again', 429);
     }
     
+    // Handle EasyPost API specific errors
+    if (err.message?.includes('EasyPost')) {
+      console.log('Returning EasyPost specific error response');
+      return createErrorResponse('EasyPost API error', err.message, 422);
+    }
+    
+    // Handle authentication errors
+    if (err.message?.includes('Invalid EasyPost API key')) {
+      console.log('Returning auth error response');
+      return createErrorResponse('Authentication error', 'Invalid EasyPost API key configuration', 401);
+    }
+    
     console.log('Returning generic error response');
     return createErrorResponse('Internal server error', err.message, 500);
   }

@@ -42,6 +42,11 @@ interface OrderWithRates extends OrderForShipping {
     shipment_id?: string;
   }>;
   selectedRateId?: string;
+  packageWeight?: {
+    itemsWeight: number;
+    boxWeight: number;
+    totalWeight: number;
+  };
 }
 
 export const useBulkShipping = () => {
@@ -300,11 +305,23 @@ export const useBulkShipping = () => {
               length: order.recommendedBox.length,
               width: order.recommendedBox.width,
               height: order.recommendedBox.height,
-              weight: Math.max(1, order.items.reduce((total, item) => {
-                const itemWeight = parseFloat(item.weight?.toString() || '0');
-                const quantity = parseInt(item.quantity?.toString() || '1');
-                return total + (itemWeight * quantity);
-              }, 0))
+              weight: Math.max(1, (() => {
+                // Calculate total weight including items and box weight
+                const itemsWeight = order.items.reduce((total, item) => {
+                  const itemWeight = parseFloat(item.weight?.toString() || '0');
+                  const quantity = parseInt(item.quantity?.toString() || '1');
+                  return total + (itemWeight * quantity);
+                }, 0);
+                
+                // Use packageWeight if available, otherwise calculate
+                if (order.packageWeight) {
+                  return order.packageWeight.totalWeight;
+                }
+                
+                // Estimate box weight (0.1 lbs per $1 of cost as fallback)
+                const boxWeight = order.recommendedBox.cost * 0.1;
+                return itemsWeight + boxWeight;
+              })())
             },
             options: {
               label_format: 'PDF'
