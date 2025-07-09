@@ -110,7 +110,7 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
     }
     
     loadOrderFromId();
-  }, [orderIdFromUrl, form, setOrderLookupComplete, setOrderItems]);
+  }, [orderIdFromUrl]); // Removed form, setOrderLookupComplete, setOrderItems from dependencies
   
   // Reset the loaded order ref when orderIdFromUrl changes to a different order
   useEffect(() => {

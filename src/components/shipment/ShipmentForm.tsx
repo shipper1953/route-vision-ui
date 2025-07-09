@@ -77,7 +77,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
     } else {
       console.log("Warehouse address not yet available:", warehouseAddress);
     }
-  }, [warehouseAddress, form, getDefaultShippingAddress]);
+  }, [warehouseAddress]); // Removed form and getDefaultShippingAddress from dependencies
 
   // Debug log to track orderItems state changes
   useEffect(() => {
