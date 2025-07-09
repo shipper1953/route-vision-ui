@@ -59,7 +59,7 @@ export const useOrderAutocomplete = () => {
   const handleInputBlur = useCallback((e: React.FocusEvent) => {
     // Delay closing to allow for selection
     setTimeout(() => {
-      if (!e.currentTarget.contains(document.activeElement)) {
+      if (e.currentTarget && !e.currentTarget.contains(document.activeElement)) {
         setOpen(false);
       }
     }, 150);
