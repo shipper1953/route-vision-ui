@@ -25,9 +25,15 @@ serve(async (req) => {
     console.log('Processing shipment request')
     console.log('API Key available:', easyPostApiKey ? 'Yes' : 'No')
     
+    if (easyPostApiKey) {
+      console.log('API Key first 10 chars:', easyPostApiKey.substring(0, 10))
+    }
+    
     if (!easyPostApiKey) {
+      console.error('EASYPOST_API_KEY environment variable not found')
       return new Response(JSON.stringify({
-        error: 'EasyPost API key not configured'
+        error: 'EasyPost API key not configured',
+        details: 'EASYPOST_API_KEY environment variable is missing'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
