@@ -86,7 +86,7 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
         }
       }
     }
-  }, [orderItems, masterItems, boxes, parameters, createItemsFromOrderData]); // Removed form from dependencies
+  }, [orderItems, masterItems, boxes, parameters]); // Removed createItemsFromOrderData from dependencies
 
   // Reset when orderItems change significantly
   useEffect(() => {
