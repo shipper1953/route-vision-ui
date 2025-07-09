@@ -56,37 +56,41 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
       
       console.log("Calculating recommended box for order items:", orderItems);
       
-      const items = createItemsFromOrderData(orderItems, masterItems);
-      if (items.length > 0) {
-        const engine = new CartonizationEngine(boxes, parameters);
-        const result = engine.calculateOptimalBox(items);
-        
-        if (result) {
-          console.log("Recommended box calculated:", result);
-          setRecommendedBox(result.recommendedBox);
-          setBoxUtilization(result.utilization);
-          setCartonizationResult(result);
+      try {
+        const items = createItemsFromOrderData(orderItems, masterItems);
+        if (items.length > 0) {
+          const engine = new CartonizationEngine(boxes, parameters);
+          const result = engine.calculateOptimalBox(items);
           
-          // Only auto-populate form once to prevent infinite loop
-          if (!hasSetFormValuesRef.current) {
-            form.setValue("length", result.recommendedBox.length);
-            form.setValue("width", result.recommendedBox.width);
-            form.setValue("height", result.recommendedBox.height);
+          if (result) {
+            console.log("Recommended box calculated:", result);
+            setRecommendedBox(result.recommendedBox);
+            setBoxUtilization(result.utilization);
+            setCartonizationResult(result);
             
-            // Calculate total weight from items
-            const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-            form.setValue("weight", totalWeight);
+            // Only auto-populate form once to prevent infinite loop
+            if (!hasSetFormValuesRef.current) {
+              form.setValue("length", result.recommendedBox.length);
+              form.setValue("width", result.recommendedBox.width);
+              form.setValue("height", result.recommendedBox.height);
+              
+              // Calculate total weight from items
+              const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+              form.setValue("weight", totalWeight);
+              
+              hasSetFormValuesRef.current = true;
+              toast.success(`Recommended ${result.recommendedBox.name} with ${result.confidence}% confidence`);
+            }
             
-            hasSetFormValuesRef.current = true;
-            toast.success(`Recommended ${result.recommendedBox.name} with ${result.confidence}% confidence`);
+            // Mark these items as calculated
+            calculatedItemsRef.current = itemsKey;
           }
-          
-          // Mark these items as calculated
-          calculatedItemsRef.current = itemsKey;
         }
+      } catch (error) {
+        console.error("Error calculating recommended box:", error);
       }
     }
-  }, [orderItems, masterItems, boxes, parameters]); // Removed createItemsFromOrderData from dependencies
+  }, [orderItems, masterItems, boxes, parameters, createItemsFromOrderData, form]);
 
   // Reset when orderItems change significantly
   useEffect(() => {

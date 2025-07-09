@@ -72,7 +72,11 @@ url = ""
 
 [functions]
 # Configuration for Edge Functions.
+
 [functions.create-shipment]
+verify_jwt = false
+
+[functions.get-smartrates]
 verify_jwt = false
 
 [functions.purchase-label]
