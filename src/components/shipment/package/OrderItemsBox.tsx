@@ -63,7 +63,7 @@ export const OrderItemsBox = ({ orderItems, onItemsScanned }: OrderItemsBoxProps
     }));
     
     onItemsScanned(scannedOrderItems);
-  }, [scannedItems, scannedQuantities, orderItems, onItemsScanned]);
+  }, [scannedItems, scannedQuantities, orderItems]); // Removed onItemsScanned from dependencies
 
   const getItemDetails = (itemId: string) => {
     return masterItems.find(item => item.id === itemId);
