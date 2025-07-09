@@ -57,4 +57,20 @@ export interface OrderData {
   shippingAddress: OrderAddress;
   parcelInfo?: ParcelInfo; // This would come from the Qboid scanning system
   shipment?: ShipmentInfo; // New field to link shipment details
+  recommendedBox?: {
+    id: string;
+    name: string;
+    length: number;
+    width: number;
+    height: number;
+    maxWeight: number;
+    cost: number;
+    inStock: number;
+    type: string;
+  };
+  packageWeight?: {
+    itemsWeight: number;
+    boxWeight: number;
+    totalWeight: number;
+  };
 }

@@ -11,6 +11,11 @@ interface OrderForShipping {
   shippingAddress: any;
   recommendedBox: any;
   recommendedService?: string;
+  packageWeight?: {
+    itemsWeight: number;
+    boxWeight: number;
+    totalWeight: number;
+  };
 }
 
 interface BulkShipTableRowProps {
@@ -52,9 +57,21 @@ export const BulkShipTableRow = ({
         }
       </TableCell>
       <TableCell>
-        <Badge variant="secondary">
-          {order.recommendedService || 'Ground'}
-        </Badge>
+        <div className="space-y-1">
+          <Badge variant="secondary">
+            {order.recommendedService || 'Ground'}
+          </Badge>
+          {order.recommendedBox && (
+            <div className="text-xs text-muted-foreground">
+              Box: {order.recommendedBox.name}
+            </div>
+          )}
+          {order.packageWeight && (
+            <div className="text-xs text-muted-foreground">
+              {order.packageWeight.totalWeight.toFixed(1)} lbs
+            </div>
+          )}
+        </div>
       </TableCell>
     </TableRow>
   );

@@ -17,6 +17,11 @@ interface OrderForShipping {
   shippingAddress: any;
   recommendedBox: any;
   recommendedService?: string;
+  packageWeight?: {
+    itemsWeight: number;
+    boxWeight: number;
+    totalWeight: number;
+  };
 }
 
 interface ShippingResult {

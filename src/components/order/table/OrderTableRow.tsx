@@ -19,8 +19,8 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const navigate = useNavigate();
   const { boxes, createItemsFromOrderData } = useCartonization();
 
-  const getRecommendedBox = (order: OrderData) => {
-    if (order.status !== 'ready_to_ship') return null;
+  const getRecommendedBoxAndWeight = (order: OrderData) => {
+    if (order.status !== 'ready_to_ship') return { box: null, weight: null };
     
     if (order.items && Array.isArray(order.items) && order.items.length > 0) {
       const items = createItemsFromOrderData(order.items, []);
@@ -30,15 +30,27 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
         const result = engine.calculateOptimalBox(items);
         
         if (result && result.recommendedBox) {
-          return result.recommendedBox;
+          // Calculate total weight including items and box
+          const itemsWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+          const boxWeight = result.recommendedBox.cost * 0.1; // Estimate box weight (0.1 lbs per $1 of cost)
+          const totalWeight = itemsWeight + boxWeight;
+          
+          return {
+            box: result.recommendedBox,
+            weight: {
+              itemsWeight,
+              boxWeight,
+              totalWeight
+            }
+          };
         }
       }
     }
     
-    return null;
+    return { box: null, weight: null };
   };
 
-  const recommendedBox = getRecommendedBox(order);
+  const { box: recommendedBox, weight: packageWeight } = getRecommendedBoxAndWeight(order);
 
   return (
     <TableRow key={order.id}>
@@ -68,6 +80,11 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
               <div className="text-muted-foreground">
                 {recommendedBox.length}" × {recommendedBox.width}" × {recommendedBox.height}"
               </div>
+              {packageWeight && (
+                <div className="text-xs text-muted-foreground">
+                  Weight: {packageWeight.totalWeight.toFixed(1)} lbs
+                </div>
+              )}
             </div>
           </div>
         ) : (
