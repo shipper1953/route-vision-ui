@@ -4,7 +4,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
 
-console.log('EasyPost API key available in Edge Function:', easyPostApiKey ? 'YES' : 'NO')
+console.log('Create-shipment function loaded. EasyPost API key available:', easyPostApiKey ? 'YES' : 'NO')
+console.log('Environment check - All env vars available:', {
+  supabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+  supabaseAnonKey: !!Deno.env.get('SUPABASE_ANON_KEY'),
+  easypostKey: !!Deno.env.get('EASYPOST_API_KEY')
+})
 
 serve(async (req) => {
   console.log('Create-shipment function invoked')
