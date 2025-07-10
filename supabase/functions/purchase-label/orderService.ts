@@ -5,33 +5,35 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
   let orderUpdateSuccess = false;
   let foundOrder = null;
   
-  // Strategy 1: Try exact match on order_id field
-  console.log(`📝 Strategy 1: Searching for order with exact order_id: "${orderId}"`);
-  const { data: orderByOrderId, error: searchError1 } = await supabaseClient
-    .from('orders')
-    .select('id, order_id, customer_name, status')
-    .eq('order_id', orderId)
-    .maybeSingle();
-  
-  if (!searchError1 && orderByOrderId) {
-    foundOrder = orderByOrderId;
-    console.log(`✅ Found order by exact order_id match:`, foundOrder);
-  } else {
-    console.log(`❌ Strategy 1 failed. Error:`, searchError1);
-  }
-  
-  // Strategy 2: If not found and orderId is numeric, try by id field
-  if (!foundOrder && !isNaN(Number(orderId))) {
-    console.log(`📝 Strategy 2: Searching for order with numeric id: ${orderId}`);
-    const { data: orderById, error: searchError2 } = await supabaseClient
+  // Strategy 1: If orderId is numeric, try by id field first (most likely case)
+  if (!isNaN(Number(orderId))) {
+    console.log(`📝 Strategy 1: Searching for order with numeric id: ${orderId}`);
+    const { data: orderById, error: searchError1 } = await supabaseClient
       .from('orders')
       .select('id, order_id, customer_name, status')
       .eq('id', parseInt(orderId, 10))
       .maybeSingle();
     
-    if (!searchError2 && orderById) {
+    if (!searchError1 && orderById) {
       foundOrder = orderById;
       console.log(`✅ Found order by numeric id:`, foundOrder);
+    } else {
+      console.log(`❌ Strategy 1 failed. Error:`, searchError1);
+    }
+  }
+  
+  // Strategy 2: Try exact match on order_id field
+  if (!foundOrder) {
+    console.log(`📝 Strategy 2: Searching for order with exact order_id: "${orderId}"`);
+    const { data: orderByOrderId, error: searchError2 } = await supabaseClient
+      .from('orders')
+      .select('id, order_id, customer_name, status')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    
+    if (!searchError2 && orderByOrderId) {
+      foundOrder = orderByOrderId;
+      console.log(`✅ Found order by exact order_id match:`, foundOrder);
     } else {
       console.log(`❌ Strategy 2 failed. Error:`, searchError2);
     }
