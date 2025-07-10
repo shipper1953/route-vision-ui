@@ -1,14 +1,12 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { saveShipmentToDatabase } from './shipmentService.ts'
 import { linkShipmentToOrder } from './orderService.ts'
-import { purchaseShippingLabel } from './easypostService.ts'
 import { corsHeaders, handleCorsPreflightRequest, createErrorResponse, createSuccessResponse } from './corsUtils.ts'
 import { authenticateUser, getUserCompany } from './authService.ts'
 import { processWalletPayment } from './walletService.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-// Fix for EASYPOST_API_KEY with newline characters
+// Fix for EASYPOST_API_KEY with newline characters - v2.0
 function getCleanEasyPostKey(): string | undefined {
   // Try clean key first
   let key = Deno.env.get('EASYPOST_API_KEY')
@@ -33,12 +31,125 @@ function getCleanEasyPostKey(): string | undefined {
 
 const easyPostApiKey = getCleanEasyPostKey()
 
-console.log('EasyPost API key available in purchase-label function:', easyPostApiKey ? 'YES' : 'NO')
+console.log('=== PURCHASE-LABEL v2.0 STARTUP ===')
+console.log('EasyPost API key available:', easyPostApiKey ? 'YES' : 'NO')
+
+async function ensurePhoneNumbers(shipmentId: string, apiKey: string) {
+  console.log('Checking and fixing phone numbers for shipment:', shipmentId);
+  
+  // Get the current shipment details
+  const getResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  if (!getResponse.ok) {
+    console.log('Failed to get shipment details, proceeding with purchase anyway');
+    return; // Don't fail the whole operation if we can't get details
+  }
+  
+  const shipment = await getResponse.json();
+  
+  // Check if phone numbers are missing or empty
+  const fromNeedsPhone = !shipment.from_address?.phone || shipment.from_address.phone.trim() === '';
+  const toNeedsPhone = !shipment.to_address?.phone || shipment.to_address.phone.trim() === '';
+  
+  if (fromNeedsPhone || toNeedsPhone) {
+    console.log('Phone numbers missing, updating shipment addresses');
+    
+    // Update the shipment with proper phone numbers
+    const updateData: any = {};
+    
+    if (fromNeedsPhone) {
+      updateData.from_address = {
+        ...shipment.from_address,
+        phone: "5555555555"
+      };
+    }
+    
+    if (toNeedsPhone) {
+      updateData.to_address = {
+        ...shipment.to_address,
+        phone: "5555555555"
+      };
+    }
+    
+    const updateResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ shipment: updateData }),
+    });
+    
+    if (updateResponse.ok) {
+      console.log('✅ Successfully updated shipment with phone numbers');
+    } else {
+      console.log('⚠️ Failed to update shipment with phone numbers, but continuing...');
+    }
+  } else {
+    console.log('✅ Phone numbers already present');
+  }
+}
+
+async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey: string) {
+  // First, ensure phone numbers are present
+  await ensurePhoneNumbers(shipmentId, apiKey);
+  
+  console.log('Purchasing label for shipment:', shipmentId, 'with rate:', rateId);
+  
+  const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ 
+      rate: { id: rateId }
+    }),
+  });
+  
+  const responseText = await response.text();
+  let responseData;
+  
+  try {
+    responseData = JSON.parse(responseText);
+  } catch (err) {
+    responseData = { raw_response: responseText };
+  }
+  
+  if (!response.ok) {
+    console.error('EasyPost API error:', responseData);
+    
+    // Provide more specific error messages
+    let errorMessage = 'EasyPost API error';
+    if (responseData.error?.message) {
+      errorMessage = responseData.error.message;
+    } else if (response.status === 422) {
+      errorMessage = 'Invalid shipment or rate data. Please check your shipment configuration.';
+    } else if (response.status === 401) {
+      errorMessage = 'Invalid EasyPost API key. Please check your configuration.';
+    } else if (response.status === 404) {
+      errorMessage = 'Shipment or rate not found. The shipment may have expired.';
+    } else if (response.status === 429) {
+      errorMessage = 'API rate limit exceeded. Please wait a few minutes before trying again.';
+    } else if (responseText.includes('rate-limited') || responseText.includes('RATE_LIMITED')) {
+      errorMessage = 'API rate limit exceeded. Please wait a few minutes before trying again.';
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  return responseData;
+}
 
 serve(async (req) => {
-  console.log('=== PURCHASE LABEL FUNCTION START ===');
+  console.log('=== PURCHASE LABEL v2.0 FUNCTION START ===');
   console.log('Request method:', req.method);
-  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
   
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
@@ -52,7 +163,6 @@ serve(async (req) => {
     // Authenticate user
     const authHeader = req.headers.get('Authorization');
     console.log('Auth header present:', authHeader ? 'YES' : 'NO');
-    console.log('Auth header value:', authHeader?.substring(0, 20) + '...');
     
     const user = await authenticateUser(authHeader);
     console.log('User authenticated successfully:', user.id);
@@ -166,12 +276,11 @@ serve(async (req) => {
     return createSuccessResponse(purchaseResponse);
     
   } catch (err) {
-    console.error('=== ERROR IN PURCHASE LABEL FUNCTION ===');
+    console.error('=== ERROR IN PURCHASE LABEL FUNCTION v2.0 ===');
     console.error('Error type:', typeof err);
     console.error('Error constructor:', err.constructor?.name);
     console.error('Error message:', err.message);
     console.error('Error stack:', err.stack);
-    console.error('Full error object:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     
     // Handle rate limiting specifically
     if (err.message?.includes('rate limit') || err.message?.includes('RATE_LIMITED')) {
