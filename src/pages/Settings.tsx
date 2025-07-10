@@ -53,10 +53,7 @@ const Settings = () => {
           </TabsContent>
           
           <TabsContent value="box-inventory" className="space-y-4">
-            <BoxInventoryManager 
-              boxes={boxes} 
-              onBoxesChange={setBoxes} 
-            />
+            <BoxInventoryManager />
           </TabsContent>
           
           <TabsContent value="box-recommendations" className="space-y-4">

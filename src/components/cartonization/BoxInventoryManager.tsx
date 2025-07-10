@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,77 +6,138 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Package, Trash2 } from "lucide-react";
-import { Box } from "@/services/cartonization/cartonizationEngine";
+import { Plus, Edit, Package, Trash2, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context";
+import { useCartonization } from "@/hooks/useCartonization";
 import { toast } from "sonner";
 
-interface BoxInventoryManagerProps {
-  boxes: Box[];
-  onBoxesChange: (boxes: Box[]) => void;
-}
-
-export const BoxInventoryManager = ({ boxes, onBoxesChange }: BoxInventoryManagerProps) => {
+export const BoxInventoryManager = () => {
+  const { boxes, loading, updateBoxInventory } = useCartonization();
+  const { userProfile } = useAuth();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingBox, setEditingBox] = useState<Box | null>(null);
-  const [newBox, setNewBox] = useState<Partial<Box>>({
+  const [editingBox, setEditingBox] = useState<any>(null);
+  const [newBox, setNewBox] = useState({
     name: '',
     length: 0,
     width: 0,
     height: 0,
-    maxWeight: 0,
+    max_weight: 0,
     cost: 0,
-    inStock: 0,
-    type: 'box'
+    in_stock: 0,
+    box_type: 'box' as 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom',
+    sku: '',
+    description: ''
   });
 
-  const handleAddBox = () => {
+  const handleAddBox = async () => {
     if (!newBox.name || !newBox.length || !newBox.width || !newBox.height) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    const box: Box = {
-      id: Date.now().toString(),
-      name: newBox.name,
-      length: newBox.length || 0,
-      width: newBox.width || 0,
-      height: newBox.height || 0,
-      maxWeight: newBox.maxWeight || 50,
-      cost: newBox.cost || 0,
-      inStock: newBox.inStock || 0,
-      type: newBox.type as 'box' | 'poly_bag'
-    };
+    if (!userProfile?.company_id) {
+      toast.error('No company assigned to user');
+      return;
+    }
 
-    onBoxesChange([...boxes, box]);
-    setNewBox({
-      name: '',
-      length: 0,
-      width: 0,
-      height: 0,
-      maxWeight: 0,
-      cost: 0,
-      inStock: 0,
-      type: 'box'
-    });
-    setIsAddDialogOpen(false);
-    toast.success('Box added successfully');
+    try {
+      const { error } = await supabase
+        .from('boxes')
+        .insert({
+          company_id: userProfile.company_id,
+          name: newBox.name,
+          length: newBox.length,
+          width: newBox.width,
+          height: newBox.height,
+          max_weight: newBox.max_weight || 50,
+          cost: newBox.cost || 0,
+          in_stock: newBox.in_stock || 0,
+          box_type: newBox.box_type,
+          sku: newBox.sku || null,
+          description: newBox.description || null
+        });
+
+      if (error) {
+        console.error('Error adding box:', error);
+        toast.error('Failed to add box');
+        return;
+      }
+
+      toast.success('Box added successfully');
+      setIsAddDialogOpen(false);
+      resetForm();
+      
+      // Refresh boxes by reloading the page or triggering a refetch
+      window.location.reload();
+    } catch (error) {
+      console.error('Error adding box:', error);
+      toast.error('Failed to add box');
+    }
   };
 
-  const handleUpdateBox = () => {
+  const handleEditBox = async () => {
     if (!editingBox) return;
 
-    const updatedBoxes = boxes.map(box => 
-      box.id === editingBox.id ? editingBox : box
-    );
-    onBoxesChange(updatedBoxes);
-    setEditingBox(null);
-    toast.success('Box updated successfully');
+    try {
+      const { error } = await supabase
+        .from('boxes')
+        .update({
+          name: editingBox.name,
+          length: editingBox.length,
+          width: editingBox.width,
+          height: editingBox.height,
+          max_weight: editingBox.maxWeight,
+          cost: editingBox.cost,
+          in_stock: editingBox.inStock,
+          box_type: editingBox.type,
+          sku: editingBox.sku || null,
+          description: editingBox.description || null
+        })
+        .eq('id', editingBox.id);
+
+      if (error) {
+        console.error('Error updating box:', error);
+        toast.error('Failed to update box');
+        return;
+      }
+
+      toast.success('Box updated successfully');
+      setEditingBox(null);
+      
+      // Refresh boxes
+      window.location.reload();
+    } catch (error) {
+      console.error('Error updating box:', error);
+      toast.error('Failed to update box');
+    }
   };
 
-  const handleDeleteBox = (boxId: string) => {
-    const updatedBoxes = boxes.filter(box => box.id !== boxId);
-    onBoxesChange(updatedBoxes);
-    toast.success('Box deleted successfully');
+  const handleDeleteBox = async (boxId: string) => {
+    if (!confirm('Are you sure you want to delete this box?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('boxes')
+        .delete()
+        .eq('id', boxId);
+
+      if (error) {
+        console.error('Error deleting box:', error);
+        toast.error('Failed to delete box');
+        return;
+      }
+
+      toast.success('Box deleted successfully');
+      
+      // Refresh boxes
+      window.location.reload();
+    } catch (error) {
+      console.error('Error deleting box:', error);
+      toast.error('Failed to delete box');
+    }
   };
 
   const resetForm = () => {
@@ -86,12 +146,25 @@ export const BoxInventoryManager = ({ boxes, onBoxesChange }: BoxInventoryManage
       length: 0,
       width: 0,
       height: 0,
-      maxWeight: 0,
+      max_weight: 0,
       cost: 0,
-      inStock: 0,
-      type: 'box'
+      in_stock: 0,
+      box_type: 'box',
+      sku: '',
+      description: ''
     });
   };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading boxes...</span>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -124,13 +197,16 @@ export const BoxInventoryManager = ({ boxes, onBoxesChange }: BoxInventoryManage
                 </div>
                 <div>
                   <Label htmlFor="boxType">Type</Label>
-                  <Select value={newBox.type} onValueChange={(value: 'box' | 'poly_bag') => setNewBox({ ...newBox, type: value })}>
+                  <Select value={newBox.box_type} onValueChange={(value) => setNewBox({ ...newBox, box_type: value as any })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="box">Box</SelectItem>
                       <SelectItem value="poly_bag">Poly Bag</SelectItem>
+                      <SelectItem value="envelope">Envelope</SelectItem>
+                      <SelectItem value="tube">Tube</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -139,8 +215,8 @@ export const BoxInventoryManager = ({ boxes, onBoxesChange }: BoxInventoryManage
                   <Input
                     id="inStock"
                     type="number"
-                    value={newBox.inStock}
-                    onChange={(e) => setNewBox({ ...newBox, inStock: parseInt(e.target.value) || 0 })}
+                    value={newBox.in_stock}
+                    onChange={(e) => setNewBox({ ...newBox, in_stock: parseInt(e.target.value) || 0 })}
                   />
                 </div>
                 <div>
@@ -179,8 +255,8 @@ export const BoxInventoryManager = ({ boxes, onBoxesChange }: BoxInventoryManage
                     id="maxWeight"
                     type="number"
                     step="0.1"
-                    value={newBox.maxWeight}
-                    onChange={(e) => setNewBox({ ...newBox, maxWeight: parseFloat(e.target.value) || 0 })}
+                    value={newBox.max_weight}
+                    onChange={(e) => setNewBox({ ...newBox, max_weight: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
                 <div>
@@ -193,6 +269,24 @@ export const BoxInventoryManager = ({ boxes, onBoxesChange }: BoxInventoryManage
                     onChange={(e) => setNewBox({ ...newBox, cost: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
+                <div className="col-span-2">
+                  <Label htmlFor="sku">SKU (Optional)</Label>
+                  <Input
+                    id="sku"
+                    value={newBox.sku}
+                    onChange={(e) => setNewBox({ ...newBox, sku: e.target.value })}
+                    placeholder="e.g., BX-001"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="description">Description (Optional)</Label>
+                  <Input
+                    id="description"
+                    value={newBox.description}
+                    onChange={(e) => setNewBox({ ...newBox, description: e.target.value })}
+                    placeholder="Additional details about this box"
+                  />
+                </div>
               </div>
               <Button onClick={handleAddBox} className="w-full mt-4">
                 Add Box
@@ -202,44 +296,58 @@ export const BoxInventoryManager = ({ boxes, onBoxesChange }: BoxInventoryManage
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {boxes.map((box) => (
-            <Card key={box.id} className="p-4">
-              <div className="flex items-start justify-between mb-2">
-                <h4 className="font-semibold">{box.name}</h4>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingBox(box)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteBox(box.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+        {boxes.length === 0 ? (
+          <div className="text-center py-8">
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No boxes found</h3>
+            <p className="text-muted-foreground mb-4">
+              Get started by adding your first box to the inventory.
+            </p>
+            <Button onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Your First Box
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {boxes.map((box) => (
+              <Card key={box.id} className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <h4 className="font-semibold">{box.name}</h4>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditingBox(box)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteBox(box.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-1 text-sm text-muted-foreground">
-                <p>Dimensions: {box.length}" × {box.width}" × {box.height}"</p>
-                <p>Max Weight: {box.maxWeight} lbs</p>
-                <p>Cost: ${box.cost.toFixed(2)}</p>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Badge variant="secondary">
-                  {box.type.replace('_', ' ').toUpperCase()}
-                </Badge>
-                <Badge variant={box.inStock > 0 ? "default" : "destructive"}>
-                  {box.inStock} in stock
-                </Badge>
-              </div>
-            </Card>
-          ))}
-        </div>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>Dimensions: {box.length}" × {box.width}" × {box.height}"</p>
+                  <p>Max Weight: {box.maxWeight} lbs</p>
+                  <p>Cost: ${box.cost.toFixed(2)}</p>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="secondary">
+                    {box.type.replace('_', ' ').toUpperCase()}
+                  </Badge>
+                  <Badge variant={box.inStock > 0 ? "default" : "destructive"}>
+                    {box.inStock} in stock
+                  </Badge>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Edit Dialog */}
         <Dialog open={!!editingBox} onOpenChange={(open) => !open && setEditingBox(null)}>
@@ -276,9 +384,19 @@ export const BoxInventoryManager = ({ boxes, onBoxesChange }: BoxInventoryManage
                     onChange={(e) => setEditingBox({ ...editingBox, cost: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
+                <div>
+                  <Label htmlFor="editMaxWeight">Max Weight (lbs)</Label>
+                  <Input
+                    id="editMaxWeight"
+                    type="number"
+                    step="0.1"
+                    value={editingBox.maxWeight}
+                    onChange={(e) => setEditingBox({ ...editingBox, maxWeight: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
               </div>
             )}
-            <Button onClick={handleUpdateBox} className="w-full mt-4">
+            <Button onClick={handleEditBox} className="w-full mt-4">
               Update Box
             </Button>
           </DialogContent>
