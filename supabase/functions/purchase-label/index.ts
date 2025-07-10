@@ -90,6 +90,18 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
     throw new Error(responseData.detail || 'Failed to purchase Shippo label')
   }
   
+  // Check if Shippo transaction was successful
+  if (responseData.status === 'ERROR') {
+    console.error('❌ Shippo transaction error:', responseData)
+    const errorMessages = responseData.messages?.map((msg: any) => msg.text).join('; ') || 'Unknown error';
+    throw new Error(`Shippo label creation failed: ${errorMessages}`)
+  }
+  
+  if (!responseData.label_url) {
+    console.error('❌ Shippo label URL missing:', responseData)
+    throw new Error('Shippo label was created but no label URL was provided')
+  }
+  
   console.log('✅ Shippo label purchased successfully')
   return responseData
 }
