@@ -45,16 +45,14 @@ export const useShipment = (initialOrderId?: string | null) => {
         actualShipmentId = shipmentResponse.easypost_shipment.id;
         console.log('Using EasyPost shipment ID:', actualShipmentId);
       } else if (selectedRate?.provider === 'shippo' && shipmentResponse?.shippo_shipment?.object_id) {
-        // For Shippo, we need to handle label purchase differently
-        console.log('Shippo label purchase not yet implemented');
-        toast.error('Shippo label purchase coming soon');
-        return null;
+        actualShipmentId = shipmentResponse.shippo_shipment.object_id;
+        console.log('Using Shippo shipment ID:', actualShipmentId);
       }
       
       const labelService = new LabelService('');
       
-      // Call the edge function with orderId if available
-      const result = await labelService.purchaseLabel(actualShipmentId, rateId, initialOrderId);
+      // Call the edge function with orderId and provider if available
+      const result = await labelService.purchaseLabel(actualShipmentId, rateId, initialOrderId, selectedRate?.provider);
       
       console.log('Label purchase result:', result);
       

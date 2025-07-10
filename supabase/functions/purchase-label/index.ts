@@ -60,6 +60,39 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
   return responseData
 }
 
+async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: string) {
+  console.log('🚚 Purchasing Shippo label for shipment:', shipmentId, 'with rate:', rateId)
+  
+  const response = await fetch(`https://api.goshippo.com/transactions/`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `ShippoToken ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      rate: rateId,
+      async: false
+    }),
+  })
+  
+  const responseText = await response.text()
+  let responseData
+  
+  try {
+    responseData = JSON.parse(responseText)
+  } catch (err) {
+    responseData = { raw_response: responseText }
+  }
+  
+  if (!response.ok) {
+    console.error('❌ Shippo API error:', responseData)
+    throw new Error(responseData.detail || 'Failed to purchase Shippo label')
+  }
+  
+  console.log('✅ Shippo label purchased successfully')
+  return responseData
+}
+
 serve(async (req) => {
   console.log('=== PURCHASE LABEL v8.0 FUNCTION START ===')
   console.log('Request method:', req.method)
@@ -116,19 +149,31 @@ serve(async (req) => {
       return createErrorResponse('Invalid JSON in request body', parseError.message, 400)
     }
     
-    const { shipmentId, rateId, orderId } = requestBody
+    const { shipmentId, rateId, orderId, provider } = requestBody
     
     if (!shipmentId || !rateId) {
       console.error('❌ Missing required parameters:', { shipmentId, rateId })
       return createErrorResponse('Missing required parameters: shipmentId and rateId are required', null, 400)
     }
     
-    console.log(`📦 Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''}`)
+    console.log(`📦 Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} using ${provider || 'easypost'}`)
 
-    // Purchase label from EasyPost
-    console.log('📡 Calling EasyPost API...')
-    const purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
-    console.log('✅ Label purchased successfully from EasyPost:', purchaseResponse.id)
+    // Purchase label from the appropriate provider
+    let purchaseResponse
+    if (provider === 'shippo') {
+      console.log('📡 Calling Shippo API...')
+      const shippoApiKey = Deno.env.get('SHIPPO_API_KEY')
+      if (!shippoApiKey) {
+        console.error('❌ Missing Shippo API key')
+        return createErrorResponse('Shippo API key not configured', null, 500)
+      }
+      purchaseResponse = await purchaseShippoLabel(shipmentId, rateId, shippoApiKey)
+      console.log('✅ Label purchased successfully from Shippo:', purchaseResponse.object_id)
+    } else {
+      console.log('📡 Calling EasyPost API...')
+      purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
+      console.log('✅ Label purchased successfully from EasyPost:', purchaseResponse.id)
+    }
     
     // Save shipment to database
     console.log('💾 Saving shipment to database...')

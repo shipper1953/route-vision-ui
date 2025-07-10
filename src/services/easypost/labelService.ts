@@ -11,12 +11,12 @@ export class LabelService {
     this.useEdgeFunctions = !apiKey;
   }
 
-  async purchaseLabel(shipmentId: string, rateId: string, orderId?: string | null): Promise<any> {
+  async purchaseLabel(shipmentId: string, rateId: string, orderId?: string | null, provider?: string): Promise<any> {
     try {
-      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''}`);
+      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} using ${provider || 'easypost'}`);
       
       if (this.useEdgeFunctions) {
-        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId);
+        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider);
       }
       
       return this.purchaseLabelDirectly(shipmentId, rateId);
@@ -26,13 +26,19 @@ export class LabelService {
     }
   }
 
-  private async purchaseLabelViaEdgeFunction(shipmentId: string, rateId: string, orderId?: string | null): Promise<any> {
+  private async purchaseLabelViaEdgeFunction(shipmentId: string, rateId: string, orderId?: string | null, provider?: string): Promise<any> {
     const requestBody: any = { shipmentId, rateId };
     
     // Include orderId if provided
     if (orderId) {
       requestBody.orderId = orderId;
       console.log('Including orderId in edge function request:', orderId);
+    }
+
+    // Include provider if provided
+    if (provider) {
+      requestBody.provider = provider;
+      console.log('Including provider in edge function request:', provider);
     }
 
     console.log('Calling purchase-label edge function with:', requestBody);
