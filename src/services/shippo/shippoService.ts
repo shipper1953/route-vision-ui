@@ -4,15 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 export interface ShippoRate {
   object_id: string;
   object_owner: string;
-  carrier: string;
-  service: string;
+  provider: string;
+  servicelevel: {
+    name: string;
+    token: string;
+  };
   amount: string;
   currency: string;
   delivery_days?: number;
   estimated_days?: number;
   zone?: string;
   duration_terms?: string;
-  provider?: string;
 }
 
 export interface ShippoShipmentResponse {

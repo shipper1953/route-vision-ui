@@ -80,8 +80,8 @@ export class RateShoppingService {
       if (shippoResponse.rates) {
         const shippoRates = shippoResponse.rates.map((rate: ShippoRate) => ({
           id: rate.object_id,
-          carrier: rate.carrier,
-          service: rate.service,
+          carrier: rate.provider,
+          service: rate.servicelevel?.name || 'Standard',
           rate: rate.amount,
           currency: rate.currency,
           delivery_days: rate.delivery_days || rate.estimated_days,
