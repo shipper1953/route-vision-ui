@@ -1,6 +1,9 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { saveShipmentToDatabase } from './shipmentService.ts'
+import { linkShipmentToOrder } from './orderService.ts'
 
-console.log('=== PURCHASE-LABEL v7.0 CLEAN SYNTAX ===')
+console.log('=== PURCHASE-LABEL v8.0 WITH ORDER LINKING ===')
 
 const corsHeaders = {
   'Content-Type': 'application/json',
@@ -58,7 +61,7 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
 }
 
 serve(async (req) => {
-  console.log('=== PURCHASE LABEL v7.0 FUNCTION START ===')
+  console.log('=== PURCHASE LABEL v8.0 FUNCTION START ===')
   console.log('Request method:', req.method)
   
   // Handle preflight OPTIONS request
@@ -70,14 +73,38 @@ serve(async (req) => {
   try {
     console.log('Processing purchase-label request...')
     
-    // Check environment variable first
-    console.log('🔑 Checking EASYPOST_API_KEY...')
-    const apiKey = Deno.env.get('EASYPOST_API_KEY')
-    if (!apiKey) {
-      console.error('❌ EASYPOST_API_KEY environment variable not found')
-      return createErrorResponse('EasyPost API key not configured', 'Please ensure EASYPOST_API_KEY is set in environment variables', 500)
+    // Get authorization header for user authentication
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) {
+      console.error('❌ Missing authorization header')
+      return createErrorResponse('Unauthorized', 'Authorization header required', 401)
     }
-    console.log('✅ EasyPost API key is configured')
+    
+    // Check environment variables
+    console.log('🔑 Checking environment variables...')
+    const apiKey = Deno.env.get('EASYPOST_API_KEY')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!apiKey || !supabaseUrl || !supabaseKey) {
+      console.error('❌ Missing required environment variables')
+      return createErrorResponse('Configuration error', 'Required environment variables not configured', 500)
+    }
+    console.log('✅ Environment variables configured')
+    
+    // Create Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+    
+    // Get user from auth header
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
+      console.error('❌ Failed to authenticate user:', authError)
+      return createErrorResponse('Unauthorized', 'Invalid authorization token', 401)
+    }
+    
+    console.log('✅ User authenticated:', user.id)
     
     // Parse request body
     let requestBody
@@ -103,11 +130,31 @@ serve(async (req) => {
     const purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
     console.log('✅ Label purchased successfully from EasyPost:', purchaseResponse.id)
     
+    // Save shipment to database
+    console.log('💾 Saving shipment to database...')
+    const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, user.id)
+    console.log('✅ Shipment saved to database with ID:', finalShipmentId)
+    
+    // Link order to shipment if orderId provided
+    if (orderId && finalShipmentId) {
+      console.log('🔗 Linking order to shipment...')
+      const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId)
+      if (linkSuccess) {
+        console.log('✅ Order successfully linked to shipment')
+      } else {
+        console.log('⚠️ Order linking failed, but shipment was created')
+      }
+    }
+    
     console.log('🎉 Returning successful response')
-    return createSuccessResponse(purchaseResponse)
+    return createSuccessResponse({
+      ...purchaseResponse,
+      shipment_id: finalShipmentId,
+      order_linked: orderId ? true : false
+    })
     
   } catch (err) {
-    console.error('💥 === ERROR IN PURCHASE LABEL FUNCTION v7.0 ===')
+    console.error('💥 === ERROR IN PURCHASE LABEL FUNCTION v8.0 ===')
     console.error('Error type:', typeof err)
     console.error('Error constructor:', err.constructor?.name)
     console.error('Error message:', err.message)
