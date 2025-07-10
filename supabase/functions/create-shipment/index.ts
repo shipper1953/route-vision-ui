@@ -1,25 +1,36 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-// Force redeployment: v3.0 - Updated to properly read EASYPOST_API_KEY
+// Force redeployment: v4.0 - Complete diagnostics and fix
 const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
 const supabaseUrl = Deno.env.get('SUPABASE_URL')
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
 
-console.log('=== CREATE-SHIPMENT FUNCTION STARTUP v3.0 ===')
+console.log('=== CREATE-SHIPMENT FUNCTION STARTUP v4.0 ===')
 console.log('Environment variables check:')
 console.log('- SUPABASE_URL:', supabaseUrl ? 'Available' : 'Missing')
 console.log('- SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Available' : 'Missing')
 console.log('- EASYPOST_API_KEY:', easyPostApiKey ? 'Available (length: ' + easyPostApiKey.length + ')' : 'Missing')
+
+// Debug: Log all environment variables (filtered for security)
+const allEnvVars = Deno.env.toObject()
+const filteredEnvVars = Object.keys(allEnvVars).reduce((acc, key) => {
+  if (key.includes('EASYPOST') || key.includes('SUPABASE')) {
+    acc[key] = key.includes('KEY') ? (allEnvVars[key] ? 'SET (length: ' + allEnvVars[key].length + ')' : 'NOT SET') : 'Available'
+  }
+  return acc
+}, {} as Record<string, string>)
+
+console.log('Filtered environment variables:', filteredEnvVars)
 console.log('==========================================')
 
 if (!easyPostApiKey) {
   console.error('❌ CRITICAL: EASYPOST_API_KEY environment variable is not set!')
-  console.error('Available env vars:', Object.keys(Deno.env.toObject()))
+  console.error('All available env var keys:', Object.keys(allEnvVars).filter(key => !key.includes('PASSWORD') && !key.includes('SECRET')))
 } else {
   console.log('✅ EASYPOST_API_KEY is properly configured')
   console.log('Key starts with:', easyPostApiKey.substring(0, 5) + '...')
+  console.log('Key validation:', easyPostApiKey.startsWith('EZ') ? 'Valid format' : 'Invalid format - should start with EZ')
 }
 
 serve(async (req) => {
@@ -43,13 +54,21 @@ serve(async (req) => {
     
     if (easyPostApiKey) {
       console.log('API Key first 10 chars:', easyPostApiKey.substring(0, 10))
+      console.log('API Key format check:', easyPostApiKey.startsWith('EZ') ? 'VALID' : 'INVALID')
     }
     
+    // Enhanced error handling for missing API key
     if (!easyPostApiKey) {
       console.error('EASYPOST_API_KEY environment variable not found')
+      console.error('Function environment diagnostic complete')
       return new Response(JSON.stringify({
         error: 'EasyPost API key not configured',
-        details: 'EASYPOST_API_KEY environment variable is missing'
+        details: 'EASYPOST_API_KEY environment variable is missing',
+        diagnostic: {
+          envVarsAvailable: Object.keys(allEnvVars).length,
+          supabaseConfigured: !!supabaseUrl && !!supabaseAnonKey,
+          timestamp: new Date().toISOString()
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
@@ -100,6 +119,7 @@ serve(async (req) => {
     })
     
     console.log('Creating shipment with standard rate data:', JSON.stringify(shipmentData, null, 2))
+    console.log('Using API key:', easyPostApiKey.substring(0, 10) + '...')
     
     // Call EasyPost API to create shipment with standard rates only
     const response = await fetch('https://api.easypost.com/v2/shipments', {
@@ -113,6 +133,9 @@ serve(async (req) => {
       }),
     })
     
+    console.log('EasyPost API response status:', response.status)
+    console.log('EasyPost API response headers:', Object.fromEntries(response.headers.entries()))
+    
     if (!response.ok) {
       const errorData = await response.json()
       console.error('EasyPost API error:', errorData)
@@ -123,12 +146,18 @@ serve(async (req) => {
       } else if (response.status === 422) {
         errorMessage = 'Invalid shipment data. Please check addresses and package dimensions.'
       } else if (response.status === 401) {
-        errorMessage = 'Invalid EasyPost API key'
+        errorMessage = 'Invalid EasyPost API key. Please verify your API key is correct.'
+        console.error('API Key authentication failed - key may be invalid or expired')
       }
       
       return new Response(JSON.stringify({
         error: errorMessage,
-        details: errorData
+        details: errorData,
+        diagnostic: {
+          status: response.status,
+          apiKeyPresent: !!easyPostApiKey,
+          apiKeyFormat: easyPostApiKey ? (easyPostApiKey.startsWith('EZ') ? 'valid' : 'invalid') : 'missing'
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: response.status,
@@ -220,7 +249,11 @@ serve(async (req) => {
     console.error('Error in create-shipment function:', err)
     return new Response(JSON.stringify({ 
       error: 'Internal server error', 
-      details: err.message 
+      details: err.message,
+      diagnostic: {
+        timestamp: new Date().toISOString(),
+        apiKeyConfigured: !!easyPostApiKey
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
