@@ -111,9 +111,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/shipments/create', { 
-                state: { orderId: order.id } 
-              })}
+              onClick={() => navigate(`/shipments/create?orderId=${order.id}`)}
             >
               <Truck className="h-4 w-4" />
             </Button>
