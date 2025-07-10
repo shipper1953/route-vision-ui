@@ -62,7 +62,17 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
 }
 
 async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: string) {
-  console.log('🚚 Purchasing Shippo label for shipment:', shipmentId, 'with rate:', rateId)
+  console.log('🚚 === PURCHASING SHIPPO LABEL ===')
+  console.log('🚚 Shipment ID:', shipmentId)
+  console.log('🚚 Rate ID:', rateId)
+  console.log('🚚 API Key configured:', apiKey ? 'YES' : 'NO')
+  
+  const requestBody = {
+    rate: rateId,
+    async: false
+  };
+  
+  console.log('📦 Shippo transaction request body:', JSON.stringify(requestBody, null, 2))
   
   const response = await fetch(`https://api.goshippo.com/transactions/`, {
     method: 'POST',
@@ -70,33 +80,40 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
       'Authorization': `ShippoToken ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      rate: rateId,
-      async: false
-    }),
+    body: JSON.stringify(requestBody),
   })
   
+  console.log('🌐 Shippo API response status:', response.status)
+  console.log('🌐 Shippo API response headers:', Object.fromEntries(response.headers.entries()))
+  
   const responseText = await response.text()
+  console.log('📥 Raw Shippo response text:', responseText)
+  
   let responseData
   
   try {
     responseData = JSON.parse(responseText)
+    console.log('📊 Parsed Shippo response data:', JSON.stringify(responseData, null, 2))
   } catch (err) {
-    responseData = { raw_response: responseText }
+    console.error('❌ Failed to parse Shippo response as JSON:', err)
+    responseData = { raw_response: responseText, parse_error: err.message }
   }
   
   if (!response.ok) {
-    console.error('❌ Shippo API error:', responseData)
-    throw new Error(responseData.detail || 'Failed to purchase Shippo label')
+    console.error('❌ Shippo API HTTP error - Status:', response.status)
+    console.error('❌ Shippo API HTTP error - Response:', responseData)
+    throw new Error(responseData.detail || responseData.message || `Shippo API error: ${response.status}`)
   }
   
   // Check if Shippo transaction was successful
   if (responseData.status === 'ERROR') {
-    console.error('❌ Shippo transaction error:', responseData)
+    console.error('❌ Shippo transaction status ERROR')
+    console.error('❌ Shippo transaction messages:', responseData.messages)
     const errorMessages = responseData.messages?.map((msg: any) => msg.text).join('; ') || 'Unknown error';
     
     // For address validation errors, provide more helpful message
-    if (errorMessages.includes('address')) {
+    if (errorMessages.includes('address') || errorMessages.includes('Address')) {
+      console.error('❌ Address validation error detected:', errorMessages)
       throw new Error(`Address validation failed: ${errorMessages}. Please verify the shipping address is complete and correct.`)
     }
     
@@ -104,12 +121,15 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
   }
   
   if (!responseData.label_url) {
-    console.error('❌ Shippo label URL missing:', responseData)
+    console.error('❌ Shippo label URL missing from response')
+    console.error('❌ Response data:', responseData)
     const warningMessages = responseData.messages?.map((msg: any) => msg.text).join('; ') || 'No additional details';
     throw new Error(`Shippo label was created but no label URL was provided. Messages: ${warningMessages}`)
   }
   
   console.log('✅ Shippo label purchased successfully')
+  console.log('✅ Label URL:', responseData.label_url)
+  console.log('✅ Tracking number:', responseData.tracking_number)
   return responseData
 }
 
