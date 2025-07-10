@@ -194,7 +194,7 @@ export const useBulkShipping = () => {
             state: 'TX',
             zip: '78701',
             country: 'US',
-            phone: '555-0123'
+            phone: '5555550123' // Fixed: 10 digit phone number
           },
           parcel: {
             length: order.recommendedBox.length,
@@ -299,7 +299,7 @@ export const useBulkShipping = () => {
               state: 'TX',
               zip: '78701',
               country: 'US',
-              phone: '555-0123'
+              phone: '5555550123' // Fixed: 10 digit phone number
             },
             parcel: {
               length: order.recommendedBox.length,
