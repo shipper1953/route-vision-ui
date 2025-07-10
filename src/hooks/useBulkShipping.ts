@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useCartonization } from "@/hooks/useCartonization";
 import { toast } from "sonner";
 import { OrderProcessor } from "@/services/bulkShipping/orderProcessor";
@@ -11,11 +11,16 @@ export const useBulkShipping = () => {
   const [loading, setLoading] = useState(true);
   const { boxes, createItemsFromOrderData } = useCartonization();
 
+  // Memoize the order processor to prevent infinite re-renders
+  const orderProcessor = useMemo(() => 
+    new OrderProcessor(boxes, createItemsFromOrderData), 
+    [boxes, createItemsFromOrderData]
+  );
+
   useEffect(() => {
     const loadShippingGroups = async () => {
       try {
         setLoading(true);
-        const orderProcessor = new OrderProcessor(boxes, createItemsFromOrderData);
         const groups = await orderProcessor.processOrdersForShipping();
         setBoxShippingGroups(groups);
       } catch (error) {
@@ -27,18 +32,24 @@ export const useBulkShipping = () => {
       }
     };
 
-    loadShippingGroups();
-  }, [boxes, createItemsFromOrderData]);
+    // Only run if we have boxes to prevent unnecessary calls
+    if (boxes.length > 0) {
+      loadShippingGroups();
+    } else {
+      setLoading(false);
+      setBoxShippingGroups([]);
+    }
+  }, [orderProcessor, boxes.length]); // Use orderProcessor and boxes.length instead of individual deps
 
-  const handleFetchRates = async (orders: OrderForShipping[]): Promise<OrderWithRates[]> => {
+  const handleFetchRates = useCallback(async (orders: OrderForShipping[]): Promise<OrderWithRates[]> => {
     const rateService = new RateService();
     return await rateService.fetchRatesForOrders(orders);
-  };
+  }, []);
 
-  const handleBulkShip = async (orders: OrderWithRates[]): Promise<ShippingResult[]> => {
+  const handleBulkShip = useCallback(async (orders: OrderWithRates[]): Promise<ShippingResult[]> => {
     const shippingService = new BulkShippingService();
     return await shippingService.processOrdersForShipping(orders);
-  };
+  }, []);
 
   return {
     boxShippingGroups,
