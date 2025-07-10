@@ -26,7 +26,7 @@ function createSuccessResponse(data: any): Response {
 }
 
 async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey: string) {
-  console.log('Purchasing label for shipment:', shipmentId, 'with rate:', rateId);
+  console.log('🚚 Purchasing label for shipment:', shipmentId, 'with rate:', rateId);
   
   const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
     method: 'POST',
@@ -49,10 +49,11 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
   }
   
   if (!response.ok) {
-    console.error('EasyPost API error:', responseData);
+    console.error('❌ EasyPost API error:', responseData);
     throw new Error(responseData.error?.message || 'Failed to purchase label');
   }
   
+  console.log('✅ Label purchased successfully');
   return responseData;
 }
 
