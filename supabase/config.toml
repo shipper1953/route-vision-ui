@@ -76,6 +76,9 @@ url = ""
 [functions.create-shipment]
 verify_jwt = false
 
+[functions.debug-env]
+verify_jwt = false
+
 [functions.get-smartrates]
 verify_jwt = false
 

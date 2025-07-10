@@ -1,73 +1,89 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-// Force redeployment: v4.0 - Complete diagnostics and fix
+// FORCE COMPLETE REDEPLOYMENT: v5.0 - Complete rebuild to fix EASYPOST_API_KEY access
+console.log('=== CREATE-SHIPMENT FUNCTION v5.0 STARTUP ===')
+console.log('Build timestamp:', new Date().toISOString())
+
+// Environment variable access with detailed logging
 const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
 const supabaseUrl = Deno.env.get('SUPABASE_URL')
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
 
-console.log('=== CREATE-SHIPMENT FUNCTION STARTUP v4.0 ===')
-console.log('Environment variables check:')
-console.log('- SUPABASE_URL:', supabaseUrl ? 'Available' : 'Missing')
-console.log('- SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Available' : 'Missing')
-console.log('- EASYPOST_API_KEY:', easyPostApiKey ? 'Available (length: ' + easyPostApiKey.length + ')' : 'Missing')
-
-// Debug: Log all environment variables (filtered for security)
+// Comprehensive environment diagnostics
 const allEnvVars = Deno.env.toObject()
-const filteredEnvVars = Object.keys(allEnvVars).reduce((acc, key) => {
-  if (key.includes('EASYPOST') || key.includes('SUPABASE')) {
-    acc[key] = key.includes('KEY') ? (allEnvVars[key] ? 'SET (length: ' + allEnvVars[key].length + ')' : 'NOT SET') : 'Available'
-  }
-  return acc
-}, {} as Record<string, string>)
+const envKeys = Object.keys(allEnvVars)
 
-console.log('Filtered environment variables:', filteredEnvVars)
+console.log('=== ENVIRONMENT DIAGNOSTICS v5.0 ===')
+console.log('Total environment variables:', envKeys.length)
+console.log('Environment keys:', envKeys.sort())
+
+// Specific checks for EASYPOST variables
+const easypostKeys = envKeys.filter(key => key.includes('EASYPOST'))
+console.log('EasyPost related keys found:', easypostKeys)
+
+// Check all variations
+const possibleKeys = [
+  'EASYPOST_API_KEY',
+  'EASYPOST_API_TOKEN', 
+  'EASYPOST_KEY',
+  'VITE_EASYPOST_API_KEY'
+]
+
+console.log('=== KEY AVAILABILITY CHECK ===')
+possibleKeys.forEach(key => {
+  const value = Deno.env.get(key)
+  console.log(`${key}:`, value ? `AVAILABLE (${value.length} chars, starts with: ${value.substring(0, 5)})` : 'NOT FOUND')
+})
+
+console.log('=== SUPABASE CONFIG ===')
+console.log('SUPABASE_URL:', supabaseUrl ? 'Available' : 'Missing')
+console.log('SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Available' : 'Missing')
+
 console.log('==========================================')
 
+// Final determination
 if (!easyPostApiKey) {
-  console.error('❌ CRITICAL: EASYPOST_API_KEY environment variable is not set!')
-  console.error('All available env var keys:', Object.keys(allEnvVars).filter(key => !key.includes('PASSWORD') && !key.includes('SECRET')))
+  console.error('❌ CRITICAL: EASYPOST_API_KEY is still not accessible')
+  console.error('This indicates the Supabase secret is not being injected properly')
+  console.error('Available env keys containing "API":', envKeys.filter(k => k.includes('API')))
+  console.error('Available env keys containing "KEY":', envKeys.filter(k => k.includes('KEY')))
 } else {
-  console.log('✅ EASYPOST_API_KEY is properly configured')
-  console.log('Key starts with:', easyPostApiKey.substring(0, 5) + '...')
-  console.log('Key validation:', easyPostApiKey.startsWith('EZ') ? 'Valid format' : 'Invalid format - should start with EZ')
+  console.log('✅ SUCCESS: EASYPOST_API_KEY is accessible')
+  console.log('Key validation:', easyPostApiKey.startsWith('EZ') ? 'Valid EasyPost format' : 'WARNING: Invalid format')
 }
 
 serve(async (req) => {
-  console.log('Create-shipment function invoked')
+  console.log('=== REQUEST RECEIVED ===')
+  console.log('Method:', req.method)
+  console.log('URL:', req.url)
+  console.log('Timestamp:', new Date().toISOString())
   
-  // Set up CORS headers
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   }
 
-  // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS preflight request')
+    console.log('Handling CORS preflight')
     return new Response(null, { headers: corsHeaders, status: 204 })
   }
 
   try {
-    console.log('Processing shipment request')
-    console.log('API Key available:', easyPostApiKey ? 'Yes' : 'No')
+    // Re-check environment in request context
+    const currentEasyPostKey = Deno.env.get('EASYPOST_API_KEY')
+    console.log('In-request API key check:', currentEasyPostKey ? 'PRESENT' : 'MISSING')
     
-    if (easyPostApiKey) {
-      console.log('API Key first 10 chars:', easyPostApiKey.substring(0, 10))
-      console.log('API Key format check:', easyPostApiKey.startsWith('EZ') ? 'VALID' : 'INVALID')
-    }
-    
-    // Enhanced error handling for missing API key
-    if (!easyPostApiKey) {
-      console.error('EASYPOST_API_KEY environment variable not found')
-      console.error('Function environment diagnostic complete')
+    if (!currentEasyPostKey) {
+      console.error('FATAL: EASYPOST_API_KEY not available during request processing')
       return new Response(JSON.stringify({
-        error: 'EasyPost API key not configured',
-        details: 'EASYPOST_API_KEY environment variable is missing',
+        error: 'EasyPost API key configuration error',
+        details: 'EASYPOST_API_KEY environment variable is not accessible to the edge function',
         diagnostic: {
-          envVarsAvailable: Object.keys(allEnvVars).length,
-          supabaseConfigured: !!supabaseUrl && !!supabaseAnonKey,
-          timestamp: new Date().toISOString()
+          functionVersion: '5.0',
+          timestamp: new Date().toISOString(),
+          envVarsTotal: Object.keys(Deno.env.toObject()).length,
+          troubleshooting: 'The Supabase secret EASYPOST_API_KEY is not being injected into the edge function runtime'
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -76,78 +92,51 @@ serve(async (req) => {
     }
 
     const { shipmentData } = await req.json()
+    console.log('Shipment data received, processing...')
     
-    console.log('Received shipment data:', JSON.stringify(shipmentData, null, 2))
-    
-    // Validate required shipment data
-    if (!shipmentData) {
-      console.error('No shipment data provided')
+    if (!shipmentData || !shipmentData.to_address || !shipmentData.from_address || !shipmentData.parcel) {
+      console.error('Invalid shipment data structure')
       return new Response(JSON.stringify({
-        error: 'Missing shipment data'
+        error: 'Invalid shipment data',
+        details: 'Missing required fields: to_address, from_address, or parcel'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })
     }
     
-    if (!shipmentData.to_address || !shipmentData.from_address || !shipmentData.parcel) {
-      console.error('Missing required shipment fields:', {
-        to_address: !!shipmentData.to_address,
-        from_address: !!shipmentData.from_address,
-        parcel: !!shipmentData.parcel
-      })
-      return new Response(JSON.stringify({
-        error: 'Missing required shipment fields (to_address, from_address, parcel)'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      })
-    }
-    
-    // Standard rate configuration
+    // Configure shipment options
     if (!shipmentData.options) {
       shipmentData.options = {}
     }
-    
-    // Set standard options
     shipmentData.options.currency = 'USD'
     shipmentData.options.delivery_confirmation = 'NO_SIGNATURE'
     
-    console.log('Standard rate configuration:', {
-      currency: shipmentData.options.currency,
-      options: shipmentData.options
-    })
+    console.log('Calling EasyPost API...')
+    console.log('Using API key:', currentEasyPostKey.substring(0, 10) + '...')
     
-    console.log('Creating shipment with standard rate data:', JSON.stringify(shipmentData, null, 2))
-    console.log('Using API key:', easyPostApiKey.substring(0, 10) + '...')
-    
-    // Call EasyPost API to create shipment with standard rates only
     const response = await fetch('https://api.easypost.com/v2/shipments', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${easyPostApiKey}`,
+        'Authorization': `Bearer ${currentEasyPostKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        shipment: shipmentData
-      }),
+      body: JSON.stringify({ shipment: shipmentData }),
     })
     
-    console.log('EasyPost API response status:', response.status)
-    console.log('EasyPost API response headers:', Object.fromEntries(response.headers.entries()))
+    console.log('EasyPost response status:', response.status)
     
     if (!response.ok) {
       const errorData = await response.json()
       console.error('EasyPost API error:', errorData)
       
       let errorMessage = 'Failed to create shipment'
-      if (errorData.error?.message) {
-        errorMessage = errorData.error.message
+      if (response.status === 401) {
+        errorMessage = 'EasyPost API authentication failed - invalid API key'
       } else if (response.status === 422) {
-        errorMessage = 'Invalid shipment data. Please check addresses and package dimensions.'
-      } else if (response.status === 401) {
-        errorMessage = 'Invalid EasyPost API key. Please verify your API key is correct.'
-        console.error('API Key authentication failed - key may be invalid or expired')
+        errorMessage = 'Invalid shipment data provided to EasyPost'
+      } else if (errorData.error?.message) {
+        errorMessage = errorData.error.message
       }
       
       return new Response(JSON.stringify({
@@ -155,8 +144,7 @@ serve(async (req) => {
         details: errorData,
         diagnostic: {
           status: response.status,
-          apiKeyPresent: !!easyPostApiKey,
-          apiKeyFormat: easyPostApiKey ? (easyPostApiKey.startsWith('EZ') ? 'valid' : 'invalid') : 'missing'
+          apiKeyFormat: currentEasyPostKey.startsWith('EZ') ? 'valid' : 'invalid'
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -165,38 +153,31 @@ serve(async (req) => {
     }
     
     const shipmentResponse = await response.json()
+    console.log('✅ EasyPost success - Shipment ID:', shipmentResponse.id)
+    console.log('Rates available:', shipmentResponse.rates?.length || 0)
     
-    console.log('EasyPost API Response Summary:')
-    console.log('- Shipment ID:', shipmentResponse.id)
-    console.log('- Standard Rates received:', shipmentResponse.rates ? shipmentResponse.rates.length : 0)
-    
-    if (!shipmentResponse.rates || shipmentResponse.rates.length === 0) {
-      console.log('⚠️ No rates available for this shipment')
+    if (!shipmentResponse.rates?.length) {
       return new Response(JSON.stringify({
-        error: 'No shipping rates available. Please check your package dimensions and addresses.'
+        error: 'No shipping rates available',
+        details: 'EasyPost returned no rates for this shipment configuration'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })
     }
     
-    console.log('✅ FINAL RESULT: Standard rates available:', shipmentResponse.rates.length)
-    
-    // Try to save to database if user is authenticated
+    // Save to database if authenticated
     const authHeader = req.headers.get('Authorization')
     if (authHeader) {
       try {
         const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          supabaseUrl ?? '',
+          supabaseAnonKey ?? '',
           { global: { headers: { Authorization: authHeader } } }
         )
         
         const { data: authData } = await supabaseClient.auth.getUser()
         if (authData?.user) {
-          console.log('Authenticated user found, saving shipment to database')
-          
-          // Get the user's company_id for proper data association
           const { data: userData } = await supabaseClient
             .from('users')
             .select('company_id')
@@ -207,8 +188,8 @@ serve(async (req) => {
             easypost_id: shipmentResponse.id,
             user_id: authData.user.id,
             company_id: userData?.company_id || null,
-            carrier: 'UPS', // Default carrier
-            service: 'Ground', // Default service
+            carrier: 'UPS',
+            service: 'Ground',
             status: 'created',
             package_dimensions: JSON.stringify({
               length: shipmentData.parcel.length,
@@ -228,32 +209,27 @@ serve(async (req) => {
             .insert(shipmentDbData)
           
           if (insertError) {
-            console.error('Failed to save shipment to database:', insertError)
+            console.error('Database save failed:', insertError)
           } else {
-            console.log('Shipment saved to database successfully')
+            console.log('✅ Shipment saved to database')
           }
         }
       } catch (dbError) {
-        console.error('Database operation failed:', dbError)
+        console.error('Database operation error:', dbError)
       }
-    } else {
-      console.log('No authenticated user, skipping database save')
     }
     
-    console.log('Returning successful response with standard rates:', shipmentResponse.rates?.length || 0)
+    console.log('✅ Returning successful response')
     return new Response(JSON.stringify(shipmentResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
     
   } catch (err) {
-    console.error('Error in create-shipment function:', err)
+    console.error('❌ Function error:', err)
     return new Response(JSON.stringify({ 
       error: 'Internal server error', 
       details: err.message,
-      diagnostic: {
-        timestamp: new Date().toISOString(),
-        apiKeyConfigured: !!easyPostApiKey
-      }
+      functionVersion: '5.0'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
