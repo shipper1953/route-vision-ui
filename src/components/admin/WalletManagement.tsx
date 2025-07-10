@@ -147,6 +147,8 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
         balance={wallet?.balance || 0}
         onManualAdd={() => setIsAddFundsDialogOpen(true)}
         onStripeAdd={() => setIsStripeDialogOpen(true)}
+        companyId={companyId}
+        onBalanceUpdated={handleDataRefresh}
       />
 
       <TransactionsTable transactions={transactions} />
