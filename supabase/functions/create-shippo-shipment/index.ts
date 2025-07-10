@@ -67,6 +67,30 @@ async function createShippoShipment(shipmentData: any, apiKey: string) {
   
   console.log('📦 Converted Shippo data:', JSON.stringify(shippoData, null, 2))
   
+  // Add specific address validation logging
+  console.log('🏠 Address validation check:')
+  console.log('   To Name:', shippoData.address_to.name)
+  console.log('   To Company:', shippoData.address_to.company)
+  console.log('   To Street1:', shippoData.address_to.street1)
+  console.log('   To City:', shippoData.address_to.city)
+  console.log('   To State:', shippoData.address_to.state)
+  console.log('   To Zip:', shippoData.address_to.zip)
+  console.log('   To Phone:', shippoData.address_to.phone)
+  console.log('   To Email:', shippoData.address_to.email)
+  
+  // Check for missing required fields
+  const missingFields = []
+  if (!shippoData.address_to.name) missingFields.push('name')
+  if (!shippoData.address_to.street1) missingFields.push('street1')
+  if (!shippoData.address_to.city) missingFields.push('city')
+  if (!shippoData.address_to.state) missingFields.push('state')
+  if (!shippoData.address_to.zip) missingFields.push('zip')
+  
+  if (missingFields.length > 0) {
+    console.error('❌ Missing required address fields:', missingFields)
+    throw new Error(`Missing required address fields: ${missingFields.join(', ')}`)
+  }
+  
   const response = await fetch('https://api.goshippo.com/shipments/', {
     method: 'POST',
     headers: {
