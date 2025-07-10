@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context";
 import { Box, Item, CartonizationParameters } from "@/services/cartonization/cartonizationEngine";
@@ -121,8 +121,8 @@ export const useCartonization = () => {
     }];
   };
 
-  // Enhanced item generation with more realistic scenarios
-  const createItemsFromOrderData = (orderItems: any[], masterItems: any[]): Item[] => {
+  // Enhanced item generation with more realistic scenarios - memoized to prevent infinite loops
+  const createItemsFromOrderData = useCallback((orderItems: any[], masterItems: any[]): Item[] => {
     if (!orderItems || orderItems.length === 0) {
       return [];
     }
@@ -223,7 +223,7 @@ export const useCartonization = () => {
       console.log(`Created item ${index}:`, itemData);
       return itemData;
     }).filter(item => item && item.id); // Remove any null items
-  };
+  }, []); // Empty dependency array since this function doesn't depend on any external state
 
   const updateParameters = (newParameters: Partial<CartonizationParameters>) => {
     setParameters(prev => ({ ...prev, ...newParameters }));
