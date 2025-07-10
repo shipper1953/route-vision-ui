@@ -2,6 +2,7 @@ import { LabelService } from "@/services/easypost/labelService";
 import { ShipmentService } from "@/services/easypost/shipmentService";
 import { OrderWithRates, ShippingResult } from "@/types/bulkShipping";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export class BulkShippingService {
   private labelService: LabelService;
@@ -50,6 +51,17 @@ export class BulkShippingService {
           );
 
           console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
+
+          // Update order in database with shipment information
+          await this.updateOrderWithShipmentInfo(order.id, {
+            carrier: selectedRate.carrier,
+            service: selectedRate.service,
+            trackingNumber: labelResponse.tracking_code,
+            trackingUrl: labelResponse.tracker?.public_url,
+            labelUrl: labelResponse.postage_label?.label_url,
+            cost: parseFloat(selectedRate.rate),
+            easypostShipmentId: shipmentId
+          });
 
           results.push({
             orderId: order.id,
@@ -170,6 +182,69 @@ export class BulkShippingService {
       }
       throw error;
     }
+  }
+
+  private async updateOrderWithShipmentInfo(orderId: string, shipmentInfo: {
+    carrier: string;
+    service: string;
+    trackingNumber: string;
+    trackingUrl?: string;
+    labelUrl?: string;
+    cost: number;
+    easypostShipmentId: string;
+  }): Promise<void> {
+    try {
+      console.log(`Updating order ${orderId} with shipment info:`, shipmentInfo);
+      
+      // Update the order status and shipping details
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'shipped',
+          shipping_address: {
+            ...((await this.getOrderShippingAddress(orderId)) || {}),
+            carrier: shipmentInfo.carrier,
+            service: shipmentInfo.service,
+            trackingNumber: shipmentInfo.trackingNumber,
+            trackingUrl: shipmentInfo.trackingUrl,
+            labelUrl: shipmentInfo.labelUrl,
+            cost: shipmentInfo.cost,
+            easypostShipmentId: shipmentInfo.easypostShipmentId
+          }
+        })
+        .eq('order_id', orderId);
+
+      if (error) {
+        console.error(`Error updating order ${orderId}:`, error);
+        throw error;
+      }
+
+      console.log(`✅ Successfully updated order ${orderId} with shipment information`);
+    } catch (error) {
+      console.error(`Failed to update order ${orderId} with shipment info:`, error);
+      // Don't throw the error to avoid failing the entire bulk process
+    }
+  }
+
+  private async getOrderShippingAddress(orderId: string): Promise<any> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('shipping_address')
+        .eq('order_id', orderId)
+        .single();
+
+      if (error) {
+        console.error(`Error fetching shipping address for order ${orderId}:`, error);
+        return null;
+      }
+
+      return data?.shipping_address;
+    } catch (error) {
+      console.error(`Failed to get shipping address for order ${orderId}:`, error);
+      return null;
+    }
+
   }
 
   private reportResults(results: ShippingResult[]): void {

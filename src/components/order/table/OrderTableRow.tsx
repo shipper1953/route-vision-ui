@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Eye, Package, Truck, Box } from "lucide-react";
+import { Eye, Package, Truck, Box, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { OrderData } from "@/types/orderTypes";
@@ -50,7 +50,35 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
     return { box: null, weight: null };
   };
 
+  const getShippingInfo = (order: OrderData) => {
+    // First check if order has shipment info in the shipment field
+    if (order.shipment) {
+      return order.shipment;
+    }
+    
+    // Check if order has shipping data in shipping_address field (where bulk shipping stores it)
+    const shippingAddress = order.shippingAddress as any;
+    if (shippingAddress && typeof shippingAddress === 'object') {
+      const hasShippingInfo = shippingAddress.carrier || shippingAddress.trackingNumber;
+      if (hasShippingInfo) {
+        return {
+          id: shippingAddress.easypostShipmentId || '',
+          carrier: shippingAddress.carrier,
+          service: shippingAddress.service,
+          trackingNumber: shippingAddress.trackingNumber,
+          trackingUrl: shippingAddress.trackingUrl,
+          estimatedDeliveryDate: shippingAddress.estimatedDeliveryDate,
+          cost: shippingAddress.cost,
+          labelUrl: shippingAddress.labelUrl
+        };
+      }
+    }
+    
+    return null;
+  };
+
   const { box: recommendedBox, weight: packageWeight } = getRecommendedBoxAndWeight(order);
+  const shippingInfo = getShippingInfo(order);
 
   return (
     <TableRow key={order.id}>
@@ -72,7 +100,37 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
         </Badge>
       </TableCell>
       <TableCell>
-        {recommendedBox ? (
+        {order.status === 'shipped' && shippingInfo ? (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <Truck className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">{shippingInfo.carrier} {shippingInfo.service}</span>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              {shippingInfo.trackingUrl ? (
+                <a 
+                  href={shippingInfo.trackingUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  {shippingInfo.trackingNumber}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : (
+                <span className="text-sm font-mono">{shippingInfo.trackingNumber}</span>
+              )}
+            </div>
+            
+            {shippingInfo.estimatedDeliveryDate && (
+              <div className="text-xs text-muted-foreground">
+                Est. Delivery: {format(new Date(shippingInfo.estimatedDeliveryDate), "MMM dd, yyyy")}
+              </div>
+            )}
+          </div>
+        ) : recommendedBox ? (
           <div className="flex items-center gap-2">
             <Box className="h-4 w-4 text-tms-blue" />
             <div className="text-sm">

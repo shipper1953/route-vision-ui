@@ -81,7 +81,7 @@ export const OrdersTable = ({ orders, loading = false }: OrdersTableProps) => {
                   <TableHead>Items</TableHead>
                   <TableHead>Value</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Recommended Box</TableHead>
+                  <TableHead>Box/Shipping Info</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
