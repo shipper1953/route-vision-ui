@@ -6,32 +6,37 @@ import { authenticateUser, getUserCompany } from './authService.ts'
 import { processWalletPayment } from './walletService.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-// Fix for EASYPOST_API_KEY with newline characters - v2.0
+console.log('=== PURCHASE-LABEL v3.0 STARTUP ===')
+
+// Fix for EASYPOST_API_KEY with newline characters - v3.0
 function getCleanEasyPostKey(): string | undefined {
-  // Try clean key first
-  let key = Deno.env.get('EASYPOST_API_KEY')
-  if (key) {
-    console.log('✅ Found clean EASYPOST_API_KEY')
-    return key.trim()
-  }
-  
-  // Try keys with newlines
-  const variations = ['EASYPOST_API_KEY\n', 'EASYPOST_API_KEY\n\n', 'EASYPOST_API_KEY\r\n']
-  for (const variant of variations) {
-    key = Deno.env.get(variant)
+  try {
+    // Try clean key first
+    let key = Deno.env.get('EASYPOST_API_KEY')
     if (key) {
-      console.log(`✅ Found EASYPOST_API_KEY with whitespace: "${variant}"`)
+      console.log('✅ Found clean EASYPOST_API_KEY')
       return key.trim()
     }
+    
+    // Try keys with newlines
+    const variations = ['EASYPOST_API_KEY\n', 'EASYPOST_API_KEY\n\n', 'EASYPOST_API_KEY\r\n']
+    for (const variant of variations) {
+      key = Deno.env.get(variant)
+      if (key) {
+        console.log(`✅ Found EASYPOST_API_KEY with whitespace: "${variant}"`)
+        return key.trim()
+      }
+    }
+    
+    console.log('❌ No EASYPOST_API_KEY found in any variation')
+    return undefined
+  } catch (error) {
+    console.error('Error getting EASYPOST_API_KEY:', error)
+    return undefined
   }
-  
-  console.log('❌ No EASYPOST_API_KEY found in any variation')
-  return undefined
 }
 
 const easyPostApiKey = getCleanEasyPostKey()
-
-console.log('=== PURCHASE-LABEL v2.0 STARTUP ===')
 console.log('EasyPost API key available:', easyPostApiKey ? 'YES' : 'NO')
 
 async function ensurePhoneNumbers(shipmentId: string, apiKey: string) {
@@ -148,16 +153,15 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
 }
 
 serve(async (req) => {
-  console.log('=== PURCHASE LABEL v2.0 FUNCTION START ===');
-  console.log('Request method:', req.method);
-  
-  // Handle preflight OPTIONS request
-  if (req.method === 'OPTIONS') {
-    console.log('Handling CORS preflight request');
-    return handleCorsPreflightRequest();
-  }
-
   try {
+    console.log('=== PURCHASE LABEL v3.0 FUNCTION START ===');
+    console.log('Request method:', req.method);
+  
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+      console.log('Handling CORS preflight request');
+      return handleCorsPreflightRequest();
+    }
     console.log('Processing purchase-label request...')
     
     // Authenticate user
@@ -276,7 +280,7 @@ serve(async (req) => {
     return createSuccessResponse(purchaseResponse);
     
   } catch (err) {
-    console.error('=== ERROR IN PURCHASE LABEL FUNCTION v2.0 ===');
+    console.error('=== ERROR IN PURCHASE LABEL FUNCTION v3.0 ===');
     console.error('Error type:', typeof err);
     console.error('Error constructor:', err.constructor?.name);
     console.error('Error message:', err.message);
