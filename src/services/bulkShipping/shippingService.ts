@@ -52,17 +52,6 @@ export class BulkShippingService {
 
           console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
 
-          // Update order in database with shipment information
-          await this.updateOrderWithShipmentInfo(order.id, {
-            carrier: selectedRate.carrier,
-            service: selectedRate.service,
-            trackingNumber: labelResponse.tracking_code,
-            trackingUrl: labelResponse.tracker?.public_url,
-            labelUrl: labelResponse.postage_label?.label_url,
-            cost: parseFloat(selectedRate.rate),
-            easypostShipmentId: shipmentId
-          });
-
           results.push({
             orderId: order.id,
             success: true,

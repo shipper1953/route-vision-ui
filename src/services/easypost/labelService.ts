@@ -35,9 +35,9 @@ export class LabelService {
       console.log('Including orderId in edge function request:', orderId);
     }
 
-    console.log('Calling label-purchase edge function with:', requestBody);
+    console.log('Calling purchase-label edge function with:', requestBody);
 
-    const { data, error } = await supabase.functions.invoke('label-purchase', {
+    const { data, error } = await supabase.functions.invoke('purchase-label', {
       body: requestBody
     });
     
