@@ -24,7 +24,7 @@ export function buildShipmentData(data: ShipmentForm) {
       state: data.fromState,
       zip: data.fromZip,
       country: data.fromCountry,
-      phone: data.fromPhone,
+      phone: data.fromPhone || "5555555555", // Default phone if missing
       email: data.fromEmail
     },
     to_address: {
@@ -36,7 +36,7 @@ export function buildShipmentData(data: ShipmentForm) {
       state: data.toState,
       zip: data.toZip,
       country: data.toCountry,
-      phone: data.toPhone,
+      phone: data.toPhone || "5555555555", // Default phone if missing  
       email: data.toEmail
     },
     parcel: {
