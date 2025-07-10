@@ -1,94 +1,103 @@
 
 import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context";
 import { Box, Item, CartonizationParameters } from "@/services/cartonization/cartonizationEngine";
 
-// Default box inventory - can be customized per user/company
-const DEFAULT_BOXES: Box[] = [
-  {
-    id: '1',
-    name: 'Small Box',
-    length: 8,
-    width: 6,
-    height: 4,
-    maxWeight: 10,
-    cost: 1.50,
-    inStock: 50,
-    type: 'box'
-  },
-  {
-    id: '2',
-    name: 'Medium Box',
-    length: 12,
-    width: 9,
-    height: 6,
-    maxWeight: 25,
-    cost: 2.75,
-    inStock: 30,
-    type: 'box'
-  },
-  {
-    id: '3',
-    name: 'Large Box',
-    length: 18,
-    width: 12,
-    height: 8,
-    maxWeight: 50,
-    cost: 4.25,
-    inStock: 20,
-    type: 'box'
-  },
-  {
-    id: '4',
-    name: 'Small Poly Bag',
-    length: 10,
-    width: 8,
-    height: 2,
-    maxWeight: 5,
-    cost: 0.75,
-    inStock: 100,
-    type: 'poly_bag'
-  },
-  {
-    id: '5',
-    name: 'Large Poly Bag',
-    length: 16,
-    width: 12,
-    height: 4,
-    maxWeight: 15,
-    cost: 1.25,
-    inStock: 75,
-    type: 'poly_bag'
-  }
-];
+// Default parameters - can be customized per user/company
+const DEFAULT_PARAMETERS: CartonizationParameters = {
+  fillRateThreshold: 75,
+  maxPackageWeight: 50,
+  dimensionalWeightFactor: 139,
+  packingEfficiency: 85,
+  allowPartialFill: true,
+  optimizeForCost: true,
+  optimizeForSpace: false
+};
 
 export const useCartonization = () => {
-  const [boxes, setBoxes] = useState<Box[]>(() => {
-    // Try to load from localStorage first
-    const saved = localStorage.getItem('cartonization_boxes');
-    return saved ? JSON.parse(saved) : DEFAULT_BOXES;
-  });
+  const [boxes, setBoxes] = useState<Box[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { userProfile } = useAuth();
 
   const [parameters, setParameters] = useState<CartonizationParameters>(() => {
     const saved = localStorage.getItem('cartonization_parameters');
-    return saved ? JSON.parse(saved) : {
-      fillRateThreshold: 75,
-      maxPackageWeight: 50,
-      dimensionalWeightFactor: 139,
-      packingEfficiency: 85,
-      allowPartialFill: true,
-      optimizeForCost: true,
-      optimizeForSpace: false
-    };
+    return saved ? JSON.parse(saved) : DEFAULT_PARAMETERS;
   });
 
-  // Save to localStorage whenever boxes or parameters change
+  // Fetch boxes from database
   useEffect(() => {
-    localStorage.setItem('cartonization_boxes', JSON.stringify(boxes));
-  }, [boxes]);
+    const fetchBoxes = async () => {
+      if (!userProfile?.company_id) {
+        setLoading(false);
+        return;
+      }
 
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('boxes')
+          .select('*')
+          .eq('company_id', userProfile.company_id)
+          .eq('is_active', true)
+          .order('name');
+
+        if (error) {
+          console.error('Error fetching boxes:', error);
+          return;
+        }
+
+        if (data) {
+          // Transform database boxes to match the Box interface
+          const transformedBoxes: Box[] = data.map(box => ({
+            id: box.id,
+            name: box.name,
+            length: Number(box.length),
+            width: Number(box.width),
+            height: Number(box.height),
+            maxWeight: Number(box.max_weight),
+            cost: Number(box.cost),
+            inStock: box.in_stock,
+            type: box.box_type
+          }));
+
+          setBoxes(transformedBoxes);
+        }
+      } catch (error) {
+        console.error('Error fetching boxes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBoxes();
+  }, [userProfile?.company_id]);
+
+  // Save parameters to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('cartonization_parameters', JSON.stringify(parameters));
   }, [parameters]);
+
+  const updateBoxInventory = async (boxId: string, newStock: number) => {
+    try {
+      const { error } = await supabase
+        .from('boxes')
+        .update({ in_stock: newStock })
+        .eq('id', boxId);
+
+      if (error) {
+        console.error('Error updating box inventory:', error);
+        return;
+      }
+
+      // Update local state
+      setBoxes(prev => prev.map(box => 
+        box.id === boxId ? { ...box, inStock: newStock } : box
+      ));
+    } catch (error) {
+      console.error('Error updating box inventory:', error);
+    }
+  };
 
   const createItemsFromShipmentData = (data: {
     length: number;
@@ -216,12 +225,6 @@ export const useCartonization = () => {
     }).filter(item => item && item.id); // Remove any null items
   };
 
-  const updateBoxInventory = (boxId: string, newStock: number) => {
-    setBoxes(prev => prev.map(box => 
-      box.id === boxId ? { ...box, inStock: newStock } : box
-    ));
-  };
-
   const updateParameters = (newParameters: Partial<CartonizationParameters>) => {
     setParameters(prev => ({ ...prev, ...newParameters }));
   };
@@ -229,6 +232,7 @@ export const useCartonization = () => {
   return {
     boxes,
     setBoxes,
+    loading,
     parameters,
     updateParameters,
     createItemsFromShipmentData,

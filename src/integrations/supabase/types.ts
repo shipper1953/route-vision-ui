@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      boxes: {
+        Row: {
+          box_type: Database["public"]["Enums"]["box_type"]
+          company_id: string
+          cost: number
+          created_at: string
+          description: string | null
+          height: number
+          id: string
+          in_stock: number
+          is_active: boolean
+          length: number
+          max_weight: number
+          name: string
+          sku: string | null
+          updated_at: string
+          width: number
+        }
+        Insert: {
+          box_type?: Database["public"]["Enums"]["box_type"]
+          company_id: string
+          cost?: number
+          created_at?: string
+          description?: string | null
+          height: number
+          id?: string
+          in_stock?: number
+          is_active?: boolean
+          length: number
+          max_weight: number
+          name: string
+          sku?: string | null
+          updated_at?: string
+          width: number
+        }
+        Update: {
+          box_type?: Database["public"]["Enums"]["box_type"]
+          company_id?: string
+          cost?: number
+          created_at?: string
+          description?: string | null
+          height?: number
+          id?: string
+          in_stock?: number
+          is_active?: boolean
+          length?: number
+          max_weight?: number
+          name?: string
+          sku?: string | null
+          updated_at?: string
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "boxes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: Json | null
@@ -505,6 +567,7 @@ export type Database = {
     }
     Enums: {
       app_role: "super_admin" | "company_admin" | "user"
+      box_type: "box" | "poly_bag" | "envelope" | "tube" | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -633,6 +696,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "company_admin", "user"],
+      box_type: ["box", "poly_bag", "envelope", "tube", "custom"],
     },
   },
 } as const

@@ -19,7 +19,7 @@ export interface Box {
   maxWeight: number;
   cost: number;
   inStock: number;
-  type: 'box' | 'poly_bag';
+  type: 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom';
   materialCost?: number;
 }
 
