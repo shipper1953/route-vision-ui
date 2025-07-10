@@ -69,9 +69,25 @@ export class ShipmentService {
     if (error) {
       console.error('Edge Function error:', error);
       
+      // If the error is about API key configuration, run diagnostics
+      if (error.message.includes('EasyPost API key') || error.message.includes('EASYPOST_API_KEY')) {
+        console.log('API key issue detected, running environment diagnostics...');
+        
+        try {
+          const { data: debugData, error: debugError } = await supabase.functions.invoke('debug-env');
+          if (debugData) {
+            console.log('🔍 Environment diagnostic results:', debugData);
+          } else {
+            console.error('🔍 Debug function failed:', debugError);
+          }
+        } catch (debugErr) {
+          console.error('🔍 Could not run diagnostics:', debugErr);
+        }
+      }
+      
       // Handle specific error cases
       if (error.message.includes('EasyPost API key not configured')) {
-        throw new Error('EasyPost configuration issue. Please contact support.');
+        throw new Error('EasyPost configuration issue. The EASYPOST_API_KEY secret is not accessible to the edge function. Please check Supabase secrets configuration.');
       } else if (error.message.includes('Invalid shipment data')) {
         throw new Error('Please verify your shipping addresses and package dimensions.');
       }
