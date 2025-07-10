@@ -66,13 +66,19 @@ export class ShippoService {
 
   private async createShipmentViaEdgeFunction(shipmentData: ShipmentRequest): Promise<ShippoShipmentResponse> {
     console.log('Using Edge Function for Shippo shipment creation');
+    console.log('📡 Calling create-shippo-shipment edge function with shipment data:', JSON.stringify(shipmentData, null, 2));
 
     const { data, error } = await supabase.functions.invoke<ShippoShipmentResponse>('create-shippo-shipment', {
       body: { shipmentData }
     });
 
+    console.log('📡 Edge function response - data:', data);
+    console.log('📡 Edge function response - error:', error);
+
     if (error) {
-      console.error('Shippo Edge Function error:', error);
+      console.error('🔴 Shippo Edge Function error details:', error);
+      console.error('🔴 Error message:', error.message);
+      console.error('🔴 Error context:', error.context);
       
       if (error.message.includes('Shippo API key not configured')) {
         throw new Error('Shippo configuration issue. The SHIPPO_API_KEY secret is not configured.');
