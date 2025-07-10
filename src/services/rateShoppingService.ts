@@ -78,20 +78,32 @@ export class RateShoppingService {
       shippo_shipment = shippoResponse;
       
       if (shippoResponse.rates) {
-        const shippoRates = shippoResponse.rates.map((rate: ShippoRate) => ({
-          id: rate.object_id,
-          carrier: rate.provider,
-          service: rate.servicelevel?.name || 'Standard',
-          rate: rate.amount,
-          currency: rate.currency,
-          delivery_days: rate.delivery_days || rate.estimated_days,
-          delivery_date: null,
-          delivery_date_guaranteed: false,
-          est_delivery_days: rate.estimated_days,
-          provider: 'shippo' as const,
-          original_rate: rate
-        } as CombinedRate));
+        console.log('Shippo rates raw data:', shippoResponse.rates);
         
+        const shippoRates = shippoResponse.rates.map((rate: ShippoRate) => {
+          console.log('Processing Shippo rate:', {
+            id: rate.object_id,
+            provider: rate.provider,
+            servicelevel: rate.servicelevel,
+            amount: rate.amount
+          });
+          
+          return {
+            id: rate.object_id,
+            carrier: rate.provider,
+            service: rate.servicelevel?.name || 'Standard',
+            rate: rate.amount,
+            currency: rate.currency,
+            delivery_days: rate.delivery_days || rate.estimated_days,
+            delivery_date: null,
+            delivery_date_guaranteed: false,
+            est_delivery_days: rate.estimated_days,
+            provider: 'shippo' as const,
+            original_rate: rate
+          } as CombinedRate;
+        });
+        
+        console.log('Processed Shippo rates:', shippoRates);
         combinedRates.push(...shippoRates);
       }
 

@@ -156,68 +156,93 @@ export const useCartonization = () => {
         const itemName = orderItem.name || orderItem.description || `Order Item ${index + 1}`;
         const quantity = orderItem.quantity || orderItem.count || 1;
         
-        // Create more realistic and varied product scenarios
-        const scenarios = [
-          // Small electronics/accessories
-          { length: 5, width: 3, height: 2, weight: 0.8, category: 'electronics' },
-          { length: 6, width: 4, height: 3, weight: 1.2, category: 'electronics' },
+        // First, try to use actual dimensions from the order item if available
+        if (orderItem.length && orderItem.width && orderItem.height && orderItem.weight) {
+          console.log("Using actual order item dimensions:", {
+            length: orderItem.length,
+            width: orderItem.width,
+            height: orderItem.height,
+            weight: orderItem.weight
+          });
           
-          // Books/documents
-          { length: 9, width: 6, height: 1, weight: 1.5, category: 'books' },
-          { length: 11, width: 8, height: 2, weight: 2.8, category: 'books' },
+          itemData = {
+            id: `order-item-${index}`,
+            name: itemName,
+            length: Number(orderItem.length),
+            width: Number(orderItem.width),
+            height: Number(orderItem.height),
+            weight: Number(orderItem.weight),
+            quantity: quantity,
+            category: 'actual',
+            fragility: 'low'
+          };
+        } else {
+          // Fall back to realistic scenarios only if no dimensions available
+          console.log("No actual dimensions found, using scenario for:", itemName);
           
-          // Clothing items
-          { length: 12, width: 9, height: 3, weight: 1.8, category: 'apparel' },
-          { length: 14, width: 10, height: 4, weight: 2.5, category: 'apparel' },
+          // Create more realistic and varied product scenarios
+          const scenarios = [
+            // Small electronics/accessories
+            { length: 5, width: 3, height: 2, weight: 0.8, category: 'electronics' },
+            { length: 6, width: 4, height: 3, weight: 1.2, category: 'electronics' },
+            
+            // Books/documents
+            { length: 9, width: 6, height: 1, weight: 1.5, category: 'books' },
+            { length: 11, width: 8, height: 2, weight: 2.8, category: 'books' },
+            
+            // Clothing items
+            { length: 12, width: 9, height: 3, weight: 1.8, category: 'apparel' },
+            { length: 14, width: 10, height: 4, weight: 2.5, category: 'apparel' },
+            
+            // Home goods/kitchen items
+            { length: 8, width: 8, height: 6, weight: 3.2, category: 'home' },
+            { length: 10, width: 8, height: 8, weight: 4.5, category: 'home' },
+            
+            // Sporting goods
+            { length: 15, width: 6, height: 4, weight: 3.8, category: 'sports' },
+            { length: 18, width: 8, height: 6, weight: 5.2, category: 'sports' },
+            
+            // Toys/games
+            { length: 12, width: 9, height: 6, weight: 2.8, category: 'toys' },
+            { length: 16, width: 12, height: 8, weight: 4.2, category: 'toys' },
+            
+            // Tools/hardware
+            { length: 10, width: 6, height: 5, weight: 6.5, category: 'tools' },
+            { length: 14, width: 8, height: 6, weight: 8.2, category: 'tools' },
+            
+            // Beauty/personal care
+            { length: 6, width: 4, height: 8, weight: 1.8, category: 'beauty' },
+            { length: 8, width: 6, height: 10, weight: 2.5, category: 'beauty' },
+            
+            // Automotive parts
+            { length: 12, width: 8, height: 4, weight: 5.8, category: 'automotive' },
+            { length: 16, width: 10, height: 6, weight: 8.5, category: 'automotive' },
+            
+            // Office supplies
+            { length: 11, width: 8, height: 3, weight: 2.2, category: 'office' },
+            { length: 13, width: 10, height: 4, weight: 3.5, category: 'office' }
+          ];
           
-          // Home goods/kitchen items
-          { length: 8, width: 8, height: 6, weight: 3.2, category: 'home' },
-          { length: 10, width: 8, height: 8, weight: 4.5, category: 'home' },
+          // Select scenario based on item description and order characteristics
+          const hash = itemName.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+          const scenarioIndex = hash % scenarios.length;
+          const selectedScenario = scenarios[scenarioIndex];
           
-          // Sporting goods
-          { length: 15, width: 6, height: 4, weight: 3.8, category: 'sports' },
-          { length: 18, width: 8, height: 6, weight: 5.2, category: 'sports' },
+          // Add some variation to make each order unique
+          const variation = (hash % 20) / 100; // 0-19% variation
           
-          // Toys/games
-          { length: 12, width: 9, height: 6, weight: 2.8, category: 'toys' },
-          { length: 16, width: 12, height: 8, weight: 4.2, category: 'toys' },
-          
-          // Tools/hardware
-          { length: 10, width: 6, height: 5, weight: 6.5, category: 'tools' },
-          { length: 14, width: 8, height: 6, weight: 8.2, category: 'tools' },
-          
-          // Beauty/personal care
-          { length: 6, width: 4, height: 8, weight: 1.8, category: 'beauty' },
-          { length: 8, width: 6, height: 10, weight: 2.5, category: 'beauty' },
-          
-          // Automotive parts
-          { length: 12, width: 8, height: 4, weight: 5.8, category: 'automotive' },
-          { length: 16, width: 10, height: 6, weight: 8.5, category: 'automotive' },
-          
-          // Office supplies
-          { length: 11, width: 8, height: 3, weight: 2.2, category: 'office' },
-          { length: 13, width: 10, height: 4, weight: 3.5, category: 'office' }
-        ];
-        
-        // Select scenario based on item description and order characteristics
-        const hash = itemName.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-        const scenarioIndex = hash % scenarios.length;
-        const selectedScenario = scenarios[scenarioIndex];
-        
-        // Add some variation to make each order unique
-        const variation = (hash % 20) / 100; // 0-19% variation
-        
-        itemData = {
-          id: `order-item-${index}`,
-          name: itemName,
-          length: Math.round(selectedScenario.length * (1 + variation)),
-          width: Math.round(selectedScenario.width * (1 + variation)),
-          height: Math.round(selectedScenario.height * (1 + variation)),
-          weight: Number((selectedScenario.weight * (1 + variation)).toFixed(1)),
-          quantity: quantity,
-          category: selectedScenario.category,
-          fragility: 'low'
-        };
+          itemData = {
+            id: `order-item-${index}`,
+            name: itemName,
+            length: Math.round(selectedScenario.length * (1 + variation)),
+            width: Math.round(selectedScenario.width * (1 + variation)),
+            height: Math.round(selectedScenario.height * (1 + variation)),
+            weight: Number((selectedScenario.weight * (1 + variation)).toFixed(1)),
+            quantity: quantity,
+            category: selectedScenario.category,
+            fragility: 'low'
+          };
+        }
       }
       
       console.log(`Created item ${index}:`, itemData);
