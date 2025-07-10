@@ -32,13 +32,13 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="box-demand">Box Demand Planning</TabsTrigger>
-            <TabsTrigger value="historical-usage">Historical Box Usage</TabsTrigger>
-            <TabsTrigger value="box-inventory">Box Inventory Management</TabsTrigger>
-            <TabsTrigger value="box-recommendations">Box Recommendations</TabsTrigger>
-            <TabsTrigger value="packaging-rules">Packaging Rules</TabsTrigger>
-            <TabsTrigger value="testing">Rule Testing</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1">
+            <TabsTrigger value="box-demand" className="text-xs lg:text-sm">Box Demand</TabsTrigger>
+            <TabsTrigger value="historical-usage" className="text-xs lg:text-sm">Historical Usage</TabsTrigger>
+            <TabsTrigger value="box-inventory" className="text-xs lg:text-sm">Box Inventory</TabsTrigger>
+            <TabsTrigger value="box-recommendations" className="text-xs lg:text-sm">Recommendations</TabsTrigger>
+            <TabsTrigger value="packaging-rules" className="text-xs lg:text-sm">Packaging Rules</TabsTrigger>
+            <TabsTrigger value="testing" className="text-xs lg:text-sm">Rule Testing</TabsTrigger>
           </TabsList>
           
           <TabsContent value="box-demand" className="space-y-4">
