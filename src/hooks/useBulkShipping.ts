@@ -184,7 +184,7 @@ export const useBulkShipping = () => {
             state: order.shippingAddress?.state || '',
             zip: order.shippingAddress?.zip || order.shippingAddress?.zipCode || '',
             country: order.shippingAddress?.country || 'US',
-            phone: order.shippingAddress?.phone || ''
+            phone: order.shippingAddress?.phone || '5555555555' // Default phone if missing
           },
           from_address: {
             name: 'Ship Tornado',
@@ -289,7 +289,7 @@ export const useBulkShipping = () => {
               state: order.shippingAddress?.state || '',
               zip: order.shippingAddress?.zip || order.shippingAddress?.zipCode || '',
               country: order.shippingAddress?.country || 'US',
-              phone: order.shippingAddress?.phone || ''
+              phone: order.shippingAddress?.phone || '5555555555' // Default phone if missing
             },
             from_address: {
               name: 'Ship Tornado',

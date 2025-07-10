@@ -85,7 +85,7 @@ serve(async (req) => {
     }
     console.log('EasyPost API key is configured');
 
-    // Purchase label from EasyPost
+    // Purchase label from EasyPost using the cleaned API key
     console.log('Calling EasyPost API...');
     const purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, easyPostApiKey);
     console.log('Label purchased successfully from EasyPost:', purchaseResponse.id);
