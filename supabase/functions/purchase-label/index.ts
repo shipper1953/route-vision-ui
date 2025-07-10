@@ -8,7 +8,30 @@ import { authenticateUser, getUserCompany } from './authService.ts'
 import { processWalletPayment } from './walletService.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
+// Fix for EASYPOST_API_KEY with newline characters
+function getCleanEasyPostKey(): string | undefined {
+  // Try clean key first
+  let key = Deno.env.get('EASYPOST_API_KEY')
+  if (key) {
+    console.log('✅ Found clean EASYPOST_API_KEY')
+    return key.trim()
+  }
+  
+  // Try keys with newlines
+  const variations = ['EASYPOST_API_KEY\n', 'EASYPOST_API_KEY\n\n', 'EASYPOST_API_KEY\r\n']
+  for (const variant of variations) {
+    key = Deno.env.get(variant)
+    if (key) {
+      console.log(`✅ Found EASYPOST_API_KEY with whitespace: "${variant}"`)
+      return key.trim()
+    }
+  }
+  
+  console.log('❌ No EASYPOST_API_KEY found in any variation')
+  return undefined
+}
+
+const easyPostApiKey = getCleanEasyPostKey()
 
 console.log('EasyPost API key available in purchase-label function:', easyPostApiKey ? 'YES' : 'NO')
 
