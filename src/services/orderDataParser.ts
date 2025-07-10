@@ -140,6 +140,7 @@ export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
     items: parsedItems,
     value: supabaseOrder.value || "0.00",
     shippingAddress: parseShippingAddress(supabaseOrder.shipping_address),
-    parcelInfo: parseParcelInfo(supabaseOrder.qboid_dimensions)
+    parcelInfo: parseParcelInfo(supabaseOrder.qboid_dimensions),
+    shipment: supabaseOrder.shipment_data || null // Map shipment_data to shipment field
   };
 };
