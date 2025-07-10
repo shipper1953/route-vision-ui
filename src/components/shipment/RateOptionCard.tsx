@@ -1,13 +1,14 @@
 
 import { useState } from "react";
-import { Truck, Clock, Shield, CheckCircle, DollarSign } from "lucide-react";
+import { Truck, Clock, Shield, CheckCircle, DollarSign, Package } from "lucide-react";
 import { SmartRate, Rate } from "@/services/easypost";
+import { CombinedRate } from "@/services/rateShoppingService";
 import { MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context";
 
 interface RateOptionCardProps {
-  rate: SmartRate | Rate | MarkedUpRate | MarkedUpSmartRate;
+  rate: SmartRate | Rate | MarkedUpRate | MarkedUpSmartRate | CombinedRate;
   isSelected: boolean;
   isRecommended: boolean;
   onSelect: (rate: SmartRate | Rate) => void;
@@ -26,6 +27,10 @@ export const RateOptionCard = ({
   
   // Check if rate has markup applied
   const hasMarkup = 'original_rate' in rate && 'markup_applied' in rate;
+  
+  // Check if rate has provider information
+  const hasProvider = 'provider' in rate;
+  const provider = hasProvider ? (rate as CombinedRate).provider : null;
   
   const getDeliveryAccuracyLabel = (accuracy?: string) => {
     switch (accuracy) {
@@ -95,6 +100,15 @@ export const RateOptionCard = ({
           <div className="font-medium flex items-center gap-2">
             <Truck className="h-4 w-4 text-muted-foreground" />
             {rate.carrier} {rate.service}
+            {provider && (
+              <Badge 
+                variant={provider === 'easypost' ? 'default' : 'secondary'} 
+                className={`ml-2 ${provider === 'easypost' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}
+              >
+                <Package className="h-3 w-3 mr-1" />
+                {provider === 'easypost' ? 'EasyPost' : 'Shippo'}
+              </Badge>
+            )}
             {isRecommended && (
               <Badge className="ml-2 bg-green-500">Recommended</Badge>
             )}

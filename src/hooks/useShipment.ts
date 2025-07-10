@@ -1,26 +1,29 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import easyPostService from '@/services/easypost';
 import { LabelService } from '@/services/easypost/labelService';
 import { linkShipmentToOrder } from '@/services/orderShipmentLinking';
+import { CombinedRateResponse } from '@/services/rateShoppingService';
 
 export const useShipment = (initialOrderId?: string | null) => {
-  const [shipmentResponse, setShipmentResponse] = useState<any>(null);
+  const [shipmentResponse, setShipmentResponse] = useState<CombinedRateResponse | null>(null);
   const [selectedRate, setSelectedRate] = useState<any>(null);
   const [recommendedRate, setRecommendedRate] = useState<any>(null);
 
-  const handleShipmentCreated = (response: any) => {
-    console.log('Shipment created:', response);
+  const handleShipmentCreated = (response: CombinedRateResponse) => {
+    console.log('Combined shipment created:', response);
     setShipmentResponse(response);
     
-    // Find and set recommended rate
+    // Find and set recommended rate from combined rates
     if (response.rates?.length > 0) {
       const cheapestRate = response.rates.reduce((prev: any, current: any) => 
         (parseFloat(prev.rate) < parseFloat(current.rate)) ? prev : current
       );
       setRecommendedRate(cheapestRate);
       setSelectedRate(cheapestRate);
+      
+      console.log('Cheapest rate found:', cheapestRate);
+      console.log('Provider:', cheapestRate.provider);
     }
   };
 
@@ -33,10 +36,25 @@ export const useShipment = (initialOrderId?: string | null) => {
   const purchaseLabel = async (shipmentId: string, rateId: string) => {
     try {
       console.log('Purchasing label with orderId:', initialOrderId);
+      console.log('Selected rate:', selectedRate);
+      
+      // Determine which shipment ID to use based on the selected rate's provider
+      let actualShipmentId = shipmentId;
+      
+      if (selectedRate?.provider === 'easypost' && shipmentResponse?.easypost_shipment?.id) {
+        actualShipmentId = shipmentResponse.easypost_shipment.id;
+        console.log('Using EasyPost shipment ID:', actualShipmentId);
+      } else if (selectedRate?.provider === 'shippo' && shipmentResponse?.shippo_shipment?.object_id) {
+        // For Shippo, we need to handle label purchase differently
+        console.log('Shippo label purchase not yet implemented');
+        toast.error('Shippo label purchase coming soon');
+        return null;
+      }
+      
       const labelService = new LabelService('');
       
       // Call the edge function with orderId if available
-      const result = await labelService.purchaseLabel(shipmentId, rateId, initialOrderId);
+      const result = await labelService.purchaseLabel(actualShipmentId, rateId, initialOrderId);
       
       console.log('Label purchase result:', result);
       
@@ -46,11 +64,11 @@ export const useShipment = (initialOrderId?: string | null) => {
           console.log('Attempting client-side order linking for order:', initialOrderId);
           await linkShipmentToOrder(initialOrderId, {
             id: result.id,
-            carrier: result.selected_rate?.carrier || 'Unknown',
-            service: result.selected_rate?.service || 'Unknown',
+            carrier: result.selected_rate?.carrier || selectedRate?.carrier || 'Unknown',
+            service: result.selected_rate?.service || selectedRate?.service || 'Unknown',
             trackingNumber: result.tracking_code || '',
             trackingUrl: result.tracker?.public_url || '',
-            cost: parseFloat(result.selected_rate?.rate || '0'),
+            cost: parseFloat(result.selected_rate?.rate || selectedRate?.rate || '0'),
             labelUrl: result.postage_label?.label_url
           });
           console.log('Client-side order linking successful');

@@ -3,7 +3,8 @@ import {
   Card, 
   CardContent
 } from "@/components/ui/card";
-import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
+import { SmartRate, Rate } from "@/services/easypost";
+import { CombinedRateResponse } from "@/services/rateShoppingService";
 import { ShippingRatesCardHeader } from "./ShippingRatesCardHeader";
 import { RatesList } from "./RatesList";
 import { ShippingRatesCardFooter } from "./ShippingRatesCardFooter";
@@ -16,7 +17,7 @@ import { Company, CompanyAddress } from "@/types/auth";
 import { applyMarkupToRates, MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
 
 interface ShippingRatesCardProps {
-  shipmentResponse: ShipmentResponse;
+  shipmentResponse: CombinedRateResponse;
   selectedRate: SmartRate | Rate | null;
   setSelectedRate: (rate: SmartRate | Rate | null) => void;
   recommendedRate: SmartRate | Rate | null;
@@ -60,6 +61,8 @@ export const ShippingRatesCard = ({
   console.log("ShippingRatesCard received response:", shipmentResponse);
   console.log("Available smartrates:", shipmentResponse?.smartRates?.length || 0);
   console.log("Available rates:", shipmentResponse?.rates?.length || 0);
+  console.log("EasyPost rates:", shipmentResponse?.rates?.filter(r => r.provider === 'easypost').length || 0);
+  console.log("Shippo rates:", shipmentResponse?.rates?.filter(r => r.provider === 'shippo').length || 0);
   
   // Use either smartrates or regular rates (fallback) if available
   const availableRates = shipmentResponse?.smartRates?.length ? 
@@ -131,9 +134,9 @@ export const ShippingRatesCard = ({
           />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
-            No shipping rates available
+            No shipping rates available from any provider
             {shipmentResponse.id && (
-              <p className="mt-2 text-xs">Shipment created (ID: {shipmentResponse.id}), but no rates were returned.</p>
+              <p className="mt-2 text-xs">Combined response (ID: {shipmentResponse.id}), but no rates were returned.</p>
             )}
           </div>
         )}

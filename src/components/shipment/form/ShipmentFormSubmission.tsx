@@ -1,12 +1,13 @@
 
 import { RatesActionButton } from "@/components/shipment/RatesActionButton";
-import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
+import { SmartRate, Rate } from "@/services/easypost";
+import { CombinedRateResponse } from "@/services/rateShoppingService";
 import { useShipmentSubmission } from "./hooks/useShipmentSubmission";
 
 interface ShipmentFormSubmissionProps {
   loading: boolean;
   setLoading: (loading: boolean) => void;
-  onShipmentCreated: (response: ShipmentResponse, selectedRate: SmartRate | Rate | null) => void;
+  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null) => void;
 }
 
 export const ShipmentFormSubmission = ({ 

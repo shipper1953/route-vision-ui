@@ -3,14 +3,15 @@ import { useState, useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ShipmentFormTabs } from "@/components/shipment/ShipmentFormTabs";
-import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
+import { SmartRate, Rate } from "@/services/easypost";
+import { CombinedRateResponse } from "@/services/rateShoppingService";
 import { shipmentSchema, ShipmentForm as ShipmentFormType } from "@/types/shipment";
 import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
 import { OrderLookupSection } from "./form/OrderLookupSection";
 import { ShipmentFormSubmission } from "./form/ShipmentFormSubmission";
 
 interface ShipmentFormProps {
-  onShipmentCreated: (response: ShipmentResponse, selectedRate: SmartRate | Rate | null) => void;
+  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null) => void;
 }
 
 export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {

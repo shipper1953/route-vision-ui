@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ArrowLeft, Package, Download, AlertTriangle } from "lucide-react";
-import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
+import { SmartRate, Rate } from "@/services/easypost";
+import { CombinedRateResponse } from "@/services/rateShoppingService";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { toast } from "sonner";
@@ -12,7 +13,7 @@ import { useAuth } from "@/context";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ShippingRatesCardFooterProps {
-  shipmentResponse: ShipmentResponse;
+  shipmentResponse: CombinedRateResponse;
   selectedRate: SmartRate | Rate | null;
   onBack: () => void;
   onBuyLabel: (shipmentId: string, rateId: string) => Promise<any>;
@@ -73,7 +74,7 @@ export const ShippingRatesCardFooter = ({
     }
     
     if (!shipmentResponse.id) {
-      toast.error("Missing shipment ID");
+      toast.error("Missing combined shipment ID");
       return;
     }
 
