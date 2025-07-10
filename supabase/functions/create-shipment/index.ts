@@ -5,8 +5,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 console.log('=== CREATE-SHIPMENT FUNCTION v5.0 STARTUP ===')
 console.log('Build timestamp:', new Date().toISOString())
 
-// Environment variable access with detailed logging
-const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
+// Environment variable access with whitespace cleanup
+let easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
+if (!easyPostApiKey) {
+  // Try with potential whitespace/newlines
+  const rawKey = Deno.env.get('EASYPOST_API_KEY\n\n') || Deno.env.get('EASYPOST_API_KEY\n')
+  easyPostApiKey = rawKey?.trim()
+}
 const supabaseUrl = Deno.env.get('SUPABASE_URL')
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
 
@@ -70,8 +75,12 @@ serve(async (req) => {
   }
 
   try {
-    // Re-check environment in request context
-    const currentEasyPostKey = Deno.env.get('EASYPOST_API_KEY')
+    // Re-check environment in request context with whitespace handling
+    let currentEasyPostKey = Deno.env.get('EASYPOST_API_KEY')
+    if (!currentEasyPostKey) {
+      const rawKey = Deno.env.get('EASYPOST_API_KEY\n\n') || Deno.env.get('EASYPOST_API_KEY\n')
+      currentEasyPostKey = rawKey?.trim()
+    }
     console.log('In-request API key check:', currentEasyPostKey ? 'PRESENT' : 'MISSING')
     
     if (!currentEasyPostKey) {
