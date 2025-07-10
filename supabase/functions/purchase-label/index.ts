@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { saveShipmentToDatabase } from './shipmentService.ts'
 import { linkShipmentToOrder } from './orderService.ts'
+import { processWalletPayment } from './walletService.ts'
 
 console.log('=== PURCHASE-LABEL v8.0 WITH ORDER LINKING ===')
 
@@ -175,9 +176,34 @@ serve(async (req) => {
       console.log('✅ Label purchased successfully from EasyPost:', purchaseResponse.id)
     }
     
+    // Get user's company for wallet processing
+    const { data: userProfile, error: userError } = await supabase
+      .from('users')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+
+    if (userError || !userProfile?.company_id) {
+      console.error('❌ Could not get user company_id:', userError);
+      return createErrorResponse('User profile not found or not assigned to a company', null, 400);
+    }
+
+    // Process wallet payment
+    const labelCost = provider === 'shippo' 
+      ? parseFloat(purchaseResponse.rate?.amount || '0')
+      : parseFloat(purchaseResponse.selected_rate?.rate || '0');
+    
+    const purchaseResponseId = provider === 'shippo' 
+      ? purchaseResponse.object_id 
+      : purchaseResponse.id;
+
+    console.log('💰 Processing wallet payment...')
+    await processWalletPayment(userProfile.company_id, labelCost, user.id, purchaseResponseId);
+    console.log('✅ Wallet payment processed successfully')
+    
     // Save shipment to database
     console.log('💾 Saving shipment to database...')
-    const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, user.id)
+    const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, user.id, provider || 'easypost')
     console.log('✅ Shipment saved to database with ID:', finalShipmentId)
     
     // Link order to shipment if orderId provided
