@@ -71,16 +71,16 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
   let shipmentData;
   
   if (provider === 'shippo') {
-    // Shippo response structure
+    // Shippo response structure - the rate info comes from a nested rate object
     shipmentData = {
       easypost_id: purchaseResponse.object_id, // Store Shippo transaction ID in easypost_id field
       tracking_number: purchaseResponse.tracking_number,
-      carrier: purchaseResponse.rate?.provider || 'Unknown',
-      service: purchaseResponse.rate?.servicelevel?.name || 'Unknown',
+      carrier: purchaseResponse.rate?.provider || purchaseResponse.carrier_account || 'Unknown',
+      service: purchaseResponse.rate?.servicelevel?.name || purchaseResponse.servicelevel?.name || 'Unknown',
       status: 'purchased',
       label_url: purchaseResponse.label_url,
       tracking_url: purchaseResponse.tracking_url_provider,
-      cost: parseFloat(purchaseResponse.rate?.amount || '0'),
+      cost: parseFloat(purchaseResponse.rate?.amount || purchaseResponse.amount || '0'),
       weight: purchaseResponse.parcel?.weight?.toString(),
       package_dimensions: JSON.stringify({
         length: purchaseResponse.parcel?.length,

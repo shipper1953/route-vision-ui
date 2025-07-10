@@ -94,12 +94,19 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
   if (responseData.status === 'ERROR') {
     console.error('❌ Shippo transaction error:', responseData)
     const errorMessages = responseData.messages?.map((msg: any) => msg.text).join('; ') || 'Unknown error';
+    
+    // For address validation errors, provide more helpful message
+    if (errorMessages.includes('address')) {
+      throw new Error(`Address validation failed: ${errorMessages}. Please verify the shipping address is complete and correct.`)
+    }
+    
     throw new Error(`Shippo label creation failed: ${errorMessages}`)
   }
   
   if (!responseData.label_url) {
     console.error('❌ Shippo label URL missing:', responseData)
-    throw new Error('Shippo label was created but no label URL was provided')
+    const warningMessages = responseData.messages?.map((msg: any) => msg.text).join('; ') || 'No additional details';
+    throw new Error(`Shippo label was created but no label URL was provided. Messages: ${warningMessages}`)
   }
   
   console.log('✅ Shippo label purchased successfully')
