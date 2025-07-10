@@ -41,10 +41,27 @@ export class LabelService {
       body: requestBody
     });
     
+    console.log('Edge function response:', { data, error });
+    
+    
     if (error) {
       console.error('Edge Function error details:', error);
       console.error('Error message:', error.message);
       console.error('Error context:', error.context);
+      
+      // Try to get more detailed error info
+      if (error.message.includes('non-2xx status code')) {
+        // Let's try calling the test function to see if the deployment system is working
+        console.log('Testing if edge functions are working...');
+        try {
+          const { data: testData, error: testError } = await supabase.functions.invoke('test-function', {
+            body: { test: true }
+          });
+          console.log('Test function result:', { testData, testError });
+        } catch (testErr) {
+          console.error('Test function also failed:', testErr);
+        }
+      }
       
       // Check if it's a 422 error with detailed response
       if (error.message.includes('422')) {
@@ -61,7 +78,7 @@ export class LabelService {
       // Provide a more specific error message
       let errorMessage = error.message;
       if (error.message.includes('non-2xx status code')) {
-        errorMessage = 'Label purchase failed. Please check your shipment configuration and try again.';
+        errorMessage = 'Edge function deployment error. The purchase-label function may not be properly deployed.';
       }
       
       throw new Error(errorMessage);
