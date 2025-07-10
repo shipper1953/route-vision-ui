@@ -6,29 +6,17 @@ import { authenticateUser, getUserCompany } from './authService.ts'
 import { processWalletPayment } from './walletService.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-console.log('=== PURCHASE-LABEL v3.0 STARTUP ===')
+console.log('=== PURCHASE-LABEL v4.0 STARTUP ===')
 
-// Fix for EASYPOST_API_KEY with newline characters - v3.0
-function getCleanEasyPostKey(): string | undefined {
+// Get EASYPOST_API_KEY with proper error handling
+function getEasyPostApiKey(): string | undefined {
   try {
-    // Try clean key first
-    let key = Deno.env.get('EASYPOST_API_KEY')
+    const key = Deno.env.get('EASYPOST_API_KEY')
     if (key) {
-      console.log('✅ Found clean EASYPOST_API_KEY')
+      console.log('✅ EASYPOST_API_KEY found')
       return key.trim()
     }
-    
-    // Try keys with newlines
-    const variations = ['EASYPOST_API_KEY\n', 'EASYPOST_API_KEY\n\n', 'EASYPOST_API_KEY\r\n']
-    for (const variant of variations) {
-      key = Deno.env.get(variant)
-      if (key) {
-        console.log(`✅ Found EASYPOST_API_KEY with whitespace: "${variant}"`)
-        return key.trim()
-      }
-    }
-    
-    console.log('❌ No EASYPOST_API_KEY found in any variation')
+    console.log('❌ EASYPOST_API_KEY not found')
     return undefined
   } catch (error) {
     console.error('Error getting EASYPOST_API_KEY:', error)
@@ -36,68 +24,73 @@ function getCleanEasyPostKey(): string | undefined {
   }
 }
 
-const easyPostApiKey = getCleanEasyPostKey()
+const easyPostApiKey = getEasyPostApiKey()
 console.log('EasyPost API key available:', easyPostApiKey ? 'YES' : 'NO')
 
 async function ensurePhoneNumbers(shipmentId: string, apiKey: string) {
   console.log('Checking and fixing phone numbers for shipment:', shipmentId);
   
-  // Get the current shipment details
-  const getResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  
-  if (!getResponse.ok) {
-    console.log('Failed to get shipment details, proceeding with purchase anyway');
-    return; // Don't fail the whole operation if we can't get details
-  }
-  
-  const shipment = await getResponse.json();
-  
-  // Check if phone numbers are missing or empty
-  const fromNeedsPhone = !shipment.from_address?.phone || shipment.from_address.phone.trim() === '';
-  const toNeedsPhone = !shipment.to_address?.phone || shipment.to_address.phone.trim() === '';
-  
-  if (fromNeedsPhone || toNeedsPhone) {
-    console.log('Phone numbers missing, updating shipment addresses');
-    
-    // Update the shipment with proper phone numbers
-    const updateData: any = {};
-    
-    if (fromNeedsPhone) {
-      updateData.from_address = {
-        ...shipment.from_address,
-        phone: "5555555555"
-      };
-    }
-    
-    if (toNeedsPhone) {
-      updateData.to_address = {
-        ...shipment.to_address,
-        phone: "5555555555"
-      };
-    }
-    
-    const updateResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
-      method: 'PUT',
+  try {
+    // Get the current shipment details
+    const getResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ shipment: updateData }),
     });
     
-    if (updateResponse.ok) {
-      console.log('✅ Successfully updated shipment with phone numbers');
-    } else {
-      console.log('⚠️ Failed to update shipment with phone numbers, but continuing...');
+    if (!getResponse.ok) {
+      console.log('Failed to get shipment details, proceeding with purchase anyway');
+      return;
     }
-  } else {
-    console.log('✅ Phone numbers already present');
+    
+    const shipment = await getResponse.json();
+    
+    // Check if phone numbers are missing or empty
+    const fromNeedsPhone = !shipment.from_address?.phone || shipment.from_address.phone.trim() === '';
+    const toNeedsPhone = !shipment.to_address?.phone || shipment.to_address.phone.trim() === '';
+    
+    if (fromNeedsPhone || toNeedsPhone) {
+      console.log('Phone numbers missing, updating shipment addresses');
+      
+      // Update the shipment with proper phone numbers
+      const updateData: any = {};
+      
+      if (fromNeedsPhone) {
+        updateData.from_address = {
+          ...shipment.from_address,
+          phone: "5555555555"
+        };
+      }
+      
+      if (toNeedsPhone) {
+        updateData.to_address = {
+          ...shipment.to_address,
+          phone: "5555555555"
+        };
+      }
+      
+      const updateResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ shipment: updateData }),
+      });
+      
+      if (updateResponse.ok) {
+        console.log('✅ Successfully updated shipment with phone numbers');
+      } else {
+        console.log('⚠️ Failed to update shipment with phone numbers, but continuing...');
+      }
+    } else {
+      console.log('✅ Phone numbers already present');
+    }
+  } catch (error) {
+    console.error('Error ensuring phone numbers:', error);
+    // Don't fail the whole operation
   }
 }
 
@@ -153,15 +146,16 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
 }
 
 serve(async (req) => {
-  try {
-    console.log('=== PURCHASE LABEL v3.0 FUNCTION START ===');
-    console.log('Request method:', req.method);
+  console.log('=== PURCHASE LABEL v4.0 FUNCTION START ===');
+  console.log('Request method:', req.method);
   
-    // Handle preflight OPTIONS request
-    if (req.method === 'OPTIONS') {
-      console.log('Handling CORS preflight request');
-      return handleCorsPreflightRequest();
-    }
+  // Handle preflight OPTIONS request
+  if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request');
+    return handleCorsPreflightRequest();
+  }
+
+  try {
     console.log('Processing purchase-label request...')
     
     // Authenticate user
@@ -280,7 +274,7 @@ serve(async (req) => {
     return createSuccessResponse(purchaseResponse);
     
   } catch (err) {
-    console.error('=== ERROR IN PURCHASE LABEL FUNCTION v3.0 ===');
+    console.error('=== ERROR IN PURCHASE LABEL FUNCTION v4.0 ===');
     console.error('Error type:', typeof err);
     console.error('Error constructor:', err.constructor?.name);
     console.error('Error message:', err.message);
