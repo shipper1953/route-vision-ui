@@ -2,22 +2,24 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-// Force redeployment: v2.1
+// Force redeployment: v3.0 - Updated to properly read EASYPOST_API_KEY
 const easyPostApiKey = Deno.env.get('EASYPOST_API_KEY')
 const supabaseUrl = Deno.env.get('SUPABASE_URL')
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
 
-console.log('=== CREATE-SHIPMENT FUNCTION STARTUP ===')
+console.log('=== CREATE-SHIPMENT FUNCTION STARTUP v3.0 ===')
 console.log('Environment variables check:')
 console.log('- SUPABASE_URL:', supabaseUrl ? 'Available' : 'Missing')
 console.log('- SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Available' : 'Missing')
-console.log('- EASYPOST_API_KEY:', easyPostApiKey ? 'Available' : 'Missing')
+console.log('- EASYPOST_API_KEY:', easyPostApiKey ? 'Available (length: ' + easyPostApiKey.length + ')' : 'Missing')
 console.log('==========================================')
 
 if (!easyPostApiKey) {
   console.error('❌ CRITICAL: EASYPOST_API_KEY environment variable is not set!')
+  console.error('Available env vars:', Object.keys(Deno.env.toObject()))
 } else {
   console.log('✅ EASYPOST_API_KEY is properly configured')
+  console.log('Key starts with:', easyPostApiKey.substring(0, 5) + '...')
 }
 
 serve(async (req) => {
