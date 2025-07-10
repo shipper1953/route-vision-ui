@@ -8,6 +8,7 @@ import { validatePackageDimensions } from "../helpers/formValidation";
 import { buildShipmentData } from "../helpers/shipmentDataBuilder";
 import { findRecommendedRateByDate, findMostEconomicalRate } from "../helpers/rateSelectionHelpers";
 import { useAuth } from "@/context";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UseShipmentSubmissionProps {
   loading: boolean;
@@ -40,6 +41,19 @@ export const useShipmentSubmission = ({
       const shipmentData = buildShipmentData(data);
       console.log("Creating shipment with data:", shipmentData);
       console.log("User company_id:", userProfile?.company_id);
+      
+      // DIAGNOSTIC: Test environment variables first
+      console.log("🔍 Running environment diagnostics...");
+      try {
+        const { data: debugData, error: debugError } = await supabase.functions.invoke('debug-env');
+        if (debugData) {
+          console.log("🔍 Environment diagnostic results:", debugData);
+        } else {
+          console.error("🔍 Debug function failed:", debugError);
+        }
+      } catch (debugErr) {
+        console.error("🔍 Could not run diagnostics:", debugErr);
+      }
       
       const response = await easyPostService.createShipment(shipmentData);
       
