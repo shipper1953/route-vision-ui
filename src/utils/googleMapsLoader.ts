@@ -3,8 +3,8 @@
  * Utility for loading and managing Google Maps API script
  */
 
-// Google Maps API key should be retrieved from environment/secure storage
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || '';
+// Google Maps API key will be fetched from Supabase edge function
+let GOOGLE_MAPS_API_KEY = '';
 const SCRIPT_ID = 'google-maps-script';
 
 declare global {
@@ -17,16 +17,49 @@ declare global {
 }
 
 /**
+ * Fetches the Google Maps API key from Supabase edge function
+ */
+const fetchGoogleApiKey = async (): Promise<string> => {
+  try {
+    const response = await fetch('/functions/v1/get-google-api-key', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    return data.apiKey;
+  } catch (error) {
+    console.error('Failed to fetch Google API key:', error);
+    throw error;
+  }
+};
+
+/**
  * Loads the Google Maps JavaScript API if not already loaded
  * @returns Promise that resolves when the API is loaded
  */
 export const loadGoogleMapsScript = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    // Check if API key is available
+  return new Promise(async (resolve, reject) => {
+    // Fetch API key first if we don't have it
     if (!GOOGLE_MAPS_API_KEY) {
-      console.error("Google Maps API key not found. Please set VITE_GOOGLE_PLACES_API_KEY environment variable.");
-      reject(new Error("Google Maps API key not configured"));
-      return;
+      try {
+        GOOGLE_MAPS_API_KEY = await fetchGoogleApiKey();
+      } catch (error) {
+        console.error("Failed to get Google Maps API key:", error);
+        reject(new Error("Google Maps API key not available"));
+        return;
+      }
     }
     // If script already exists or is loading, handle appropriately
     if (document.getElementById(SCRIPT_ID)) {
