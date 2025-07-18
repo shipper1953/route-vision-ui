@@ -18,11 +18,13 @@ export function UserProfileDropdown() {
   const navigate = useNavigate();
   const { company } = useCompanyInfo(userProfile?.company_id);
 
-  if (!user || !userProfile) {
+  if (!user) {
     return null;
   }
 
-  const initials = userProfile.name
+  // Fallback to user data if userProfile is not loaded yet
+  const displayName = userProfile?.name || user.email?.split('@')[0] || 'User';
+  const initials = userProfile?.name
     ? userProfile.name
         .split(' ')
         .map(n => n[0])
@@ -55,7 +57,7 @@ export function UserProfileDropdown() {
               </AvatarFallback>
             </Avatar>
             <div className="text-left text-sm">
-              <div className="font-medium">{userProfile.name}</div>
+              <div className="font-medium">{displayName}</div>
               <div className="text-muted-foreground text-xs flex items-center gap-1">
                 <Building2 className="h-3 w-3" />
                 {company?.name || 'Demo'}

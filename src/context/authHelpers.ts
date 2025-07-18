@@ -15,33 +15,6 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
     if (error) {
       if (error.code === 'PGRST116') {
         console.warn('No profile found for user:', userId);
-        
-        // Try to create a profile for this user if they don't have one
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && user.id === userId) {
-          console.log('Attempting to create profile for existing user');
-          await createUserProfile(user);
-          
-          // Try to fetch the profile again
-          const { data: newData, error: newError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single();
-            
-          if (newError) {
-            console.error('Failed to fetch newly created profile:', newError);
-            return null;
-          }
-          
-          // Convert warehouse_ids from Json to string[] with proper type casting
-          return {
-            ...newData,
-            warehouse_ids: Array.isArray(newData.warehouse_ids) 
-              ? (newData.warehouse_ids as string[])
-              : []
-          };
-        }
         return null;
       }
       throw error;
@@ -64,15 +37,16 @@ export const createUserProfile = async (user: any): Promise<UserProfile | null> 
   try {
     console.log('Creating user profile for:', user.email);
     
-    // Get Demo company ID
+    // Get active Demo company ID
     const { data: demoCompany, error: companyError } = await supabase
       .from('companies')
       .select('id')
       .eq('name', 'Demo')
+      .eq('is_active', true)
       .single();
       
     if (companyError) {
-      console.error('Error finding Demo company:', companyError);
+      console.error('Error finding active Demo company:', companyError);
       return null;
     }
     
