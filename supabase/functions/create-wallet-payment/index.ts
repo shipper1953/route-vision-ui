@@ -80,8 +80,8 @@ serve(async (req) => {
         },
       ],
       mode: 'payment',
-      success_url: `${req.headers.get("origin")}/admin/wallet?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/admin/wallet?canceled=true`,
+      success_url: `${req.headers.get("origin")}/company-admin?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.get("origin")}/company-admin?canceled=true`,
       metadata: {
         company_id: companyId,
         wallet_topup: 'true',
