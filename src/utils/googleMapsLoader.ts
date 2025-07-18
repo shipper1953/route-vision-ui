@@ -4,7 +4,7 @@
  */
 
 // Google Maps API key should be retrieved from environment/secure storage
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || '';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyBKXKdQdstbXc9sI3OwJBsrKV1zJl2QcG4';
 const SCRIPT_ID = 'google-maps-script';
 
 declare global {
