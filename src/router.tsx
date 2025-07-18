@@ -15,6 +15,7 @@ import ItemMaster from "@/pages/ItemMaster";
 import Users from "@/pages/Users";
 import CreateUser from "@/pages/CreateUser";
 import Settings from "@/pages/Settings";
+import ProfileSettings from "@/pages/ProfileSettings";
 import AdminPanel from "@/pages/AdminPanel";
 import SuperAdminPanel from "@/pages/SuperAdminPanel";
 import CompanyAdminPanel from "@/pages/CompanyAdminPanel";
@@ -72,6 +73,10 @@ const router = createBrowserRouter([
   {
     path: "/settings",
     element: <Settings />,
+  },
+  {
+    path: "/profile",
+    element: <ProfileSettings />,
   },
   {
     path: "/admin",

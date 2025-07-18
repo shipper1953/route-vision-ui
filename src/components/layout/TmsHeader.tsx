@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "react-router-dom";
 import { useMemo } from "react";
+import { UserProfileDropdown } from "./UserProfileDropdown";
 
 export function TmsHeader() {
   const location = useLocation();
@@ -41,10 +42,7 @@ export function TmsHeader() {
           <span className="absolute top-1 right-1 h-2 w-2 bg-tms-amber rounded-full"></span>
         </Button>
         <div className="h-9 w-px bg-border mx-2"></div>
-        <div className="text-sm">
-          <div className="font-medium">Welcome back</div>
-          <div className="text-muted-foreground text-xs">Thursday, May 15</div>
-        </div>
+        <UserProfileDropdown />
       </div>
     </header>
   );
