@@ -120,12 +120,14 @@ export type Database = {
       }
       orders: {
         Row: {
+          actual_delivery_date: string | null
           company_id: string | null
           created_at: string | null
           customer_company: string | null
           customer_email: string | null
           customer_name: string | null
           customer_phone: string | null
+          estimated_delivery_date: string | null
           id: number
           items: Json
           order_date: string | null
@@ -140,12 +142,14 @@ export type Database = {
           warehouse_id: string | null
         }
         Insert: {
+          actual_delivery_date?: string | null
           company_id?: string | null
           created_at?: string | null
           customer_company?: string | null
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          estimated_delivery_date?: string | null
           id?: number
           items?: Json
           order_date?: string | null
@@ -160,12 +164,14 @@ export type Database = {
           warehouse_id?: string | null
         }
         Update: {
+          actual_delivery_date?: string | null
           company_id?: string | null
           created_at?: string | null
           customer_company?: string | null
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          estimated_delivery_date?: string | null
           id?: number
           items?: Json
           order_date?: string | null
