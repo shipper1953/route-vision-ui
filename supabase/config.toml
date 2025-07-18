@@ -87,3 +87,9 @@ verify_jwt = false
 
 [functions.qboid-wifi-api-handler]
 verify_jwt = false
+
+[functions.easypost-webhook]
+verify_jwt = false
+
+[functions.shippo-webhook]
+verify_jwt = false
