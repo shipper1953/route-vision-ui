@@ -121,7 +121,12 @@ export const useGooglePlacesAutocomplete = ({ onAddressSelected }: UseGooglePlac
     } catch (error) {
       console.error("Error loading Google Maps:", error);
       setIsScriptLoading(false);
-      setScriptLoadError(`Failed to load Google Maps: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      if (error instanceof Error && error.message.includes("API key not configured")) {
+        setScriptLoadError("Google Maps API key not configured. Address autocomplete is disabled.");
+      } else {
+        setScriptLoadError(`Failed to load Google Maps: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   };
   

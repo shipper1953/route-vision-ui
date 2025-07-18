@@ -4,7 +4,7 @@
  */
 
 // Google Maps API key should be retrieved from environment/secure storage
-const GOOGLE_MAPS_API_KEY = 'AIzaSyBKXKdQdstbXc9sI3OwJBsrKV1zJl2QcG4';
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || '';
 const SCRIPT_ID = 'google-maps-script';
 
 declare global {
@@ -22,6 +22,12 @@ declare global {
  */
 export const loadGoogleMapsScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
+    // Check if API key is available
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.error("Google Maps API key not found. Please set VITE_GOOGLE_PLACES_API_KEY environment variable.");
+      reject(new Error("Google Maps API key not configured"));
+      return;
+    }
     // If script already exists or is loading, handle appropriately
     if (document.getElementById(SCRIPT_ID)) {
       console.log("Google Maps script already exists in DOM");
