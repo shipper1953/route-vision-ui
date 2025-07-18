@@ -81,6 +81,8 @@ export const OrdersTable = ({ orders, loading = false }: OrdersTableProps) => {
                   <TableHead>Items</TableHead>
                   <TableHead>Value</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Est. Delivery</TableHead>
+                  <TableHead>Actual Delivery</TableHead>
                   <TableHead>Box/Shipping Info</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -88,7 +90,7 @@ export const OrdersTable = ({ orders, loading = false }: OrdersTableProps) => {
               <TableBody>
                 {filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No orders found
                     </TableCell>
                   </TableRow>

@@ -82,6 +82,7 @@ export const ShipmentsTable = ({
             <TableHead>Route</TableHead>
             <TableHead>Ship Date</TableHead>
             <TableHead>Est. Delivery</TableHead>
+            <TableHead>Actual Delivery</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -129,6 +130,7 @@ export const ShipmentsTable = ({
                 </div>
               </TableCell>
               <TableCell>{shipment.estimatedDelivery || "Not available"}</TableCell>
+              <TableCell>{shipment.actualDelivery || "Not delivered"}</TableCell>
               <TableCell>
                 <ShipmentStatus status={shipment.status} />
               </TableCell>
@@ -151,7 +153,7 @@ export const ShipmentsTable = ({
           
           {filteredShipments.length === 0 && (
             <TableRow>
-              <TableCell colSpan={10} className="h-24 text-center">
+              <TableCell colSpan={11} className="h-24 text-center">
                 No shipments found.
               </TableCell>
             </TableRow>

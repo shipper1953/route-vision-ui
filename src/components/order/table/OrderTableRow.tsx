@@ -68,6 +68,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
           trackingNumber: shippingAddress.trackingNumber,
           trackingUrl: shippingAddress.trackingUrl,
           estimatedDeliveryDate: shippingAddress.estimatedDeliveryDate,
+          actualDeliveryDate: shippingAddress.actualDeliveryDate,
           cost: shippingAddress.cost,
           labelUrl: shippingAddress.labelUrl
         };
@@ -112,6 +113,18 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
         </Badge>
       </TableCell>
       <TableCell>
+        {shippingInfo?.estimatedDeliveryDate 
+          ? format(new Date(shippingInfo.estimatedDeliveryDate), "MMM dd, yyyy")
+          : "-"
+        }
+      </TableCell>
+      <TableCell>
+        {shippingInfo?.actualDeliveryDate 
+          ? format(new Date(shippingInfo.actualDeliveryDate), "MMM dd, yyyy")
+          : "-"
+        }
+      </TableCell>
+      <TableCell>
         {order.status === 'shipped' && shippingInfo ? (
           <div className="space-y-1">
             <div className="flex items-center gap-1">
@@ -135,12 +148,6 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
                 <span className="text-sm font-mono">{shippingInfo.trackingNumber}</span>
               )}
             </div>
-            
-            {shippingInfo.estimatedDeliveryDate && (
-              <div className="text-xs text-muted-foreground">
-                Est. Delivery: {format(new Date(shippingInfo.estimatedDeliveryDate), "MMM dd, yyyy")}
-              </div>
-            )}
           </div>
         ) : recommendedBox ? (
           <div className="flex items-center gap-2">
