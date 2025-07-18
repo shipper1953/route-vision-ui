@@ -13,20 +13,26 @@ export const OrdersHeader = () => {
   const handleSyncDeliveryDates = async () => {
     setIsSync(true);
     try {
+      console.log('Starting delivery date sync...');
       const { data, error } = await supabase.functions.invoke('sync-delivery-dates');
+      
+      console.log('Sync response:', { data, error });
       
       if (error) {
         console.error('Sync error:', error);
-        toast.error('Failed to sync delivery dates');
+        toast.error(`Failed to sync delivery dates: ${error.message || 'Unknown error'}`);
       } else {
         console.log('Sync result:', data);
-        toast.success(`Updated ${data?.updates?.length || 0} shipments with delivery dates`);
-        // Refresh the page to show updated data
-        window.location.reload();
+        const updatedCount = data?.updates?.length || 0;
+        toast.success(`Processed ${data?.message || 'shipments'} - Updated ${updatedCount} with delivery dates`);
+        if (updatedCount > 0) {
+          // Refresh the page to show updated data
+          setTimeout(() => window.location.reload(), 1000);
+        }
       }
     } catch (error) {
       console.error('Error calling sync function:', error);
-      toast.error('Failed to sync delivery dates');
+      toast.error(`Failed to sync delivery dates: ${error.message || 'Network error'}`);
     } finally {
       setIsSync(false);
     }

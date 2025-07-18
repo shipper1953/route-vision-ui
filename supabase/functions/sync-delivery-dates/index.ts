@@ -58,24 +58,33 @@ Deno.serve(async (req) => {
 
     for (const shipment of shipments || []) {
       try {
-        // Fetch tracker data from EasyPost
-        const trackerResponse = await fetch(
-          `https://api.easypost.com/v2/trackers/${shipment.easypost_id}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${easypostApiKey}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        console.log(`Processing shipment ${shipment.id} with EasyPost ID: ${shipment.easypost_id}`);
+        
+        // Fetch tracker data from EasyPost using the correct endpoint
+        const trackerUrl = `https://api.easypost.com/v2/trackers/${shipment.easypost_id}`;
+        console.log(`Fetching tracker from: ${trackerUrl}`);
+        
+        const trackerResponse = await fetch(trackerUrl, {
+          headers: {
+            'Authorization': `Bearer ${easypostApiKey}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
+        console.log(`Tracker response status: ${trackerResponse.status}`);
+        
         if (!trackerResponse.ok) {
-          console.error(`Failed to fetch tracker for ${shipment.easypost_id}: ${trackerResponse.status}`);
+          const errorText = await trackerResponse.text();
+          console.error(`Failed to fetch tracker for ${shipment.easypost_id}: ${trackerResponse.status} - ${errorText}`);
           continue;
         }
 
         const tracker: EasyPostTracker = await trackerResponse.json();
-        console.log(`Tracker status for ${shipment.easypost_id}: ${tracker.status}`);
+        console.log(`Tracker data for ${shipment.easypost_id}:`, {
+          status: tracker.status,
+          est_delivery_date: tracker.est_delivery_date,
+          tracking_details_count: tracker.tracking_details?.length || 0
+        });
 
         let estimatedDeliveryDate = shipment.estimated_delivery_date;
         let actualDeliveryDate = shipment.actual_delivery_date;
@@ -84,6 +93,7 @@ Deno.serve(async (req) => {
         // Update estimated delivery date if available
         if (tracker.est_delivery_date && !estimatedDeliveryDate) {
           estimatedDeliveryDate = tracker.est_delivery_date;
+          console.log(`Setting estimated delivery date: ${estimatedDeliveryDate}`);
         }
 
         // Check for delivery in tracking details
@@ -95,12 +105,19 @@ Deno.serve(async (req) => {
         if (deliveredEvent && !actualDeliveryDate) {
           actualDeliveryDate = deliveredEvent.datetime;
           status = 'delivered';
+          console.log(`Found delivery event: ${deliveredEvent.datetime}`);
         }
 
         // Update shipment if there are changes
         if (estimatedDeliveryDate !== shipment.estimated_delivery_date || 
             actualDeliveryDate !== shipment.actual_delivery_date ||
             (deliveredEvent && status === 'delivered')) {
+          
+          console.log(`Updating shipment ${shipment.id} with:`, {
+            estimated_delivery_date: estimatedDeliveryDate,
+            actual_delivery_date: actualDeliveryDate,
+            status: status
+          });
           
           const { error: updateError } = await supabase
             .from('shipments')
@@ -121,12 +138,15 @@ Deno.serve(async (req) => {
               actual_delivery_date: actualDeliveryDate,
               status: status
             });
-            console.log(`Updated shipment ${shipment.id} with delivery dates`);
+            console.log(`Successfully updated shipment ${shipment.id}`);
           }
+        } else {
+          console.log(`No changes needed for shipment ${shipment.id}`);
         }
 
       } catch (error) {
         console.error(`Error processing shipment ${shipment.easypost_id}:`, error);
+        // Continue processing other shipments even if one fails
       }
     }
 
