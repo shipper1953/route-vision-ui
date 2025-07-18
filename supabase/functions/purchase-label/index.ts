@@ -158,20 +158,21 @@ serve(async (req) => {
     console.log('🔑 Checking environment variables...')
     const apiKey = Deno.env.get('EASYPOST_API_KEY')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
-    if (!apiKey || !supabaseUrl || !supabaseKey) {
+    if (!apiKey || !supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
       console.error('❌ Missing required environment variables')
       return createErrorResponse('Configuration error', 'Required environment variables not configured', 500)
     }
     console.log('✅ Environment variables configured')
     
-    // Create Supabase client
-    const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+    // Create Supabase client for user authentication
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })
     
     // Get user from auth header
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
     
     if (authError || !user) {
       console.error('❌ Failed to authenticate user:', authError)
@@ -215,6 +216,9 @@ serve(async (req) => {
       purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
       console.log('✅ Label purchased successfully from EasyPost:', purchaseResponse.id)
     }
+    
+    // Create Supabase client with service role for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
     
     // Get user's company for wallet processing
     const { data: userProfile, error: userError } = await supabase
