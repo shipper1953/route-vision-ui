@@ -93,3 +93,6 @@ verify_jwt = false
 
 [functions.shippo-webhook]
 verify_jwt = false
+
+[functions.test-easypost-tracking]
+verify_jwt = false
