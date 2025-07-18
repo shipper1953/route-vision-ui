@@ -1,6 +1,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useSearchParams } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -20,6 +21,7 @@ const CreateOrder = () => {
   const { isAuthenticated, loading, userProfile } = useAuth();
   const { isSubmitting, onSubmit } = useCreateOrder();
   const { warehouseAddress } = useDefaultAddressValues();
+  const [searchParams] = useSearchParams();
 
   // Initialize the form with the correct type
   const form = useForm<OrderFormValues>({
@@ -40,6 +42,45 @@ const CreateOrder = () => {
       warehouseId: "",
     },
   });
+
+  // Handle copying order data from URL params
+  useEffect(() => {
+    const copyData = searchParams.get('copy');
+    if (copyData) {
+      try {
+        const orderData = JSON.parse(decodeURIComponent(copyData));
+        
+        // Pre-fill form with copied order data
+        if (orderData.customerName) form.setValue("customerName", orderData.customerName);
+        if (orderData.customerCompany) form.setValue("customerCompany", orderData.customerCompany);
+        if (orderData.customerEmail) form.setValue("customerEmail", orderData.customerEmail);
+        if (orderData.customerPhone) form.setValue("customerPhone", orderData.customerPhone);
+        
+        // Pre-fill shipping address
+        if (orderData.shippingAddress) {
+          const addr = orderData.shippingAddress;
+          if (addr.street1) form.setValue("street1", addr.street1);
+          if (addr.street2) form.setValue("street2", addr.street2);
+          if (addr.city) form.setValue("city", addr.city);
+          if (addr.state) form.setValue("state", addr.state);
+          if (addr.zip) form.setValue("zip", addr.zip);
+          if (addr.country) form.setValue("country", addr.country);
+        }
+        
+        // Pre-fill items if they're in array format
+        if (orderData.items && Array.isArray(orderData.items)) {
+          const formattedItems = orderData.items.map((item: any) => ({
+            itemId: item.itemId || "",
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || 0
+          }));
+          form.setValue("orderItems", formattedItems);
+        }
+      } catch (error) {
+        console.error("Failed to parse copied order data:", error);
+      }
+    }
+  }, [searchParams, form]);
 
   // Set default warehouse when warehouse address is loaded
   useEffect(() => {

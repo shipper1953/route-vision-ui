@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Eye, Package, Truck, Box, ExternalLink } from "lucide-react";
+import { Eye, Package, Truck, Box, ExternalLink, Copy } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { OrderData } from "@/types/orderTypes";
@@ -79,6 +79,18 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
 
   const { box: recommendedBox, weight: packageWeight } = getRecommendedBoxAndWeight(order);
   const shippingInfo = getShippingInfo(order);
+
+  const handleCopyOrder = () => {
+    const orderData = encodeURIComponent(JSON.stringify({
+      customerName: order.customerName,
+      customerCompany: order.customerCompany,
+      customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
+      shippingAddress: order.shippingAddress,
+      items: order.items
+    }));
+    navigate(`/orders/create?copy=${orderData}`);
+  };
 
   return (
     <TableRow key={order.id}>
@@ -164,6 +176,14 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
             onClick={() => navigate(`/orders/${order.id}/edit`)}
           >
             <Package className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCopyOrder}
+            title="Copy Order"
+          >
+            <Copy className="h-4 w-4" />
           </Button>
           {order.status !== 'shipped' && order.status !== 'delivered' && (
             <Button
