@@ -95,11 +95,17 @@ export const ManualAddFundsDialog = ({
 
       if (transactionError) throw transactionError;
 
-      // Update wallet balance
-      const newBalance = (currentWallet.balance || 0) + amount;
+      // Calculate the correct balance from all transactions
+      const { data: transactions } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('wallet_id', currentWallet.id);
+
+      const correctBalance = (transactions || []).reduce((sum, transaction) => sum + transaction.amount, 0);
+      
       const { error: walletError } = await supabase
         .from('wallets')
-        .update({ balance: newBalance })
+        .update({ balance: correctBalance })
         .eq('id', currentWallet.id);
 
       if (walletError) throw walletError;
