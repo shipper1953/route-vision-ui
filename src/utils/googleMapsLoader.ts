@@ -3,7 +3,8 @@
  * Utility for loading and managing Google Maps API script
  */
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyBEc8QSEfbN44p7b1izuociU3CJBKPnSTo';
+// Google Maps API key should be retrieved from environment/secure storage
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || '';
 const SCRIPT_ID = 'google-maps-script';
 
 declare global {

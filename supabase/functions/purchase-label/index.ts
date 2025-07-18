@@ -8,9 +8,10 @@ console.log('=== PURCHASE-LABEL v8.0 WITH ORDER LINKING ===')
 
 const corsHeaders = {
   'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://gidrlosmhpvdcogrkidj.supabase.co',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Max-Age': '86400',
 }
 
 function createErrorResponse(error: string, details?: any, status: number = 500): Response {

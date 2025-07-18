@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ interface EditUserDialogProps {
 
 export const EditUserDialog = ({ user, companies, onUserUpdated }: EditUserDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [editedUser, setEditedUser] = useState({
     name: user.name,
     email: user.email,
@@ -25,9 +26,44 @@ export const EditUserDialog = ({ user, companies, onUserUpdated }: EditUserDialo
     role: user.role
   });
 
+  // Check current user's role on component mount
+  useEffect(() => {
+    const checkUserRole = async () => {
+      try {
+        const { data: currentUser } = await supabase.auth.getUser();
+        if (currentUser.user) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', currentUser.user.id)
+            .single();
+          
+          setCurrentUserRole(userData?.role || '');
+        }
+      } catch (error) {
+        console.error('Error fetching current user role:', error);
+      }
+    };
+    checkUserRole();
+  }, []);
+
   const updateUser = async () => {
     try {
       console.log('Updating user with data:', editedUser);
+      
+      // Get current user's role to verify permissions
+      const { data: currentUserData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+      
+      // Security check: Only super admins can change roles
+      const isRoleChanged = editedUser.role !== user.role;
+      if (isRoleChanged && currentUserData?.role !== 'super_admin') {
+        toast.error('Only super administrators can change user roles');
+        return;
+      }
       
       const { error } = await supabase
         .from('users')
@@ -105,6 +141,7 @@ export const EditUserDialog = ({ user, companies, onUserUpdated }: EditUserDialo
             <Select 
               value={editedUser.role} 
               onValueChange={(value: 'user' | 'company_admin' | 'super_admin') => setEditedUser({ ...editedUser, role: value })}
+              disabled={currentUserRole !== 'super_admin'}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a role" />
@@ -115,6 +152,11 @@ export const EditUserDialog = ({ user, companies, onUserUpdated }: EditUserDialo
                 <SelectItem value="super_admin">Super Admin</SelectItem>
               </SelectContent>
             </Select>
+            {currentUserRole !== 'super_admin' && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Only super administrators can modify user roles
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             <Button onClick={updateUser} className="flex-1">
