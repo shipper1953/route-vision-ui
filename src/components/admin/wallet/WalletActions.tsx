@@ -5,6 +5,7 @@ import { Plus, CreditCard, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
+import { useAuth } from "@/context";
 
 interface WalletActionsProps {
   balance: number;
@@ -22,6 +23,7 @@ export const WalletActions = ({
   onBalanceUpdated 
 }: WalletActionsProps) => {
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const { isSuperAdmin } = useAuth();
 
   const recalculateBalance = async () => {
     if (!companyId) return;
@@ -85,10 +87,12 @@ export const WalletActions = ({
               <RefreshCw className={`h-4 w-4 mr-2 ${isRecalculating ? 'animate-spin' : ''}`} />
               {isRecalculating ? 'Calculating...' : 'Recalculate'}
             </Button>
-            <Button variant="outline" onClick={onManualAdd}>
-              <Plus className="h-4 w-4 mr-2" />
-              Manual Add
-            </Button>
+            {isSuperAdmin && (
+              <Button variant="outline" onClick={onManualAdd}>
+                <Plus className="h-4 w-4 mr-2" />
+                Manual Add
+              </Button>
+            )}
             <Button onClick={onStripeAdd}>
               <CreditCard className="h-4 w-4 mr-2" />
               Add Funds
