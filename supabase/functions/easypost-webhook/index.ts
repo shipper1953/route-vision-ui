@@ -26,6 +26,9 @@ interface EasyPostWebhookEvent {
     est_delivery_date: string;
     shipment_id: string;
     carrier: string;
+    carrier_detail: string;
+    public_url: string;
+    fees: any[];
     tracking_details: Array<{
       object: string;
       message: string;
@@ -63,19 +66,31 @@ Deno.serve(async (req) => {
     );
 
     const webhookEvent: EasyPostWebhookEvent = await req.json();
-    console.log('Received EasyPost webhook:', webhookEvent);
+    console.log('Received EasyPost webhook:', {
+      id: webhookEvent.id,
+      object: webhookEvent.object,
+      description: webhookEvent.description,
+      mode: webhookEvent.mode
+    });
 
-    // Only process tracker events
-    if (webhookEvent.object !== 'Event' || !webhookEvent.result) {
-      console.log('Not a tracker event, ignoring');
+    // EasyPost recommends responding with 200 OK immediately, then processing
+    // Return early acknowledgment for non-tracker events
+    if (webhookEvent.object !== 'Event' || !webhookEvent.result || webhookEvent.result.object !== 'Tracker') {
+      console.log('Not a tracker event, ignoring:', webhookEvent.description);
       return new Response('OK', { status: 200, headers: corsHeaders });
     }
 
+    // Process tracker events
     const tracker = webhookEvent.result;
     const trackingCode = tracker.tracking_code;
     const shipmentId = tracker.shipment_id;
 
-    console.log(`Processing tracker update for tracking code: ${trackingCode}, shipment: ${shipmentId}`);
+    console.log(`Processing tracker event: ${webhookEvent.description}`, {
+      tracking_code: trackingCode,
+      shipment_id: shipmentId,
+      status: tracker.status,
+      status_detail: tracker.status_detail
+    });
 
     // Find the shipment in our database by EasyPost ID or tracking number
     const { data: shipments, error: shipmentError } = await supabase
@@ -102,19 +117,27 @@ Deno.serve(async (req) => {
     // Update estimated delivery date if available and not already set
     if (tracker.est_delivery_date && !estimatedDeliveryDate) {
       estimatedDeliveryDate = tracker.est_delivery_date;
+      console.log(`Setting estimated delivery date: ${estimatedDeliveryDate}`);
     }
 
-    // Check for delivery in tracking details
+    // Check for delivery status - EasyPost uses specific status values
+    let isDelivered = false;
+    if (tracker.status === 'delivered' || tracker.status_detail === 'arrived_at_destination') {
+      isDelivered = true;
+    }
+
+    // Also check tracking details for delivery events
     const deliveredEvent = tracker.tracking_details?.find(detail => 
       detail.status === 'delivered' || 
-      detail.status_detail === 'delivered' ||
-      detail.description?.toLowerCase().includes('delivered')
+      detail.status_detail === 'arrived_at_destination' ||
+      detail.status === 'out_for_delivery' && detail.message?.toLowerCase().includes('delivered')
     );
 
-    if (deliveredEvent && !actualDeliveryDate) {
-      actualDeliveryDate = deliveredEvent.datetime;
+    if ((isDelivered || deliveredEvent) && !actualDeliveryDate) {
+      // Use the most recent tracking detail datetime or current time
+      actualDeliveryDate = deliveredEvent?.datetime || new Date().toISOString();
       status = 'delivered';
-      console.log(`Package delivered at: ${deliveredEvent.datetime}`);
+      console.log(`Package delivered at: ${actualDeliveryDate}`);
     }
 
     // Update the shipment if there are changes
@@ -136,13 +159,17 @@ Deno.serve(async (req) => {
         return new Response('Update failed', { status: 500, headers: corsHeaders });
       }
 
-      console.log(`Updated shipment ${shipment.id} with delivery information`);
+      console.log(`Updated shipment ${shipment.id} with delivery information from EasyPost webhook`);
+    } else {
+      console.log(`No updates needed for shipment ${shipment.id}`);
     }
 
+    // Always return 200 OK to acknowledge receipt of webhook
     return new Response('OK', { status: 200, headers: corsHeaders });
 
   } catch (error) {
     console.error('Error processing EasyPost webhook:', error);
-    return new Response('Internal error', { status: 500, headers: corsHeaders });
+    // Still return 200 to prevent EasyPost from retrying
+    return new Response('OK', { status: 200, headers: corsHeaders });
   }
 });
