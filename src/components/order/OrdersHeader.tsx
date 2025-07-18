@@ -37,26 +37,6 @@ export const OrdersHeader = () => {
       setIsSync(false);
     }
   };
-
-  const handleTestTracking = async () => {
-    try {
-      console.log('Testing EasyPost tracking for order 34...');
-      const { data, error } = await supabase.functions.invoke('test-easypost-tracking', {
-        body: { shipmentId: 'shp_6ad65a7d97cb45f591dc54caa5a3cd74' }
-      });
-      
-      if (error) {
-        console.error('Test tracking error:', error);
-        toast.error(`Test failed: ${error.message}`);
-      } else {
-        console.log('EasyPost tracking data:', data);
-        toast.success('Check console for tracking data');
-      }
-    } catch (error) {
-      console.error('Error testing tracking:', error);
-      toast.error('Test tracking failed');
-    }
-  };
   
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
@@ -66,18 +46,12 @@ export const OrdersHeader = () => {
       </div>
       <div className="mt-4 md:mt-0 flex gap-3">
         <Button
-          onClick={handleTestTracking}
-          variant="outline"
-        >
-          Test Order 34 Tracking
-        </Button>
-        <Button
           onClick={handleSyncDeliveryDates}
           disabled={isSync}
           variant="outline"
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${isSync ? 'animate-spin' : ''}`} />
-          Sync Delivery Dates
+          Sync All Past Deliveries
         </Button>
         <Button className="bg-tms-blue hover:bg-tms-blue-400" onClick={() => navigate('/orders/create')}>
           <ShoppingBag className="mr-2 h-4 w-4" />
