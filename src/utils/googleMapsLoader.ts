@@ -21,21 +21,23 @@ declare global {
  */
 const fetchGoogleApiKey = async (): Promise<string> => {
   try {
-    const response = await fetch('/functions/v1/get-google-api-key', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    // Import supabase client dynamically to avoid issues
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    const { data, error } = await supabase.functions.invoke('get-google-api-key', {
+      method: 'GET'
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (error) {
+      throw new Error(error.message || 'Failed to get API key');
     }
 
-    const data = await response.json();
-    
-    if (data.error) {
+    if (data?.error) {
       throw new Error(data.error);
+    }
+
+    if (!data?.apiKey) {
+      throw new Error('No API key returned');
     }
 
     return data.apiKey;
