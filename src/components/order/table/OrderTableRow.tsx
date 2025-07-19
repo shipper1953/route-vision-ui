@@ -125,7 +125,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
         }
       </TableCell>
       <TableCell>
-        {order.status === 'shipped' && shippingInfo ? (
+        {(order.status === 'shipped' || order.status === 'delivered') && shippingInfo ? (
           <div className="space-y-1">
             <div className="flex items-center gap-1">
               <Truck className="h-4 w-4 text-muted-foreground" />
