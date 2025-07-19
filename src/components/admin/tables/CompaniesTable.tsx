@@ -10,12 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Company } from "@/types/auth";
-import { Edit, Trash2, Users, Wallet } from "lucide-react";
+import { Edit, Trash2, Users, Wallet, Percent } from "lucide-react";
 
 interface CompaniesTableProps {
   companies: Company[];
   onEditClick: (company: Company) => void;
   onWalletClick: (company: Company) => void;
+  onMarkupClick: (company: Company) => void;
   onToggleStatus: (companyId: string, isActive: boolean) => void;
 }
 
@@ -23,6 +24,7 @@ export const CompaniesTable = ({
   companies, 
   onEditClick, 
   onWalletClick, 
+  onMarkupClick,
   onToggleStatus 
 }: CompaniesTableProps) => {
   if (companies.length === 0) {
@@ -83,6 +85,14 @@ export const CompaniesTable = ({
                   onClick={() => onWalletClick(company)}
                 >
                   <Wallet className="h-4 w-4" />
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => onMarkupClick(company)}
+                  title="Edit Markup"
+                >
+                  <Percent className="h-4 w-4" />
                 </Button>
                 <Button 
                   size="sm" 

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Company } from "@/types/auth";
 import { CompanyWalletDialog } from "./dialogs/CompanyWalletDialog";
+import { EditMarkupDialog } from "./dialogs/EditMarkupDialog";
 import { useCompanyManagement } from "./hooks/useCompanyManagement";
 import { CreateCompanyDialog } from "./dialogs/CreateCompanyDialog";
 import { EditCompanyDialog } from "./dialogs/EditCompanyDialog";
@@ -17,8 +18,10 @@ export const CompanyManagement = () => {
   const { companies, loading, setCompanies, toggleCompanyStatus } = useCompanyManagement();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
+  const [isMarkupDialogOpen, setIsMarkupDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [markupCompany, setMarkupCompany] = useState<Company | null>(null);
 
   const handleCompanyCreated = (newCompany: Company) => {
     setCompanies([newCompany, ...companies]);
@@ -38,6 +41,16 @@ export const CompanyManagement = () => {
   const handleWalletClick = (company: Company) => {
     setSelectedCompany(company);
     setIsWalletDialogOpen(true);
+  };
+
+  const handleMarkupClick = (company: Company) => {
+    setMarkupCompany(company);
+    setIsMarkupDialogOpen(true);
+  };
+
+  const handleMarkupUpdated = () => {
+    // Refresh companies list to show updated markup values
+    window.location.reload();
   };
 
   if (loading) {
@@ -71,6 +84,7 @@ export const CompanyManagement = () => {
           companies={companies}
           onEditClick={handleEditClick}
           onWalletClick={handleWalletClick}
+          onMarkupClick={handleMarkupClick}
           onToggleStatus={toggleCompanyStatus}
         />
 
@@ -85,6 +99,13 @@ export const CompanyManagement = () => {
           open={isWalletDialogOpen}
           onOpenChange={setIsWalletDialogOpen}
           company={selectedCompany}
+        />
+
+        <EditMarkupDialog
+          company={markupCompany}
+          open={isMarkupDialogOpen}
+          onOpenChange={setIsMarkupDialogOpen}
+          onSuccess={handleMarkupUpdated}
         />
       </CardContent>
     </Card>
