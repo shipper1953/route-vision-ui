@@ -141,6 +141,10 @@ export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
     value: supabaseOrder.value || "0.00",
     shippingAddress: parseShippingAddress(supabaseOrder.shipping_address),
     parcelInfo: parseParcelInfo(supabaseOrder.qboid_dimensions),
-    shipment: supabaseOrder.shipment_data || null // Map shipment_data to shipment field
+    shipment: supabaseOrder.shipment_data ? {
+      ...supabaseOrder.shipment_data,
+      estimatedDeliveryDate: supabaseOrder.estimated_delivery_date,
+      actualDeliveryDate: supabaseOrder.actual_delivery_date
+    } : null // Map shipment_data to shipment field with delivery dates from order
   };
 };
