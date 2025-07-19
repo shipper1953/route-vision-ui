@@ -91,6 +91,10 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
         weight: purchaseResponse.parcel?.weight,
         weight_unit: purchaseResponse.parcel?.mass_unit || 'lb'
       }),
+      // Capture estimated delivery date from Shippo rate
+      estimated_delivery_date: purchaseResponse.rate?.estimated_days ? 
+        new Date(Date.now() + purchaseResponse.rate.estimated_days * 24 * 60 * 60 * 1000).toISOString() : 
+        null,
       created_at: purchaseResponse.object_created,
       user_id: userId,
       company_id: companyId,
@@ -117,6 +121,8 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
         weight: purchaseResponse.parcel?.weight,
         weight_unit: 'oz'
       }),
+      // Capture estimated delivery date from EasyPost tracker
+      estimated_delivery_date: purchaseResponse.tracker?.est_delivery_date || null,
       created_at: purchaseResponse.created_at,
       user_id: userId,
       company_id: companyId,
