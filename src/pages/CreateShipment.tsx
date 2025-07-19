@@ -152,13 +152,13 @@ const CreateShipment = () => {
           <ShippingLabelDialog
             isOpen={showLabelDialog}
             onClose={handleDialogClose}
-            labelUrl={labelData?.label_url}
+            labelUrl={labelData?.postage_label?.label_url || labelData?.label_url}
             shipmentId={labelData?.object_id || labelData?.id || ''}
             orderDetails={labelData ? {
               carrier: labelData.selected_rate?.carrier || 'Unknown',
               service: labelData.selected_rate?.service || 'Unknown',
-              trackingCode: labelData.tracking_number || 'N/A',
-              trackingUrl: labelData.tracking_url_provider || labelData.tracker?.public_url || '',
+              trackingCode: labelData.tracking_code || labelData.tracking_number || 'N/A',
+              trackingUrl: labelData.tracker?.public_url || labelData.tracking_url_provider || '',
               createdAt: new Date().toLocaleString()
             } : undefined}
           />
