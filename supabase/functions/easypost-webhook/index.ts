@@ -114,10 +114,10 @@ Deno.serve(async (req) => {
     let actualDeliveryDate = shipment.actual_delivery_date;
     let status = shipment.status;
 
-    // Update estimated delivery date if available and not already set
-    if (tracker.est_delivery_date && !estimatedDeliveryDate) {
+    // Update estimated delivery date if available from EasyPost
+    if (tracker.est_delivery_date) {
       estimatedDeliveryDate = tracker.est_delivery_date;
-      console.log(`Setting estimated delivery date: ${estimatedDeliveryDate}`);
+      console.log(`Setting estimated delivery date from EasyPost: ${estimatedDeliveryDate}`);
     }
 
     // Check for delivery status - EasyPost uses specific status values
