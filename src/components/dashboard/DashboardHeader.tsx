@@ -15,11 +15,11 @@ export const DashboardHeader = () => {
         </p>
       </div>
       <div className="mt-4 md:mt-0 flex gap-3">
-        <Button className="bg-tms-blue hover:bg-tms-blue-400" onClick={() => navigate('/orders/new')}>
+        <Button className="bg-tms-blue hover:bg-tms-blue-400" onClick={() => navigate('/orders/create')}>
           <Package className="mr-2 h-4 w-4" />
           Create Order
         </Button>
-        <Button className="bg-tms-teal hover:bg-tms-teal/80" onClick={() => navigate('/shipments/new')}>
+        <Button className="bg-tms-teal hover:bg-tms-teal/80" onClick={() => navigate('/shipments/create')}>
           <Truck className="mr-2 h-4 w-4" />
           Create Shipment
         </Button>
