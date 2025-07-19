@@ -60,8 +60,33 @@ Deno.serve(async (req) => {
       try {
         console.log(`Processing shipment ${shipment.id} with EasyPost ID: ${shipment.easypost_id}`);
         
-        // Fetch tracker data from EasyPost using the correct endpoint
-        const trackerUrl = `https://api.easypost.com/v2/trackers/${shipment.easypost_id}`;
+        // First try to get the shipment details to get the tracker ID
+        const shipmentUrl = `https://api.easypost.com/v2/shipments/${shipment.easypost_id}`;
+        console.log(`Fetching shipment from: ${shipmentUrl}`);
+        
+        const shipmentResponse = await fetch(shipmentUrl, {
+          headers: {
+            'Authorization': `Bearer ${easypostApiKey}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!shipmentResponse.ok) {
+          const errorText = await shipmentResponse.text();
+          console.error(`Failed to fetch shipment for ${shipment.easypost_id}: ${shipmentResponse.status} - ${errorText}`);
+          continue;
+        }
+
+        const shipmentData = await shipmentResponse.json();
+        const trackerId = shipmentData.tracker?.id;
+        
+        if (!trackerId) {
+          console.log(`No tracker found for shipment ${shipment.easypost_id}`);
+          continue;
+        }
+
+        // Now fetch the tracker data
+        const trackerUrl = `https://api.easypost.com/v2/trackers/${trackerId}`;
         console.log(`Fetching tracker from: ${trackerUrl}`);
         
         const trackerResponse = await fetch(trackerUrl, {
