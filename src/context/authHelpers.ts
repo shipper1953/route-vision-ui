@@ -6,25 +6,27 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
   console.log('Fetching user profile for userId:', userId);
   
   try {
+    // Use the security definer function to avoid RLS recursion
     const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
+      .rpc('get_user_profile', { user_id: userId });
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        console.warn('No profile found for user:', userId);
-        return null;
-      }
-      throw error;
+      console.error('Error fetching user profile:', error);
+      return null;
     }
 
+    if (!data || data.length === 0) {
+      console.warn('No profile found for user:', userId);
+      return null;
+    }
+
+    const profileData = data[0];
+    
     // Convert warehouse_ids from Json to string[] with proper type casting
     return {
-      ...data,
-      warehouse_ids: Array.isArray(data.warehouse_ids) 
-        ? (data.warehouse_ids as string[])
+      ...profileData,
+      warehouse_ids: Array.isArray(profileData.warehouse_ids) 
+        ? (profileData.warehouse_ids as string[])
         : []
     };
   } catch (error) {

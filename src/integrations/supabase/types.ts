@@ -566,7 +566,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      get_user_profile: {
+        Args: { user_id: string }
+        Returns: {
+          id: string
+          name: string
+          email: string
+          role: Database["public"]["Enums"]["app_role"]
+          company_id: string
+          warehouse_ids: Json
+        }[]
+      }
     }
     Enums: {
       app_role: "super_admin" | "company_admin" | "user"
