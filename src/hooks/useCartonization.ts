@@ -157,8 +157,28 @@ export const useCartonization = () => {
         const quantity = orderItem.quantity || orderItem.count || 1;
         
         // First, try to use actual dimensions from the order item if available
-        if (orderItem.length && orderItem.width && orderItem.height && orderItem.weight) {
+        const dimensions = orderItem.dimensions;
+        if (dimensions && dimensions.length && dimensions.width && dimensions.height && dimensions.weight) {
           console.log("Using actual order item dimensions:", {
+            length: dimensions.length,
+            width: dimensions.width,
+            height: dimensions.height,
+            weight: dimensions.weight
+          });
+          
+          itemData = {
+            id: `order-item-${index}`,
+            name: itemName,
+            length: Number(dimensions.length),
+            width: Number(dimensions.width),
+            height: Number(dimensions.height),
+            weight: Number(dimensions.weight),
+            quantity: quantity,
+            category: 'actual',
+            fragility: 'low'
+          };
+        } else if (orderItem.length && orderItem.width && orderItem.height && orderItem.weight) {
+          console.log("Using direct order item dimensions:", {
             length: orderItem.length,
             width: orderItem.width,
             height: orderItem.height,
