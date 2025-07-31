@@ -51,10 +51,24 @@ export const useBulkShipping = () => {
     return await shippingService.processOrdersForShipping(orders);
   }, []);
 
+  const refreshData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const groups = await orderProcessor.processOrdersForShipping();
+      setBoxShippingGroups(groups);
+    } catch (error) {
+      console.error('Error refreshing bulk shipping data:', error);
+      toast.error('Failed to refresh shipping data');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderProcessor]);
+
   return {
     boxShippingGroups,
     loading,
     handleFetchRates,
-    handleBulkShip
+    handleBulkShip,
+    refreshData
   };
 };

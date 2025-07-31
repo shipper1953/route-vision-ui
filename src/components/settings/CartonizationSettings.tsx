@@ -12,7 +12,7 @@ import { BulkShipOrdersTable } from "@/components/cartonization/BulkShipOrdersTa
 
 export const CartonizationSettings = () => {
   const { boxStats, loading } = useBoxOrderStats();
-  const { boxShippingGroups, loading: bulkShippingLoading, handleFetchRates, handleBulkShip } = useBulkShipping();
+  const { boxShippingGroups, loading: bulkShippingLoading, handleFetchRates, handleBulkShip, refreshData } = useBulkShipping();
   const [expandedBoxId, setExpandedBoxId] = useState<string | null>(null);
   const [showBulkShipping, setShowBulkShipping] = useState(false);
 
@@ -92,6 +92,7 @@ export const CartonizationSettings = () => {
                     orders={group.orders}
                     onFetchRates={handleFetchRates}
                     onBulkShip={handleBulkShip}
+                    onRefreshData={refreshData}
                   />
                 ))
               )}

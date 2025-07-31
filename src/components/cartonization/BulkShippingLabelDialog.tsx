@@ -7,6 +7,7 @@ import { useState } from "react";
 interface BulkShippingLabelDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onComplete?: () => void; // New callback for when shipping is complete
   shipmentLabels: Array<{
     orderId: string;
     labelUrl: string;
@@ -19,6 +20,7 @@ interface BulkShippingLabelDialogProps {
 export const BulkShippingLabelDialog = ({
   isOpen,
   onClose,
+  onComplete,
   shipmentLabels
 }: BulkShippingLabelDialogProps) => {
   const [isPrinting, setIsPrinting] = useState(false);
@@ -154,8 +156,14 @@ export const BulkShippingLabelDialog = ({
           </div>
 
           <div className="flex justify-end pt-4">
-            <Button onClick={onClose} variant="outline">
-              Close
+            <Button 
+              onClick={() => {
+                onClose();
+                onComplete?.(); // Trigger refresh when done
+              }} 
+              variant="outline"
+            >
+              Done
             </Button>
           </div>
         </div>

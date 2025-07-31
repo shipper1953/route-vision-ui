@@ -39,6 +39,7 @@ interface BulkShipOrdersTableProps {
   orders: OrderForShipping[];
   onFetchRates: (selectedOrders: OrderForShipping[]) => Promise<OrderWithRates[]>;
   onBulkShip: (selectedOrders: OrderWithRates[]) => Promise<ShippingResult[]>;
+  onRefreshData?: () => void; // New callback for refreshing data
 }
 
 interface OrderWithRates extends OrderForShipping {
@@ -52,7 +53,7 @@ interface OrderWithRates extends OrderForShipping {
   selectedRateId?: string;
 }
 
-export const BulkShipOrdersTable = ({ boxName, boxDimensions, orders, onFetchRates, onBulkShip }: BulkShipOrdersTableProps) => {
+export const BulkShipOrdersTable = ({ boxName, boxDimensions, orders, onFetchRates, onBulkShip, onRefreshData }: BulkShipOrdersTableProps) => {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [isFetchingRates, setIsFetchingRates] = useState(false);
   const [isShipping, setIsShipping] = useState(false);
@@ -198,6 +199,7 @@ export const BulkShipOrdersTable = ({ boxName, boxDimensions, orders, onFetchRat
       <BulkShippingLabelDialog
         isOpen={showLabelsDialog}
         onClose={() => setShowLabelsDialog(false)}
+        onComplete={onRefreshData}
         shipmentLabels={shipmentLabels}
       />
     </>
