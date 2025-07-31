@@ -117,6 +117,84 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
 
   console.log("Order created successfully with warehouse:", data.warehouse_id);
 
+  // Calculate and store cartonization data for the new order
+  if (orderData.orderItems && orderData.orderItems.length > 0) {
+    try {
+      console.log("Calculating cartonization for new order:", data.id);
+      
+      // Get company boxes for cartonization
+      const { data: boxes, error: boxError } = await supabase
+        .from('boxes')
+        .select('*')
+        .eq('company_id', userProfile.company_id)
+        .eq('is_active', true)
+        .gt('in_stock', 0);
+
+      if (!boxError && boxes && boxes.length > 0) {
+        // Import cartonization logic
+        const { CartonizationEngine } = await import('../services/cartonization/cartonizationEngine');
+        
+        // Convert order items to cartonization items
+        const items = orderData.orderItems
+          .filter(item => item.dimensions)
+          .map(item => ({
+            id: item.itemId,
+            name: item.name,
+            sku: item.sku,
+            length: item.dimensions!.length,
+            width: item.dimensions!.width,
+            height: item.dimensions!.height,
+            weight: item.dimensions!.weight,
+            quantity: item.quantity,
+            category: 'order_item'
+          }));
+
+        if (items.length > 0) {
+          const engine = new CartonizationEngine(boxes.map(box => ({
+            id: box.id,
+            name: box.name,
+            length: box.length,
+            width: box.width,
+            height: box.height,
+            maxWeight: box.max_weight,
+            cost: box.cost,
+            inStock: box.in_stock,
+            type: box.box_type
+          })));
+
+          const result = engine.calculateOptimalBox(items);
+          
+          if (result && result.recommendedBox) {
+            const itemsWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+            const boxWeight = result.recommendedBox.cost * 0.1; // Estimate box weight
+            const totalWeight = itemsWeight + boxWeight;
+
+            // Store cartonization result
+            const { error: cartonError } = await supabase.rpc('update_order_cartonization', {
+              p_order_id: data.id,
+              p_recommended_box_id: result.recommendedBox.id,
+              p_recommended_box_data: JSON.parse(JSON.stringify(result.recommendedBox)),
+              p_utilization: result.utilization,
+              p_confidence: result.confidence,
+              p_total_weight: totalWeight,
+              p_items_weight: itemsWeight,
+              p_box_weight: boxWeight
+            });
+
+            if (cartonError) {
+              console.error("Error storing cartonization data:", cartonError);
+            } else {
+              console.log("Cartonization data stored successfully for order:", data.id);
+            }
+          }
+        }
+      }
+    } catch (cartonizationError) {
+      console.error("Error calculating cartonization:", cartonizationError);
+      // Don't fail order creation if cartonization fails
+    }
+  }
+
   // Convert back to OrderData format with proper type handling
   const shippingAddress = typeof data.shipping_address === 'object' && data.shipping_address !== null
     ? data.shipping_address as any
