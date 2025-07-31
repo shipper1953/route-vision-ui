@@ -93,6 +93,3 @@ verify_jwt = false
 
 [functions.shippo-webhook]
 verify_jwt = false
-
-[functions.test-cartonization]
-verify_jwt = false

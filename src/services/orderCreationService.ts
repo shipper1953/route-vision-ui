@@ -23,7 +23,6 @@ interface CreateOrderInput extends Omit<OrderData, 'id'> {
 
 export const createOrder = async (orderData: CreateOrderInput): Promise<OrderData> => {
   console.log("Creating order with data:", orderData);
-  console.log("Order items structure:", JSON.stringify(orderData.orderItems, null, 2));
   
   // Get current user
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -118,17 +117,9 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
 
   console.log("Order created successfully with warehouse:", data.warehouse_id);
 
-  console.log("Order created, checking for cartonization...");
-  console.log("OrderData.orderItems:", JSON.stringify(orderData.orderItems, null, 2));
-  console.log("Created order data.items:", JSON.stringify(data.items, null, 2));
-  
   // Calculate and store cartonization data for the new order
   if (orderData.orderItems && orderData.orderItems.length > 0) {
-    console.log("Starting cartonization calculation...");
     try {
-      console.log("Calculating cartonization for new order:", data.id);
-      console.log("Order items:", orderData.orderItems);
-      
       // Get company boxes for cartonization
       const { data: boxes, error: boxError } = await supabase
         .from('boxes')
@@ -136,8 +127,6 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
         .eq('company_id', userProfile.company_id)
         .eq('is_active', true)
         .gt('in_stock', 0);
-
-      console.log("Available boxes:", boxes?.length || 0, boxError);
 
       if (!boxError && boxes && boxes.length > 0) {
         // Import cartonization logic
