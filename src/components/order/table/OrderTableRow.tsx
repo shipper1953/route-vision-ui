@@ -26,6 +26,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
     console.log(`Order status: ${order.status}`);
     console.log(`Order items:`, order.items);
     console.log(`Available boxes: ${boxes.length}`);
+    console.log(`Master items: ${masterItems.length}`);
     
     // Only skip cartonization for shipped/delivered orders - show for ready_to_ship, pending, etc.
     if (order.status === 'shipped' || order.status === 'delivered') {
