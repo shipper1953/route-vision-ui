@@ -9,6 +9,7 @@ export const usePackagingOptimization = (orderItems: any[]) => {
   const form = useFormContext<ShipmentForm>();
   const [showCartonization, setShowCartonization] = useState(false);
   const [scannedItems, setScannedItems] = useState<any[]>([]);
+  const [selectedBox, setSelectedBox] = useState<any>(null);
   const { boxes, createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
 
@@ -62,6 +63,9 @@ export const usePackagingOptimization = (orderItems: any[]) => {
     form.setValue("width", box.width);
     form.setValue("height", box.height);
     
+    // Update selected box state
+    setSelectedBox(box);
+    
     toast.success(`Selected ${box.name} for optimal packaging`);
   };
 
@@ -102,6 +106,7 @@ export const usePackagingOptimization = (orderItems: any[]) => {
     handleSelectBox,
     handleItemsScanned,
     buildCartonizationItems,
-    boxes
+    boxes,
+    selectedBox
   };
 };

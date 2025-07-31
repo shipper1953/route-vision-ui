@@ -26,7 +26,8 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
     handleSelectBox,
     handleItemsScanned,
     buildCartonizationItems,
-    boxes
+    boxes,
+    selectedBox
   } = usePackagingOptimization(orderItems);
 
   const handleUseRecommendedBox = (box: any) => {
@@ -63,7 +64,7 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
       {/* Box Selector */}
       <BoxSelector
         onSelectBox={handleSelectBox}
-        selectedBox={recommendedBox}
+        selectedBox={selectedBox || recommendedBox}
       />
 
       {/* Cartonization Dialog */}
