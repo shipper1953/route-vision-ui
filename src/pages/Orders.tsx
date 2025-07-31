@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { useSearchParams } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { 
@@ -16,6 +17,7 @@ import { OrdersSearch } from "@/components/order/OrdersSearch";
 import { OrdersTable } from "@/components/order/OrdersTable";
 
 const Orders = () => {
+  const { isAuthenticated, user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,8 +49,8 @@ const Orders = () => {
     
     loadOrders();
     
-    // Only depend on the specific highlight parameter value, not the entire searchParams object
-  }, [highlightedOrderId]);
+    // Only depend on the specific highlight parameter value and authentication state
+  }, [highlightedOrderId, isAuthenticated, user]);
   
   const filteredOrders = orders.filter(order => {
     const orderId = String(order.id || '').toLowerCase();
