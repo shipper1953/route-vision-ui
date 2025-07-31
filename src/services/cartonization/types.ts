@@ -33,6 +33,31 @@ export interface CartonizationParameters {
   optimizeForSpace: boolean;
 }
 
+export interface PackageRecommendation {
+  box: Box;
+  assignedItems: Item[];
+  utilization: number;
+  packageWeight: number;
+  packageVolume: number;
+  dimensionalWeight: number;
+  confidence: number;
+  packingResult: PackingResult;
+}
+
+export interface MultiPackageCartonizationResult {
+  packages: PackageRecommendation[];
+  totalPackages: number;
+  totalWeight: number;
+  totalVolume: number;
+  totalCost: number;
+  splittingStrategy: 'weight' | 'volume' | 'category' | 'fragility' | 'hybrid';
+  optimizationObjective: 'minimize_packages' | 'minimize_cost' | 'balanced';
+  confidence: number;
+  alternatives: MultiPackageCartonizationResult[];
+  rulesApplied: string[];
+  processingTime: number;
+}
+
 export interface CartonizationResult {
   recommendedBox: Box;
   utilization: number;
@@ -50,6 +75,8 @@ export interface CartonizationResult {
   }>;
   rulesApplied: string[];
   processingTime: number;
+  // Add multi-package support to existing result
+  multiPackageResult?: MultiPackageCartonizationResult;
 }
 
 export interface PackedItem {

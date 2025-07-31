@@ -1,6 +1,7 @@
-import { Item, Box, CartonizationParameters, CartonizationResult, PackedItem, Space } from './types';
+import { Item, Box, CartonizationParameters, CartonizationResult, PackedItem, Space, MultiPackageCartonizationResult } from './types';
 import { BinPackingAlgorithm } from './binPacking';
 import { CartonizationUtils } from './utils';
+import { MultiPackageAlgorithm } from './multiPackageAlgorithm';
 
 // Re-export types for backward compatibility
 export type { Item, Box, CartonizationParameters, CartonizationResult } from './types';
@@ -23,13 +24,51 @@ export class CartonizationEngine {
     };
   }
 
-  calculateOptimalBox(items: Item[]): CartonizationResult | null {
+  calculateOptimalBox(items: Item[], enableMultiPackage: boolean = false): CartonizationResult | null {
     const startTime = Date.now();
     
     if (!items.length || !this.boxes.length) {
       console.log('❌ No items or boxes available for cartonization');
       return null;
     }
+
+    // Try single-box solution first
+    const singleBoxResult = this.calculateSingleBoxSolution(items, startTime);
+    
+    // If single box works and multi-package is not enabled, return single box result
+    if (singleBoxResult && !enableMultiPackage) {
+      return singleBoxResult;
+    }
+
+    // If single box fails or multi-package is enabled, try multi-package solution
+    if (enableMultiPackage || !singleBoxResult) {
+      console.log('🚀 Attempting multi-package cartonization...');
+      const multiPackageAlgorithm = new MultiPackageAlgorithm(this.boxes, this.parameters);
+      const multiPackageResult = multiPackageAlgorithm.calculateMultiPackageCartonization(items);
+      
+      if (multiPackageResult) {
+        // If we have both solutions, decide which to use
+        if (singleBoxResult) {
+          // Compare solutions - prefer single box if confidence is high enough
+          if (singleBoxResult.confidence >= 75 && multiPackageResult.packages.length > 1) {
+            console.log('✅ Using single-box solution due to high confidence');
+            singleBoxResult.multiPackageResult = multiPackageResult;
+            return singleBoxResult;
+          } else {
+            console.log('✅ Using multi-package solution');
+            return this.convertMultiPackageToCartonizationResult(multiPackageResult, singleBoxResult);
+          }
+        } else {
+          console.log('✅ Using multi-package solution (only viable option)');
+          return this.convertMultiPackageToCartonizationResult(multiPackageResult);
+        }
+      }
+    }
+
+    return singleBoxResult;
+  }
+
+  private calculateSingleBoxSolution(items: Item[], startTime: number): CartonizationResult | null {
 
     const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
     const totalVolume = items.reduce((sum, item) => 
@@ -280,6 +319,34 @@ export class CartonizationEngine {
     return result.success;
   }
 
+  private convertMultiPackageToCartonizationResult(
+    multiPackageResult: MultiPackageCartonizationResult,
+    singleBoxResult?: CartonizationResult
+  ): CartonizationResult {
+    // Use the first package as the "recommended box" for backward compatibility
+    const primaryPackage = multiPackageResult.packages[0];
+    
+    return {
+      recommendedBox: primaryPackage.box,
+      utilization: primaryPackage.utilization,
+      itemsFit: true,
+      totalWeight: multiPackageResult.totalWeight,
+      totalVolume: multiPackageResult.totalVolume,
+      dimensionalWeight: primaryPackage.dimensionalWeight,
+      savings: singleBoxResult ? singleBoxResult.recommendedBox.cost - multiPackageResult.totalCost : 0,
+      confidence: multiPackageResult.confidence,
+      alternatives: multiPackageResult.packages.slice(1, 4).map(pkg => ({
+        box: pkg.box,
+        utilization: pkg.utilization,
+        cost: pkg.box.cost,
+        confidence: pkg.confidence
+      })),
+      rulesApplied: multiPackageResult.rulesApplied,
+      processingTime: multiPackageResult.processingTime,
+      multiPackageResult: multiPackageResult
+    };
+  }
+
   // Test a specific scenario
   testScenario(scenario: {
     items: Item[];
@@ -288,5 +355,14 @@ export class CartonizationEngine {
     serviceLevel?: string;
   }): CartonizationResult | null {
     return this.calculateOptimalBox(scenario.items);
+  }
+
+  // New method for explicit multi-package calculation
+  calculateMultiPackageCartonization(
+    items: Item[],
+    optimizationObjective: 'minimize_packages' | 'minimize_cost' | 'balanced' = 'minimize_packages'
+  ): MultiPackageCartonizationResult | null {
+    const multiPackageAlgorithm = new MultiPackageAlgorithm(this.boxes, this.parameters);
+    return multiPackageAlgorithm.calculateMultiPackageCartonization(items, optimizationObjective);
   }
 }
