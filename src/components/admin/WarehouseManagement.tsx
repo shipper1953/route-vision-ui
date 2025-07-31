@@ -20,6 +20,8 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
   const [newWarehouse, setNewWarehouse] = useState({
     name: '',
     address: {
@@ -117,6 +119,39 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
     } catch (error) {
       console.error('Error setting default warehouse:', error);
       toast.error('Failed to set default warehouse');
+    }
+  };
+
+  const handleEditWarehouse = (warehouse: Warehouse) => {
+    setEditingWarehouse(warehouse);
+    setIsEditDialogOpen(true);
+  };
+
+  const updateWarehouse = async () => {
+    if (!editingWarehouse) return;
+
+    try {
+      const { error } = await supabase
+        .from('warehouses')
+        .update({
+          name: editingWarehouse.name,
+          address: editingWarehouse.address,
+        })
+        .eq('id', editingWarehouse.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setWarehouses(warehouses.map(warehouse => 
+        warehouse.id === editingWarehouse.id ? editingWarehouse : warehouse
+      ));
+
+      setIsEditDialogOpen(false);
+      setEditingWarehouse(null);
+      toast.success('Warehouse updated successfully');
+    } catch (error) {
+      console.error('Error updating warehouse:', error);
+      toast.error('Failed to update warehouse');
     }
   };
 
@@ -224,6 +259,106 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
           </Dialog>
         </div>
       </CardHeader>
+      
+      {/* Edit Warehouse Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Warehouse</DialogTitle>
+          </DialogHeader>
+          {editingWarehouse && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-warehouse-name">Warehouse Name</Label>
+                <Input
+                  id="edit-warehouse-name"
+                  value={editingWarehouse.name}
+                  onChange={(e) => setEditingWarehouse({ 
+                    ...editingWarehouse, 
+                    name: e.target.value 
+                  })}
+                  placeholder="Enter warehouse name"
+                />
+              </div>
+              
+              <div className="space-y-4">
+                <h4 className="font-medium">Address</h4>
+                <div>
+                  <Label htmlFor="edit-street1">Street Address</Label>
+                  <Input
+                    id="edit-street1"
+                    value={editingWarehouse.address.street1}
+                    onChange={(e) => setEditingWarehouse({ 
+                      ...editingWarehouse, 
+                      address: { ...editingWarehouse.address, street1: e.target.value }
+                    })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-street2">Street Address 2 (Optional)</Label>
+                  <Input
+                    id="edit-street2"
+                    value={editingWarehouse.address.street2 || ''}
+                    onChange={(e) => setEditingWarehouse({ 
+                      ...editingWarehouse, 
+                      address: { ...editingWarehouse.address, street2: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="edit-city">City</Label>
+                    <Input
+                      id="edit-city"
+                      value={editingWarehouse.address.city}
+                      onChange={(e) => setEditingWarehouse({ 
+                        ...editingWarehouse, 
+                        address: { ...editingWarehouse.address, city: e.target.value }
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-state">State</Label>
+                    <Input
+                      id="edit-state"
+                      value={editingWarehouse.address.state}
+                      onChange={(e) => setEditingWarehouse({ 
+                        ...editingWarehouse, 
+                        address: { ...editingWarehouse.address, state: e.target.value }
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-zip">ZIP Code</Label>
+                    <Input
+                      id="edit-zip"
+                      value={editingWarehouse.address.zip}
+                      onChange={(e) => setEditingWarehouse({ 
+                        ...editingWarehouse, 
+                        address: { ...editingWarehouse.address, zip: e.target.value }
+                      })}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button onClick={updateWarehouse} className="flex-1">
+                  Update Warehouse
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      
       <CardContent>
         {warehouses.length === 0 ? (
           <p className="text-muted-foreground text-center py-8">
@@ -268,7 +403,11 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                           Set Default
                         </Button>
                       )}
-                      <Button size="sm" variant="outline">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleEditWarehouse(warehouse)}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
                     </div>
