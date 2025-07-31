@@ -56,25 +56,8 @@ export const useShipment = (initialOrderId?: string | null) => {
       
       console.log('Label purchase result:', result);
       
-      // If we have an orderId and the edge function didn't handle linking, try client-side linking
-      if (initialOrderId && result) {
-        try {
-          console.log('Attempting client-side order linking for order:', initialOrderId);
-          await linkShipmentToOrder(initialOrderId, {
-            id: result.id,
-            carrier: result.selected_rate?.carrier || selectedRate?.carrier || 'Unknown',
-            service: result.selected_rate?.service || selectedRate?.service || 'Unknown',
-            trackingNumber: result.tracking_code || '',
-            trackingUrl: result.tracker?.public_url || '',
-            cost: parseFloat(result.selected_rate?.rate || selectedRate?.rate || '0'),
-            labelUrl: result.postage_label?.label_url
-          });
-          console.log('Client-side order linking successful');
-        } catch (linkError) {
-          console.error('Client-side order linking failed:', linkError);
-          // Don't fail the whole operation for linking issues
-        }
-      }
+      // The edge function now handles all linking internally, so no need for client-side linking
+      toast.success('Shipping label purchased successfully!');
       
       return result;
     } catch (error) {
