@@ -1,4 +1,3 @@
-
 import { Item, Box, CartonizationParameters, CartonizationResult, PackedItem, Space } from './types';
 import { BinPackingAlgorithm } from './binPacking';
 import { CartonizationUtils } from './utils';
@@ -13,13 +12,13 @@ export class CartonizationEngine {
   constructor(boxes: Box[], parameters?: Partial<CartonizationParameters>) {
     this.boxes = boxes.filter(box => box.inStock > 0);
     this.parameters = {
-      fillRateThreshold: 75,
+      fillRateThreshold: 45, // More realistic threshold for practical packaging
       maxPackageWeight: 50,
       dimensionalWeightFactor: 139,
       packingEfficiency: 85,
       allowPartialFill: true,
-      optimizeForCost: true,
-      optimizeForSpace: false,
+      optimizeForCost: false,
+      optimizeForSpace: true, // Prioritize smallest boxes
       ...parameters
     };
   }
@@ -37,7 +36,8 @@ export class CartonizationEngine {
       sum + (item.length * item.width * item.height * item.quantity), 0
     );
 
-    console.log(`Cartonization input - Items: ${items.length}, Total weight: ${totalWeight}, Total volume: ${totalVolume}`);
+    console.log(`🔍 Starting cartonization analysis for ${items.length} items:`);
+    console.log(`📊 Total weight: ${totalWeight} lbs, Total volume: ${totalVolume} cubic inches`);
 
     // Filter boxes that can handle the weight
     const suitableBoxes = this.boxes.filter(box => {
@@ -51,14 +51,27 @@ export class CartonizationEngine {
       return null;
     }
 
-    console.log(`Found ${suitableBoxes.length} suitable boxes for weight constraint`);
+    // CRITICAL: Sort boxes by volume (smallest first) to prioritize smallest suitable box
+    const sortedBoxes = suitableBoxes.sort((a, b) => {
+      const volumeA = a.length * a.width * a.height;
+      const volumeB = b.length * b.width * b.height;
+      return volumeA - volumeB; // Smallest first
+    });
+
+    console.log(`📦 Testing ${sortedBoxes.length} boxes (smallest first):`);
+    sortedBoxes.forEach(box => {
+      const volume = box.length * box.width * box.height;
+      console.log(`  - ${box.name}: ${box.length}×${box.width}×${box.height} (${volume} cubic inches)`);
+    });
 
     const rulesApplied: string[] = [];
     
-    // Calculate analysis for each suitable box with enhanced 3D packing
-    const boxAnalysis = suitableBoxes.map(box => {
+    // Calculate analysis for each suitable box with enhanced 3D packing (test in size order)
+    const boxAnalysis = sortedBoxes.map(box => {
       const boxVolume = box.length * box.width * box.height;
       const basicUtilization = Math.min((totalVolume / boxVolume) * 100, 100);
+      
+      console.log(`\n🧪 Testing box: ${box.name} (${box.length}×${box.width}×${box.height})`);
       
       // Use enhanced 3D bin packing to check if items actually fit
       const packingResult = BinPackingAlgorithm.enhanced3DBinPacking(items, box);
@@ -66,25 +79,32 @@ export class CartonizationEngine {
       const actualUtilization = packingResult.success ? 
         (packingResult.usedVolume / boxVolume) * 100 : 0;
       
+      if (!itemsFit) {
+        console.log(`❌ 3D packing failed for ${box.name}: Items do not fit`);
+      } else {
+        console.log(`✅ ${box.name} - Utilization: ${actualUtilization.toFixed(1)}%`);
+      }
+      
       const dimensionalWeight = CartonizationUtils.calculateDimensionalWeight(box, this.parameters.dimensionalWeightFactor);
       
-      console.log(`Box ${box.name} analysis:`, {
-        basicUtilization: basicUtilization.toFixed(1),
-        actualUtilization: actualUtilization.toFixed(1),
-        itemsFit,
-        usedVolume: packingResult.usedVolume,
-        boxVolume,
-        packedItems: packingResult.packedItems?.length || 0
-      });
-      
-      // Calculate confidence using utility function
-      const confidence = !itemsFit ? 0 : 
+      // Calculate confidence with bonus for smaller boxes
+      let confidence = !itemsFit ? 0 : 
         CartonizationUtils.calculateConfidence(
           actualUtilization, 
           totalWeight, 
           box, 
           packingResult.packingEfficiency
         );
+      
+      // Size bonus: smaller boxes get higher confidence when they fit
+      if (itemsFit) {
+        const sizeRank = sortedBoxes.indexOf(box);
+        const sizeBonusMax = 15;
+        const sizeBonus = Math.max(0, sizeBonusMax - (sizeRank * 3));
+        confidence += sizeBonus;
+        confidence = Math.min(confidence, 100);
+        console.log(`📈 ${box.name} confidence: ${confidence}% (size bonus: +${sizeBonus})`);
+      }
       
       return {
         box,
@@ -108,13 +128,13 @@ export class CartonizationEngine {
       return null;
     }
 
-    // Apply business rules for selection using utility function
-    let sortedBoxes = CartonizationUtils.sortBoxesByOptimization(fittingBoxes, this.parameters);
+    // Apply business rules for selection - prioritize smallest boxes first
+    let optimizedBoxes = this.sortBoxesByOptimization(fittingBoxes);
     
     if (this.parameters.optimizeForCost) {
       rulesApplied.push('Cost Optimization Rule');
     } else if (this.parameters.optimizeForSpace) {
-      rulesApplied.push('Space Optimization Rule');
+      rulesApplied.push('Space Optimization Rule (Smallest Box Priority)');
     } else {
       rulesApplied.push('Balanced Optimization Rule');
     }
@@ -129,8 +149,8 @@ export class CartonizationEngine {
       
       console.log(`Applying fill rate logic: preference=${preferenceThreshold}%, minViable=${minViableThreshold}%`);
       
-      // Filter out only truly unusable boxes (below 60% utilization)
-      sortedBoxes = sortedBoxes.filter(analysis => {
+      // Filter out only truly unusable boxes (below minimum threshold)
+      optimizedBoxes = optimizedBoxes.filter(analysis => {
         const isViable = analysis.utilization >= minViableThreshold;
         const meetsPreference = analysis.utilization >= preferenceThreshold;
         
@@ -140,30 +160,49 @@ export class CartonizationEngine {
         return isViable;
       });
       
-      // Re-sort with preference weighting - boxes meeting preference threshold get bonus points
-      if (preferenceThreshold > minViableThreshold) {
-        sortedBoxes = sortedBoxes.map(analysis => ({
-          ...analysis,
-          // Add bonus confidence for boxes that meet the preference threshold
-          adjustedConfidence: analysis.confidence + (analysis.utilization >= preferenceThreshold ? 10 : 0)
-        })).sort((a, b) => {
-          // Sort by adjusted confidence first, then by original sorting criteria
-          if (Math.abs(a.adjustedConfidence - b.adjustedConfidence) > 5) {
-            return b.adjustedConfidence - a.adjustedConfidence;
-          }
-          // Fall back to utilization for similar confidence scores
-          return b.utilization - a.utilization;
-        });
+      // If no boxes meet threshold, use fallback logic for smallest fitting box
+      if (optimizedBoxes.length === 0 && fittingBoxes.length > 0) {
+        console.log("🔄 Using smallest fitting box as fallback");
+        const fallback = fittingBoxes[0]; // Already sorted by size
+        rulesApplied.push("Fallback: smallest fitting box");
+        
+        const fallbackConfidence = Math.max(fallback.confidence - 20, 60);
+        console.log(`🎯 Fallback recommendation: ${fallback.box.name} with ${fallbackConfidence}% confidence`);
+        
+        return {
+          recommendedBox: fallback.box,
+          utilization: fallback.utilization,
+          itemsFit: true,
+          totalWeight,
+          totalVolume,
+          dimensionalWeight: fallback.dimensionalWeight,
+          savings: 0,
+          confidence: fallbackConfidence,
+          alternatives: fittingBoxes.slice(1, 4).map(analysis => ({
+            box: analysis.box,
+            utilization: analysis.utilization,
+            cost: analysis.cost,
+            confidence: analysis.confidence
+          })),
+          rulesApplied: [...rulesApplied, "Fallback: smallest fitting box"],
+          processingTime: Date.now() - startTime
+        };
       }
     }
 
-    if (!sortedBoxes.length) {
+    if (!optimizedBoxes.length) {
       console.log('❌ No boxes meet fill rate threshold');
       return null;
     }
 
-    const recommendedAnalysis = sortedBoxes[0];
-    const alternatives = sortedBoxes.slice(1, 4).map(analysis => ({
+    const recommendedAnalysis = optimizedBoxes[0];
+    
+    console.log(`🎯 Recommended: ${recommendedAnalysis.box.name} with ${recommendedAnalysis.confidence}% confidence`);
+    console.log(`📊 Final ranking:`);
+    optimizedBoxes.slice(0, 3).forEach((analysis, index) => {
+      console.log(`  ${index + 1}. ${analysis.box.name} - ${analysis.confidence}% confidence, ${analysis.utilization.toFixed(1)}% utilization`);
+    });
+    const alternatives = optimizedBoxes.slice(1, 4).map(analysis => ({
       box: analysis.box,
       utilization: analysis.utilization,
       cost: analysis.cost,
@@ -181,8 +220,9 @@ export class CartonizationEngine {
     rulesApplied.push('Enhanced 3D Bin Packing Algorithm');
     rulesApplied.push('Multi-Orientation Item Fitting');
     rulesApplied.push('Dimensional Weight Calculation');
+    rulesApplied.push('Smallest Box Priority Logic');
 
-    console.log(`✅ Recommended box: ${recommendedAnalysis.box.name} with ${recommendedAnalysis.confidence}% confidence`);
+    console.log(`✅ Final recommendation: ${recommendedAnalysis.box.name} with ${recommendedAnalysis.confidence}% confidence`);
 
     return {
       recommendedBox: recommendedAnalysis.box,
@@ -197,6 +237,41 @@ export class CartonizationEngine {
       rulesApplied,
       processingTime
     };
+  }
+
+  // Add new sorting method that prioritizes smallest boxes
+  private sortBoxesByOptimization(analyses: any[]): any[] {
+    return analyses.sort((a, b) => {
+      // PRIMARY: Size preference - always prefer smaller boxes
+      const volumeA = a.box.length * a.box.width * a.box.height;
+      const volumeB = b.box.length * b.box.width * b.box.height;
+      
+      // If volumes are significantly different, prefer smaller
+      const volumeDiff = Math.abs(volumeA - volumeB);
+      const largerVolume = Math.max(volumeA, volumeB);
+      const volumeVariation = volumeDiff / largerVolume;
+      
+      if (volumeVariation > 0.15) { // 15% difference threshold
+        return volumeA - volumeB; // Smaller volume first
+      }
+
+      // SECONDARY: Confidence (higher is better) for similar-sized boxes
+      if (Math.abs(a.confidence - b.confidence) > 5) {
+        return b.confidence - a.confidence;
+      }
+
+      // TERTIARY: Optimization preference for final tiebreaker
+      if (this.parameters.optimizeForSpace) {
+        return b.utilization - a.utilization;
+      }
+      
+      if (this.parameters.optimizeForCost) {
+        return a.cost - b.cost;
+      }
+
+      // DEFAULT: Utilization (higher is better)
+      return b.utilization - a.utilization;
+    });
   }
 
   // Legacy method for backward compatibility

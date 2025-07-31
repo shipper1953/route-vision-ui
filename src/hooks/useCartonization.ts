@@ -6,13 +6,13 @@ import { Box, Item, CartonizationParameters } from "@/services/cartonization/car
 
 // Default parameters - can be customized per user/company
 const DEFAULT_PARAMETERS: CartonizationParameters = {
-  fillRateThreshold: 75,
+  fillRateThreshold: 45, // More realistic threshold for practical packaging
   maxPackageWeight: 50,
   dimensionalWeightFactor: 139,
   packingEfficiency: 85,
   allowPartialFill: true,
-  optimizeForCost: true,
-  optimizeForSpace: false
+  optimizeForCost: false,
+  optimizeForSpace: true // Prioritize smallest boxes
 };
 
 export const useCartonization = () => {
