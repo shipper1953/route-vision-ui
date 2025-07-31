@@ -1,64 +1,98 @@
 
 import { useState, useEffect } from "react";
 import { Item } from "@/types/itemMaster";
-
-// Mock data for now - in a real app this would come from a database
-const MOCK_ITEMS: Item[] = [
-  {
-    id: '1',
-    sku: 'ELEC001',
-    name: 'Wireless Headphones',
-    length: 8,
-    width: 6,
-    height: 3,
-    weight: 0.8,
-    category: 'Electronics',
-    isActive: true
-  },
-  {
-    id: '2',
-    sku: 'BOOK001',
-    name: 'Programming Guide',
-    length: 9,
-    width: 7,
-    height: 1.5,
-    weight: 2.1,
-    category: 'Books',
-    isActive: true
-  },
-  {
-    id: '3',
-    sku: 'CLOTH001',
-    name: 'Cotton T-Shirt',
-    length: 12,
-    width: 8,
-    height: 0.5,
-    weight: 0.3,
-    category: 'Clothing',
-    isActive: true
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 export const useItemMaster = () => {
-  const [items, setItems] = useState<Item[]>(() => {
-    const saved = localStorage.getItem('item_master');
-    return saved ? JSON.parse(saved) : MOCK_ITEMS;
-  });
+  const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
+  const { userProfile } = useAuth();
 
-  // Save to localStorage whenever items change
+  // Fetch items from Supabase
   useEffect(() => {
-    localStorage.setItem('item_master', JSON.stringify(items));
-  }, [items]);
+    if (userProfile) {
+      fetchItems();
+    }
+  }, [userProfile]);
 
-  const createItem = async (itemData: Omit<Item, 'id'>) => {
+  const fetchItems = async () => {
     setLoading(true);
     try {
-      const newItem = {
-        ...itemData,
-        id: Date.now().toString() // Simple ID generation
+      const { data, error } = await supabase
+        .from('items')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      
+      // Map database fields to frontend interface
+      const mappedItems: Item[] = (data || []).map(item => ({
+        id: item.id,
+        sku: item.sku,
+        name: item.name,
+        length: Number(item.length),
+        width: Number(item.width),
+        height: Number(item.height),
+        weight: Number(item.weight),
+        category: item.category,
+        isActive: item.is_active
+      }));
+      
+      setItems(mappedItems);
+    } catch (error) {
+      console.error('Error fetching items:', error);
+      toast.error('Failed to fetch items');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createItem = async (itemData: Omit<Item, 'id'>) => {
+    if (!userProfile?.company_id) {
+      toast.error('Company information not found');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('items')
+        .insert({
+          sku: itemData.sku,
+          name: itemData.name,
+          length: itemData.length,
+          width: itemData.width,
+          height: itemData.height,
+          weight: itemData.weight,
+          category: itemData.category,
+          is_active: itemData.isActive,
+          company_id: userProfile.company_id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Map the created item and add to state
+      const newItem: Item = {
+        id: data.id,
+        sku: data.sku,
+        name: data.name,
+        length: Number(data.length),
+        width: Number(data.width),
+        height: Number(data.height),
+        weight: Number(data.weight),
+        category: data.category,
+        isActive: data.is_active
       };
+
       setItems(prev => [...prev, newItem]);
+      toast.success('Item created successfully');
+    } catch (error) {
+      console.error('Error creating item:', error);
+      toast.error('Failed to create item');
     } finally {
       setLoading(false);
     }
@@ -67,9 +101,29 @@ export const useItemMaster = () => {
   const updateItem = async (updatedItem: Item) => {
     setLoading(true);
     try {
+      const { error } = await supabase
+        .from('items')
+        .update({
+          sku: updatedItem.sku,
+          name: updatedItem.name,
+          length: updatedItem.length,
+          width: updatedItem.width,
+          height: updatedItem.height,
+          weight: updatedItem.weight,
+          category: updatedItem.category,
+          is_active: updatedItem.isActive
+        })
+        .eq('id', updatedItem.id);
+
+      if (error) throw error;
+
       setItems(prev => prev.map(item => 
         item.id === updatedItem.id ? updatedItem : item
       ));
+      toast.success('Item updated successfully');
+    } catch (error) {
+      console.error('Error updating item:', error);
+      toast.error('Failed to update item');
     } finally {
       setLoading(false);
     }
@@ -78,7 +132,18 @@ export const useItemMaster = () => {
   const deleteItem = async (id: string) => {
     setLoading(true);
     try {
+      const { error } = await supabase
+        .from('items')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
       setItems(prev => prev.filter(item => item.id !== id));
+      toast.success('Item deleted successfully');
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      toast.error('Failed to delete item');
     } finally {
       setLoading(false);
     }
