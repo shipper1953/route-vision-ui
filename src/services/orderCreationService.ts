@@ -121,6 +121,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
   if (orderData.orderItems && orderData.orderItems.length > 0) {
     try {
       console.log("Calculating cartonization for new order:", data.id);
+      console.log("Order items:", orderData.orderItems);
       
       // Get company boxes for cartonization
       const { data: boxes, error: boxError } = await supabase
@@ -130,24 +131,34 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
         .eq('is_active', true)
         .gt('in_stock', 0);
 
+      console.log("Available boxes:", boxes?.length || 0, boxError);
+
       if (!boxError && boxes && boxes.length > 0) {
         // Import cartonization logic
         const { CartonizationEngine } = await import('../services/cartonization/cartonizationEngine');
         
         // Convert order items to cartonization items
         const items = orderData.orderItems
-          .filter(item => item.dimensions)
-          .map(item => ({
-            id: item.itemId,
-            name: item.name,
-            sku: item.sku,
-            length: item.dimensions!.length,
-            width: item.dimensions!.width,
-            height: item.dimensions!.height,
-            weight: item.dimensions!.weight,
-            quantity: item.quantity,
-            category: 'order_item'
-          }));
+          .filter(item => {
+            console.log("Checking item for dimensions:", item);
+            return item.dimensions;
+          })
+          .map(item => {
+            console.log("Converting item to cartonization format:", item);
+            return {
+              id: item.itemId,
+              name: item.name,
+              sku: item.sku,
+              length: item.dimensions!.length,
+              width: item.dimensions!.width,
+              height: item.dimensions!.height,
+              weight: item.dimensions!.weight,
+              quantity: item.quantity,
+              category: 'order_item'
+            };
+          });
+
+        console.log("Cartonization items:", items);
 
         if (items.length > 0) {
           const engine = new CartonizationEngine(boxes.map(box => ({
@@ -162,12 +173,22 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
             type: box.box_type
           })));
 
+          console.log("Running cartonization engine...");
           const result = engine.calculateOptimalBox(items);
+          console.log("Cartonization result:", result);
           
           if (result && result.recommendedBox) {
             const itemsWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
             const boxWeight = result.recommendedBox.cost * 0.1; // Estimate box weight
             const totalWeight = itemsWeight + boxWeight;
+
+            console.log("Storing cartonization data:", {
+              orderId: data.id,
+              boxId: result.recommendedBox.id,
+              utilization: result.utilization,
+              confidence: result.confidence,
+              totalWeight
+            });
 
             // Store cartonization result
             const { error: cartonError } = await supabase.rpc('update_order_cartonization', {
@@ -186,13 +207,21 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
             } else {
               console.log("Cartonization data stored successfully for order:", data.id);
             }
+          } else {
+            console.log("No cartonization result returned from engine");
           }
+        } else {
+          console.log("No items with dimensions found for cartonization");
         }
+      } else {
+        console.log("No boxes available for cartonization:", { boxError, boxCount: boxes?.length });
       }
     } catch (cartonizationError) {
       console.error("Error calculating cartonization:", cartonizationError);
       // Don't fail order creation if cartonization fails
     }
+  } else {
+    console.log("No order items provided for cartonization");
   }
 
   // Convert back to OrderData format with proper type handling
