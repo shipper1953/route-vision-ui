@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { CompanyManagement } from "@/components/admin/CompanyManagement";
 import { SuperAdminUserCreation } from "@/components/admin/SuperAdminUserCreation";
 import { SuperAdminShipmentsReport } from "@/components/admin/SuperAdminShipmentsReport";
+import { SuperAdminPackageInventory } from "@/components/admin/SuperAdminPackageInventory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const SuperAdminPanel = () => {
@@ -67,6 +68,7 @@ const SuperAdminPanel = () => {
           <TabsList>
             <TabsTrigger value="users">User Management</TabsTrigger>
             <TabsTrigger value="companies">Companies</TabsTrigger>
+            <TabsTrigger value="packages">Package Inventory</TabsTrigger>
             <TabsTrigger value="shipments">Shipments Report</TabsTrigger>
           </TabsList>
           
@@ -76,6 +78,10 @@ const SuperAdminPanel = () => {
           
           <TabsContent value="companies" className="space-y-4">
             <CompanyManagement />
+          </TabsContent>
+          
+          <TabsContent value="packages" className="space-y-4">
+            <SuperAdminPackageInventory />
           </TabsContent>
           
           <TabsContent value="shipments" className="space-y-4">
