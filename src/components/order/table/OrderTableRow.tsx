@@ -22,18 +22,38 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const getRecommendedBoxAndWeight = (order: OrderData) => {
     // Skip cartonization for shipped/delivered orders, show box info for others
     if (order.status === 'shipped' || order.status === 'delivered') return { box: null, weight: null };
+    
+    console.log(`Analyzing order ${order.id} for box recommendation:`, {
+      status: order.status,
+      items: order.items,
+      boxesAvailable: boxes.length
+    });
+    
     if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+      // Use empty array for masterItems - the createItemsFromOrderData should handle this
       const items = createItemsFromOrderData(order.items, []);
+      
+      console.log(`Created ${items.length} items for cartonization:`, items);
       
       if (items.length > 0) {
         const engine = new CartonizationEngine(boxes);
         const result = engine.calculateOptimalBox(items);
+        
+        console.log(`Cartonization result for order ${order.id}:`, result);
         
         if (result && result.recommendedBox) {
           // Calculate total weight including items and box
           const itemsWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
           const boxWeight = result.recommendedBox.cost * 0.1; // Estimate box weight (0.1 lbs per $1 of cost)
           const totalWeight = itemsWeight + boxWeight;
+          
+          console.log(`Box recommendation for order ${order.id}:`, {
+            box: result.recommendedBox.name,
+            itemsWeight,
+            boxWeight,
+            totalWeight,
+            utilization: result.utilization
+          });
           
           return {
             box: result.recommendedBox,
@@ -43,8 +63,14 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
               totalWeight
             }
           };
+        } else {
+          console.log(`No box recommendation for order ${order.id} - cartonization failed`);
         }
+      } else {
+        console.log(`No items created for order ${order.id} cartonization`);
       }
+    } else {
+      console.log(`Order ${order.id} has no valid items for cartonization`);
     }
     
     return { box: null, weight: null };
