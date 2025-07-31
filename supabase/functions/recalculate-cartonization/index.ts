@@ -299,13 +299,18 @@ Deno.serve(async (req) => {
       throw boxesError;
     }
 
-    // Get master items for dimensions
-    const { data: masterItems, error: masterError } = await supabase
-      .from('item_master')
-      .select('*');
-
-    if (masterError) {
-      console.error('Error fetching master items:', masterError);
+    // Try to get master items for dimensions (table may not exist)
+    let masterItems = [];
+    try {
+      const { data, error } = await supabase
+        .from('item_master')
+        .select('*');
+      
+      if (!error && data) {
+        masterItems = data;
+      }
+    } catch (error) {
+      console.log('Item master table not available, using fallback dimensions');
     }
 
     const results = [];
