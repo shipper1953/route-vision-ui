@@ -154,6 +154,8 @@ serve(async (req) => {
       return createErrorResponse('Unauthorized', 'Authorization header required', 401)
     }
     
+    console.log('✅ User authenticated via JWT verification')
+    
     // Check environment variables
     console.log('🔑 Checking environment variables...')
     const apiKey = Deno.env.get('EASYPOST_API_KEY')
@@ -166,24 +168,6 @@ serve(async (req) => {
       return createErrorResponse('Configuration error', 'Required environment variables not configured', 500)
     }
     console.log('✅ Environment variables configured')
-    
-    // Create Supabase client for user authentication
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })
-    
-    // Get user from auth header
-    const token = authHeader.replace('Bearer ', '')
-    console.log('🔑 Attempting to authenticate user with token...')
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
-    
-    if (authError || !user) {
-      console.error('❌ Failed to authenticate user:', authError)
-      console.error('❌ Auth error details:', JSON.stringify(authError, null, 2))
-      console.error('❌ Token length:', token?.length)
-      console.error('❌ Token prefix:', token?.substring(0, 20) + '...')
-      return createErrorResponse('Unauthorized', 'Invalid authorization token', 401)
-    }
-    
-    console.log('✅ User authenticated:', user.id)
     
     // Parse request body
     let requestBody
@@ -224,6 +208,17 @@ serve(async (req) => {
     // Create Supabase client with service role for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
     
+    // Create client with anon key to get user from auth header
+    const authClient = createClient(supabaseUrl, supabaseAnonKey)
+    const { data: { user }, error: authError } = await authClient.auth.getUser(authHeader.replace('Bearer ', ''))
+    
+    if (authError || !user) {
+      console.error('❌ Failed to authenticate user:', authError)
+      return createErrorResponse('Unauthorized', 'Invalid authorization token', 401)
+    }
+
+    console.log('✅ User authenticated:', user.id)
+
     // Get user's company for wallet processing
     const { data: userProfile, error: userError } = await supabase
       .from('users')
