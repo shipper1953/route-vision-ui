@@ -43,55 +43,63 @@ export class LabelService {
 
     console.log('Calling purchase-label edge function with:', requestBody);
 
-    const { data, error } = await supabase.functions.invoke('purchase-label', {
-      body: requestBody
-    });
-    
-    console.log('Edge function response:', { data, error });
-    
-    
-    if (error) {
-      console.error('Edge Function error details:', error);
-      console.error('Error message:', error.message);
-      console.error('Error context:', error.context);
+    try {
+      const response = await fetch(`${window.location.origin.replace('https://f60d16ad-630c-47ed-bfa7-82586b1ceebb.lovableproject.com', 'https://gidrlosmhpvdcogrkidj.supabase.co')}/functions/v1/purchase-label`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpZHJsb3NtaHB2ZGNvZ3JraWRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcyOTMzMzIsImV4cCI6MjA2Mjg2OTMzMn0.DJ5r3pTVbJ80xR_kBNsc_5B_wXpIc8At646Ts-ls35Q'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      const responseText = await response.text();
+      console.log('Raw edge function response:', responseText);
       
-      // Try to get more detailed error info
-      if (error.message.includes('non-2xx status code')) {
-        // Let's try calling the test function to see if the deployment system is working
-        console.log('Testing if edge functions are working...');
-        try {
-          const { data: testData, error: testError } = await supabase.functions.invoke('test-function', {
-            body: { test: true }
-          });
-          console.log('Test function result:', { testData, testError });
-        } catch (testErr) {
-          console.error('Test function also failed:', testErr);
-        }
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON:', parseError);
+        responseData = { raw_response: responseText };
+      }
+
+      if (!response.ok) {
+        console.error('Edge function returned error status:', response.status);
+        console.error('Error response data:', responseData);
+        
+        // Extract the actual error message from the edge function response
+        const errorMessage = responseData?.error || responseData?.details || `Edge function error (${response.status})`;
+        throw new Error(errorMessage);
+      }
+
+      console.log('Edge function success response:', responseData);
+      this.storeLabelData(responseData);
+      return responseData;
+
+    } catch (fetchError) {
+      console.error('Edge function fetch error:', fetchError);
+      
+      // If it's our custom error, re-throw it
+      if (fetchError.message && !fetchError.message.includes('fetch')) {
+        throw fetchError;
       }
       
-      // Check if it's a 422 error with detailed response
-      if (error.message.includes('422')) {
-        try {
-          const errorDetails = JSON.parse(error.message.split('422 ')[1]);
-          if (errorDetails.error === 'EasyPost API error' && errorDetails.details?.error?.message) {
-            throw new Error(`EasyPost validation failed: ${errorDetails.details.error.message}`);
-          }
-        } catch (parseError) {
-          // If parsing fails, just throw the original error
-        }
+      // Fallback to supabase client for network issues
+      console.log('Falling back to supabase client...');
+      const { data, error } = await supabase.functions.invoke('purchase-label', {
+        body: requestBody
+      });
+      
+      if (error) {
+        console.error('Supabase client also failed:', error);
+        throw new Error(error.message || 'Failed to purchase label via edge function');
       }
       
-      // Provide a more specific error message
-      let errorMessage = error.message;
-      if (error.message.includes('non-2xx status code')) {
-        errorMessage = 'Edge function deployment error. The purchase-label function may not be properly deployed.';
-      }
-      
-      throw new Error(errorMessage);
+      this.storeLabelData(data);
+      return data;
     }
-    
-    this.storeLabelData(data);
-    return data;
   }
 
   private async purchaseLabelDirectly(shipmentId: string, rateId: string): Promise<any> {
