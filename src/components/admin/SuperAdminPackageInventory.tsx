@@ -38,7 +38,7 @@ export const SuperAdminPackageInventory = () => {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingBox, setEditingBox] = useState<Box | null>(null);
   const [newBox, setNewBox] = useState({
@@ -93,7 +93,7 @@ export const SuperAdminPackageInventory = () => {
           .eq('is_active', true)
           .order('name');
 
-        if (selectedCompanyId) {
+        if (selectedCompanyId && selectedCompanyId !== "all") {
           query = query.eq('company_id', selectedCompanyId);
         }
 
@@ -423,7 +423,7 @@ export const SuperAdminPackageInventory = () => {
               <SelectValue placeholder="All companies" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All companies</SelectItem>
+              <SelectItem value="all">All companies</SelectItem>
               {companies.map(company => (
                 <SelectItem key={company.id} value={company.id}>
                   {company.name}
@@ -438,7 +438,7 @@ export const SuperAdminPackageInventory = () => {
             <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No packages found</h3>
             <p className="text-muted-foreground mb-4">
-              {selectedCompanyId 
+              {selectedCompanyId && selectedCompanyId !== "all"
                 ? "No packages found for the selected company." 
                 : "Get started by adding packages to company inventories."
               }
