@@ -30,6 +30,7 @@ export async function fetchOrders(): Promise<OrderData[]> {
     }
     
     console.log(`Found ${data.length} orders in Supabase`);
+    console.log("Raw order IDs from DB:", data.map(o => o.id).slice(0, 10)); // Show first 10 IDs
     
     // First, let's see what shipments exist in the database
     const { data: allShipments } = await supabase
