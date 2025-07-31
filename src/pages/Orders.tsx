@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { fetchOrders, OrderData } from "@/services/orderService";
+import { supabase } from "@/integrations/supabase/client";
 import { OrdersHeader } from "@/components/order/OrdersHeader";
 import { OrdersSearch } from "@/components/order/OrdersSearch";
 import { OrdersTable } from "@/components/order/OrdersTable";
@@ -29,6 +30,13 @@ const Orders = () => {
         console.log("Orders loaded from Supabase:", orderData.length);
         console.log("Order IDs and statuses:", orderData.map(o => ({ id: o.id, status: o.status })));
         console.log("Ready to ship orders:", orderData.filter(o => o.status === 'ready_to_ship'));
+        
+        // Force debug auth state
+        console.log("=== CURRENT AUTH STATE DEBUG ===");
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log("Current session:", session?.user?.email);
+        console.log("Session exists:", !!session);
+        
         setOrders(orderData);
       } catch (error) {
         console.error("Error loading orders:", error);
