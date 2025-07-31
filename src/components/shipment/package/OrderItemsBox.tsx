@@ -106,9 +106,13 @@ export const OrderItemsBox = ({ orderItems, onItemsScanned }: OrderItemsBoxProps
                     ? 'bg-green-50 border-green-200' 
                     : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                 }`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
+                onMouseDown={(e) => {
+                  // Prevent the event if clicking on checkbox area
+                  const target = e.target as HTMLElement;
+                  if (target.closest('[role="checkbox"]')) {
+                    return;
+                  }
+                  console.log('Item row clicked:', orderItem.itemId);
                   handleItemClick(orderItem.itemId, orderItem.quantity);
                 }}
               >
@@ -117,7 +121,15 @@ export const OrderItemsBox = ({ orderItems, onItemsScanned }: OrderItemsBoxProps
                     checked={isFullyScanned}
                     onCheckedChange={(checked) => {
                       console.log('Checkbox clicked:', checked, 'for item:', orderItem.itemId);
-                      if (!checked && isFullyScanned) {
+                      if (checked) {
+                        // If checking, mark as fully scanned
+                        setScannedQuantities(prev => ({
+                          ...prev,
+                          [orderItem.itemId]: orderItem.quantity
+                        }));
+                        setScannedItems(prev => new Set([...prev, orderItem.itemId]));
+                      } else {
+                        // If unchecking, reset
                         handleItemUncheck(orderItem.itemId);
                       }
                     }}
