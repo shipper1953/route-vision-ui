@@ -299,19 +299,6 @@ Deno.serve(async (req) => {
       throw boxesError;
     }
 
-    // Try to get master items for dimensions (table may not exist)
-    let masterItems = [];
-    try {
-      const { data, error } = await supabase
-        .from('item_master')
-        .select('*');
-      
-      if (!error && data) {
-        masterItems = data;
-      }
-    } catch (error) {
-      console.log('Item master table not available, using fallback dimensions');
-    }
 
     const results = [];
     const engine = new SimpleCartonizationEngine(boxes || []);
@@ -320,33 +307,32 @@ Deno.serve(async (req) => {
       try {
         console.log(`Processing order ${order.id}`);
         
-        // Convert order items to cartonization items
+        // Convert order items to cartonization items using the dimensions from the order items themselves
         const items: Item[] = [];
         
         if (Array.isArray(order.items)) {
           for (const orderItem of order.items) {
-            const masterItem = masterItems?.find(m => m.id === orderItem.itemId);
-            
-            if (masterItem && masterItem.length && masterItem.width && masterItem.height && masterItem.weight) {
+            // Use dimensions from the order item if available
+            if (orderItem.dimensions && orderItem.dimensions.length && orderItem.dimensions.width && orderItem.dimensions.height && orderItem.dimensions.weight) {
               items.push({
-                id: orderItem.itemId,
-                name: masterItem.name || `Item ${orderItem.itemId}`,
-                length: masterItem.length,
-                width: masterItem.width,
-                height: masterItem.height,
-                weight: masterItem.weight,
-                quantity: orderItem.quantity
+                id: orderItem.itemId || `item_${items.length}`,
+                name: orderItem.name || `Item ${orderItem.itemId || items.length}`,
+                length: orderItem.dimensions.length,
+                width: orderItem.dimensions.width,
+                height: orderItem.dimensions.height,
+                weight: orderItem.dimensions.weight,
+                quantity: orderItem.quantity || 1
               });
             } else {
-              // Use default dimensions if no master item data
+              // Use fallback dimensions if no dimensions in order item
               items.push({
-                id: orderItem.itemId,
-                name: `Item ${orderItem.itemId}`,
+                id: orderItem.itemId || `item_${items.length}`,
+                name: orderItem.name || `Item ${orderItem.itemId || items.length}`,
                 length: 6,
                 width: 4,
                 height: 2,
                 weight: 0.5,
-                quantity: orderItem.quantity
+                quantity: orderItem.quantity || 1
               });
             }
           }
