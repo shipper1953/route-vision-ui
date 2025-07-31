@@ -6,9 +6,10 @@ import { Eye, Package, Truck, Box, ExternalLink, Copy } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { OrderData } from "@/types/orderTypes";
+import { useCartonization } from "@/hooks/useCartonization";
+import { CartonizationEngine } from "@/services/cartonization/cartonizationEngine";
 import { renderOrderItems } from "../helpers/orderItemsHelper";
 import { getStatusBadgeVariant } from "../helpers/statusHelper";
-import { OrderTableRowCartonization } from "./OrderTableRowCartonization";
 
 interface OrderTableRowProps {
   order: OrderData;
@@ -16,6 +17,64 @@ interface OrderTableRowProps {
 
 export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const navigate = useNavigate();
+  const { boxes, createItemsFromOrderData } = useCartonization();
+
+  const getRecommendedBoxAndWeight = (order: OrderData) => {
+    // Skip cartonization for shipped/delivered orders, show box info for others
+    if (order.status === 'shipped' || order.status === 'delivered') return { box: null, weight: null };
+    
+    console.log(`Analyzing order ${order.id} for box recommendation:`, {
+      status: order.status,
+      items: order.items,
+      boxesAvailable: boxes.length
+    });
+    
+    if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+      // Use empty array for masterItems - the createItemsFromOrderData should handle this
+      const items = createItemsFromOrderData(order.items, []);
+      
+      console.log(`Created ${items.length} items for cartonization:`, items);
+      
+      if (items.length > 0) {
+        const engine = new CartonizationEngine(boxes);
+        const result = engine.calculateOptimalBox(items);
+        
+        console.log(`Cartonization result for order ${order.id}:`, result);
+        
+        if (result && result.recommendedBox) {
+          // Calculate total weight including items and box
+          const itemsWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+          const boxWeight = result.recommendedBox.cost * 0.1; // Estimate box weight (0.1 lbs per $1 of cost)
+          const totalWeight = itemsWeight + boxWeight;
+          
+          console.log(`Box recommendation for order ${order.id}:`, {
+            box: result.recommendedBox.name,
+            itemsWeight,
+            boxWeight,
+            totalWeight,
+            utilization: result.utilization
+          });
+          
+          return {
+            box: result.recommendedBox,
+            weight: {
+              itemsWeight,
+              boxWeight,
+              totalWeight
+            }
+          };
+        } else {
+          console.log(`No box recommendation for order ${order.id} - cartonization failed`);
+        }
+      } else {
+        console.log(`No items created for order ${order.id} cartonization`);
+      }
+    } else {
+      console.log(`Order ${order.id} has no valid items for cartonization`);
+    }
+    
+    return { box: null, weight: null };
+  };
 
   const getShippingInfo = (order: OrderData) => {
     // First check if order has shipment info in the shipment field
@@ -45,6 +104,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
     return null;
   };
 
+  const { box: recommendedBox, weight: packageWeight } = getRecommendedBoxAndWeight(order);
   const shippingInfo = getShippingInfo(order);
 
   const handleCopyOrder = () => {
@@ -115,8 +175,23 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
               )}
             </div>
           </div>
+        ) : recommendedBox ? (
+          <div className="flex items-center gap-2">
+            <Box className="h-4 w-4 text-tms-blue" />
+            <div className="text-sm">
+              <div className="font-medium">{recommendedBox.name}</div>
+              <div className="text-muted-foreground">
+                {recommendedBox.length}" × {recommendedBox.width}" × {recommendedBox.height}"
+              </div>
+              {packageWeight && (
+                <div className="text-xs text-muted-foreground">
+                  Weight: {packageWeight.totalWeight.toFixed(1)} lbs
+                </div>
+              )}
+            </div>
+          </div>
         ) : (
-          <OrderTableRowCartonization orderId={order.id} />
+          <span className="text-muted-foreground text-sm">-</span>
         )}
       </TableCell>
       <TableCell>

@@ -1,5 +1,5 @@
 
-import { FileDown, ShoppingBag, RefreshCw, Box } from "lucide-react";
+import { FileDown, ShoppingBag, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -9,7 +9,6 @@ import { supabase } from "@/integrations/supabase/client";
 export const OrdersHeader = () => {
   const navigate = useNavigate();
   const [isSync, setIsSync] = useState(false);
-  const [isRecalculating, setIsRecalculating] = useState(false);
 
   const handleSyncDeliveryDates = async () => {
     setIsSync(true);
@@ -38,34 +37,6 @@ export const OrdersHeader = () => {
       setIsSync(false);
     }
   };
-
-  const handleRecalculateCartonization = async () => {
-    setIsRecalculating(true);
-    try {
-      console.log('Starting cartonization recalculation...');
-      const { data, error } = await supabase.functions.invoke('recalculate-cartonization', {
-        body: {} // Empty body means recalculate for all orders
-      });
-      
-      console.log('Cartonization response:', { data, error });
-      
-      if (error) {
-        console.error('Cartonization error:', error);
-        toast.error(`Failed to recalculate box recommendations: ${error.message || 'Unknown error'}`);
-      } else {
-        console.log('Cartonization result:', data);
-        const processedCount = data?.processed || 0;
-        toast.success(`Successfully recalculated box recommendations for ${processedCount} orders`);
-        // Refresh the page to show updated data
-        setTimeout(() => window.location.reload(), 1000);
-      }
-    } catch (error) {
-      console.error('Error calling cartonization function:', error);
-      toast.error(`Failed to recalculate box recommendations: ${error.message || 'Network error'}`);
-    } finally {
-      setIsRecalculating(false);
-    }
-  };
   
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
@@ -74,14 +45,6 @@ export const OrdersHeader = () => {
         <p className="text-muted-foreground">Manage your customer orders</p>
       </div>
       <div className="mt-4 md:mt-0 flex gap-3">
-        <Button
-          onClick={handleRecalculateCartonization}
-          disabled={isRecalculating}
-          variant="outline"
-        >
-          <Box className={`mr-2 h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
-          Refresh Box Recommendations
-        </Button>
         <Button
           onClick={handleSyncDeliveryDates}
           disabled={isSync}

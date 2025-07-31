@@ -118,66 +118,6 @@ export type Database = {
         }
         Relationships: []
       }
-      order_cartonization: {
-        Row: {
-          box_weight: number | null
-          calculation_timestamp: string | null
-          confidence: number | null
-          created_at: string | null
-          id: string
-          items_weight: number | null
-          order_id: number
-          recommended_box_data: Json | null
-          recommended_box_id: string | null
-          total_weight: number | null
-          updated_at: string | null
-          utilization: number | null
-        }
-        Insert: {
-          box_weight?: number | null
-          calculation_timestamp?: string | null
-          confidence?: number | null
-          created_at?: string | null
-          id?: string
-          items_weight?: number | null
-          order_id: number
-          recommended_box_data?: Json | null
-          recommended_box_id?: string | null
-          total_weight?: number | null
-          updated_at?: string | null
-          utilization?: number | null
-        }
-        Update: {
-          box_weight?: number | null
-          calculation_timestamp?: string | null
-          confidence?: number | null
-          created_at?: string | null
-          id?: string
-          items_weight?: number | null
-          order_id?: number
-          recommended_box_data?: Json | null
-          recommended_box_id?: string | null
-          total_weight?: number | null
-          updated_at?: string | null
-          utilization?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_cartonization_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_cartonization_recommended_box_id_fkey"
-            columns: ["recommended_box_id"]
-            isOneToOne: false
-            referencedRelation: "boxes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       orders: {
         Row: {
           actual_delivery_date: string | null

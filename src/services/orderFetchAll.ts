@@ -30,7 +30,6 @@ export async function fetchOrders(): Promise<OrderData[]> {
     }
     
     console.log(`Found ${data.length} orders in Supabase`);
-    console.log("Raw order IDs from DB:", data.map(o => o.id).slice(0, 10)); // Show first 10 IDs
     
     // First, let's see what shipments exist in the database
     const { data: allShipments } = await supabase
@@ -131,11 +130,6 @@ export async function fetchOrders(): Promise<OrderData[]> {
     
     // Convert Supabase data to our OrderData format
     const supabaseOrders: OrderData[] = ordersWithShipments.map(order => convertSupabaseToOrderData(order));
-    
-    console.log("=== ORDERS FETCHED FROM SUPABASE ===");
-    console.log(`Total orders: ${supabaseOrders.length}`);
-    console.log("Order IDs and statuses:", supabaseOrders.map(o => ({ id: o.id, status: o.status })));
-    console.log("Ready to ship orders:", supabaseOrders.filter(o => o.status === 'ready_to_ship'));
     
     return supabaseOrders;
   } catch (err) {
