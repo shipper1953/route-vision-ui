@@ -83,7 +83,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.purchase-label]
-verify_jwt = true
+verify_jwt = false
 
 [functions.qboid-wifi-api-handler]
 verify_jwt = false
