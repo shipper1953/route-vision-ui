@@ -118,6 +118,66 @@ export type Database = {
         }
         Relationships: []
       }
+      order_cartonization: {
+        Row: {
+          box_weight: number | null
+          calculation_timestamp: string | null
+          confidence: number | null
+          created_at: string | null
+          id: string
+          items_weight: number | null
+          order_id: number
+          recommended_box_data: Json | null
+          recommended_box_id: string | null
+          total_weight: number | null
+          updated_at: string | null
+          utilization: number | null
+        }
+        Insert: {
+          box_weight?: number | null
+          calculation_timestamp?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          id?: string
+          items_weight?: number | null
+          order_id: number
+          recommended_box_data?: Json | null
+          recommended_box_id?: string | null
+          total_weight?: number | null
+          updated_at?: string | null
+          utilization?: number | null
+        }
+        Update: {
+          box_weight?: number | null
+          calculation_timestamp?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          id?: string
+          items_weight?: number | null
+          order_id?: number
+          recommended_box_data?: Json | null
+          recommended_box_id?: string | null
+          total_weight?: number | null
+          updated_at?: string | null
+          utilization?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_cartonization_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_cartonization_recommended_box_id_fkey"
+            columns: ["recommended_box_id"]
+            isOneToOne: false
+            referencedRelation: "boxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           actual_delivery_date: string | null
@@ -574,6 +634,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_company_boxes_for_cartonization: {
+        Args: { p_company_id: string }
+        Returns: {
+          id: string
+          name: string
+          length: number
+          width: number
+          height: number
+          max_weight: number
+          cost: number
+          box_type: string
+        }[]
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
@@ -588,6 +661,19 @@ export type Database = {
           company_id: string
           warehouse_ids: Json
         }[]
+      }
+      update_order_cartonization: {
+        Args: {
+          p_order_id: number
+          p_recommended_box_id: string
+          p_recommended_box_data: Json
+          p_utilization: number
+          p_confidence: number
+          p_total_weight: number
+          p_items_weight: number
+          p_box_weight: number
+        }
+        Returns: undefined
       }
     }
     Enums: {
