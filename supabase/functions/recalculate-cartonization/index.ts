@@ -52,6 +52,15 @@ interface PackedItem {
   rotated: boolean;
 }
 
+interface Space {
+  x: number;
+  y: number;
+  z: number;
+  length: number;
+  width: number;
+  height: number;
+}
+
 interface PackingResult {
   success: boolean;
   packedItems: PackedItem[];
@@ -78,53 +87,142 @@ interface CartonizationResult {
   processingTime: number;
 }
 
-// Simplified 3D bin packing algorithm
+// Enhanced 3D bin packing algorithm with rotation support
 class BinPackingAlgorithm {
   static enhanced3DBinPacking(items: Item[], box: Box): PackingResult {
-    const packedItems: PackedItem[] = [];
-    let usedVolume = 0;
-    let x = 0, y = 0, z = 0;
+    // Expand items by quantity
+    const expandedItems: Item[] = [];
+    items.forEach(item => {
+      for (let i = 0; i < item.quantity; i++) {
+        expandedItems.push({ ...item, quantity: 1 });
+      }
+    });
 
-    for (const item of items) {
-      for (let q = 0; q < item.quantity; q++) {
-        const itemVolume = item.length * item.width * item.height;
+    // Sort items by volume (largest first) for better packing
+    const sortedItems = expandedItems.sort((a, b) => 
+      (b.length * b.width * b.height) - (a.length * a.width * a.height)
+    );
+
+    const packedItems: PackedItem[] = [];
+    const spaces: Space[] = [{
+      x: 0, y: 0, z: 0,
+      length: box.length,
+      width: box.width,
+      height: box.height
+    }];
+
+    console.log(`Starting 3D bin packing for ${sortedItems.length} items in box ${box.name} (${box.length}x${box.width}x${box.height})`);
+
+    for (const item of sortedItems) {
+      let itemPacked = false;
+      
+      // Try to find a space where this item fits
+      for (let spaceIndex = 0; spaceIndex < spaces.length && !itemPacked; spaceIndex++) {
+        const space = spaces[spaceIndex];
         
-        // Simple placement logic - check if item fits in remaining space
-        if (x + item.length <= box.length && 
-            y + item.width <= box.width && 
-            z + item.height <= box.height) {
-          
-          packedItems.push({
-            item,
-            x, y, z,
-            length: item.length,
-            width: item.width,
-            height: item.height,
-            rotated: false
-          });
-          
-          usedVolume += itemVolume;
-          
-          // Update position for next item
-          x += item.length;
-          if (x >= box.length) {
-            x = 0;
-            y += item.width;
-            if (y >= box.width) {
-              y = 0;
-              z += item.height;
+        // Try all 6 possible orientations of the item
+        const orientations = [
+          { l: item.length, w: item.width, h: item.height, rotated: false },
+          { l: item.length, w: item.height, h: item.width, rotated: true },
+          { l: item.width, w: item.length, h: item.height, rotated: true },
+          { l: item.width, w: item.height, h: item.length, rotated: true },
+          { l: item.height, w: item.length, h: item.width, rotated: true },
+          { l: item.height, w: item.width, h: item.length, rotated: true }
+        ];
+
+        for (const orientation of orientations) {
+          if (orientation.l <= space.length && 
+              orientation.w <= space.width && 
+              orientation.h <= space.height) {
+            
+            // Item fits in this orientation
+            const packedItem: PackedItem = {
+              item,
+              x: space.x,
+              y: space.y,
+              z: space.z,
+              length: orientation.l,
+              width: orientation.w,
+              height: orientation.h,
+              rotated: orientation.rotated
+            };
+            
+            packedItems.push(packedItem);
+            
+            // Remove the used space and create new spaces
+            spaces.splice(spaceIndex, 1);
+            
+            // Create up to 3 new spaces from the remaining space
+            const newSpaces: Space[] = [];
+            
+            // Right space
+            if (space.x + orientation.l < space.x + space.length) {
+              newSpaces.push({
+                x: space.x + orientation.l,
+                y: space.y,
+                z: space.z,
+                length: space.length - orientation.l,
+                width: space.width,
+                height: space.height
+              });
             }
+            
+            // Back space
+            if (space.y + orientation.w < space.y + space.width) {
+              newSpaces.push({
+                x: space.x,
+                y: space.y + orientation.w,
+                z: space.z,
+                length: orientation.l,
+                width: space.width - orientation.w,
+                height: space.height
+              });
+            }
+            
+            // Top space
+            if (space.z + orientation.h < space.z + space.height) {
+              newSpaces.push({
+                x: space.x,
+                y: space.y,
+                z: space.z + orientation.h,
+                length: orientation.l,
+                width: orientation.w,
+                height: space.height - orientation.h
+              });
+            }
+            
+            // Add new spaces, sorted by volume (smallest first for better packing)
+            newSpaces.sort((a, b) => (a.length * a.width * a.height) - (b.length * b.width * b.height));
+            spaces.splice(spaceIndex, 0, ...newSpaces);
+            
+            itemPacked = true;
+            console.log(`✅ Packed item ${item.name} (${orientation.l}x${orientation.w}x${orientation.h}${orientation.rotated ? ' rotated' : ''})`);
+            break;
           }
-        } else {
-          // Item doesn't fit
-          return { success: false, packedItems: [], usedVolume: 0, packingEfficiency: 0 };
         }
       }
+      
+      if (!itemPacked) {
+        console.log(`❌ Could not pack item ${item.name} (${item.length}x${item.width}x${item.height}) - no suitable space found`);
+        // Return failure if any item doesn't fit
+        return {
+          success: false,
+          packedItems: [],
+          usedVolume: 0,
+          packingEfficiency: 0
+        };
+      }
     }
-
+    
+    // Calculate used volume and packing efficiency
+    const usedVolume = packedItems.reduce((sum, packed) => 
+      sum + (packed.length * packed.width * packed.height), 0
+    );
     const boxVolume = box.length * box.width * box.height;
-    const packingEfficiency = boxVolume > 0 ? (usedVolume / boxVolume) * 100 : 0;
-
+    const packingEfficiency = usedVolume / boxVolume;
+    
+    console.log(`✅ Successfully packed all ${packedItems.length} items. Used volume: ${usedVolume}/${boxVolume} (${(packingEfficiency * 100).toFixed(1)}%)`);
+    
     return {
       success: true,
       packedItems,
@@ -263,11 +361,14 @@ Deno.serve(async (req) => {
 
     let ordersQuery = supabase
       .from('orders')
-      .select('id, items, company_id');
+      .select('id, items, company_id, status, order_id, customer_name');
 
     // Filter orders based on request
     if (orderIds && orderIds.length > 0) {
       ordersQuery = ordersQuery.in('id', orderIds);
+    } else {
+      // If no specific orders, process ready-to-ship orders
+      ordersQuery = ordersQuery.eq('status', 'ready_to_ship');
     }
 
     // Apply company filter unless super admin
