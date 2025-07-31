@@ -26,6 +26,7 @@ export const useUpdateOrder = (orderId: string) => {
 
     setIsSubmitting(true);
     console.log("Updating order with data:", data);
+    console.log("Order items being updated:", data.orderItems);
     
     try {
       // Format the date for the API

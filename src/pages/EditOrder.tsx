@@ -77,10 +77,20 @@ const EditOrder = () => {
         form.setValue("customerPhone", orderData.customerPhone || "");
         form.setValue("requiredDeliveryDate", new Date(orderData.requiredDeliveryDate));
         
-        // Convert legacy items data to orderItems array if needed
-        // For now, initialize with empty array - this could be enhanced to parse existing items
-        form.setValue("orderItems", []);
+        // Convert existing items data to orderItems array
+        if (orderData.items && Array.isArray(orderData.items)) {
+          const existingOrderItems = orderData.items.map((item: any) => ({
+            itemId: item.itemId || item.id,
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || 0
+          }));
+          form.setValue("orderItems", existingOrderItems);
+        } else {
+          form.setValue("orderItems", []);
+        }
         
+        // For now, we'll let the user select the warehouse since OrderData doesn't include it
+        // This could be enhanced to fetch and pre-populate the warehouse from the order record
         // Set shipping address
         if (orderData.shippingAddress) {
           form.setValue("street1", orderData.shippingAddress.street1 || "");
