@@ -108,12 +108,11 @@ export const OrderItemsBox = ({ orderItems, onItemsScanned }: OrderItemsBoxProps
                 <div className="flex items-center gap-3">
                   <Checkbox
                     checked={isFullyScanned}
-                    onChange={() => {
-                      if (isFullyScanned) {
+                    onCheckedChange={(checked) => {
+                      if (!checked && isFullyScanned) {
                         handleItemUncheck(orderItem.itemId);
                       }
                     }}
-                    className="pointer-events-none"
                   />
                   <div>
                     <div className="font-medium">

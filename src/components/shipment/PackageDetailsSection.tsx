@@ -5,6 +5,7 @@ import { useRecommendedBox } from "./package/hooks/useRecommendedBox";
 import { usePackagingOptimization } from "./package/hooks/usePackagingOptimization";
 import { RecommendedBoxCard } from "./package/RecommendedBoxCard";
 import { PackageDetailsCard } from "./package/PackageDetailsCard";
+import { BoxSelector } from "./package/BoxSelector";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 
@@ -57,6 +58,12 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
         orderItemsCount={orderItems.length}
         orderId={orderId}
         onOptimizePackaging={handleOptimizePackaging}
+      />
+
+      {/* Box Selector */}
+      <BoxSelector
+        onSelectBox={handleSelectBox}
+        selectedBox={recommendedBox}
       />
 
       {/* Cartonization Dialog */}
