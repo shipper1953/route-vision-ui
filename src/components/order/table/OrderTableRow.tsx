@@ -111,6 +111,8 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const { box: recommendedBox, weight: packageWeight } = getRecommendedBoxAndWeight(order);
   const shippingInfo = getShippingInfo(order);
   
+  console.log(`=== ORDER ROW RENDERED ===`);
+  console.log(`Order ID: ${order.id}, Status: ${order.status}, Customer: ${order.customerName}`);
   console.log(`Order ${order.id} - recommendedBox:`, recommendedBox, 'packageWeight:', packageWeight);
 
   const handleCopyOrder = () => {
