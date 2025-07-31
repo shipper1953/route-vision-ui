@@ -27,6 +27,8 @@ const Orders = () => {
         setLoading(true);
         const orderData = await fetchOrders();
         console.log("Orders loaded from Supabase:", orderData.length);
+        console.log("Order IDs and statuses:", orderData.map(o => ({ id: o.id, status: o.status })));
+        console.log("Ready to ship orders:", orderData.filter(o => o.status === 'ready_to_ship'));
         setOrders(orderData);
       } catch (error) {
         console.error("Error loading orders:", error);
