@@ -20,8 +20,8 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const { boxes, createItemsFromOrderData } = useCartonization();
 
   const getRecommendedBoxAndWeight = (order: OrderData) => {
-    if (order.status !== 'ready_to_ship') return { box: null, weight: null };
-    
+    // Skip cartonization for shipped/delivered orders, show box info for others
+    if (order.status === 'shipped' || order.status === 'delivered') return { box: null, weight: null };
     if (order.items && Array.isArray(order.items) && order.items.length > 0) {
       const items = createItemsFromOrderData(order.items, []);
       
