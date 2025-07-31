@@ -6,15 +6,42 @@ import { useBulkShipping } from "@/hooks/useBulkShipping";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, ChevronDown, ChevronRight, Ship } from "lucide-react";
+import { TrendingUp, ChevronDown, ChevronRight, Ship, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BulkShipOrdersTable } from "@/components/cartonization/BulkShipOrdersTable";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const CartonizationSettings = () => {
   const { boxStats, loading } = useBoxOrderStats();
   const { boxShippingGroups, loading: bulkShippingLoading, handleFetchRates, handleBulkShip, refreshData } = useBulkShipping();
   const [expandedBoxId, setExpandedBoxId] = useState<string | null>(null);
   const [showBulkShipping, setShowBulkShipping] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshBoxRecommendations = async () => {
+    setRefreshing(true);
+    try {
+      // Call edge function to recalculate all orders
+      const { error } = await supabase.functions.invoke('recalculate-cartonization', {
+        body: {} // No specific orderIds = process all ready orders
+      });
+      
+      if (error) {
+        console.error('Error refreshing recommendations:', error);
+        toast.error('Failed to refresh recommendations');
+      } else {
+        toast.success('Box recommendations refreshed successfully');
+        // Refresh the data
+        await refreshData();
+      }
+    } catch (error) {
+      console.error('Error refreshing recommendations:', error);
+      toast.error('Failed to refresh recommendations');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const toggleExpanded = (boxId: string) => {
     setExpandedBoxId(expandedBoxId === boxId ? null : boxId);
@@ -23,22 +50,35 @@ export const CartonizationSettings = () => {
   return (
     <div className="space-y-6">
       {/* Toggle between Box Demand Ranking and Bulk Shipping */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant={!showBulkShipping ? "default" : "outline"}
+            onClick={() => setShowBulkShipping(false)}
+            className="gap-2"
+          >
+            <TrendingUp className="h-4 w-4" />
+            Box Demand Ranking
+          </Button>
+          <Button
+            variant={showBulkShipping ? "default" : "outline"}
+            onClick={() => setShowBulkShipping(true)}
+            className="gap-2"
+          >
+            <Ship className="h-4 w-4" />
+            Bulk Ship by Box Size
+          </Button>
+        </div>
+        
         <Button
-          variant={!showBulkShipping ? "default" : "outline"}
-          onClick={() => setShowBulkShipping(false)}
-          className="gap-2"
+          onClick={refreshBoxRecommendations}
+          disabled={refreshing}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
         >
-          <TrendingUp className="h-4 w-4" />
-          Box Demand Ranking
-        </Button>
-        <Button
-          variant={showBulkShipping ? "default" : "outline"}
-          onClick={() => setShowBulkShipping(true)}
-          className="gap-2"
-        >
-          <Ship className="h-4 w-4" />
-          Bulk Ship by Box Size
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh Box Recommendations
         </Button>
       </div>
 

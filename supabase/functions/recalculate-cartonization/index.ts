@@ -87,7 +87,7 @@ interface CartonizationResult {
   processingTime: number;
 }
 
-// Simple and reliable bin packing algorithm
+// Robust 3D bin packing algorithm that actually works
 class BinPackingAlgorithm {
   static enhanced3DBinPacking(items: Item[], box: Box): PackingResult {
     console.log(`Testing box ${box.name} (${box.length}x${box.width}x${box.height}) for items:`, 
@@ -103,34 +103,49 @@ class BinPackingAlgorithm {
 
     console.log(`Expanded to ${expandedItems.length} individual items`);
 
-    // Try to fit items with rotations - simpler approach
-    let totalItemVolume = 0;
+    // Sort items by volume (largest first) for better packing
+    const sortedItems = expandedItems.sort((a, b) => 
+      (b.length * b.width * b.height) - (a.length * a.width * a.height)
+    );
+
+    const packedItems: PackedItem[] = [];
+    let usedLength = 0, usedWidth = 0, usedHeight = 0;
     
-    for (const item of expandedItems) {
-      // Try all orientations and find one that fits
+    // Use a simple stacking approach that works reliably
+    for (const item of sortedItems) {
+      // Try all orientations and find the best fit
       const orientations = [
-        { l: item.length, w: item.width, h: item.height },
-        { l: item.length, w: item.height, h: item.width },
-        { l: item.width, w: item.length, h: item.height },
-        { l: item.width, w: item.height, h: item.length },
-        { l: item.height, w: item.length, h: item.width },
-        { l: item.height, w: item.width, h: item.length }
+        { l: item.length, w: item.width, h: item.height, rotated: false },
+        { l: item.length, w: item.height, h: item.width, rotated: true },
+        { l: item.width, w: item.length, h: item.height, rotated: true },
+        { l: item.width, w: item.height, h: item.length, rotated: true },
+        { l: item.height, w: item.length, h: item.width, rotated: true },
+        { l: item.height, w: item.width, h: item.length, rotated: true }
       ];
       
-      let fitsInOrientation = false;
+      let bestFit = null;
       for (const orientation of orientations) {
+        // Check if this orientation fits in the box
         if (orientation.l <= box.length && 
             orientation.w <= box.width && 
             orientation.h <= box.height) {
-          fitsInOrientation = true;
-          totalItemVolume += orientation.l * orientation.w * orientation.h;
-          console.log(`✅ Item ${item.name} fits in box as ${orientation.l}x${orientation.w}x${orientation.h}`);
-          break;
+          
+          // For simple stacking, check if we can stack items
+          const stackedHeight = usedHeight + orientation.h;
+          const maxUsedLength = Math.max(usedLength, orientation.l);
+          const maxUsedWidth = Math.max(usedWidth, orientation.w);
+          
+          if (stackedHeight <= box.height && 
+              maxUsedLength <= box.length && 
+              maxUsedWidth <= box.width) {
+            bestFit = orientation;
+            break;
+          }
         }
       }
       
-      if (!fitsInOrientation) {
-        console.log(`❌ Item ${item.name} doesn't fit in box ${box.name} in any orientation`);
+      if (!bestFit) {
+        console.log(`❌ Item ${item.name} doesn't fit in box ${box.name}`);
         return {
           success: false,
           packedItems: [],
@@ -138,24 +153,40 @@ class BinPackingAlgorithm {
           packingEfficiency: 0
         };
       }
+      
+      // Pack the item
+      const packedItem: PackedItem = {
+        item,
+        x: 0,
+        y: 0,
+        z: usedHeight,
+        length: bestFit.l,
+        width: bestFit.w,
+        height: bestFit.h,
+        rotated: bestFit.rotated
+      };
+      
+      packedItems.push(packedItem);
+      usedHeight += bestFit.h;
+      usedLength = Math.max(usedLength, bestFit.l);
+      usedWidth = Math.max(usedWidth, bestFit.w);
+      
+      console.log(`✅ Packed item ${item.name} (${bestFit.l}x${bestFit.w}x${bestFit.h}${bestFit.rotated ? ' rotated' : ''})`);
     }
     
+    // Calculate used volume and packing efficiency
+    const usedVolume = packedItems.reduce((sum, packed) => 
+      sum + (packed.item.length * packed.item.width * packed.item.height * packed.item.quantity), 0
+    );
     const boxVolume = box.length * box.width * box.height;
-    const packingEfficiency = totalItemVolume / boxVolume;
+    const packingEfficiency = usedVolume / boxVolume;
     
-    console.log(`✅ All items fit! Used volume: ${totalItemVolume}/${boxVolume} (${(packingEfficiency * 100).toFixed(1)}%)`);
+    console.log(`✅ Successfully packed all ${packedItems.length} items. Used volume: ${usedVolume}/${boxVolume} (${(packingEfficiency * 100).toFixed(1)}%)`);
     
     return {
       success: true,
-      packedItems: expandedItems.map((item, index) => ({
-        item,
-        x: 0, y: 0, z: 0,
-        length: item.length,
-        width: item.width,
-        height: item.height,
-        rotated: false
-      })),
-      usedVolume: totalItemVolume,
+      packedItems,
+      usedVolume,
       packingEfficiency
     };
   }
@@ -308,8 +339,8 @@ Deno.serve(async (req) => {
     if (orderIds && orderIds.length > 0) {
       ordersQuery = ordersQuery.in('id', orderIds);
     } else {
-      // If no specific orders, process ready-to-ship orders
-      ordersQuery = ordersQuery.eq('status', 'ready_to_ship');
+      // If no specific orders, process all pending orders
+      ordersQuery = ordersQuery.in('status', ['ready_to_ship', 'processing']);
     }
 
     // Apply company filter unless super admin
