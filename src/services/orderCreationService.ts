@@ -23,6 +23,7 @@ interface CreateOrderInput extends Omit<OrderData, 'id'> {
 
 export const createOrder = async (orderData: CreateOrderInput): Promise<OrderData> => {
   console.log("Creating order with data:", orderData);
+  console.log("Order items structure:", JSON.stringify(orderData.orderItems, null, 2));
   
   // Get current user
   const { data: { user }, error: userError } = await supabase.auth.getUser();
