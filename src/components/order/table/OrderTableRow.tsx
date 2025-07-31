@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { OrderData } from "@/types/orderTypes";
 import { useCartonization } from "@/hooks/useCartonization";
+import { useItemMaster } from "@/hooks/useItemMaster";
 import { CartonizationEngine } from "@/services/cartonization/cartonizationEngine";
 import { renderOrderItems } from "../helpers/orderItemsHelper";
 import { getStatusBadgeVariant } from "../helpers/statusHelper";
@@ -18,6 +19,7 @@ interface OrderTableRowProps {
 export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const navigate = useNavigate();
   const { boxes, createItemsFromOrderData } = useCartonization();
+  const { items: masterItems } = useItemMaster();
 
   const getRecommendedBoxAndWeight = (order: OrderData) => {
     console.log(`=== Analyzing order ${order.id} for box recommendation ===`);
@@ -32,8 +34,8 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
     }
     
     if (order.items && Array.isArray(order.items) && order.items.length > 0) {
-      // Use empty array for masterItems - the createItemsFromOrderData should handle this
-      const items = createItemsFromOrderData(order.items, []);
+      // Use master items for proper cartonization
+      const items = createItemsFromOrderData(order.items, masterItems);
       
       console.log(`Created ${items.length} items for cartonization:`, items);
       
