@@ -118,8 +118,13 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
 
   console.log("Order created successfully with warehouse:", data.warehouse_id);
 
+  console.log("Order created, checking for cartonization...");
+  console.log("OrderData.orderItems:", JSON.stringify(orderData.orderItems, null, 2));
+  console.log("Created order data.items:", JSON.stringify(data.items, null, 2));
+  
   // Calculate and store cartonization data for the new order
   if (orderData.orderItems && orderData.orderItems.length > 0) {
+    console.log("Starting cartonization calculation...");
     try {
       console.log("Calculating cartonization for new order:", data.id);
       console.log("Order items:", orderData.orderItems);
