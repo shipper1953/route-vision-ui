@@ -20,14 +20,16 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const { boxes, createItemsFromOrderData } = useCartonization();
 
   const getRecommendedBoxAndWeight = (order: OrderData) => {
-    // Skip cartonization for shipped/delivered orders, show box info for others
-    if (order.status === 'shipped' || order.status === 'delivered') return { box: null, weight: null };
+    console.log(`=== Analyzing order ${order.id} for box recommendation ===`);
+    console.log(`Order status: ${order.status}`);
+    console.log(`Order items:`, order.items);
+    console.log(`Available boxes: ${boxes.length}`);
     
-    console.log(`Analyzing order ${order.id} for box recommendation:`, {
-      status: order.status,
-      items: order.items,
-      boxesAvailable: boxes.length
-    });
+    // Skip cartonization for shipped/delivered orders, show box info for others
+    if (order.status === 'shipped' || order.status === 'delivered') {
+      console.log(`Skipping cartonization for ${order.status} order ${order.id}`);
+      return { box: null, weight: null };
+    }
     
     if (order.items && Array.isArray(order.items) && order.items.length > 0) {
       // Use empty array for masterItems - the createItemsFromOrderData should handle this
@@ -35,7 +37,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
       
       console.log(`Created ${items.length} items for cartonization:`, items);
       
-      if (items.length > 0) {
+      if (items.length > 0 && boxes.length > 0) {
         const engine = new CartonizationEngine(boxes);
         const result = engine.calculateOptimalBox(items);
         
@@ -67,7 +69,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
           console.log(`No box recommendation for order ${order.id} - cartonization failed`);
         }
       } else {
-        console.log(`No items created for order ${order.id} cartonization`);
+        console.log(`No items created for order ${order.id} cartonization - items: ${items.length}, boxes: ${boxes.length}`);
       }
     } else {
       console.log(`Order ${order.id} has no valid items for cartonization`);
