@@ -12,6 +12,7 @@ export const useCreateOrder = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
   const { items } = useItemMaster();
+  console.log("Available items in useCreateOrder:", items);
 
   const onSubmit = async (data: OrderFormValues) => {
     if (!user?.id) {
@@ -42,6 +43,7 @@ export const useCreateOrder = () => {
       
       // Prepare order items with item details for dimensions
       const orderItemsWithDetails = data.orderItems.map(orderItem => {
+        console.log("Looking for item with ID:", orderItem.itemId, "in items:", items.map(i => ({ id: i.id, name: i.name })));
         const itemDetails = items.find(item => item.id === orderItem.itemId);
         console.log("Creating order item with details:", { orderItem, itemDetails });
         return {
