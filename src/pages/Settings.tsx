@@ -8,6 +8,7 @@ import { CartonizationTestingEnvironment } from "@/components/cartonization/Cart
 import { PackagingAlgorithm } from "@/components/cartonization/PackagingAlgorithm";
 import { BoxRecommendations } from "@/components/cartonization/BoxRecommendations";
 import { useCartonization } from "@/hooks/useCartonization";
+import { CartonizationDebug } from "@/components/debug/CartonizationDebug";
 
 const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -84,6 +85,7 @@ const Settings = () => {
           
           <TabsContent value="testing" className="space-y-4">
             <CartonizationTestingEnvironment />
+            <CartonizationDebug />
           </TabsContent>
         </Tabs>
       </div>

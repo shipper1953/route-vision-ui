@@ -260,10 +260,15 @@ class SimpleCartonizationEngine {
 
     const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
     
+    console.log(`Total weight: ${totalWeight}, Available boxes:`, this.boxes.map(b => `${b.name}(${b.maxWeight}kg)`));
+    
     // Filter boxes by weight capacity
     const suitableBoxes = this.boxes.filter(box => box.maxWeight >= totalWeight);
     
+    console.log(`Suitable boxes for weight ${totalWeight}:`, suitableBoxes.map(b => `${b.name}(${b.length}x${b.width}x${b.height})`));
+    
     if (!suitableBoxes.length) {
+      console.log('No boxes can handle the weight requirement');
       return null;
     }
 
@@ -271,7 +276,14 @@ class SimpleCartonizationEngine {
     const alternatives: any[] = [];
 
     for (const box of suitableBoxes) {
+      console.log(`Testing box ${box.name} (${box.length}x${box.width}x${box.height}) for items:`, items.map(i => `${i.name}(${i.length}x${i.width}x${i.height})`));
       const packingResult = BinPackingAlgorithm.enhanced3DBinPacking(items, box);
+      
+      if (packingResult.success) {
+        console.log(`✅ Box ${box.name} packing successful with ${(packingResult.packingEfficiency * 100).toFixed(1)}% efficiency`);
+      } else {
+        console.log(`❌ Box ${box.name} packing failed`);
+      }
       
       if (packingResult.success) {
         const utilization = packingResult.packingEfficiency;
@@ -443,6 +455,8 @@ Deno.serve(async (req) => {
           console.log(`No items found for order ${order.id}`);
           continue;
         }
+
+        console.log(`Order ${order.id} has ${items.length} items:`, items.map(i => `${i.name} (${i.length}x${i.width}x${i.height}, ${i.weight}kg)`));
 
         const result = engine.calculateOptimalBox(items);
         
