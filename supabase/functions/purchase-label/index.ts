@@ -172,10 +172,14 @@ serve(async (req) => {
     
     // Get user from auth header
     const token = authHeader.replace('Bearer ', '')
+    console.log('🔑 Attempting to authenticate user with token...')
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
     
     if (authError || !user) {
       console.error('❌ Failed to authenticate user:', authError)
+      console.error('❌ Auth error details:', JSON.stringify(authError, null, 2))
+      console.error('❌ Token length:', token?.length)
+      console.error('❌ Token prefix:', token?.substring(0, 20) + '...')
       return createErrorResponse('Unauthorized', 'Invalid authorization token', 401)
     }
     
