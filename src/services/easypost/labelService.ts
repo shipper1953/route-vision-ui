@@ -69,8 +69,8 @@ export class LabelService {
         console.error('Edge function returned error status:', response.status);
         console.error('Error response data:', responseData);
         
-        // Extract the actual error message from the edge function response
-        const errorMessage = responseData?.error || responseData?.details || `Edge function error (${response.status})`;
+        // Extract the most specific error message available
+        const errorMessage = responseData?.details || responseData?.error || `Edge function error (${response.status})`;
         throw new Error(errorMessage);
       }
 
