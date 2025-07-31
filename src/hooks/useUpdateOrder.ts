@@ -75,7 +75,7 @@ export const useUpdateOrder = (orderId: string) => {
           },
           warehouse_id: data.warehouseId
         })
-        .eq('order_id', orderId);
+        .eq('id', parseInt(orderId)); // Use id field, not order_id
       
       if (error) {
         console.error("Error updating order:", error);
@@ -87,7 +87,7 @@ export const useUpdateOrder = (orderId: string) => {
       const { data: updatedOrder, error: fetchError } = await supabase
         .from('orders')
         .select('*')
-        .eq('order_id', orderId)
+        .eq('id', parseInt(orderId)) // Use id field, not order_id
         .single();
 
       if (!fetchError && updatedOrder) {
