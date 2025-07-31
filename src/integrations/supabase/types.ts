@@ -118,6 +118,51 @@ export type Database = {
         }
         Relationships: []
       }
+      items: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          height: number
+          id: string
+          is_active: boolean
+          length: number
+          name: string
+          sku: string
+          updated_at: string
+          weight: number
+          width: number
+        }
+        Insert: {
+          category: string
+          company_id: string
+          created_at?: string
+          height: number
+          id?: string
+          is_active?: boolean
+          length: number
+          name: string
+          sku: string
+          updated_at?: string
+          weight: number
+          width: number
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          height?: number
+          id?: string
+          is_active?: boolean
+          length?: number
+          name?: string
+          sku?: string
+          updated_at?: string
+          weight?: number
+          width?: number
+        }
+        Relationships: []
+      }
       order_cartonization: {
         Row: {
           box_weight: number | null
