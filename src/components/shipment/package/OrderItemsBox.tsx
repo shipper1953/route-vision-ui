@@ -26,8 +26,11 @@ export const OrderItemsBox = ({ orderItems, onItemsScanned }: OrderItemsBoxProps
   const { items: masterItems } = useItemMaster();
 
   const handleItemClick = (itemId: string, maxQuantity: number) => {
+    console.log('Item clicked:', itemId, 'maxQuantity:', maxQuantity);
     const currentQuantity = scannedQuantities[itemId] || 0;
     const newQuantity = currentQuantity + 1;
+    
+    console.log('Current quantity:', currentQuantity, 'New quantity:', newQuantity);
     
     if (newQuantity <= maxQuantity) {
       setScannedQuantities(prev => ({
@@ -103,16 +106,22 @@ export const OrderItemsBox = ({ orderItems, onItemsScanned }: OrderItemsBoxProps
                     ? 'bg-green-50 border-green-200' 
                     : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                 }`}
-                onClick={() => handleItemClick(orderItem.itemId, orderItem.quantity)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleItemClick(orderItem.itemId, orderItem.quantity);
+                }}
               >
                 <div className="flex items-center gap-3">
                   <Checkbox
                     checked={isFullyScanned}
                     onCheckedChange={(checked) => {
+                      console.log('Checkbox clicked:', checked, 'for item:', orderItem.itemId);
                       if (!checked && isFullyScanned) {
                         handleItemUncheck(orderItem.itemId);
                       }
                     }}
+                    onClick={(e) => e.stopPropagation()}
                   />
                   <div>
                     <div className="font-medium">
