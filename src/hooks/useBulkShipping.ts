@@ -13,8 +13,8 @@ export const useBulkShipping = () => {
 
   // Memoize the order processor to prevent infinite re-renders
   const orderProcessor = useMemo(() => 
-    new OrderProcessor(boxes, createItemsFromOrderData), 
-    [boxes, createItemsFromOrderData]
+    new OrderProcessor(boxes), 
+    [boxes]
   );
 
   useEffect(() => {

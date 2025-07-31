@@ -117,6 +117,17 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
 
   console.log("Order created successfully with warehouse:", data.warehouse_id);
 
+  // Trigger cartonization calculation for the new order
+  try {
+    console.log('Triggering cartonization for new order:', data.id);
+    await supabase.functions.invoke('recalculate-cartonization', {
+      body: { orderIds: [data.id] }
+    });
+  } catch (cartonizationError) {
+    console.error('Error calculating cartonization for new order:', cartonizationError);
+    // Don't fail order creation if cartonization fails
+  }
+
   // Convert back to OrderData format with proper type handling
   const shippingAddress = typeof data.shipping_address === 'object' && data.shipping_address !== null
     ? data.shipping_address as any
