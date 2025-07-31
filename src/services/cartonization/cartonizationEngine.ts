@@ -119,12 +119,42 @@ export class CartonizationEngine {
       rulesApplied.push('Balanced Optimization Rule');
     }
 
-    // Apply fill rate threshold rule
+    // Apply fill rate threshold rule - use as preference weight, not hard filter
     if (this.parameters.fillRateThreshold > 0) {
-      rulesApplied.push(`Fill Rate Threshold (${this.parameters.fillRateThreshold}%)`);
-      sortedBoxes = sortedBoxes.filter(analysis => 
-        analysis.utilization >= this.parameters.fillRateThreshold || this.parameters.allowPartialFill
-      );
+      rulesApplied.push(`Fill Rate Preference (${this.parameters.fillRateThreshold}%)`);
+      
+      // Set minimum viable threshold (60%) - below this, boxes are truly unusable
+      const minViableThreshold = 60;
+      const preferenceThreshold = this.parameters.fillRateThreshold;
+      
+      console.log(`Applying fill rate logic: preference=${preferenceThreshold}%, minViable=${minViableThreshold}%`);
+      
+      // Filter out only truly unusable boxes (below 60% utilization)
+      sortedBoxes = sortedBoxes.filter(analysis => {
+        const isViable = analysis.utilization >= minViableThreshold;
+        const meetsPreference = analysis.utilization >= preferenceThreshold;
+        
+        console.log(`Box ${analysis.box.name}: utilization=${analysis.utilization.toFixed(1)}%, viable=${isViable}, meetsPreference=${meetsPreference}`);
+        
+        // Always keep viable boxes, but note preference
+        return isViable;
+      });
+      
+      // Re-sort with preference weighting - boxes meeting preference threshold get bonus points
+      if (preferenceThreshold > minViableThreshold) {
+        sortedBoxes = sortedBoxes.map(analysis => ({
+          ...analysis,
+          // Add bonus confidence for boxes that meet the preference threshold
+          adjustedConfidence: analysis.confidence + (analysis.utilization >= preferenceThreshold ? 10 : 0)
+        })).sort((a, b) => {
+          // Sort by adjusted confidence first, then by original sorting criteria
+          if (Math.abs(a.adjustedConfidence - b.adjustedConfidence) > 5) {
+            return b.adjustedConfidence - a.adjustedConfidence;
+          }
+          // Fall back to utilization for similar confidence scores
+          return b.utilization - a.utilization;
+        });
+      }
     }
 
     if (!sortedBoxes.length) {
