@@ -131,6 +131,11 @@ export async function fetchOrders(): Promise<OrderData[]> {
     // Convert Supabase data to our OrderData format
     const supabaseOrders: OrderData[] = ordersWithShipments.map(order => convertSupabaseToOrderData(order));
     
+    console.log("=== ORDERS FETCHED FROM SUPABASE ===");
+    console.log(`Total orders: ${supabaseOrders.length}`);
+    console.log("Order IDs and statuses:", supabaseOrders.map(o => ({ id: o.id, status: o.status })));
+    console.log("Ready to ship orders:", supabaseOrders.filter(o => o.status === 'ready_to_ship'));
+    
     return supabaseOrders;
   } catch (err) {
     console.error("Error fetching orders from Supabase:", err);
