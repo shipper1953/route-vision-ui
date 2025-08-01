@@ -5,12 +5,15 @@ import { ShipmentForm } from "@/types/shipment";
 import { useCartonization } from "@/hooks/useCartonization";
 import { useItemMaster } from "@/hooks/useItemMaster";
 import { CartonizationEngine, CartonizationResult } from "@/services/cartonization/cartonizationEngine";
+import { MultiPackageCartonizationResult } from "@/services/cartonization/types";
 
 export const useRecommendedBox = (orderItems: any[]) => {
   const form = useFormContext<ShipmentForm>();
   const [recommendedBox, setRecommendedBox] = useState<any>(null);
   const [boxUtilization, setBoxUtilization] = useState<number>(0);
   const [cartonizationResult, setCartonizationResult] = useState<CartonizationResult | null>(null);
+  const [multiPackageResult, setMultiPackageResult] = useState<MultiPackageCartonizationResult | null>(null);
+  const [needsMultiPackage, setNeedsMultiPackage] = useState<boolean>(false);
   const { boxes, parameters, createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
   
@@ -35,7 +38,50 @@ export const useRecommendedBox = (orderItems: any[]) => {
         const items = createItemsFromOrderData(orderItems, masterItems);
         if (items.length > 0) {
           const engine = new CartonizationEngine(boxes, parameters);
-          const result = engine.calculateOptimalBox(items);
+          
+          // Try single-package first
+          let result = engine.calculateOptimalBox(items, false);
+          let multiPackage = null;
+          let requiresMultiPackage = false;
+          
+          // If single package fails or has low confidence, try multi-package
+          if (!result || result.confidence < 60) {
+            console.log('Single-package solution insufficient, trying multi-package...');
+            multiPackage = engine.calculateMultiPackageCartonization(items, 'balanced');
+            
+            if (multiPackage) {
+              requiresMultiPackage = true;
+              setMultiPackageResult(multiPackage);
+              setNeedsMultiPackage(true);
+              
+              // Use first package for form values
+              const firstPackage = multiPackage.packages[0];
+              if (firstPackage) {
+                result = {
+                  recommendedBox: firstPackage.box,
+                  utilization: firstPackage.utilization,
+                  itemsFit: true,
+                  totalWeight: multiPackage.totalWeight,
+                  totalVolume: multiPackage.totalVolume,
+                  dimensionalWeight: firstPackage.dimensionalWeight,
+                  savings: 0,
+                  confidence: multiPackage.confidence,
+                  alternatives: multiPackage.packages.slice(1, 4).map(pkg => ({
+                    box: pkg.box,
+                    utilization: pkg.utilization,
+                    cost: pkg.box.cost,
+                    confidence: pkg.confidence
+                  })),
+                  rulesApplied: multiPackage.rulesApplied,
+                  processingTime: multiPackage.processingTime,
+                  multiPackageResult: multiPackage
+                };
+              }
+            }
+          } else {
+            setNeedsMultiPackage(false);
+            setMultiPackageResult(null);
+          }
           
           if (result) {
             console.log("Recommended box calculated:", result);
@@ -54,7 +100,12 @@ export const useRecommendedBox = (orderItems: any[]) => {
               form.setValue("weight", totalWeight);
               
               hasSetFormValuesRef.current = true;
-              toast.success(`Recommended ${result.recommendedBox.name} with ${result.confidence}% confidence`);
+              
+              if (requiresMultiPackage) {
+                toast.success(`Multi-package solution: ${multiPackage!.totalPackages} packages needed`);
+              } else {
+                toast.success(`Recommended ${result.recommendedBox.name} with ${result.confidence}% confidence`);
+              }
             }
             
             // Mark these items as calculated
@@ -78,6 +129,8 @@ export const useRecommendedBox = (orderItems: any[]) => {
   return {
     recommendedBox,
     boxUtilization,
-    cartonizationResult
+    cartonizationResult,
+    multiPackageResult,
+    needsMultiPackage
   };
 };

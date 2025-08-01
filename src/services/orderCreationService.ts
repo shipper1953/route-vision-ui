@@ -149,7 +149,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
               height: item.dimensions!.height,
               weight: item.dimensions!.weight,
               quantity: item.quantity,
-              category: 'order_item'
+              category: 'order_item' as const
             };
           });
 
@@ -159,17 +159,51 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
           const engine = new CartonizationEngine(boxes.map(box => ({
             id: box.id,
             name: box.name,
-            length: box.length,
-            width: box.width,
-            height: box.height,
-            maxWeight: box.max_weight,
-            cost: box.cost,
+            length: Number(box.length),
+            width: Number(box.width),
+            height: Number(box.height),
+            maxWeight: Number(box.max_weight),
+            cost: Number(box.cost),
             inStock: box.in_stock,
-            type: box.box_type
+            type: box.box_type as 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom'
           })));
 
           console.log("Running cartonization engine...");
-          const result = engine.calculateOptimalBox(items);
+          
+          // Try single-package first, then multi-package if needed
+          let result = engine.calculateOptimalBox(items, false);
+          let multiPackageResult = null;
+          
+          // If single package fails or has low confidence, try multi-package
+          if (!result || result.confidence < 60) {
+            console.log('Single-package solution insufficient, trying multi-package...');
+            multiPackageResult = engine.calculateMultiPackageCartonization(items, 'balanced');
+            
+            if (multiPackageResult) {
+              console.log(`Multi-package solution found: ${multiPackageResult.totalPackages} packages`);
+              // Create a result from multi-package for storage
+              result = {
+                recommendedBox: multiPackageResult.packages[0].box,
+                utilization: multiPackageResult.packages[0].utilization,
+                itemsFit: true,
+                totalWeight: multiPackageResult.totalWeight,
+                totalVolume: multiPackageResult.totalVolume,
+                dimensionalWeight: multiPackageResult.packages[0].dimensionalWeight,
+                savings: 0,
+                confidence: multiPackageResult.confidence,
+                alternatives: multiPackageResult.packages.slice(1, 4).map(pkg => ({
+                  box: pkg.box,
+                  utilization: pkg.utilization,
+                  cost: pkg.box.cost,
+                  confidence: pkg.confidence
+                })),
+                rulesApplied: multiPackageResult.rulesApplied,
+                processingTime: multiPackageResult.processingTime,
+                multiPackageResult: multiPackageResult
+              };
+            }
+          }
+          
           console.log("Cartonization result:", result);
           
           if (result && result.recommendedBox) {
@@ -182,14 +216,18 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
               boxId: result.recommendedBox.id,
               utilization: result.utilization,
               confidence: result.confidence,
-              totalWeight
+              totalWeight,
+              multiPackage: !!multiPackageResult
             });
 
-            // Store cartonization result
+            // Store cartonization result with multi-package data
             const { error: cartonError } = await supabase.rpc('update_order_cartonization', {
               p_order_id: data.id,
               p_recommended_box_id: result.recommendedBox.id,
-              p_recommended_box_data: JSON.parse(JSON.stringify(result.recommendedBox)),
+              p_recommended_box_data: JSON.parse(JSON.stringify({
+                ...result.recommendedBox,
+                multiPackageResult: multiPackageResult || null
+              })),
               p_utilization: result.utilization,
               p_confidence: result.confidence,
               p_total_weight: totalWeight,
@@ -201,6 +239,29 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
               console.error("Error storing cartonization data:", cartonError);
             } else {
               console.log("Cartonization data stored successfully for order:", data.id);
+              
+              // If multi-package result exists, also store multi-package specific data
+              if (multiPackageResult) {
+                try {
+                  const { error: updateError } = await supabase
+                    .from('order_cartonization')
+                    .update({
+                      packages: multiPackageResult.packages,
+                      total_packages: multiPackageResult.totalPackages,
+                      splitting_strategy: multiPackageResult.splittingStrategy,
+                      optimization_objective: multiPackageResult.optimizationObjective
+                    })
+                    .eq('order_id', data.id);
+
+                  if (updateError) {
+                    console.error("Error updating multi-package data:", updateError);
+                  } else {
+                    console.log("Multi-package data stored successfully");
+                  }
+                } catch (mpError) {
+                  console.error("Error storing multi-package data:", mpError);
+                }
+              }
             }
           } else {
             console.log("No cartonization result returned from engine");

@@ -171,9 +171,13 @@ export type Database = {
           created_at: string | null
           id: string
           items_weight: number | null
+          optimization_objective: string | null
           order_id: number
+          packages: Json | null
           recommended_box_data: Json | null
           recommended_box_id: string | null
+          splitting_strategy: string | null
+          total_packages: number | null
           total_weight: number | null
           updated_at: string | null
           utilization: number | null
@@ -185,9 +189,13 @@ export type Database = {
           created_at?: string | null
           id?: string
           items_weight?: number | null
+          optimization_objective?: string | null
           order_id: number
+          packages?: Json | null
           recommended_box_data?: Json | null
           recommended_box_id?: string | null
+          splitting_strategy?: string | null
+          total_packages?: number | null
           total_weight?: number | null
           updated_at?: string | null
           utilization?: number | null
@@ -199,9 +207,13 @@ export type Database = {
           created_at?: string | null
           id?: string
           items_weight?: number | null
+          optimization_objective?: string | null
           order_id?: number
+          packages?: Json | null
           recommended_box_data?: Json | null
           recommended_box_id?: string | null
+          splitting_strategy?: string | null
+          total_packages?: number | null
           total_weight?: number | null
           updated_at?: string | null
           utilization?: number | null
