@@ -71,7 +71,11 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
           weight: Math.max(1, Math.round((pkg as any).packageWeight || 1)),
         }));
         (form as any).setValue('multiParcels', parcels);
-        console.log('Stored multiParcels in form:', parcels);
+        // Persist for cross-step access (in case RHF state resets when navigating steps)
+        try {
+          localStorage.setItem('multiParcels', JSON.stringify(parcels));
+        } catch {}
+        console.log('Stored multiParcels in form and localStorage:', parcels);
       } catch (e) {
         console.warn('Failed to prepare multiParcels:', e);
       }

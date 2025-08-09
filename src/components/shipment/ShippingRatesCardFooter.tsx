@@ -89,7 +89,11 @@ export const ShippingRatesCardFooter = ({
     setPurchasing(true);
     try {
       // Use multi-parcel flow when more than one parcel
-      const multiParcels = (form as any)?.getValues?.('multiParcels') || [];
+      const storedParcels = (() => {
+        try { return JSON.parse(localStorage.getItem('multiParcels') || '[]'); } catch { return []; }
+      })();
+      const multiParcels = (form as any)?.getValues?.('multiParcels') || storedParcels;
+      console.log('Multi-parcel purchase check: parcels found =', Array.isArray(multiParcels) ? multiParcels.length : 0);
       if (Array.isArray(multiParcels) && multiParcels.length > 1) {
         const to = {
           name: form.getValues('toName'),
