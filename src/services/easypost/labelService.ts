@@ -26,6 +26,26 @@ export class LabelService {
     }
   }
 
+  async purchaseMultipleLabels(params: {
+    packages: Array<{ length: number; width: number; height: number; weight: number }>;
+    orderId?: string | null;
+    provider?: string;
+    carrier?: string;
+    service?: string;
+    to: any;
+    from: any;
+  }): Promise<any> {
+    try {
+      if (!this.useEdgeFunctions) {
+        throw new Error('Bulk purchasing is only supported via edge functions');
+      }
+      return this.purchaseMultipleLabelsViaEdgeFunction(params);
+    } catch (error) {
+      console.error('Error purchasing multiple labels:', error);
+      throw error;
+    }
+  }
+
   private async purchaseLabelViaEdgeFunction(shipmentId: string, rateId: string, orderId?: string | null, provider?: string): Promise<any> {
     const requestBody: any = { shipmentId, rateId };
     

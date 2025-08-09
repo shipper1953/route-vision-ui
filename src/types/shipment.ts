@@ -62,6 +62,9 @@ export const shipmentSchema = z.object({
   
   // EasyPost shipment ID
   shipmentId: z.string().optional(),
+
+  // Multi-package parcels (optional, used for multi-label purchasing)
+  multiParcels: z.array(parcelSchema).optional(),
 });
 
 export type ShipmentForm = z.infer<typeof shipmentSchema>;

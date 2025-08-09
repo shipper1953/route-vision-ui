@@ -235,6 +235,33 @@ export type Database = {
           },
         ]
       }
+      order_shipments: {
+        Row: {
+          created_at: string | null
+          id: string
+          order_id: number
+          package_index: number
+          package_info: Json | null
+          shipment_id: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          order_id: number
+          package_index?: number
+          package_info?: Json | null
+          shipment_id: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          order_id?: number
+          package_index?: number
+          package_info?: Json | null
+          shipment_id?: number
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           actual_delivery_date: string | null

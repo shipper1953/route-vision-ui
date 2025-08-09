@@ -49,7 +49,7 @@ export const FormField = ({ name, label, placeholder, required = false, type = "
               type={type}
               placeholder={placeholder} 
               onChange={(e) => handleInputChange(e, field)}
-              value={field.value ?? ''} 
+              value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
               onBlur={field.onBlur}
               name={field.name}
               ref={field.ref}

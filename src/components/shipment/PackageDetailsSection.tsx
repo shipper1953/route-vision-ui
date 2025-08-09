@@ -60,6 +60,24 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
     }
   }, [orderItems, masterItems, createItemsFromOrderData, calculateMultiPackage]);
 
+  // Expose multi-package parcels to the form so the purchase step can buy multiple labels
+  useEffect(() => {
+    if (multiPackageResult) {
+      try {
+        const parcels = multiPackageResult.packages.map((pkg) => ({
+          length: pkg.box.length,
+          width: pkg.box.width,
+          height: pkg.box.height,
+          weight: Math.max(1, Math.round((pkg as any).packageWeight || 1)),
+        }));
+        (form as any).setValue('multiParcels', parcels);
+        console.log('Stored multiParcels in form:', parcels);
+      } catch (e) {
+        console.warn('Failed to prepare multiParcels:', e);
+      }
+    }
+  }, [multiPackageResult]);
+
   const handleUseRecommendedBox = (box: any) => {
     handleSelectBox(box);
   };
