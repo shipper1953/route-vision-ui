@@ -1,4 +1,5 @@
 
+import { useEffect, useState } from "react";
 import { OrderItemsBox } from "./package/OrderItemsBox";
 import { CartonizationDialog } from "@/components/cartonization/CartonizationDialog";
 import { useRecommendedBox } from "./package/hooks/useRecommendedBox";
@@ -8,6 +9,11 @@ import { PackageDetailsCard } from "./package/PackageDetailsCard";
 import { BoxSelector } from "./package/BoxSelector";
 import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
+import { MultiPackageDisplay } from "@/components/cartonization/MultiPackageDisplay";
+import { useMultiPackageCartonization } from "@/hooks/useMultiPackageCartonization";
+import { useCartonization } from "@/hooks/useCartonization";
+import { useItemMaster } from "@/hooks/useItemMaster";
+import { EditPackageDialog } from "@/components/cartonization/dialogs/EditPackageDialog";
 
 interface PackageDetailsSectionProps {
   orderItems?: any[];
@@ -30,8 +36,43 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
     selectedBox
   } = usePackagingOptimization(orderItems);
 
+  // Multi-package management
+  const { createItemsFromOrderData } = useCartonization();
+  const { items: masterItems } = useItemMaster();
+  const {
+    multiPackageResult,
+    selectedPackageIndex,
+    setSelectedPackageIndex,
+    addManualPackage,
+    editPackage,
+    calculateMultiPackage,
+  } = useMultiPackageCartonization();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (orderItems && orderItems.length > 0) {
+      const items = createItemsFromOrderData(orderItems, masterItems);
+      if (items.length > 0) {
+        calculateMultiPackage(items, 'balanced');
+      }
+    }
+  }, [orderItems, masterItems, createItemsFromOrderData, calculateMultiPackage]);
+
   const handleUseRecommendedBox = (box: any) => {
     handleSelectBox(box);
+  };
+
+  const handleEditPackage = (idx: number) => {
+    setEditingIndex(idx);
+    setEditOpen(true);
+  };
+
+  const handleSavePackageItems = (updatedItems: any[]) => {
+    if (editingIndex !== null) {
+      editPackage(editingIndex, { assignedItems: updatedItems });
+    }
   };
   
   return (
@@ -109,6 +150,29 @@ export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSection
             </div>
           </div>
         </div>
+      )}
+
+      {multiPackageResult && (
+        <>
+          <MultiPackageDisplay
+            multiPackageResult={multiPackageResult}
+            onAddPackage={addManualPackage}
+            onEditPackage={handleEditPackage}
+            onPackageSelect={setSelectedPackageIndex}
+            selectedPackageIndex={selectedPackageIndex}
+          />
+
+          {editingIndex !== null && multiPackageResult && (
+            <EditPackageDialog
+              open={editOpen}
+              onOpenChange={setEditOpen}
+              packageIndex={editingIndex}
+              pkg={multiPackageResult.packages[editingIndex]}
+              multiPackageResult={multiPackageResult}
+              onSave={handleSavePackageItems}
+            />
+          )}
+        </>
       )}
 
       {/* Package Details Card */}

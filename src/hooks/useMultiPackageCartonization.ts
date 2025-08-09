@@ -97,23 +97,64 @@ export const useMultiPackageCartonization = () => {
     if (!multiPackageResult) return;
 
     const updatedPackages = [...multiPackageResult.packages];
-    updatedPackages[packageIndex] = { ...updatedPackages[packageIndex], ...updatedPackage };
+    const current = { ...updatedPackages[packageIndex], ...updatedPackage } as any;
+
+    // Recalculate per-package metrics if assignedItems or box changed
+    try {
+      const box = current.box;
+      const boxVolume = (box?.length ?? 0) * (box?.width ?? 0) * (box?.height ?? 0);
+      const divisor = (parameters as any)?.dimensionalWeightFactor || 139;
+
+      const items = current.assignedItems || [];
+      let packageWeight = 0;
+      let usedVolume = 0;
+
+      for (const it of items) {
+        const qty = Number(it.quantity ?? 1);
+        const l = Number(it.length ?? it.dimensions?.length ?? 0);
+        const w = Number(it.width ?? it.dimensions?.width ?? 0);
+        const h = Number(it.height ?? it.dimensions?.height ?? 0);
+        const wt = Number(it.weight ?? it.dimensions?.weight ?? 0);
+        packageWeight += wt * qty;
+        usedVolume += l * w * h * qty;
+      }
+
+      const dimensionalWeight = boxVolume > 0 ? (box.length * box.width * box.height) / divisor : 0;
+      const utilization = boxVolume > 0 ? Math.min(100, (usedVolume / boxVolume) * 100) : 0;
+
+      current.packageWeight = packageWeight;
+      current.packageVolume = usedVolume;
+      current.dimensionalWeight = Number(dimensionalWeight.toFixed(2));
+      current.utilization = Number(utilization.toFixed(1));
+      current.packingResult = {
+        success: true,
+        packedItems: items,
+        usedVolume,
+        packingEfficiency: current.utilization
+      };
+    } catch (e) {
+      console.warn('Failed to recalculate package metrics, keeping previous where possible', e);
+    }
+
+    updatedPackages[packageIndex] = current;
 
     // Recalculate totals
-    const totalWeight = updatedPackages.reduce((sum, pkg) => sum + pkg.packageWeight, 0);
-    const totalCost = updatedPackages.reduce((sum, pkg) => sum + pkg.box.cost, 0);
+    const totalWeight = updatedPackages.reduce((sum, pkg: any) => sum + (Number(pkg.packageWeight) || 0), 0);
+    const totalCost = updatedPackages.reduce((sum, pkg: any) => sum + (Number(pkg.box?.cost) || 0), 0);
+    const totalVolume = updatedPackages.reduce((sum, pkg: any) => sum + (Number(pkg.packageVolume) || 0), 0);
 
     const updatedResult = {
       ...multiPackageResult,
       packages: updatedPackages,
       totalWeight,
       totalCost,
+      totalVolume,
       rulesApplied: [...multiPackageResult.rulesApplied, 'Manual Package Edit']
-    };
+    } as any;
 
     setMultiPackageResult(updatedResult);
     toast.success('Package updated successfully');
-  }, [multiPackageResult]);
+  }, [multiPackageResult, parameters]);
 
   const removePackage = useCallback((packageIndex: number) => {
     if (!multiPackageResult || multiPackageResult.packages.length <= 1) {
@@ -124,8 +165,9 @@ export const useMultiPackageCartonization = () => {
     const updatedPackages = multiPackageResult.packages.filter((_, index) => index !== packageIndex);
     
     // Recalculate totals
-    const totalWeight = updatedPackages.reduce((sum, pkg) => sum + pkg.packageWeight, 0);
-    const totalCost = updatedPackages.reduce((sum, pkg) => sum + pkg.box.cost, 0);
+    const totalWeight = updatedPackages.reduce((sum, pkg: any) => sum + (Number(pkg.packageWeight) || 0), 0);
+    const totalCost = updatedPackages.reduce((sum, pkg: any) => sum + (Number(pkg.box?.cost) || 0), 0);
+    const totalVolume = updatedPackages.reduce((sum, pkg: any) => sum + (Number(pkg.packageVolume) || 0), 0);
 
     const updatedResult = {
       ...multiPackageResult,
@@ -133,6 +175,7 @@ export const useMultiPackageCartonization = () => {
       totalPackages: updatedPackages.length,
       totalWeight,
       totalCost,
+      totalVolume,
       rulesApplied: [...multiPackageResult.rulesApplied, 'Manual Package Removal']
     };
 
