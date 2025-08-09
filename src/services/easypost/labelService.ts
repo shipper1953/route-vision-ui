@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getOriginalRateAmount } from "@/utils/rateMarkupUtils";
-
+import { RateShoppingService } from "@/services/rateShoppingService";
 export class LabelService {
   private apiKey: string;
   private baseUrl = "https://api.easypost.com/v2";
@@ -120,6 +120,105 @@ export class LabelService {
       this.storeLabelData(data);
       return data;
     }
+  }
+
+  private async purchaseMultipleLabelsViaEdgeFunction(params: {
+    packages: Array<{ length: number; width: number; height: number; weight: number }>;
+    orderId?: string | null;
+    provider?: string;
+    carrier?: string;
+    service?: string;
+    to: any;
+    from: any;
+  }): Promise<{ results: any[]; errors: any[] }> {
+    const { packages, orderId, provider, carrier, service, to, from } = params;
+    const results: any[] = [];
+    const errors: any[] = [];
+    const rateService = new RateShoppingService();
+
+    for (let i = 0; i < packages.length; i++) {
+      const parcel = packages[i];
+
+      // Build shipment data for this parcel
+      const shipmentData: any = {
+        to_address: {
+          name: to?.name || to?.company || '',
+          company: to?.company || undefined,
+          street1: to?.street1 || '',
+          street2: to?.street2 || undefined,
+          city: to?.city || '',
+          state: to?.state || '',
+          zip: to?.zip || '',
+          country: to?.country || 'US',
+          phone: to?.phone || '5555555555',
+          email: to?.email || undefined,
+        },
+        from_address: {
+          name: from?.name || from?.company || '',
+          company: from?.company || undefined,
+          street1: from?.street1 || '',
+          street2: from?.street2 || undefined,
+          city: from?.city || '',
+          state: from?.state || '',
+          zip: from?.zip || '',
+          country: from?.country || 'US',
+          phone: from?.phone || '5555550123',
+          email: from?.email || undefined,
+        },
+        parcel: {
+          length: parcel.length,
+          width: parcel.width,
+          height: parcel.height,
+          weight: parcel.weight,
+        },
+        options: { label_format: 'PDF' },
+      };
+
+      try {
+        // Get rates from both providers for this parcel
+        const combined = await rateService.getRatesFromAllProviders(shipmentData);
+
+        // Pick a rate matching selected provider/carrier/service when possible
+        const desiredProvider = (provider || 'easypost') as 'easypost' | 'shippo';
+        let selectedRate = combined.rates.find(
+          (r) => r.provider === desiredProvider && r.carrier === carrier && r.service === service
+        );
+        if (!selectedRate) {
+          const candidates = combined.rates.filter((r) => r.provider === desiredProvider);
+          selectedRate = candidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0] || combined.rates[0];
+        }
+
+        // Determine shipment id per provider
+        let actualShipmentId: string | undefined;
+        if (desiredProvider === 'shippo') {
+          actualShipmentId = combined.shippo_shipment?.object_id;
+        } else {
+          actualShipmentId = combined.easypost_shipment?.id;
+        }
+
+        if (!selectedRate || !actualShipmentId) {
+          throw new Error('No matching rate or shipment id found for parcel');
+        }
+
+        // Purchase the label using the existing edge function
+        const purchase = await this.purchaseLabelViaEdgeFunction(
+          actualShipmentId,
+          selectedRate.id,
+          orderId,
+          desiredProvider
+        );
+
+        results.push({ index: i, purchase });
+      } catch (err: any) {
+        console.error('Failed to purchase label for parcel', i, err);
+        errors.push({ index: i, error: err?.message || String(err) });
+      }
+
+      // Small delay to avoid provider rate limits
+      await new Promise((res) => setTimeout(res, 250));
+    }
+
+    return { results, errors };
   }
 
   private async purchaseLabelDirectly(shipmentId: string, rateId: string): Promise<any> {

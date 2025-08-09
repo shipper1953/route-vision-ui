@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { linkShipmentToOrder } from "@/services/orderService";
 import { useAuth } from "@/context";
 import { supabase } from "@/integrations/supabase/client";
+import { LabelService } from "@/services/easypost/labelService";
 
 interface ShippingRatesCardFooterProps {
   shipmentResponse: CombinedRateResponse;
@@ -87,15 +88,62 @@ export const ShippingRatesCardFooter = ({
     
     setPurchasing(true);
     try {
-      console.log(`Purchasing label for shipment ${shipmentResponse.id} with rate ${selectedRate.id}`);
-      const result = await onBuyLabel(shipmentResponse.id, selectedRate.id);
-      
-      // Don't show toast here since we'll be showing the dialog
-      // The dialog will be triggered by the parent component
-      
+      // Use multi-parcel flow when more than one parcel
+      const multiParcels = (form as any)?.getValues?.('multiParcels') || [];
+      if (Array.isArray(multiParcels) && multiParcels.length > 1) {
+        const to = {
+          name: form.getValues('toName'),
+          company: form.getValues('toCompany'),
+          street1: form.getValues('toStreet1'),
+          street2: form.getValues('toStreet2'),
+          city: form.getValues('toCity'),
+          state: form.getValues('toState'),
+          zip: form.getValues('toZip'),
+          country: form.getValues('toCountry'),
+          phone: form.getValues('toPhone'),
+          email: form.getValues('toEmail'),
+        };
+        const from = {
+          name: form.getValues('fromName'),
+          company: form.getValues('fromCompany'),
+          street1: form.getValues('fromStreet1'),
+          street2: form.getValues('fromStreet2'),
+          city: form.getValues('fromCity'),
+          state: form.getValues('fromState'),
+          zip: form.getValues('fromZip'),
+          country: form.getValues('fromCountry'),
+          phone: form.getValues('fromPhone'),
+          email: form.getValues('fromEmail'),
+        };
+
+        const labelService = new LabelService('');
+        const provider = (selectedRate as any)?.provider;
+        const carrier = (selectedRate as any)?.carrier;
+        const service = (selectedRate as any)?.service;
+
+        toast.info(`Purchasing ${multiParcels.length} labels...`);
+        const resp = await labelService.purchaseMultipleLabels({
+          packages: multiParcels,
+          orderId,
+          provider,
+          carrier,
+          service,
+          to,
+          from,
+        });
+
+        if (resp.errors?.length) {
+          toast.error(`Purchased ${resp.results.length} labels, ${resp.errors.length} failed`);
+        } else {
+          toast.success(`Purchased ${resp.results.length} labels successfully`);
+        }
+      } else {
+        console.log(`Purchasing label for shipment ${shipmentResponse.id} with rate ${selectedRate.id}`);
+        await onBuyLabel(shipmentResponse.id, selectedRate.id);
+      }
     } catch (error) {
-      console.error("Error purchasing label:", error);
-      toast.error("Failed to purchase shipping label");
+      console.error("Error purchasing label(s):", error);
+      toast.error("Failed to purchase shipping label(s)");
     } finally {
       setPurchasing(false);
     }
