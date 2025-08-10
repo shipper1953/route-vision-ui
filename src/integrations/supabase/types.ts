@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_events: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       boxes: {
         Row: {
           box_type: Database["public"]["Enums"]["box_type"]
@@ -114,6 +141,45 @@ export type Database = {
           name?: string
           phone?: string | null
           settings?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_shipping_prefs: {
+        Row: {
+          carrier_whitelist: string[] | null
+          company_id: string
+          created_at: string
+          delivery_confidence: number
+          id: string
+          max_transit_days: number | null
+          optimize_objective: string
+          service_blacklist: string[] | null
+          sla_preference: string
+          updated_at: string
+        }
+        Insert: {
+          carrier_whitelist?: string[] | null
+          company_id: string
+          created_at?: string
+          delivery_confidence?: number
+          id?: string
+          max_transit_days?: number | null
+          optimize_objective?: string
+          service_blacklist?: string[] | null
+          sla_preference?: string
+          updated_at?: string
+        }
+        Update: {
+          carrier_whitelist?: string[] | null
+          company_id?: string
+          created_at?: string
+          delivery_confidence?: number
+          id?: string
+          max_transit_days?: number | null
+          optimize_objective?: string
+          service_blacklist?: string[] | null
+          sla_preference?: string
           updated_at?: string
         }
         Relationships: []
@@ -374,6 +440,39 @@ export type Database = {
         }
         Relationships: []
       }
+      service_mappings: {
+        Row: {
+          carrier: string
+          created_at: string
+          id: string
+          normalized_service: string
+          provider: string
+          service_code: string
+          speed_rank: number
+          updated_at: string
+        }
+        Insert: {
+          carrier: string
+          created_at?: string
+          id?: string
+          normalized_service: string
+          provider: string
+          service_code: string
+          speed_rank: number
+          updated_at?: string
+        }
+        Update: {
+          carrier?: string
+          created_at?: string
+          id?: string
+          normalized_service?: string
+          provider?: string
+          service_code?: string
+          speed_rank?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shipments: {
         Row: {
           actual_delivery_date: string | null
@@ -501,6 +600,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      shipping_rules: {
+        Row: {
+          actions: Json
+          company_id: string
+          conditions: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          actions?: Json
+          company_id: string
+          conditions?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          actions?: Json
+          company_id?: string
+          conditions?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       transactions: {
         Row: {
