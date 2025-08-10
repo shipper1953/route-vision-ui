@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const CompanyAdminPanel = () => {
   const { isAuthenticated, isCompanyAdmin, userProfile, loading } = useAuth();
@@ -21,6 +22,48 @@ const CompanyAdminPanel = () => {
       navigate('/login');
     }
   }, [isAuthenticated, isCompanyAdmin, loading, navigate]);
+
+  // Confirm Stripe session on return and clean URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('success');
+    const sessionId = params.get('session_id');
+    const canceled = params.get('canceled');
+
+    const cleanUrl = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('success');
+      url.searchParams.delete('session_id');
+      url.searchParams.delete('canceled');
+      window.history.replaceState({}, '', url.toString());
+    };
+
+    if (canceled) {
+      cleanUrl();
+      return;
+    }
+
+    if (success === 'true' && sessionId && userProfile?.company_id) {
+      (async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('confirm-stripe-session', {
+            body: { sessionId, companyId: userProfile.company_id },
+          });
+          if (error) throw error;
+          if (data?.credited) {
+            toast.success(`Wallet credited: $${data.amount}`);
+          } else if (data?.alreadyRecorded) {
+            toast.info('Payment already recorded.');
+          }
+        } catch (e) {
+          console.error('Payment confirmation failed', e);
+          toast.error('Payment confirmation failed');
+        } finally {
+          cleanUrl();
+        }
+      })();
+    }
+  }, [userProfile?.company_id]);
 
   // Fetch company orders
   const { data: companyOrders = [] } = useQuery({

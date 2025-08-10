@@ -93,3 +93,6 @@ verify_jwt = false
 
 [functions.shippo-webhook]
 verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
