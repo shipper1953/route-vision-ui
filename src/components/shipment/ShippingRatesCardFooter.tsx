@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -12,7 +11,7 @@ import { linkShipmentToOrder } from "@/services/orderService";
 import { useAuth } from "@/context";
 import { supabase } from "@/integrations/supabase/client";
 import { LabelService } from "@/services/easypost/labelService";
-
+import { BulkShippingLabelDialog } from "@/components/cartonization/BulkShippingLabelDialog";
 interface ShippingRatesCardFooterProps {
   shipmentResponse: CombinedRateResponse;
   selectedRate: SmartRate | Rate | null;
@@ -29,6 +28,8 @@ export const ShippingRatesCardFooter = ({
   const [purchasing, setPurchasing] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [hasSufficientFunds, setHasSufficientFunds] = useState(true);
+  const [showMultiLabelsDialog, setShowMultiLabelsDialog] = useState(false);
+  const [shipmentLabels, setShipmentLabels] = useState<Array<{ orderId: string; labelUrl: string; trackingNumber: string; carrier: string; service: string }>>([]);
   const form = useFormContext<ShipmentForm>();
   const { userProfile } = useAuth();
   
@@ -255,16 +256,29 @@ export const ShippingRatesCardFooter = ({
         } else {
           toast.success(`Purchased ${resp.results.length} labels successfully`);
         }
+
+        // Prepare and show dialog with label downloads
+        const labels = (resp.results || []).map((r: any) => {
+          const p = r.purchase || r;
+          const labelUrl = p?.postage_label?.label_url || p?.label_url;
+          const carrier = p?.selected_rate?.carrier || p?.rate?.carrier || p?.carrier || 'Unknown';
+          const service = p?.selected_rate?.service || p?.rate?.service || p?.service || 'Unknown';
+          const trackingNumber = p?.tracking_code || p?.tracking_number || 'N/A';
+          return {
+            orderId: orderId || '',
+            labelUrl,
+            trackingNumber,
+            carrier,
+            service,
+          };
+        }).filter((x: any) => !!x.labelUrl);
+        if (labels.length) {
+          setShipmentLabels(labels);
+          setShowMultiLabelsDialog(true);
+        }
       } else {
         console.log(`Purchasing label for shipment ${shipmentResponse.id} with rate ${selectedRate.id}`);
-        const labelService = new LabelService('');
-        const provider = (selectedRate as any)?.provider;
-        await labelService.purchaseLabel(
-          shipmentResponse.id,
-          (selectedRate as any).id,
-          orderId,
-          provider
-        );
+        await onBuyLabel(shipmentResponse.id, (selectedRate as any).id);
       }
       } catch (error: any) {
         console.error("Error purchasing label(s):", error);
@@ -286,40 +300,48 @@ export const ShippingRatesCardFooter = ({
   const estimatedTotalAmount = selectedRate ? selectedRateAmount * (multiParcelsCount > 1 ? multiParcelsCount : 1) : 0;
 
   return (
-    <div className="mt-6 pt-4 border-t">
-      {showInsufficientFundsWarning && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
-          <AlertTriangle className="w-4 h-4" />
-          <span className="text-sm">
-            Insufficient funds. You need ${selectedRateAmount.toFixed(2)} but only have ${walletBalance.toFixed(2)} in your wallet.
-          </span>
+    <>
+      <div className="mt-6 pt-4 border-t">
+        {showInsufficientFundsWarning && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+            <AlertTriangle className="w-4 h-4" />
+            <span className="text-sm">
+              Insufficient funds. You need ${selectedRateAmount.toFixed(2)} but only have ${walletBalance.toFixed(2)} in your wallet.
+            </span>
+          </div>
+        )}
+        
+        <div className="flex justify-between items-center">
+          <Button variant="ghost" onClick={onBack} className="gap-1">
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+          <Button 
+            onClick={handlePurchaseLabel}
+            disabled={!selectedRate || purchasing || !hasSufficientFunds} 
+            className={purchasing ? "bg-transparent hover:bg-transparent border-transparent" : "bg-tms-blue hover:bg-tms-blue-400 gap-1"}
+          >
+            {purchasing ? (
+              <LoadingSpinner size={100} className="[&>span]:hidden [&>div]:bg-transparent tornado-360-spin" />
+            ) : (
+              <>
+                {multiParcelsCount > 1 ? `Buy ${multiParcelsCount} Labels` : 'Buy Shipping Label'}
+                {selectedRate && (
+                  <span className="ml-1">
+                    {multiParcelsCount > 1 ? `~$${estimatedTotalAmount.toFixed(2)}` : `$${selectedRateAmount.toFixed(2)}`}
+                  </span>
+                )}
+              </>
+            )}
+          </Button>
         </div>
-      )}
-      
-      <div className="flex justify-between items-center">
-        <Button variant="ghost" onClick={onBack} className="gap-1">
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </Button>
-        <Button 
-          onClick={handlePurchaseLabel}
-          disabled={!selectedRate || purchasing || !hasSufficientFunds} 
-          className={purchasing ? "bg-transparent hover:bg-transparent border-transparent" : "bg-tms-blue hover:bg-tms-blue-400 gap-1"}
-        >
-          {purchasing ? (
-            <LoadingSpinner size={100} className="[&>span]:hidden [&>div]:bg-transparent tornado-360-spin" />
-          ) : (
-            <>
-              {multiParcelsCount > 1 ? `Buy ${multiParcelsCount} Labels` : 'Buy Shipping Label'}
-              {selectedRate && (
-                <span className="ml-1">
-                  {multiParcelsCount > 1 ? `~$${estimatedTotalAmount.toFixed(2)}` : `$${selectedRateAmount.toFixed(2)}`}
-                </span>
-              )}
-            </>
-          )}
-        </Button>
       </div>
-    </div>
+
+      <BulkShippingLabelDialog
+        isOpen={showMultiLabelsDialog}
+        onClose={() => setShowMultiLabelsDialog(false)}
+        shipmentLabels={shipmentLabels}
+      />
+    </>
   );
 };
