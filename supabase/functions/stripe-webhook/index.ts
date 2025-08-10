@@ -53,10 +53,26 @@ serve(async (req) => {
 
         if (walletError && walletError.code === 'PGRST116') {
           // Create wallet if it doesn't exist
+          // Find a user to own this wallet (first user in the company)
+          const { data: users, error: usersError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('company_id', companyId)
+            .limit(1);
+
+          if (usersError) {
+            throw usersError;
+          }
+          const ownerId = users && users.length > 0 ? users[0].id : null;
+          if (!ownerId) {
+            throw new Error('No user found for company to own wallet');
+          }
+
           const { data: newWallet, error: createError } = await supabase
             .from('wallets')
             .insert({
               company_id: companyId,
+              user_id: ownerId,
               balance: amount,
               currency: 'USD'
             })

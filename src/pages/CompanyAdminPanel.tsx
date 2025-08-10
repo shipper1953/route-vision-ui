@@ -30,6 +30,8 @@ const CompanyAdminPanel = () => {
     const sessionId = params.get('session_id');
     const canceled = params.get('canceled');
 
+    console.log('[CompanyAdminPanel] URL params', { success, sessionId, canceled });
+
     const cleanUrl = () => {
       const url = new URL(window.location.href);
       url.searchParams.delete('success');
@@ -43,9 +45,11 @@ const CompanyAdminPanel = () => {
       return;
     }
 
-    if (success === 'true' && sessionId && userProfile?.company_id) {
+    // Proceed if we have a sessionId (some Stripe redirects may omit custom params)
+    if (sessionId && userProfile?.company_id) {
       (async () => {
         try {
+          console.log('[CompanyAdminPanel] Confirming Stripe session', sessionId);
           const { data, error } = await supabase.functions.invoke('confirm-stripe-session', {
             body: { sessionId, companyId: userProfile.company_id },
           });
@@ -54,6 +58,8 @@ const CompanyAdminPanel = () => {
             toast.success(`Wallet credited: $${data.amount}`);
           } else if (data?.alreadyRecorded) {
             toast.info('Payment already recorded.');
+          } else {
+            toast.message('Payment processed.');
           }
         } catch (e) {
           console.error('Payment confirmation failed', e);
