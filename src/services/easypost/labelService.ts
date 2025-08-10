@@ -255,31 +255,57 @@ export class LabelService {
         options: { label_format: 'PDF' },
       };
 
-      try {
-        // Get rates from both providers for this parcel
-        const combined = await rateService.getRatesFromAllProviders(shipmentData);
+        try {
+          // Get rates from both providers for this parcel
+          const combined = await rateService.getRatesFromAllProviders(shipmentData);
 
-        // Pick a rate matching selected provider/carrier/service when possible
-        const desiredProvider = (provider || undefined) as 'easypost' | 'shippo' | undefined;
-        let selectedRate = desiredProvider
-          ? combined.rates.find((r) => r.provider === desiredProvider && r.carrier === carrier && r.service === service)
-          : undefined;
+          // Pick a rate matching selected provider/carrier/service when possible
+          const desiredProvider = (provider || undefined) as 'easypost' | 'shippo' | undefined;
+          let selectedRate = desiredProvider
+            ? combined.rates.find((r) => r.provider === desiredProvider && r.carrier === carrier && r.service === service)
+            : undefined;
 
-        if (!selectedRate && desiredProvider) {
-          const candidates = combined.rates.filter((r) => r.provider === desiredProvider);
-          if (candidates.length > 0) {
-            selectedRate = candidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+          if (!selectedRate && desiredProvider) {
+            const candidates = combined.rates.filter((r) => r.provider === desiredProvider);
+            if (candidates.length > 0) {
+              selectedRate = candidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+            }
           }
-        }
 
-        if (!selectedRate && combined.rates.length > 0) {
-          // Fallback to absolute cheapest across all providers
-          selectedRate = combined.rates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
-        }
+          if (!selectedRate && combined.rates.length > 0) {
+            // Fallback to absolute cheapest across all providers
+            selectedRate = combined.rates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+          }
 
-        if (!selectedRate) {
-          throw new Error('No rates available for this parcel');
-        }
+          // Last-chance retry with slightly adjusted dimensions if still no rates
+          if (!selectedRate && (!combined.rates || combined.rates.length === 0)) {
+            const adjusted = {
+              ...shipmentData,
+              parcel: {
+                length: Math.max(1, Math.floor((shipmentData.parcel.length || 1) - 0.1)),
+                width: Math.max(1, Math.floor((shipmentData.parcel.width || 1) - 0.1)),
+                height: Math.max(1, Math.floor((shipmentData.parcel.height || 1) - 0.1)),
+                weight: Math.max(1, Math.ceil(shipmentData.parcel.weight || 1)),
+              }
+            };
+            console.warn('No rates found, retrying with adjusted parcel:', adjusted.parcel);
+            const retryCombined = await rateService.getRatesFromAllProviders(adjusted as any);
+            if (retryCombined.rates?.length) {
+              const desiredRetry = desiredProvider
+                ? retryCombined.rates.find((r) => r.provider === desiredProvider && r.carrier === carrier && r.service === service)
+                : undefined;
+              selectedRate = desiredRetry || retryCombined.rates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+              // Replace vars to continue flow
+              (shipmentData as any) = adjusted;
+              (combined as any) = retryCombined;
+            }
+          }
+
+          if (!selectedRate) {
+            console.error('No rates for parcel with data:', { parcel: shipmentData.parcel, to, from });
+            throw new Error('No rates available for this parcel');
+          }
+
 
         // Determine shipment id based on selected rate's provider
         let actualShipmentId: string | undefined;

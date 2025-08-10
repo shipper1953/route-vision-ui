@@ -96,6 +96,22 @@ export const ShippingRatesCardFooter = ({
       console.log('Multi-parcel purchase check: parcels found =', Array.isArray(multiParcels) ? multiParcels.length : 0);
       if (Array.isArray(multiParcels) && multiParcels.length > 1) {
         const gv = (k: any) => (form?.getValues ? (form as any).getValues(k) : '');
+        const fallbackParcel = {
+          length: Number(gv('length')) || 6,
+          width: Number(gv('width')) || 4,
+          height: Number(gv('height')) || 2,
+          weight: Number(gv('weight')) || 16,
+        };
+        const sanitizedParcels = multiParcels.map((p: any, idx: number) => {
+          const sp = {
+            length: Math.max(1, Number(p?.length ?? fallbackParcel.length) || fallbackParcel.length),
+            width: Math.max(1, Number(p?.width ?? fallbackParcel.width) || fallbackParcel.width),
+            height: Math.max(1, Number(p?.height ?? fallbackParcel.height) || fallbackParcel.height),
+            weight: Math.max(1, Number(p?.weight ?? fallbackParcel.weight) || fallbackParcel.weight),
+          };
+          console.log(`Parcel[${idx}] sanitized:`, sp);
+          return sp;
+        });
         const to = {
           name: gv('toName'),
           company: gv('toCompany'),
@@ -130,7 +146,7 @@ export const ShippingRatesCardFooter = ({
         let estimateTotal = 0;
         try {
           const estimate = await labelService.estimateMultipleLabelsCost({
-            packages: multiParcels,
+            packages: sanitizedParcels,
             provider,
             carrier,
             service,
@@ -138,21 +154,21 @@ export const ShippingRatesCardFooter = ({
             from,
           });
           // If estimation covered fewer parcels, fall back to selected rate * count
-          const fallbackTotal = selectedRateAmount * multiParcels.length;
+          const fallbackTotal = selectedRateAmount * sanitizedParcels.length;
           estimateTotal = Math.max(estimate.total, fallbackTotal);
         } catch (estErr: any) {
           console.warn('Estimation failed, falling back to simple multiplier:', estErr?.message || estErr);
-          estimateTotal = selectedRateAmount * multiParcels.length;
+          estimateTotal = selectedRateAmount * sanitizedParcels.length;
         }
 
         if (walletBalance < estimateTotal) {
-          toast.error(`Insufficient funds. Need $${estimateTotal.toFixed(2)} for ${multiParcels.length} labels, wallet has $${walletBalance.toFixed(2)}.`);
+          toast.error(`Insufficient funds. Need $${estimateTotal.toFixed(2)} for ${sanitizedParcels.length} labels, wallet has $${walletBalance.toFixed(2)}.`);
           return;
         }
 
-        toast.info(`Purchasing ${multiParcels.length} labels...`);
+        toast.info(`Purchasing ${sanitizedParcels.length} labels...`);
         const resp = await labelService.purchaseMultipleLabels({
-          packages: multiParcels,
+          packages: sanitizedParcels,
           orderId,
           provider,
           carrier,
