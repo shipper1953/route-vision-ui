@@ -142,6 +142,16 @@ const CreateShipment = () => {
             onBuyLabel={async (shipmentId, rateId) => {
               const result = await purchaseLabel(shipmentId, rateId);
               if (result) {
+                // Client-side fallback: mark order shipped and link shipment if provided
+                try {
+                  if (orderId && !isNaN(Number(orderId))) {
+                    const update: any = { status: 'shipped' };
+                    if ((result as any).shipment_id) update.shipment_id = (result as any).shipment_id;
+                    await supabase.from('orders').update(update).eq('id', Number(orderId));
+                  }
+                } catch (e) {
+                  console.warn('Failed to update order after purchase (client fallback):', e);
+                }
                 await handleLabelPurchased(result);
               }
               return result;

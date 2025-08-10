@@ -275,6 +275,13 @@ export const ShippingRatesCardFooter = ({
           };
         }).filter((x: any) => !!x.labelUrl);
         if (labels.length) {
+          try {
+            if (orderId && !isNaN(Number(orderId))) {
+              await supabase.from('orders').update({ status: 'shipped' }).eq('id', Number(orderId));
+            }
+          } catch (e) {
+            console.warn('Failed to mark order shipped on client fallback:', e);
+          }
           setShipmentLabels(labels);
           setShowMultiLabelsDialog(true);
         }
