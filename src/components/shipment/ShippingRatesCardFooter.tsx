@@ -95,29 +95,30 @@ export const ShippingRatesCardFooter = ({
       const multiParcels = (form as any)?.getValues?.('multiParcels') || storedParcels;
       console.log('Multi-parcel purchase check: parcels found =', Array.isArray(multiParcels) ? multiParcels.length : 0);
       if (Array.isArray(multiParcels) && multiParcels.length > 1) {
+        const gv = (k: any) => (form?.getValues ? (form as any).getValues(k) : '');
         const to = {
-          name: form.getValues('toName'),
-          company: form.getValues('toCompany'),
-          street1: form.getValues('toStreet1'),
-          street2: form.getValues('toStreet2'),
-          city: form.getValues('toCity'),
-          state: form.getValues('toState'),
-          zip: form.getValues('toZip'),
-          country: form.getValues('toCountry'),
-          phone: form.getValues('toPhone'),
-          email: form.getValues('toEmail'),
+          name: gv('toName'),
+          company: gv('toCompany'),
+          street1: gv('toStreet1'),
+          street2: gv('toStreet2'),
+          city: gv('toCity'),
+          state: gv('toState'),
+          zip: gv('toZip'),
+          country: gv('toCountry'),
+          phone: gv('toPhone'),
+          email: gv('toEmail'),
         };
         const from = {
-          name: form.getValues('fromName'),
-          company: form.getValues('fromCompany'),
-          street1: form.getValues('fromStreet1'),
-          street2: form.getValues('fromStreet2'),
-          city: form.getValues('fromCity'),
-          state: form.getValues('fromState'),
-          zip: form.getValues('fromZip'),
-          country: form.getValues('fromCountry'),
-          phone: form.getValues('fromPhone'),
-          email: form.getValues('fromEmail'),
+          name: gv('fromName'),
+          company: gv('fromCompany'),
+          street1: gv('fromStreet1'),
+          street2: gv('fromStreet2'),
+          city: gv('fromCity'),
+          state: gv('fromState'),
+          zip: gv('fromZip'),
+          country: gv('fromCountry'),
+          phone: gv('fromPhone'),
+          email: gv('fromEmail'),
         };
 
         const labelService = new LabelService('');
