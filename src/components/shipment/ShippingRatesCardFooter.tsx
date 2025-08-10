@@ -125,6 +125,21 @@ export const ShippingRatesCardFooter = ({
         const carrier = (selectedRate as any)?.carrier;
         const service = (selectedRate as any)?.service;
 
+        // Preflight: estimate total cost to ensure sufficient wallet funds for all parcels
+        const estimate = await labelService.estimateMultipleLabelsCost({
+          packages: multiParcels,
+          provider,
+          carrier,
+          service,
+          to,
+          from,
+        });
+
+        if (walletBalance < estimate.total) {
+          toast.error(`Insufficient funds. Need $${estimate.total.toFixed(2)} for ${multiParcels.length} labels, wallet has $${walletBalance.toFixed(2)}.`);
+          return;
+        }
+
         toast.info(`Purchasing ${multiParcels.length} labels...`);
         const resp = await labelService.purchaseMultipleLabels({
           packages: multiParcels,
@@ -156,6 +171,13 @@ export const ShippingRatesCardFooter = ({
   const selectedRateAmount = selectedRate ? parseFloat(selectedRate.rate) : 0;
   const showInsufficientFundsWarning = selectedRate && !hasSufficientFunds;
 
+  // Display: if multi-parcel, show estimated total (rate x count)
+  const storedParcelsForDisplay = (() => {
+    try { return JSON.parse(localStorage.getItem('multiParcels') || '[]'); } catch { return []; }
+  })();
+  const multiParcelsCount = (form as any)?.getValues?.('multiParcels')?.length || storedParcelsForDisplay.length || 0;
+  const estimatedTotalAmount = selectedRate ? selectedRateAmount * (multiParcelsCount > 1 ? multiParcelsCount : 1) : 0;
+
   return (
     <div className="mt-6 pt-4 border-t">
       {showInsufficientFundsWarning && (
@@ -181,9 +203,12 @@ export const ShippingRatesCardFooter = ({
             <LoadingSpinner size={100} className="[&>span]:hidden [&>div]:bg-transparent tornado-360-spin" />
           ) : (
             <>
-              <Package className="w-4 h-4" />
-              Buy Shipping Label
-              {selectedRate && <span className="ml-1">${parseFloat(selectedRate.rate).toFixed(2)}</span>}
+              {multiParcelsCount > 1 ? `Buy ${multiParcelsCount} Labels` : 'Buy Shipping Label'}
+              {selectedRate && (
+                <span className="ml-1">
+                  {multiParcelsCount > 1 ? `~$${estimatedTotalAmount.toFixed(2)}` : `$${selectedRateAmount.toFixed(2)}`}
+                </span>
+              )}
             </>
           )}
         </Button>

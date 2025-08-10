@@ -39,14 +39,85 @@ export class LabelService {
       if (!this.useEdgeFunctions) {
         throw new Error('Bulk purchasing is only supported via edge functions');
       }
-      return this.purchaseMultipleLabelsViaEdgeFunction(params);
-    } catch (error) {
-      console.error('Error purchasing multiple labels:', error);
-      throw error;
-    }
-  }
-
-  private async purchaseLabelViaEdgeFunction(shipmentId: string, rateId: string, orderId?: string | null, provider?: string): Promise<any> {
+       return this.purchaseMultipleLabelsViaEdgeFunction(params);
+     } catch (error) {
+       console.error('Error purchasing multiple labels:', error);
+       throw error;
+     }
+   }
+ 
+   // Estimate total cost for purchasing multiple labels (no purchase is made)
+   async estimateMultipleLabelsCost(params: {
+     packages: Array<{ length: number; width: number; height: number; weight: number }>;
+     provider?: string;
+     carrier?: string;
+     service?: string;
+     to: any;
+     from: any;
+   }): Promise<{ total: number; perParcel: Array<{ index: number; rate: string; provider: string; carrier: string; service: string }> }> {
+     const { packages, provider, carrier, service, to, from } = params;
+     const rateService = new RateShoppingService();
+     const perParcel: Array<{ index: number; rate: string; provider: string; carrier: string; service: string }> = [];
+     let total = 0;
+ 
+     for (let i = 0; i < packages.length; i++) {
+       const parcel = packages[i];
+       const shipmentData: any = {
+         to_address: {
+           name: to?.name || to?.company || '',
+           company: to?.company || undefined,
+           street1: to?.street1 || '',
+           street2: to?.street2 || undefined,
+           city: to?.city || '',
+           state: to?.state || '',
+           zip: to?.zip || '',
+           country: to?.country || 'US',
+           phone: to?.phone || '5555555555',
+           email: to?.email || undefined,
+         },
+         from_address: {
+           name: from?.name || from?.company || '',
+           company: from?.company || undefined,
+           street1: from?.street1 || '',
+           street2: from?.street2 || undefined,
+           city: from?.city || '',
+           state: from?.state || '',
+           zip: from?.zip || '',
+           country: from?.country || 'US',
+           phone: from?.phone || '5555550123',
+           email: from?.email || undefined,
+         },
+         parcel: {
+           length: parcel.length,
+           width: parcel.width,
+           height: parcel.height,
+           weight: parcel.weight,
+         },
+       };
+ 
+       const combined = await rateService.getRatesFromAllProviders(shipmentData);
+       const desiredProvider = (provider || 'easypost') as 'easypost' | 'shippo';
+       let selectedRate = combined.rates.find(
+         (r) => r.provider === desiredProvider && r.carrier === carrier && r.service === service
+       );
+       if (!selectedRate) {
+         const candidates = combined.rates.filter((r) => r.provider === desiredProvider);
+         selectedRate = candidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0] || combined.rates[0];
+       }
+ 
+       if (!selectedRate) {
+         throw new Error('No rate found during cost estimation');
+       }
+ 
+       const amt = parseFloat(selectedRate.rate);
+       total += isNaN(amt) ? 0 : amt;
+       perParcel.push({ index: i, rate: selectedRate.rate, provider: selectedRate.provider, carrier: selectedRate.carrier, service: selectedRate.service });
+     }
+ 
+     return { total, perParcel };
+   }
+ 
+   private async purchaseLabelViaEdgeFunction(shipmentId: string, rateId: string, orderId?: string | null, provider?: string): Promise<any> {
     const requestBody: any = { shipmentId, rateId };
     
     // Include orderId if provided
