@@ -13,7 +13,14 @@ export const WarehouseSelectionSection = () => {
 
   useEffect(() => {
     const fetchWarehouses = async () => {
-      if (!userProfile?.company_id) return;
+      setLoading(true);
+
+      if (!userProfile?.company_id) {
+        // No company assigned (e.g., super admin without company) — avoid infinite loading
+        setWarehouses([]);
+        setLoading(false);
+        return;
+      }
       
       try {
         const { data, error } = await supabase
