@@ -159,12 +159,20 @@ export const ShippingRatesCardFooter = ({
         }
       } else {
         console.log(`Purchasing label for shipment ${shipmentResponse.id} with rate ${selectedRate.id}`);
-        await onBuyLabel(shipmentResponse.id, selectedRate.id);
+        const labelService = new LabelService('');
+        const provider = (selectedRate as any)?.provider;
+        await labelService.purchaseLabel(
+          shipmentResponse.id,
+          (selectedRate as any).id,
+          orderId,
+          provider
+        );
       }
-    } catch (error) {
-      console.error("Error purchasing label(s):", error);
-      toast.error("Failed to purchase shipping label(s)");
-    } finally {
+      } catch (error: any) {
+        console.error("Error purchasing label(s):", error);
+        const msg = error?.message || (typeof error === 'string' ? error : 'Failed to purchase shipping label(s)');
+        toast.error(msg);
+      } finally {
       setPurchasing(false);
     }
   };

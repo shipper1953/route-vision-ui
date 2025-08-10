@@ -202,21 +202,43 @@ serve(async (req) => {
     // Create Supabase client with service role for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
     
-    // For now, we'll extract user ID from request body or use a default
-    // This is a temporary workaround until auth is properly configured
-    const defaultUserId = "00be6af7-a275-49fe-842f-1bd402bf113b" // Your user ID
-    console.log('✅ Using default user ID for testing:', defaultUserId)
+    // Determine company_id for wallet processing. Prefer order.company_id when orderId is provided.
+    let companyIdForWallet: string | null = null;
+    const defaultUserId = "00be6af7-a275-49fe-842f-1bd402bf113b" // TODO: replace when auth is wired in
 
-    // Get user's company for wallet processing
-    const { data: userProfile, error: userError } = await supabase
-      .from('users')
-      .select('company_id')
-      .eq('id', defaultUserId)
-      .single();
+    if (orderId) {
+      const numericOrderId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
+      console.log('🔎 Looking up order company_id for order:', numericOrderId);
+      const { data: orderRow, error: orderErr } = await supabase
+        .from('orders')
+        .select('company_id')
+        .eq('id', numericOrderId)
+        .maybeSingle();
+      if (orderErr) {
+        console.error('❌ Failed to fetch order for company_id:', orderErr);
+      } else if (orderRow?.company_id) {
+        companyIdForWallet = orderRow.company_id;
+        console.log('✅ Using company_id from order:', companyIdForWallet);
+      } else {
+        console.warn('⚠️ Order found but company_id missing');
+      }
+    }
 
-    if (userError || !userProfile?.company_id) {
-      console.error('❌ Could not get user company_id:', userError);
-      return createErrorResponse('User profile not found or not assigned to a company', null, 400);
+    // Fallback to default user profile company if order lookup failed
+    if (!companyIdForWallet) {
+      console.log('ℹ️ Falling back to default user company for wallet processing');
+      const { data: userProfile, error: userError } = await supabase
+        .from('users')
+        .select('company_id')
+        .eq('id', defaultUserId)
+        .maybeSingle();
+
+      if (userError || !userProfile?.company_id) {
+        console.error('❌ Could not resolve company_id for wallet processing:', userError);
+        return createErrorResponse('User profile not found or not assigned to a company', null, 400);
+      }
+      companyIdForWallet = userProfile.company_id;
+      console.log('✅ Using fallback company_id:', companyIdForWallet);
     }
 
     // Process wallet payment
@@ -228,8 +250,8 @@ serve(async (req) => {
       ? purchaseResponse.object_id 
       : purchaseResponse.id;
 
-    console.log('💰 Processing wallet payment...')
-    await processWalletPayment(userProfile.company_id, labelCost, defaultUserId, purchaseResponseId);
+    console.log('💰 Processing wallet payment for company:', companyIdForWallet)
+    await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId);
     console.log('✅ Wallet payment processed successfully')
     
     // Save shipment to database
