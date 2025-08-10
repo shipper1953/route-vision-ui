@@ -33,8 +33,10 @@ export const ShippingRatesCardFooter = ({
   const form = useFormContext<ShipmentForm>();
   const { userProfile } = useAuth();
   
-  // Safely get orderID from form context if available
-  const orderId = form?.getValues ? form.getValues("orderId") : undefined;
+  // Safely get orderID from form context or URL fallback
+  const formOrderId = form?.getValues ? form.getValues("orderId") : undefined;
+  const urlOrderId = (() => { try { return new URLSearchParams(window.location.search).get('orderId'); } catch { return null; } })();
+  const orderId = formOrderId || urlOrderId || undefined;
 
   // Fetch wallet balance when component mounts or user changes
   useEffect(() => {

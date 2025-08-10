@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
@@ -13,7 +12,8 @@ import { fetchOrders, OrderData } from "@/services/orderService";
 import { OrdersHeader } from "@/components/order/OrdersHeader";
 import { OrdersSearch } from "@/components/order/OrdersSearch";
 import { OrdersTable } from "@/components/order/OrdersTable";
-
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 const Orders = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [orders, setOrders] = useState<OrderData[]>([]);
@@ -36,7 +36,27 @@ const Orders = () => {
     };
     
     loadOrders();
-    
+
+    // Realtime updates for order status/linking
+    const channel = supabase
+      .channel('public:orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
+        console.log('Realtime order update:', payload);
+        try {
+          const orderData = await fetchOrders();
+          setOrders(orderData);
+          if (payload.eventType === 'UPDATE' && payload.new?.status === 'shipped') {
+            toast.success(`Order ${payload.new.id} marked as shipped`);
+          }
+        } catch (e) {
+          console.warn('Failed to refresh orders on realtime update:', e);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
     // Only depend on the specific highlight parameter value, not the entire searchParams object
   }, [highlightedOrderId]);
   
