@@ -112,31 +112,69 @@ export const ShippingRatesCardFooter = ({
           console.log(`Parcel[${idx}] sanitized:`, sp);
           return sp;
         });
-        const to = {
-          name: gv('toName'),
-          company: gv('toCompany'),
-          street1: gv('toStreet1'),
-          street2: gv('toStreet2'),
-          city: gv('toCity'),
-          state: gv('toState'),
-          zip: gv('toZip'),
-          country: gv('toCountry'),
-          phone: gv('toPhone'),
-          email: gv('toEmail'),
+        // Build TO/FROM with robust fallbacks (warehouse default if needed)
+        const initialTo = {
+          name: gv('toName') || gv('toCompany') || 'Recipient',
+          company: gv('toCompany') || undefined,
+          street1: gv('toStreet1') || '',
+          street2: gv('toStreet2') || undefined,
+          city: gv('toCity') || '',
+          state: gv('toState') || '',
+          zip: gv('toZip') || '',
+          country: gv('toCountry') || 'US',
+          phone: gv('toPhone') || '5555555555',
+          email: gv('toEmail') || undefined,
         };
-        const from = {
-          name: gv('fromName'),
-          company: gv('fromCompany'),
-          street1: gv('fromStreet1'),
-          street2: gv('fromStreet2'),
-          city: gv('fromCity'),
-          state: gv('fromState'),
-          zip: gv('fromZip'),
-          country: gv('fromCountry'),
-          phone: gv('fromPhone'),
-          email: gv('fromEmail'),
-        };
-
+        let from = {
+          name: gv('fromName') || gv('fromCompany') || 'Warehouse',
+          company: gv('fromCompany') || undefined,
+          street1: gv('fromStreet1') || '',
+          street2: gv('fromStreet2') || undefined,
+          city: gv('fromCity') || '',
+          state: gv('fromState') || '',
+          zip: gv('fromZip') || '',
+          country: gv('fromCountry') || 'US',
+          phone: gv('fromPhone') || '5555555555',
+          email: gv('fromEmail') || undefined,
+        } as any;
+        const missingFromCore = !from.street1 || !from.city || !from.state || !from.zip;
+        if (missingFromCore && userProfile?.company_id) {
+          try {
+            const { data: wh } = await supabase
+              .from('warehouses')
+              .select('address')
+              .eq('company_id', userProfile.company_id)
+              .order('is_default', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (wh?.address) {
+              const a = wh.address as any;
+              from = {
+                name: from.name,
+                company: from.company,
+                street1: a.street1 || a.address1 || '123 Demo St',
+                street2: a.street2 || undefined,
+                city: a.city || 'Boulder',
+                state: a.state || 'CO',
+                zip: a.zip || a.postal_code || '80301',
+                country: a.country || 'US',
+                phone: from.phone || '5555555555',
+                email: from.email,
+              };
+            }
+          } catch (e) {
+            console.warn('Fallback to default warehouse address failed:', e);
+          }
+          // As ultimate fallback, ensure minimally valid origin
+          if (!from.street1) {
+            from.street1 = '123 Demo St';
+            from.city = from.city || 'Boulder';
+            from.state = from.state || 'CO';
+            from.zip = from.zip || '80301';
+            from.country = from.country || 'US';
+          }
+        }
+        const to = initialTo;
         const labelService = new LabelService('');
         const provider = (selectedRate as any)?.provider;
         const carrier = (selectedRate as any)?.carrier;
