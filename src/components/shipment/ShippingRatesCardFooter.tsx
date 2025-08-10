@@ -162,7 +162,9 @@ export const ShippingRatesCardFooter = ({
         });
 
         if (resp.errors?.length) {
-          toast.error(`Purchased ${resp.results.length} labels, ${resp.errors.length} failed`);
+          console.error('Multi-parcel purchase errors:', resp.errors);
+          const first = resp.errors[0]?.error || 'Unknown error';
+          toast.error(`Purchased ${resp.results.length} labels, ${resp.errors.length} failed. First error: ${first}`);
         } else {
           toast.success(`Purchased ${resp.results.length} labels successfully`);
         }

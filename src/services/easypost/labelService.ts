@@ -310,13 +310,49 @@ export class LabelService {
           throw new Error('No shipment id available for selected provider');
         }
 
-        // Purchase the label using the existing edge function
-        const purchase = await this.purchaseLabelViaEdgeFunction(
-          actualShipmentId,
-          selectedRate.id,
-          orderId,
-          selectedRate.provider
-        );
+        // Attempt purchase, with provider fallback if it fails
+        let purchase: any | null = null;
+        try {
+          console.log(`Attempting purchase for parcel ${i}: provider=${selectedRate.provider}, rateId=${selectedRate.id}, shipmentId=${actualShipmentId}`);
+          purchase = await this.purchaseLabelViaEdgeFunction(
+            actualShipmentId,
+            selectedRate.id,
+            orderId,
+            selectedRate.provider
+          );
+        } catch (primaryErr: any) {
+          console.warn(`Primary purchase failed for parcel ${i}:`, primaryErr?.message || primaryErr);
+          // Try alternate provider if available
+          if (selectedRate.provider === 'shippo' && combined.easypost_shipment?.id) {
+            const epCandidates = combined.rates.filter((r) => r.provider === 'easypost');
+            const epRate = epCandidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+            if (epRate) {
+              console.log(`Falling back to EasyPost for parcel ${i}: rateId=${epRate.id}`);
+              purchase = await this.purchaseLabelViaEdgeFunction(
+                combined.easypost_shipment.id,
+                epRate.id,
+                orderId,
+                'easypost'
+              );
+            }
+          } else if (selectedRate.provider === 'easypost' && combined.shippo_shipment?.object_id) {
+            const shCandidates = combined.rates.filter((r) => r.provider === 'shippo');
+            const shRate = shCandidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+            if (shRate) {
+              console.log(`Falling back to Shippo for parcel ${i}: rateId=${shRate.id}`);
+              purchase = await this.purchaseLabelViaEdgeFunction(
+                combined.shippo_shipment.object_id,
+                shRate.id,
+                orderId,
+                'shippo'
+              );
+            }
+          }
+
+          if (!purchase) {
+            throw primaryErr;
+          }
+        }
 
         results.push({ index: i, purchase });
       } catch (err: any) {
