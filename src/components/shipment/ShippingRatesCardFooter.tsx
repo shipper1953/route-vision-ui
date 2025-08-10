@@ -124,7 +124,7 @@ export const ShippingRatesCardFooter = ({
           country: gv('toCountry') || 'US',
           phone: gv('toPhone') || '5555555555',
           email: gv('toEmail') || undefined,
-        };
+        } as any;
         let from = {
           name: gv('fromName') || gv('fromCompany') || 'Warehouse',
           company: gv('fromCompany') || undefined,
@@ -137,6 +137,32 @@ export const ShippingRatesCardFooter = ({
           phone: gv('fromPhone') || '5555555555',
           email: gv('fromEmail') || undefined,
         } as any;
+
+        // Fallback TO/FROM from the previously created combined shipment (most reliable)
+        const epTo = (shipmentResponse as any)?.easypost_shipment?.to_address;
+        const epFrom = (shipmentResponse as any)?.easypost_shipment?.from_address;
+        if ((!initialTo.street1 || !initialTo.city || !initialTo.state || !initialTo.zip) && epTo) {
+          initialTo.street1 = initialTo.street1 || epTo.street1;
+          initialTo.street2 = initialTo.street2 || epTo.street2;
+          initialTo.city = initialTo.city || epTo.city;
+          initialTo.state = initialTo.state || epTo.state;
+          initialTo.zip = initialTo.zip || epTo.zip;
+          initialTo.country = initialTo.country || epTo.country || 'US';
+          initialTo.phone = initialTo.phone || epTo.phone || '5555555555';
+          initialTo.email = initialTo.email || epTo.email;
+        }
+        if ((!from.street1 || !from.city || !from.state || !from.zip) && epFrom) {
+          from.street1 = from.street1 || epFrom.street1;
+          from.street2 = from.street2 || epFrom.street2;
+          from.city = from.city || epFrom.city;
+          from.state = from.state || epFrom.state;
+          from.zip = from.zip || epFrom.zip;
+          from.country = from.country || epFrom.country || 'US';
+          from.phone = from.phone || epFrom.phone || '5555555555';
+          from.email = from.email || epFrom.email;
+        }
+
+        // If still missing FROM core, try default warehouse address
         const missingFromCore = !from.street1 || !from.city || !from.state || !from.zip;
         if (missingFromCore && userProfile?.company_id) {
           try {
@@ -175,6 +201,13 @@ export const ShippingRatesCardFooter = ({
           }
         }
         const to = initialTo;
+        // Validate addresses before proceeding
+        const missingToCore = !to.street1 || !to.city || !to.state || !to.zip;
+        if (missingToCore) {
+          toast.error('Recipient address is incomplete. Please fill street, city, state, and zip.');
+          setPurchasing(false);
+          return;
+        }
         const labelService = new LabelService('');
         const provider = (selectedRate as any)?.provider;
         const carrier = (selectedRate as any)?.carrier;
