@@ -41,13 +41,21 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
 
     // Check for successful payment from URL params
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('success') === 'true') {
-      toast.success('Payment successful! Your wallet will be updated shortly.');
-      // Refresh wallet data
-      setTimeout(() => {
+    const sessionId = urlParams.get('session_id');
+    if (urlParams.get('success') === 'true' && sessionId && companyId) {
+      toast.message('Confirming payment...');
+      supabase.functions.invoke('confirm-stripe-session', {
+        body: { sessionId, companyId }
+      }).then(({ data, error }) => {
+        if (error) throw error;
+        toast.success('Payment confirmed! Wallet updated.');
+      }).catch((err) => {
+        console.error('Payment confirmation failed:', err);
+        toast.error('Payment recorded by Stripe, updating balance shortly.');
+      }).finally(() => {
         fetchWallet();
         fetchTransactions();
-      }, 2000);
+      });
     } else if (urlParams.get('canceled') === 'true') {
       toast.error('Payment was canceled.');
     }
