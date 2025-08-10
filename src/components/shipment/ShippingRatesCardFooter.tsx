@@ -127,17 +127,26 @@ export const ShippingRatesCardFooter = ({
         const service = (selectedRate as any)?.service;
 
         // Preflight: estimate total cost to ensure sufficient wallet funds for all parcels
-        const estimate = await labelService.estimateMultipleLabelsCost({
-          packages: multiParcels,
-          provider,
-          carrier,
-          service,
-          to,
-          from,
-        });
+        let estimateTotal = 0;
+        try {
+          const estimate = await labelService.estimateMultipleLabelsCost({
+            packages: multiParcels,
+            provider,
+            carrier,
+            service,
+            to,
+            from,
+          });
+          // If estimation covered fewer parcels, fall back to selected rate * count
+          const fallbackTotal = selectedRateAmount * multiParcels.length;
+          estimateTotal = Math.max(estimate.total, fallbackTotal);
+        } catch (estErr: any) {
+          console.warn('Estimation failed, falling back to simple multiplier:', estErr?.message || estErr);
+          estimateTotal = selectedRateAmount * multiParcels.length;
+        }
 
-        if (walletBalance < estimate.total) {
-          toast.error(`Insufficient funds. Need $${estimate.total.toFixed(2)} for ${multiParcels.length} labels, wallet has $${walletBalance.toFixed(2)}.`);
+        if (walletBalance < estimateTotal) {
+          toast.error(`Insufficient funds. Need $${estimateTotal.toFixed(2)} for ${multiParcels.length} labels, wallet has $${walletBalance.toFixed(2)}.`);
           return;
         }
 

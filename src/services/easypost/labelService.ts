@@ -95,23 +95,33 @@ export class LabelService {
          },
        };
  
-       const combined = await rateService.getRatesFromAllProviders(shipmentData);
-       const desiredProvider = (provider || 'easypost') as 'easypost' | 'shippo';
-       let selectedRate = combined.rates.find(
-         (r) => r.provider === desiredProvider && r.carrier === carrier && r.service === service
-       );
-       if (!selectedRate) {
-         const candidates = combined.rates.filter((r) => r.provider === desiredProvider);
-         selectedRate = candidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0] || combined.rates[0];
-       }
- 
-       if (!selectedRate) {
-         throw new Error('No rate found during cost estimation');
-       }
- 
-       const amt = parseFloat(selectedRate.rate);
-       total += isNaN(amt) ? 0 : amt;
-       perParcel.push({ index: i, rate: selectedRate.rate, provider: selectedRate.provider, carrier: selectedRate.carrier, service: selectedRate.service });
+      const combined = await rateService.getRatesFromAllProviders(shipmentData);
+      const desiredProvider = (provider || 'easypost') as 'easypost' | 'shippo';
+
+      // Choose best available rate with graceful fallback
+      let selectedRate = combined.rates.find(
+        (r) => r.provider === desiredProvider && r.carrier === carrier && r.service === service
+      );
+      if (!selectedRate) {
+        const candidates = combined.rates.filter((r) => r.provider === desiredProvider);
+        if (candidates.length > 0) {
+          selectedRate = candidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+        }
+      }
+      if (!selectedRate && combined.rates.length > 0) {
+        // Fallback to absolute cheapest across all providers
+        selectedRate = combined.rates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+      }
+
+      if (!selectedRate) {
+        console.warn('No rates returned during cost estimation for parcel index', i);
+        // Skip this parcel in estimation rather than throwing
+        continue;
+      }
+
+      const amt = parseFloat(selectedRate.rate);
+      total += isNaN(amt) ? 0 : amt;
+      perParcel.push({ index: i, rate: selectedRate.rate, provider: selectedRate.provider, carrier: selectedRate.carrier, service: selectedRate.service });
      }
  
      return { total, perParcel };
@@ -250,25 +260,54 @@ export class LabelService {
         const combined = await rateService.getRatesFromAllProviders(shipmentData);
 
         // Pick a rate matching selected provider/carrier/service when possible
-        const desiredProvider = (provider || 'easypost') as 'easypost' | 'shippo';
-        let selectedRate = combined.rates.find(
-          (r) => r.provider === desiredProvider && r.carrier === carrier && r.service === service
-        );
-        if (!selectedRate) {
+        const desiredProvider = (provider || undefined) as 'easypost' | 'shippo' | undefined;
+        let selectedRate = desiredProvider
+          ? combined.rates.find((r) => r.provider === desiredProvider && r.carrier === carrier && r.service === service)
+          : undefined;
+
+        if (!selectedRate && desiredProvider) {
           const candidates = combined.rates.filter((r) => r.provider === desiredProvider);
-          selectedRate = candidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0] || combined.rates[0];
+          if (candidates.length > 0) {
+            selectedRate = candidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+          }
         }
 
-        // Determine shipment id per provider
+        if (!selectedRate && combined.rates.length > 0) {
+          // Fallback to absolute cheapest across all providers
+          selectedRate = combined.rates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+        }
+
+        if (!selectedRate) {
+          throw new Error('No rates available for this parcel');
+        }
+
+        // Determine shipment id based on selected rate's provider
         let actualShipmentId: string | undefined;
-        if (desiredProvider === 'shippo') {
+        if (selectedRate.provider === 'shippo') {
           actualShipmentId = combined.shippo_shipment?.object_id;
         } else {
           actualShipmentId = combined.easypost_shipment?.id;
         }
 
-        if (!selectedRate || !actualShipmentId) {
-          throw new Error('No matching rate or shipment id found for parcel');
+        // If shipment id missing for chosen provider, try switching to the other provider
+        if (!actualShipmentId) {
+          if (selectedRate.provider === 'shippo' && combined.easypost_shipment?.id) {
+            const epCandidates = combined.rates.filter((r) => r.provider === 'easypost');
+            if (epCandidates.length > 0) {
+              selectedRate = epCandidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+              actualShipmentId = combined.easypost_shipment.id;
+            }
+          } else if (selectedRate.provider === 'easypost' && combined.shippo_shipment?.object_id) {
+            const shCandidates = combined.rates.filter((r) => r.provider === 'shippo');
+            if (shCandidates.length > 0) {
+              selectedRate = shCandidates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+              actualShipmentId = combined.shippo_shipment.object_id;
+            }
+          }
+        }
+
+        if (!actualShipmentId) {
+          throw new Error('No shipment id available for selected provider');
         }
 
         // Purchase the label using the existing edge function
@@ -276,7 +315,7 @@ export class LabelService {
           actualShipmentId,
           selectedRate.id,
           orderId,
-          desiredProvider
+          selectedRate.provider
         );
 
         results.push({ index: i, purchase });
