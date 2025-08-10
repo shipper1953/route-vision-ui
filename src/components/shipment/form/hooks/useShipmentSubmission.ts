@@ -1,4 +1,3 @@
-
 import { useFormContext } from "react-hook-form";
 import { toast } from "sonner";
 import { ShipmentForm } from "@/types/shipment";
@@ -9,7 +8,8 @@ import { buildShipmentData } from "../helpers/shipmentDataBuilder";
 import { findRecommendedRateByDate, findMostEconomicalRate } from "../helpers/rateSelectionHelpers";
 import { useAuth } from "@/context";
 import { supabase } from "@/integrations/supabase/client";
-
+import { recommendRate } from "@/services/shipping/rateSelection";
+import { logEvent } from "@/services/shipping/analytics";
 interface UseShipmentSubmissionProps {
   loading: boolean;
   setLoading: (loading: boolean) => void;
@@ -67,25 +67,45 @@ export const useShipmentSubmission = ({
         return;
       }
       
-      // Find recommended rate based on required delivery date
-      let recommendedRate = null;
-      
-      console.log("Required delivery date from form:", data.requiredDeliveryDate);
-      
-      if (data.requiredDeliveryDate) {
-        console.log("Finding rate for required delivery date:", data.requiredDeliveryDate);
-        recommendedRate = findRecommendedRateByDate(response as any, data.requiredDeliveryDate);
-      } else {
-        console.log("No required delivery date, finding most economical rate");
-        recommendedRate = findMostEconomicalRate(response as any);
-      }
-      
+      // Recommend a rate using company SLA prefs and rules
       const totalRates = response.rates.length + (response.smartRates?.length || 0);
       const easyPostCount = response.rates.filter(r => r.provider === 'easypost').length;
       const shippoCount = response.rates.filter(r => r.provider === 'shippo').length;
-      
+
+      await logEvent('rates_shopped', {
+        response_id: response.id,
+        totalRates,
+        easyPostCount,
+        shippoCount,
+        orderId: data.orderId || null,
+        requiredDeliveryDate: data.requiredDeliveryDate || null,
+      });
+
+      let recommendedRate: any = await recommendRate(response as any, data.requiredDeliveryDate || null);
+
+      // Fallback to existing helpers if no recommendation found
+      if (!recommendedRate) {
+        if (data.requiredDeliveryDate) {
+          recommendedRate = findRecommendedRateByDate(response as any, data.requiredDeliveryDate);
+        } else {
+          recommendedRate = findMostEconomicalRate(response as any);
+        }
+      }
+
+      await logEvent('rate_recommended', {
+        response_id: response.id,
+        rate: recommendedRate ? {
+          id: recommendedRate.id,
+          provider: recommendedRate.provider,
+          carrier: recommendedRate.carrier,
+          service: recommendedRate.service,
+          rate: recommendedRate.rate,
+          delivery_days: recommendedRate.delivery_days ?? null,
+        } : null,
+      });
+
       toast.success(`Found ${totalRates} rates from multiple providers (EasyPost: ${easyPostCount}, Shippo: ${shippoCount})`);
-      onShipmentCreated(response, recommendedRate);
+      onShipmentCreated(response, recommendedRate as any);
     } catch (error) {
       console.error("Error creating shipment:", error);
       

@@ -1,10 +1,9 @@
-
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LabelService } from '@/services/easypost/labelService';
 import { linkShipmentToOrder } from '@/services/orderShipmentLinking';
 import { CombinedRateResponse } from '@/services/rateShoppingService';
-
+import { logEvent } from '@/services/shipping/analytics';
 export const useShipment = (initialOrderId?: string | null) => {
   const [shipmentResponse, setShipmentResponse] = useState<CombinedRateResponse | null>(null);
   const [selectedRate, setSelectedRate] = useState<any>(null);
@@ -55,18 +54,34 @@ export const useShipment = (initialOrderId?: string | null) => {
       const result = await labelService.purchaseLabel(actualShipmentId, rateId, initialOrderId, selectedRate?.provider);
       
       console.log('Label purchase result:', result);
+      await logEvent('label_purchased', {
+        orderId: initialOrderId || null,
+        provider: selectedRate?.provider || null,
+        carrier: selectedRate?.carrier || null,
+        service: selectedRate?.service || null,
+        rateId,
+        shipmentId: actualShipmentId,
+      });
       
       // The edge function now handles all linking internally, so no need for client-side linking
       toast.success('Shipping label purchased successfully!');
       
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error purchasing label:', error);
+      await logEvent('label_failed', {
+        orderId: initialOrderId || null,
+        provider: selectedRate?.provider || null,
+        carrier: selectedRate?.carrier || null,
+        service: selectedRate?.service || null,
+        rateId,
+        shipmentId,
+        error: error?.message || String(error),
+      });
       toast.error('Failed to purchase label');
       throw error;
     }
   };
-
   return {
     shipmentResponse,
     selectedRate,
