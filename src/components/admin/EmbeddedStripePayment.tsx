@@ -38,10 +38,19 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
   const elements = useElements();
   const [loading, setLoading] = useState(false);
 
+  console.log('PaymentForm rendered with:', { 
+    stripe: !!stripe, 
+    elements: !!elements, 
+    clientSecret: !!clientSecret,
+    amount 
+  });
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    console.log('Payment form submitted');
 
     if (!stripe || !elements) {
+      console.log('Stripe or elements not ready');
       return;
     }
 
@@ -51,18 +60,21 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
       const { error } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: window.location.href, // This won't be used since we handle success here
+          return_url: window.location.href,
         },
-        redirect: "if_required", // Prevents automatic redirect
+        redirect: "if_required",
       });
 
       if (error) {
+        console.error('Payment error:', error);
         toast.error(error.message || "Payment failed");
       } else {
+        console.log('Payment successful');
         toast.success(`Payment successful! $${(amount / 100).toFixed(2)} added to wallet.`);
         onSuccess();
       }
     } catch (err) {
+      console.error('Payment exception:', err);
       toast.error("An unexpected error occurred");
     } finally {
       setLoading(false);
@@ -70,33 +82,41 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="min-h-[120px]">
-        <PaymentElement 
-          options={{
-            layout: "tabs"
-          }}
-        />
-      </div>
-      
-      <div className="flex gap-3">
-        <Button
-          type="submit"
-          disabled={!stripe || loading}
-          className="flex-1"
-        >
-          {loading ? "Processing..." : `Pay $${(amount / 100).toFixed(2)}`}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={loading}
-        >
-          Cancel
-        </Button>
-      </div>
-    </form>
+    <div className="payment-form-container">
+      <p className="text-sm text-muted-foreground mb-4">
+        Debug: Stripe={!!stripe}, Elements={!!elements}, ClientSecret={!!clientSecret}
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="min-h-[120px] border border-border rounded p-4">
+          <p className="text-xs text-muted-foreground mb-2">PaymentElement should render below:</p>
+          <PaymentElement 
+            options={{
+              layout: "tabs"
+            }}
+            onReady={() => console.log('PaymentElement is ready')}
+            onChange={(event) => console.log('PaymentElement changed:', event)}
+          />
+        </div>
+        
+        <div className="flex gap-3">
+          <Button
+            type="submit"
+            disabled={!stripe || loading}
+            className="flex-1"
+          >
+            {loading ? "Processing..." : `Pay $${(amount / 100).toFixed(2)}`}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };
 
@@ -209,7 +229,10 @@ export const EmbeddedStripePayment = ({
   };
 
   return (
-    <div className="stripe-payment-container">
+    <div className="stripe-payment-container bg-background p-4 border border-border rounded">
+      <p className="text-sm text-muted-foreground mb-4">
+        Stripe Container - ClientSecret: {clientSecret ? 'Present' : 'Missing'}
+      </p>
       <Elements stripe={stripeInstance} options={options}>
         <PaymentForm
           clientSecret={clientSecret}
