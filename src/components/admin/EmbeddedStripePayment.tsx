@@ -10,7 +10,21 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-const stripePromise = loadStripe("pk_test_51Pp7dmBaAOl9o2jJMzc2UpjUAP6FyAzlm1zKBT1LQA1HHrQqfUNPNY6fDKOlgCT7hYlHNJkNQdZdDZK2wdDf5IaY00GKO0qUNp");
+let stripePromise: Promise<any> | null = null;
+
+const getStripe = async () => {
+  if (!stripePromise) {
+    // Get the publishable key from the edge function
+    const { data, error } = await supabase.functions.invoke('get-stripe-key');
+    
+    if (error || !data?.publishableKey) {
+      throw new Error('Failed to get Stripe publishable key');
+    }
+    
+    stripePromise = loadStripe(data.publishableKey);
+  }
+  return stripePromise;
+};
 
 interface PaymentFormProps {
   clientSecret: string;
@@ -97,6 +111,22 @@ export const EmbeddedStripePayment = ({
 }: EmbeddedStripePaymentProps) => {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
+
+  useEffect(() => {
+    const initializeStripe = async () => {
+      try {
+        const stripe = await getStripe();
+        setStripePromise(Promise.resolve(stripe));
+      } catch (err) {
+        console.error('Error initializing Stripe:', err);
+        toast.error('Failed to initialize Stripe');
+        onCancel();
+      }
+    };
+
+    initializeStripe();
+  }, [onCancel]);
 
   useEffect(() => {
     const createPaymentIntent = async () => {
@@ -126,7 +156,7 @@ export const EmbeddedStripePayment = ({
     createPaymentIntent();
   }, [amount, companyId, savePaymentMethod, onCancel]);
 
-  if (loading) {
+  if (loading || !stripePromise) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

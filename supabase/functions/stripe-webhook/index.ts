@@ -121,6 +121,90 @@ serve(async (req) => {
       }
     }
 
+    // Handle payment intent succeeded (for embedded payments)
+    if (event.type === "payment_intent.succeeded") {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      
+      if (paymentIntent.metadata?.wallet_topup === 'true') {
+        const companyId = paymentIntent.metadata.company_id;
+        const amount = paymentIntent.amount / 100; // Convert cents to dollars
+
+        // Get or create wallet
+        let { data: wallet, error: walletError } = await supabase
+          .from('wallets')
+          .select('*')
+          .eq('company_id', companyId)
+          .single();
+
+        if (walletError && walletError.code === 'PGRST116') {
+          // Create wallet if it doesn't exist
+          const { data: users, error: usersError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('company_id', companyId)
+            .limit(1);
+
+          if (usersError) {
+            throw usersError;
+          }
+          const ownerId = users && users.length > 0 ? users[0].id : null;
+          if (!ownerId) {
+            throw new Error('No user found for company to own wallet');
+          }
+
+          const { data: newWallet, error: createError } = await supabase
+            .from('wallets')
+            .insert({
+              company_id: companyId,
+              user_id: ownerId,
+              balance: amount,
+              currency: 'USD'
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            throw createError;
+          }
+          wallet = newWallet;
+        } else if (walletError) {
+          throw walletError;
+        } else {
+          // Update existing wallet balance
+          const { error: updateError } = await supabase
+            .from('wallets')
+            .update({ 
+              balance: wallet.balance + amount,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', wallet.id);
+
+          if (updateError) {
+            throw updateError;
+          }
+        }
+
+        // Record transaction
+        const { error: transactionError } = await supabase
+          .from('transactions')
+          .insert({
+            wallet_id: wallet.id,
+            company_id: companyId,
+            amount: amount,
+            type: 'credit',
+            description: `Stripe payment - Intent: ${paymentIntent.id}`,
+            reference_id: paymentIntent.id,
+            reference_type: 'stripe_payment_intent',
+          });
+
+        if (transactionError) {
+          throw transactionError;
+        }
+
+        console.log(`Wallet topped up via payment intent: Company ${companyId}, Amount: $${amount}`);
+      }
+    }
+
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
