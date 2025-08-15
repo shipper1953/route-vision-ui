@@ -24,8 +24,10 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    console.log('[PaymentForm] Submit clicked', { stripe: !!stripe, elements: !!elements });
 
     if (!stripe || !elements) {
+      console.error('[PaymentForm] Stripe or elements not ready', { stripe: !!stripe, elements: !!elements });
       toast({
         title: "Error",
         description: "Payment system not ready. Please try again.",
@@ -46,12 +48,14 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
       });
 
       if (error) {
+        console.error('[PaymentForm] Payment error:', error);
         toast({
           title: "Payment Failed",
           description: error.message || "Payment failed",
           variant: "destructive"
         });
       } else {
+        console.log('[PaymentForm] Payment successful');
         toast({
           title: "Payment Successful",
           description: `$${(amount / 100).toFixed(2)} added to wallet.`
@@ -59,6 +63,7 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
         onSuccess();
       }
     } catch (err) {
+      console.error('[PaymentForm] Unexpected error:', err);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -69,15 +74,29 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
     }
   };
 
+  console.log('[PaymentForm] Rendering form', { 
+    stripe: !!stripe, 
+    elements: !!elements, 
+    clientSecret: clientSecret.substring(0, 10) + '...' 
+  });
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
         <div className="p-4 border rounded-lg bg-card">
-          <PaymentElement 
-            options={{
-              layout: "tabs",
-            }}
-          />
+          {!stripe || !elements ? (
+            <div className="py-8 text-center text-muted-foreground">
+              Loading payment form...
+            </div>
+          ) : (
+            <PaymentElement 
+              options={{
+                layout: "tabs",
+              }}
+              onReady={() => console.log('[PaymentElement] Ready')}
+              onLoadError={(error) => console.error('[PaymentElement] Load error:', error)}
+            />
+          )}
         </div>
       </div>
       
@@ -125,21 +144,26 @@ export const EmbeddedStripePayment = ({
   useEffect(() => {
     const initializePayment = async () => {
       try {
+        console.log('[EmbeddedStripe] Starting initialization', { amount, companyId });
         setLoading(true);
         setError(null);
         
         // Get Stripe publishable key
+        console.log('[EmbeddedStripe] Fetching Stripe key');
         const { data: keyData, error: keyError } = await supabase.functions.invoke('get-stripe-key');
+        console.log('[EmbeddedStripe] Stripe key response', { data: keyData, error: keyError });
         
         if (keyError || !keyData?.publishableKey) {
-          throw new Error('Failed to get Stripe publishable key');
+          throw new Error('Failed to get Stripe publishable key: ' + (keyError?.message || 'No key returned'));
         }
         
         // Initialize Stripe
+        console.log('[EmbeddedStripe] Loading Stripe with key:', keyData.publishableKey.substring(0, 10) + '...');
         const stripe = loadStripe(keyData.publishableKey);
         setStripePromise(stripe);
         
         // Create payment intent
+        console.log('[EmbeddedStripe] Creating payment intent');
         const { data, error } = await supabase.functions.invoke('create-payment-intent', {
           body: {
             amount: Math.round(amount * 100),
@@ -147,14 +171,20 @@ export const EmbeddedStripePayment = ({
             savePaymentMethod
           }
         });
+        console.log('[EmbeddedStripe] Payment intent response', { data, error });
 
         if (error) {
           throw error;
         }
 
+        if (!data?.clientSecret) {
+          throw new Error('No client secret returned from payment intent');
+        }
+
+        console.log('[EmbeddedStripe] Setting client secret:', data.clientSecret.substring(0, 10) + '...');
         setClientSecret(data.clientSecret);
       } catch (err) {
-        console.error('Error initializing payment:', err);
+        console.error('[EmbeddedStripe] Error initializing payment:', err);
         setError('Failed to initialize payment: ' + (err as Error).message);
       } finally {
         setLoading(false);
@@ -191,11 +221,16 @@ export const EmbeddedStripePayment = ({
     },
   };
 
+  console.log('[EmbeddedStripe] Rendering Elements', { 
+    stripePromise: !!stripePromise, 
+    clientSecret: clientSecret?.substring(0, 10) + '...',
+    options 
+  });
+
   return (
     <Elements 
       stripe={stripePromise} 
       options={options}
-      key={clientSecret} // Force remount when clientSecret changes
     >
       <PaymentForm
         clientSecret={clientSecret}
