@@ -111,13 +111,13 @@ export const EmbeddedStripePayment = ({
 }: EmbeddedStripePaymentProps) => {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
+  const [stripeInstance, setStripeInstance] = useState<any>(null);
 
   useEffect(() => {
     const initializeStripe = async () => {
       try {
         const stripe = await getStripe();
-        setStripePromise(Promise.resolve(stripe));
+        setStripeInstance(stripe);
       } catch (err) {
         console.error('Error initializing Stripe:', err);
         toast.error('Failed to initialize Stripe');
@@ -129,6 +129,8 @@ export const EmbeddedStripePayment = ({
   }, [onCancel]);
 
   useEffect(() => {
+    if (!stripeInstance) return;
+
     const createPaymentIntent = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('create-payment-intent', {
@@ -154,24 +156,13 @@ export const EmbeddedStripePayment = ({
     };
 
     createPaymentIntent();
-  }, [amount, companyId, savePaymentMethod, onCancel]);
+  }, [amount, companyId, savePaymentMethod, onCancel, stripeInstance]);
 
-  if (loading || !stripePromise) {
+  if (loading || !stripeInstance || !clientSecret) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         <span className="ml-2">Loading payment form...</span>
-      </div>
-    );
-  }
-
-  if (!clientSecret) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-destructive">Failed to load payment form</p>
-        <Button variant="outline" onClick={onCancel} className="mt-4">
-          Close
-        </Button>
       </div>
     );
   }
@@ -184,7 +175,7 @@ export const EmbeddedStripePayment = ({
   };
 
   return (
-    <Elements stripe={stripePromise} options={options}>
+    <Elements stripe={stripeInstance} options={options} key={clientSecret}>
       <PaymentForm
         clientSecret={clientSecret}
         amount={Math.round(amount * 100)}
