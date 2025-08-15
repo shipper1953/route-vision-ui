@@ -7,7 +7,7 @@ import { WalletBalanceCards } from "./wallet/WalletBalanceCards";
 import { WalletActions } from "./wallet/WalletActions";
 import { TransactionsTable } from "./wallet/TransactionsTable";
 import { ManualAddFundsDialog } from "./wallet/ManualAddFundsDialog";
-import { useStripePayment } from "@/hooks/useStripePayment";
+import { StripePaymentDialog } from "./StripePaymentDialog";
 
 interface WalletManagementProps {
   companyId?: string;
@@ -31,8 +31,7 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddFundsDialogOpen, setIsAddFundsDialogOpen] = useState(false);
-  
-  const { createPaymentSession, loading: stripeLoading } = useStripePayment(companyId);
+  const [isStripeDialogOpen, setIsStripeDialogOpen] = useState(false);
 
   useEffect(() => {
     if (companyId) {
@@ -155,7 +154,7 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
       <WalletActions
         balance={wallet?.balance || 0}
         onManualAdd={() => setIsAddFundsDialogOpen(true)}
-        onStripeAdd={() => createPaymentSession(100)} // Default $100, or make this configurable
+        onStripeAdd={() => setIsStripeDialogOpen(true)}
         companyId={companyId}
         onBalanceUpdated={handleDataRefresh}
       />
@@ -168,6 +167,14 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
         wallet={wallet}
         companyId={companyId}
         onSuccess={handleDataRefresh}
+      />
+
+      <StripePaymentDialog
+        open={isStripeDialogOpen}
+        onOpenChange={setIsStripeDialogOpen}
+        companyId={companyId}
+        currentBalance={wallet?.balance || 0}
+        onPaymentSuccess={handleDataRefresh}
       />
     </div>
   );
