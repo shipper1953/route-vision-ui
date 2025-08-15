@@ -26,8 +26,8 @@ export const useStripePayment = (companyId?: string) => {
         throw error;
       }
 
-      // Open Stripe checkout in a new tab
-      window.open(data.url, '_blank');
+      // Redirect to Stripe checkout in the same tab to preserve authentication
+      window.location.href = data.url;
     } catch (error) {
       console.error('Error creating payment session:', error);
       toast.error('Failed to create payment session');
