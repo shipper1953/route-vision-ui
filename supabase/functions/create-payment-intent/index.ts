@@ -13,11 +13,16 @@ serve(async (req) => {
   }
 
   try {
+    // Get auth token for user context
+    const authHeader = req.headers.get('Authorization');
+    
     const { amount, companyId, savePaymentMethod = false } = await req.json();
 
     if (!amount || !companyId) {
       throw new Error("Amount and company ID are required");
     }
+
+    console.log(`Creating payment intent for company ${companyId}, amount: $${(amount / 100).toFixed(2)}`);
 
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {

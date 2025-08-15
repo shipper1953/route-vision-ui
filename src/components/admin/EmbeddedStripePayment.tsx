@@ -15,7 +15,6 @@ let stripePromise: Promise<any> | null = null;
 const getStripe = async () => {
   if (!stripePromise) {
     try {
-      // Get the publishable key from the edge function
       const { data, error } = await supabase.functions.invoke('get-stripe-key');
       
       if (error || !data?.publishableKey) {
@@ -23,7 +22,6 @@ const getStripe = async () => {
         throw new Error('Failed to get Stripe publishable key');
       }
       
-      console.log('Got Stripe publishable key:', data.publishableKey.substring(0, 20) + '...');
       stripePromise = loadStripe(data.publishableKey);
     } catch (err) {
       console.error('Error in getStripe:', err);
@@ -44,27 +42,18 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  console.log('PaymentForm rendered with:', { 
-    stripe: !!stripe, 
-    elements: !!elements, 
-    clientSecret: !!clientSecret,
-    amount 
-  });
-
-  // Wait a bit for Elements to fully initialize
   useEffect(() => {
     if (stripe && elements) {
-      console.log('Stripe and Elements are ready');
+      setIsReady(true);
     }
   }, [stripe, elements]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    console.log('Payment form submitted');
 
     if (!stripe || !elements) {
-      console.log('Stripe or elements not ready');
       toast({
         title: "Error",
         description: "Payment system not ready. Please try again.",
@@ -85,14 +74,12 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
       });
 
       if (error) {
-        console.error('Payment error:', error);
         toast({
           title: "Payment Failed",
           description: error.message || "Payment failed",
           variant: "destructive"
         });
       } else {
-        console.log('Payment successful');
         toast({
           title: "Payment Successful",
           description: `$${(amount / 100).toFixed(2)} added to wallet.`
@@ -100,7 +87,6 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
         onSuccess();
       }
     } catch (err) {
-      console.error('Payment exception:', err);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -111,58 +97,50 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
     }
   };
 
+  if (!isReady) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+        <p className="text-sm text-muted-foreground">Initializing payment system...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="payment-form-container">
-      <div className="text-sm text-muted-foreground mb-4 p-2 bg-muted rounded">
-        Debug: Stripe={stripe ? '✓' : '✗'}, Elements={elements ? '✓' : '✗'}, ClientSecret={clientSecret ? '✓' : '✗'}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-4">
+        <PaymentElement 
+          options={{
+            layout: "tabs",
+            paymentMethodOrder: ['card'],
+            defaultValues: {
+              billingDetails: {
+                name: '',
+                email: '',
+              }
+            }
+          }}
+        />
       </div>
       
-      {!stripe || !elements ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-          <p className="text-sm text-muted-foreground">Initializing payment system...</p>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="min-h-[200px] border border-border rounded p-4 bg-background">
-            <p className="text-xs text-muted-foreground mb-4">PaymentElement should render below:</p>
-            <PaymentElement 
-              options={{
-                layout: "tabs",
-                paymentMethodOrder: ['card']
-              }}
-              onReady={() => {
-                console.log('PaymentElement is ready');
-              }}
-              onChange={(event) => {
-                console.log('PaymentElement changed:', event);
-              }}
-              onLoadError={(error) => {
-                console.error('PaymentElement load error:', error);
-              }}
-            />
-          </div>
-          
-          <div className="flex gap-3">
-            <Button
-              type="submit"
-              disabled={!stripe || !elements || loading}
-              className="flex-1"
-            >
-              {loading ? "Processing..." : `Pay $${(amount / 100).toFixed(2)}`}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
-    </div>
+      <div className="flex gap-3">
+        <Button
+          type="submit"
+          disabled={!stripe || !elements || loading}
+          className="flex-1"
+        >
+          {loading ? "Processing..." : `Pay $${(amount / 100).toFixed(2)}`}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={loading}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 };
 
@@ -187,66 +165,41 @@ export const EmbeddedStripePayment = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('EmbeddedStripePayment mounted with amount:', amount, 'companyId:', companyId);
-    
-    const initializeStripe = async () => {
+    const initializePayment = async () => {
       try {
-        console.log('Initializing Stripe...');
         setLoading(true);
-        const stripe = await getStripe();
-        console.log('Stripe initialized successfully:', !!stripe);
-        setStripeInstance(stripe);
-      } catch (err) {
-        console.error('Error initializing Stripe:', err);
-        setError('Failed to initialize Stripe: ' + (err as Error).message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Only initialize once
-    if (!stripeInstance && !error) {
-      initializeStripe();
-    }
-  }, []); // Remove dependencies to prevent re-initialization
-
-  useEffect(() => {
-    if (!stripeInstance || !companyId || clientSecret) return; // Don't recreate if we already have a clientSecret
-
-    const createPaymentIntent = async () => {
-      try {
-        console.log('Creating payment intent...');
         setError(null);
-        setLoading(true);
         
+        // Initialize Stripe
+        const stripe = await getStripe();
+        setStripeInstance(stripe);
+        
+        // Create payment intent
         const { data, error } = await supabase.functions.invoke('create-payment-intent', {
           body: {
-            amount: Math.round(amount * 100), // Convert to cents
+            amount: Math.round(amount * 100),
             companyId,
             savePaymentMethod
           }
         });
 
         if (error) {
-          console.error('Payment intent error:', error);
           throw error;
         }
 
-        console.log('Payment intent created successfully');
         setClientSecret(data.clientSecret);
       } catch (err) {
-        console.error('Error creating payment intent:', err);
+        console.error('Error initializing payment:', err);
         setError('Failed to initialize payment');
       } finally {
         setLoading(false);
       }
     };
 
-    createPaymentIntent();
-  }, [amount, companyId, savePaymentMethod, stripeInstance]); // Keep these dependencies but prevent re-creation
+    initializePayment();
+  }, [amount, companyId, savePaymentMethod]);
 
   if (error) {
-    console.log('EmbeddedStripePayment: Showing error state:', error);
     return (
       <div className="text-center py-8">
         <p className="text-destructive mb-4">{error}</p>
@@ -258,7 +211,6 @@ export const EmbeddedStripePayment = ({
   }
 
   if (loading || !stripeInstance || !clientSecret) {
-    console.log('EmbeddedStripePayment: Showing loading state. Loading:', loading, 'StripeInstance:', !!stripeInstance, 'ClientSecret:', !!clientSecret);
     return (
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -266,8 +218,6 @@ export const EmbeddedStripePayment = ({
       </div>
     );
   }
-
-  console.log('EmbeddedStripePayment: Rendering payment form with clientSecret:', clientSecret);
 
   const options = {
     clientSecret,
@@ -277,10 +227,7 @@ export const EmbeddedStripePayment = ({
   };
 
   return (
-    <div className="stripe-payment-container bg-background p-4 border border-border rounded">
-      <p className="text-sm text-muted-foreground mb-4">
-        Stripe Container - ClientSecret: {clientSecret ? 'Present' : 'Missing'}
-      </p>
+    <div className="p-6">
       <Elements stripe={stripeInstance} options={options}>
         <PaymentForm
           clientSecret={clientSecret}
