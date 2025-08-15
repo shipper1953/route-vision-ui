@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CreditCard, DollarSign } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { WorkingStripePayment } from "./WorkingStripePayment";
 
 interface SimpleStripePaymentDialogProps {
   open: boolean;
@@ -23,123 +22,112 @@ export const SimpleStripePaymentDialog = ({
   onPaymentSuccess
 }: SimpleStripePaymentDialogProps) => {
   const [amount, setAmount] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
 
-  const handlePayment = async () => {
+  const handleContinue = () => {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      toast.error("Please enter a valid amount");
       return;
     }
+    setShowPayment(true);
+  };
 
-    if (!companyId) {
-      toast.error("Company ID is required");
-      return;
-    }
+  const handleSuccess = () => {
+    setShowPayment(false);
+    setAmount('');
+    onPaymentSuccess?.();
+    onOpenChange(false);
+  };
 
-    setLoading(true);
-    
-    try {
-      console.log('Creating payment intent for amount:', numAmount);
-      
-      const { data, error } = await supabase.functions.invoke('create-payment-intent', {
-        body: {
-          amount: Math.round(numAmount * 100), // Convert to cents
-          companyId,
-          savePaymentMethod: false
-        }
-      });
+  const handleCancel = () => {
+    setShowPayment(false);
+  };
 
-      if (error) {
-        console.error('Payment intent error:', error);
-        throw error;
-      }
-
-      console.log('Payment intent created:', data);
-      
-      if (data.clientSecret) {
-        // For testing, let's just simulate a successful payment
-        toast.success(`Test: Would process $${numAmount} payment`);
-        onPaymentSuccess?.();
-        onOpenChange(false);
-        setAmount('');
-      } else {
-        throw new Error('No client secret received');
-      }
-      
-    } catch (err) {
-      console.error('Payment error:', err);
-      toast.error(`Payment failed: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
+  const handleClose = () => {
+    setShowPayment(false);
+    setAmount('');
+    onOpenChange(false);
   };
 
   const suggestedAmounts = [50, 100, 250, 500];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
-            Test Payment Dialog
+            Real Stripe Payment
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6">
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <div className="text-sm text-muted-foreground">Current Balance</div>
-            <div className="text-2xl font-bold text-green-600">
-              ${currentBalance.toFixed(2)}
+        {!showPayment ? (
+          <div className="space-y-6">
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <div className="text-sm text-muted-foreground">Current Balance</div>
+              <div className="text-2xl font-bold text-green-600">
+                ${currentBalance.toFixed(2)}
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-3">
-            <Label htmlFor="amount">Amount to Add ($)</Label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="1"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Enter amount"
-                className="pl-9"
-              />
+            <div className="space-y-3">
+              <Label htmlFor="amount">Amount to Add ($)</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  className="pl-9"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-4 gap-2">
-            {suggestedAmounts.map((suggestedAmount) => (
-              <Button
-                key={suggestedAmount}
-                variant="outline"
-                size="sm"
-                onClick={() => setAmount(suggestedAmount.toString())}
-                className="text-xs"
-              >
-                ${suggestedAmount}
-              </Button>
-            ))}
-          </div>
+            <div className="grid grid-cols-4 gap-2">
+              {suggestedAmounts.map((suggestedAmount) => (
+                <Button
+                  key={suggestedAmount}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAmount(suggestedAmount.toString())}
+                  className="text-xs"
+                >
+                  ${suggestedAmount}
+                </Button>
+              ))}
+            </div>
 
-          <div className="space-y-2">
             <Button 
-              onClick={handlePayment} 
-              disabled={!amount || parseFloat(amount) <= 0 || loading}
+              onClick={handleContinue} 
+              disabled={!amount || parseFloat(amount) <= 0}
               className="w-full"
             >
-              {loading ? "Processing..." : `Test Payment $${amount || "0"}`}
+              Continue to Payment
             </Button>
-            
-            <p className="text-xs text-muted-foreground text-center">
-              This is a test dialog to verify the payment intent creation works.
-            </p>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <div className="text-sm text-muted-foreground">Adding to wallet</div>
+              <div className="text-xl font-bold">
+                ${parseFloat(amount).toFixed(2)}
+              </div>
+            </div>
+            
+            {companyId && (
+              <WorkingStripePayment
+                amount={parseFloat(amount)}
+                companyId={companyId}
+                onSuccess={handleSuccess}
+                onCancel={handleCancel}
+              />
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
