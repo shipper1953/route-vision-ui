@@ -130,16 +130,20 @@ export const EmbeddedStripePayment = ({
       }
     };
 
-    initializeStripe();
-  }, [amount, companyId]);
+    // Only initialize once
+    if (!stripeInstance) {
+      initializeStripe();
+    }
+  }, []); // Remove dependencies to prevent re-initialization
 
   useEffect(() => {
-    if (!stripeInstance || !companyId) return;
+    if (!stripeInstance || !companyId || clientSecret) return; // Don't recreate if we already have a clientSecret
 
     const createPaymentIntent = async () => {
       try {
         console.log('Creating payment intent...');
         setError(null);
+        setLoading(true);
         
         const { data, error } = await supabase.functions.invoke('create-payment-intent', {
           body: {
@@ -165,7 +169,7 @@ export const EmbeddedStripePayment = ({
     };
 
     createPaymentIntent();
-  }, [amount, companyId, savePaymentMethod, stripeInstance]);
+  }, [amount, companyId, savePaymentMethod, stripeInstance]); // Keep these dependencies but prevent re-creation
 
   if (error) {
     return (
@@ -195,13 +199,15 @@ export const EmbeddedStripePayment = ({
   };
 
   return (
-    <Elements stripe={stripeInstance} options={options} key={clientSecret}>
-      <PaymentForm
-        clientSecret={clientSecret}
-        amount={Math.round(amount * 100)}
-        onSuccess={onSuccess}
-        onCancel={onCancel}
-      />
-    </Elements>
+    <div className="stripe-payment-container">
+      <Elements stripe={stripeInstance} options={options}>
+        <PaymentForm
+          clientSecret={clientSecret}
+          amount={Math.round(amount * 100)}
+          onSuccess={onSuccess}
+          onCancel={onCancel}
+        />
+      </Elements>
+    </div>
   );
 };
