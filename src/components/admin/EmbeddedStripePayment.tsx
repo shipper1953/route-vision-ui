@@ -223,12 +223,15 @@ export const EmbeddedStripePayment = ({
     clientSecret,
     appearance: {
       theme: 'stripe' as const,
+      variables: {
+        colorPrimary: 'hsl(var(--primary))',
+      },
     },
   };
 
   return (
     <div className="p-6">
-      <Elements stripe={stripeInstance} options={options}>
+      <Elements stripe={stripeInstance} options={options} key={clientSecret}>
         <PaymentForm
           clientSecret={clientSecret}
           amount={Math.round(amount * 100)}
