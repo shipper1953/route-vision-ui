@@ -71,7 +71,13 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement />
+      <div className="min-h-[120px]">
+        <PaymentElement 
+          options={{
+            layout: "tabs"
+          }}
+        />
+      </div>
       
       <div className="flex gap-3">
         <Button
@@ -172,6 +178,7 @@ export const EmbeddedStripePayment = ({
   }, [amount, companyId, savePaymentMethod, stripeInstance]); // Keep these dependencies but prevent re-creation
 
   if (error) {
+    console.log('EmbeddedStripePayment: Showing error state:', error);
     return (
       <div className="text-center py-8">
         <p className="text-destructive mb-4">{error}</p>
@@ -183,6 +190,7 @@ export const EmbeddedStripePayment = ({
   }
 
   if (loading || !stripeInstance || !clientSecret) {
+    console.log('EmbeddedStripePayment: Showing loading state. Loading:', loading, 'StripeInstance:', !!stripeInstance, 'ClientSecret:', !!clientSecret);
     return (
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -190,6 +198,8 @@ export const EmbeddedStripePayment = ({
       </div>
     );
   }
+
+  console.log('EmbeddedStripePayment: Rendering payment form with clientSecret:', clientSecret);
 
   const options = {
     clientSecret,
