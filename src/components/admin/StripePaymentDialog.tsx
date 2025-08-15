@@ -6,38 +6,55 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CreditCard, DollarSign } from "lucide-react";
-import { useStripePayment } from "@/hooks/useStripePayment";
+import { EmbeddedStripePayment } from "./EmbeddedStripePayment";
 
 interface StripePaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId?: string;
   currentBalance: number;
+  onPaymentSuccess?: () => void;
 }
 
 export const StripePaymentDialog = ({ 
   open, 
   onOpenChange, 
   companyId, 
-  currentBalance 
+  currentBalance,
+  onPaymentSuccess
 }: StripePaymentDialogProps) => {
   const [amount, setAmount] = useState('');
   const [savePaymentMethod, setSavePaymentMethod] = useState(false);
-  const { createPaymentSession, loading } = useStripePayment(companyId);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
 
-  const handlePayment = async () => {
+  const handleContinueToPayment = () => {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       return;
     }
+    setShowPaymentForm(true);
+  };
 
-    await createPaymentSession(numAmount, savePaymentMethod);
-    onOpenChange(false);
+  const handlePaymentSuccess = () => {
+    setShowPaymentForm(false);
     setAmount('');
     setSavePaymentMethod(false);
+    onPaymentSuccess?.();
+    onOpenChange(false);
+  };
+
+  const handleCancel = () => {
+    setShowPaymentForm(false);
+    setAmount('');
+    setSavePaymentMethod(false);
+    onOpenChange(false);
   };
 
   const suggestedAmounts = [50, 100, 250, 500];
+
+  if (!companyId) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -45,74 +62,93 @@ export const StripePaymentDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
-            Add Funds with Stripe
+            {showPaymentForm ? "Complete Payment" : "Add Funds with Stripe"}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6">
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <div className="text-sm text-muted-foreground">Current Balance</div>
-            <div className="text-2xl font-bold text-green-600">
-              ${currentBalance.toFixed(2)}
+        {!showPaymentForm ? (
+          <div className="space-y-6">
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <div className="text-sm text-muted-foreground">Current Balance</div>
+              <div className="text-2xl font-bold text-green-600">
+                ${currentBalance.toFixed(2)}
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-3">
-            <Label htmlFor="amount">Amount to Add ($)</Label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="1"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Enter amount"
-                className="pl-9"
+            <div className="space-y-3">
+              <Label htmlFor="amount">Amount to Add ($)</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
+              {suggestedAmounts.map((suggestedAmount) => (
+                <Button
+                  key={suggestedAmount}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAmount(suggestedAmount.toString())}
+                  className="text-xs"
+                >
+                  ${suggestedAmount}
+                </Button>
+              ))}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="save-payment"
+                checked={savePaymentMethod}
+                onCheckedChange={(checked) => setSavePaymentMethod(checked as boolean)}
               />
+              <Label htmlFor="save-payment" className="text-sm">
+                Save payment method for future use
+              </Label>
+            </div>
+
+            <div className="space-y-2">
+              <Button 
+                onClick={handleContinueToPayment} 
+                disabled={!amount || parseFloat(amount) <= 0}
+                className="w-full"
+              >
+                Continue to Payment
+              </Button>
+              
+              <p className="text-xs text-muted-foreground text-center">
+                Secure payment powered by Stripe. Your payment information is encrypted and secure.
+              </p>
             </div>
           </div>
-
-          <div className="grid grid-cols-4 gap-2">
-            {suggestedAmounts.map((suggestedAmount) => (
-              <Button
-                key={suggestedAmount}
-                variant="outline"
-                size="sm"
-                onClick={() => setAmount(suggestedAmount.toString())}
-                className="text-xs"
-              >
-                ${suggestedAmount}
-              </Button>
-            ))}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="save-payment"
-              checked={savePaymentMethod}
-              onCheckedChange={(checked) => setSavePaymentMethod(checked as boolean)}
-            />
-            <Label htmlFor="save-payment" className="text-sm">
-              Save payment method for future use
-            </Label>
-          </div>
-
-          <div className="space-y-2">
-            <Button 
-              onClick={handlePayment} 
-              disabled={!amount || parseFloat(amount) <= 0 || loading}
-              className="w-full"
-            >
-              {loading ? "Processing..." : `Add $${amount || "0"} to Wallet`}
-            </Button>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <div className="text-sm text-muted-foreground">Adding to wallet</div>
+              <div className="text-xl font-bold">
+                ${parseFloat(amount).toFixed(2)}
+              </div>
+            </div>
             
-            <p className="text-xs text-muted-foreground text-center">
-              Secure payment powered by Stripe. Supports credit cards and bank accounts.
-            </p>
+            <EmbeddedStripePayment
+              amount={parseFloat(amount)}
+              companyId={companyId}
+              savePaymentMethod={savePaymentMethod}
+              onSuccess={handlePaymentSuccess}
+              onCancel={handleCancel}
+            />
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );

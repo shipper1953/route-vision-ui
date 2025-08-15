@@ -174,6 +174,7 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
         onOpenChange={setIsStripeDialogOpen}
         companyId={companyId}
         currentBalance={wallet?.balance || 0}
+        onPaymentSuccess={handleDataRefresh}
       />
     </div>
   );
