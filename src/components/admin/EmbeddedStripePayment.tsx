@@ -112,27 +112,35 @@ export const EmbeddedStripePayment = ({
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [stripeInstance, setStripeInstance] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('EmbeddedStripePayment mounted with amount:', amount, 'companyId:', companyId);
+    
     const initializeStripe = async () => {
       try {
+        console.log('Initializing Stripe...');
         const stripe = await getStripe();
+        console.log('Stripe initialized successfully');
         setStripeInstance(stripe);
       } catch (err) {
         console.error('Error initializing Stripe:', err);
-        toast.error('Failed to initialize Stripe');
-        onCancel();
+        setError('Failed to initialize Stripe');
+        setLoading(false);
       }
     };
 
     initializeStripe();
-  }, [onCancel]);
+  }, [amount, companyId]);
 
   useEffect(() => {
-    if (!stripeInstance) return;
+    if (!stripeInstance || !companyId) return;
 
     const createPaymentIntent = async () => {
       try {
+        console.log('Creating payment intent...');
+        setError(null);
+        
         const { data, error } = await supabase.functions.invoke('create-payment-intent', {
           body: {
             amount: Math.round(amount * 100), // Convert to cents
@@ -142,21 +150,33 @@ export const EmbeddedStripePayment = ({
         });
 
         if (error) {
+          console.error('Payment intent error:', error);
           throw error;
         }
 
+        console.log('Payment intent created successfully');
         setClientSecret(data.clientSecret);
       } catch (err) {
         console.error('Error creating payment intent:', err);
-        toast.error('Failed to initialize payment');
-        onCancel();
+        setError('Failed to initialize payment');
       } finally {
         setLoading(false);
       }
     };
 
     createPaymentIntent();
-  }, [amount, companyId, savePaymentMethod, onCancel, stripeInstance]);
+  }, [amount, companyId, savePaymentMethod, stripeInstance]);
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-destructive mb-4">{error}</p>
+        <Button variant="outline" onClick={onCancel}>
+          Close
+        </Button>
+      </div>
+    );
+  }
 
   if (loading || !stripeInstance || !clientSecret) {
     return (
