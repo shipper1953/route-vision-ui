@@ -192,7 +192,11 @@ export const EmbeddedStripePayment = ({
   };
 
   return (
-    <Elements stripe={stripePromise} options={options}>
+    <Elements 
+      stripe={stripePromise} 
+      options={options}
+      key={clientSecret} // Force remount when clientSecret changes
+    >
       <PaymentForm
         clientSecret={clientSecret}
         amount={Math.round(amount * 100)}
