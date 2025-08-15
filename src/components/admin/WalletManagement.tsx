@@ -3,11 +3,11 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Wallet, Transaction } from "@/types/auth";
-import { SimpleStripePaymentDialog } from "./SimpleStripePaymentDialog";
 import { WalletBalanceCards } from "./wallet/WalletBalanceCards";
 import { WalletActions } from "./wallet/WalletActions";
 import { TransactionsTable } from "./wallet/TransactionsTable";
 import { ManualAddFundsDialog } from "./wallet/ManualAddFundsDialog";
+import { useStripePayment } from "@/hooks/useStripePayment";
 
 interface WalletManagementProps {
   companyId?: string;
@@ -31,7 +31,8 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddFundsDialogOpen, setIsAddFundsDialogOpen] = useState(false);
-  const [isStripeDialogOpen, setIsStripeDialogOpen] = useState(false);
+  
+  const { createPaymentSession, loading: stripeLoading } = useStripePayment(companyId);
 
   useEffect(() => {
     if (companyId) {
@@ -154,7 +155,7 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
       <WalletActions
         balance={wallet?.balance || 0}
         onManualAdd={() => setIsAddFundsDialogOpen(true)}
-        onStripeAdd={() => setIsStripeDialogOpen(true)}
+        onStripeAdd={() => createPaymentSession(100)} // Default $100, or make this configurable
         companyId={companyId}
         onBalanceUpdated={handleDataRefresh}
       />
@@ -167,14 +168,6 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
         wallet={wallet}
         companyId={companyId}
         onSuccess={handleDataRefresh}
-      />
-
-      <SimpleStripePaymentDialog
-        open={isStripeDialogOpen}
-        onOpenChange={setIsStripeDialogOpen}
-        companyId={companyId}
-        currentBalance={wallet?.balance || 0}
-        onPaymentSuccess={handleDataRefresh}
       />
     </div>
   );
