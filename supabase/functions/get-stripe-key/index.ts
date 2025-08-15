@@ -14,8 +14,11 @@ serve(async (req) => {
     const publishableKey = Deno.env.get("STRIPE_PUBLISHABLE_KEY");
     
     if (!publishableKey) {
+      console.error("STRIPE_PUBLISHABLE_KEY environment variable not found");
       throw new Error("Stripe publishable key not configured");
     }
+
+    console.log("Returning Stripe publishable key:", publishableKey.substring(0, 10) + "...");
 
     return new Response(
       JSON.stringify({ publishableKey }),
