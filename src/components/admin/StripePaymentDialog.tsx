@@ -27,6 +27,16 @@ export const StripePaymentDialog = ({
   const [savePaymentMethod, setSavePaymentMethod] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
 
+  // Reset state when dialog closes
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      setShowPaymentForm(false);
+      setAmount('');
+      setSavePaymentMethod(false);
+    }
+    onOpenChange(newOpen);
+  };
+
   const handleContinueToPayment = () => {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -40,14 +50,13 @@ export const StripePaymentDialog = ({
     setAmount('');
     setSavePaymentMethod(false);
     onPaymentSuccess?.();
-    onOpenChange(false);
+    handleOpenChange(false);
   };
 
   const handleCancel = () => {
     setShowPaymentForm(false);
     setAmount('');
     setSavePaymentMethod(false);
-    onOpenChange(false);
   };
 
   const suggestedAmounts = [50, 100, 250, 500];
@@ -57,7 +66,7 @@ export const StripePaymentDialog = ({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -140,13 +149,15 @@ export const StripePaymentDialog = ({
               </div>
             </div>
             
-            <EmbeddedStripePayment
-              amount={parseFloat(amount)}
-              companyId={companyId}
-              savePaymentMethod={savePaymentMethod}
-              onSuccess={handlePaymentSuccess}
-              onCancel={handleCancel}
-            />
+            {showPaymentForm && (
+              <EmbeddedStripePayment
+                amount={parseFloat(amount)}
+                companyId={companyId}
+                savePaymentMethod={savePaymentMethod}
+                onSuccess={handlePaymentSuccess}
+                onCancel={handleCancel}
+              />
+            )}
           </div>
         )}
       </DialogContent>
