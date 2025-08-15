@@ -7,21 +7,28 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 let stripePromise: Promise<any> | null = null;
 
 const getStripe = async () => {
   if (!stripePromise) {
-    // Get the publishable key from the edge function
-    const { data, error } = await supabase.functions.invoke('get-stripe-key');
-    
-    if (error || !data?.publishableKey) {
-      throw new Error('Failed to get Stripe publishable key');
+    try {
+      // Get the publishable key from the edge function
+      const { data, error } = await supabase.functions.invoke('get-stripe-key');
+      
+      if (error || !data?.publishableKey) {
+        console.error('Failed to get Stripe publishable key:', error);
+        throw new Error('Failed to get Stripe publishable key');
+      }
+      
+      console.log('Got Stripe publishable key:', data.publishableKey.substring(0, 20) + '...');
+      stripePromise = loadStripe(data.publishableKey);
+    } catch (err) {
+      console.error('Error in getStripe:', err);
+      throw err;
     }
-    
-    stripePromise = loadStripe(data.publishableKey);
   }
   return stripePromise;
 };
@@ -45,12 +52,24 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
     amount 
   });
 
+  // Wait a bit for Elements to fully initialize
+  useEffect(() => {
+    if (stripe && elements) {
+      console.log('Stripe and Elements are ready');
+    }
+  }, [stripe, elements]);
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     console.log('Payment form submitted');
 
     if (!stripe || !elements) {
       console.log('Stripe or elements not ready');
+      toast({
+        title: "Error",
+        description: "Payment system not ready. Please try again.",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -67,15 +86,26 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
 
       if (error) {
         console.error('Payment error:', error);
-        toast.error(error.message || "Payment failed");
+        toast({
+          title: "Payment Failed",
+          description: error.message || "Payment failed",
+          variant: "destructive"
+        });
       } else {
         console.log('Payment successful');
-        toast.success(`Payment successful! $${(amount / 100).toFixed(2)} added to wallet.`);
+        toast({
+          title: "Payment Successful",
+          description: `$${(amount / 100).toFixed(2)} added to wallet.`
+        });
         onSuccess();
       }
     } catch (err) {
       console.error('Payment exception:', err);
-      toast.error("An unexpected error occurred");
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -83,39 +113,55 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
 
   return (
     <div className="payment-form-container">
-      <p className="text-sm text-muted-foreground mb-4">
-        Debug: Stripe={!!stripe}, Elements={!!elements}, ClientSecret={!!clientSecret}
-      </p>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="min-h-[120px] border border-border rounded p-4">
-          <p className="text-xs text-muted-foreground mb-2">PaymentElement should render below:</p>
-          <PaymentElement 
-            options={{
-              layout: "tabs"
-            }}
-            onReady={() => console.log('PaymentElement is ready')}
-            onChange={(event) => console.log('PaymentElement changed:', event)}
-          />
+      <div className="text-sm text-muted-foreground mb-4 p-2 bg-muted rounded">
+        Debug: Stripe={stripe ? '✓' : '✗'}, Elements={elements ? '✓' : '✗'}, ClientSecret={clientSecret ? '✓' : '✗'}
+      </div>
+      
+      {!stripe || !elements ? (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">Initializing payment system...</p>
         </div>
-        
-        <div className="flex gap-3">
-          <Button
-            type="submit"
-            disabled={!stripe || loading}
-            className="flex-1"
-          >
-            {loading ? "Processing..." : `Pay $${(amount / 100).toFixed(2)}`}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-        </div>
-      </form>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="min-h-[200px] border border-border rounded p-4 bg-background">
+            <p className="text-xs text-muted-foreground mb-4">PaymentElement should render below:</p>
+            <PaymentElement 
+              options={{
+                layout: "tabs",
+                paymentMethodOrder: ['card']
+              }}
+              onReady={() => {
+                console.log('PaymentElement is ready');
+              }}
+              onChange={(event) => {
+                console.log('PaymentElement changed:', event);
+              }}
+              onLoadError={(error) => {
+                console.error('PaymentElement load error:', error);
+              }}
+            />
+          </div>
+          
+          <div className="flex gap-3">
+            <Button
+              type="submit"
+              disabled={!stripe || !elements || loading}
+              className="flex-1"
+            >
+              {loading ? "Processing..." : `Pay $${(amount / 100).toFixed(2)}`}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
     </div>
   );
 };
@@ -146,18 +192,20 @@ export const EmbeddedStripePayment = ({
     const initializeStripe = async () => {
       try {
         console.log('Initializing Stripe...');
+        setLoading(true);
         const stripe = await getStripe();
-        console.log('Stripe initialized successfully');
+        console.log('Stripe initialized successfully:', !!stripe);
         setStripeInstance(stripe);
       } catch (err) {
         console.error('Error initializing Stripe:', err);
-        setError('Failed to initialize Stripe');
+        setError('Failed to initialize Stripe: ' + (err as Error).message);
+      } finally {
         setLoading(false);
       }
     };
 
     // Only initialize once
-    if (!stripeInstance) {
+    if (!stripeInstance && !error) {
       initializeStripe();
     }
   }, []); // Remove dependencies to prevent re-initialization
