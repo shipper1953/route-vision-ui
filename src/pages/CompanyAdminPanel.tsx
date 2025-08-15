@@ -1,7 +1,7 @@
 
 import { useAuth } from "@/context";
 import { TmsLayout } from "@/components/layout/TmsLayout";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CompanyProfile } from "@/components/admin/CompanyProfile";
 import { WarehouseManagement } from "@/components/admin/WarehouseManagement";
@@ -16,6 +16,7 @@ import { toast } from "sonner";
 const CompanyAdminPanel = () => {
   const { isAuthenticated, isCompanyAdmin, userProfile, loading } = useAuth();
   const navigate = useNavigate();
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
 
   useEffect(() => {
     if (!loading && (!isAuthenticated || !isCompanyAdmin)) {
@@ -45,19 +46,31 @@ const CompanyAdminPanel = () => {
       return;
     }
 
-    // Proceed if we have a sessionId (some Stripe redirects may omit custom params)
-    if (sessionId && userProfile?.company_id) {
+    // Proceed if we have a sessionId and user profile is loaded
+    if (sessionId && userProfile?.company_id && !confirmingPayment) {
+      setConfirmingPayment(true);
+      
       (async () => {
         try {
           console.log('[CompanyAdminPanel] Confirming Stripe session', sessionId);
+          
           const { data, error } = await supabase.functions.invoke('confirm-stripe-session', {
             body: { sessionId, companyId: userProfile.company_id },
           });
-          if (error) throw error;
+          
+          if (error) {
+            console.error('Confirmation error:', error);
+            throw error;
+          }
+          
+          console.log('[CompanyAdminPanel] Confirmation response:', data);
+          
           if (data?.credited) {
             toast.success(`Wallet credited: $${data.amount}`);
           } else if (data?.alreadyRecorded) {
             toast.info('Payment already recorded.');
+          } else if (data?.amount) {
+            toast.success(`Payment processed: $${data.amount}`);
           } else {
             toast.message('Payment processed.');
           }
@@ -65,11 +78,12 @@ const CompanyAdminPanel = () => {
           console.error('Payment confirmation failed', e);
           toast.error('Payment confirmation failed');
         } finally {
+          setConfirmingPayment(false);
           cleanUrl();
         }
       })();
     }
-  }, [userProfile?.company_id]);
+  }, [userProfile?.company_id, confirmingPayment]);
 
   // Fetch company orders
   const { data: companyOrders = [] } = useQuery({
@@ -107,13 +121,13 @@ const CompanyAdminPanel = () => {
     enabled: !!userProfile?.company_id && isCompanyAdmin,
   });
 
-  // Show loading while checking authentication
-  if (loading) {
+  // Show loading while checking authentication or confirming payment
+  if (loading || confirmingPayment) {
     return (
       <div className="flex min-h-screen bg-background items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tms-navy mx-auto mb-4"></div>
-          <p>Loading...</p>
+          <p>{confirmingPayment ? 'Processing payment...' : 'Loading...'}</p>
         </div>
       </div>
     );
