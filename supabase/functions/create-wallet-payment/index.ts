@@ -62,10 +62,12 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
+    console.log(`Creating checkout session for company ${companyId}, amount: $${(amount / 100).toFixed(2)}`);
+    
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      payment_method_types: ['card', 'us_bank_account'],
+      payment_method_types: ['card'], // Simplified to just cards for better loading
       line_items: [
         {
           price_data: {
@@ -92,6 +94,8 @@ serve(async (req) => {
         },
       }),
     });
+
+    console.log(`Checkout session created: ${session.id}, URL: ${session.url}`);
 
     return new Response(
       JSON.stringify({ url: session.url, sessionId: session.id }),
