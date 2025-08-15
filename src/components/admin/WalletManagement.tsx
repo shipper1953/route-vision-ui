@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Wallet, Transaction } from "@/types/auth";
-import { StripePaymentDialog } from "./StripePaymentDialog";
+import { SimpleStripePaymentDialog } from "./SimpleStripePaymentDialog";
 import { WalletBalanceCards } from "./wallet/WalletBalanceCards";
 import { WalletActions } from "./wallet/WalletActions";
 import { TransactionsTable } from "./wallet/TransactionsTable";
@@ -169,7 +169,7 @@ export const WalletManagement = ({ companyId }: WalletManagementProps) => {
         onSuccess={handleDataRefresh}
       />
 
-      <StripePaymentDialog
+      <SimpleStripePaymentDialog
         open={isStripeDialogOpen}
         onOpenChange={setIsStripeDialogOpen}
         companyId={companyId}
