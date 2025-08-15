@@ -99,9 +99,9 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
 
   if (!isReady) {
     return (
-      <div className="text-center py-8">
+      <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-        <p className="text-sm text-muted-foreground">Initializing payment system...</p>
+        <p className="text-sm text-muted-foreground">Loading payment form...</p>
       </div>
     );
   }
@@ -109,18 +109,20 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onCancel }: PaymentFormP
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
-        <PaymentElement 
-          options={{
-            layout: "tabs",
-            paymentMethodOrder: ['card'],
-            defaultValues: {
-              billingDetails: {
-                name: '',
-                email: '',
+        <div className="p-4 border rounded-lg bg-card">
+          <PaymentElement 
+            options={{
+              layout: "tabs",
+              paymentMethodOrder: ['card'],
+              fields: {
+                billingDetails: {
+                  name: 'never',
+                  email: 'never'
+                }
               }
-            }
-          }}
-        />
+            }}
+          />
+        </div>
       </div>
       
       <div className="flex gap-3">
@@ -230,7 +232,7 @@ export const EmbeddedStripePayment = ({
   };
 
   return (
-    <div className="p-6">
+    <div className="space-y-4">
       <Elements stripe={stripeInstance} options={options} key={clientSecret}>
         <PaymentForm
           clientSecret={clientSecret}
