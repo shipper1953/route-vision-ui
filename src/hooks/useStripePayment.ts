@@ -26,6 +26,11 @@ export const useStripePayment = (companyId?: string) => {
         throw error;
       }
 
+      if (!data?.url) {
+        throw new Error('No checkout URL received from Stripe');
+      }
+
+      console.log('Redirecting to Stripe checkout:', data.url);
       // Redirect to Stripe checkout in the same tab to preserve authentication
       window.location.href = data.url;
     } catch (error) {
