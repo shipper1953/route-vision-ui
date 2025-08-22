@@ -16,7 +16,7 @@ serve(async (req) => {
     // Get auth token for user context
     const authHeader = req.headers.get('Authorization');
     
-    const { amount, companyId, savePaymentMethod = false } = await req.json();
+    const { amount, companyId, savePaymentMethod = false, paymentMethodId } = await req.json();
 
     if (!amount || !companyId) {
       throw new Error("Amount and company ID are required");
@@ -69,7 +69,7 @@ serve(async (req) => {
     console.log(`Creating payment intent for company ${companyId}, amount: $${(amount / 100).toFixed(2)}`);
     
     // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntentData: any = {
       amount: amount, // amount in cents
       currency: 'usd',
       customer: customerId,
@@ -81,7 +81,21 @@ serve(async (req) => {
       ...(savePaymentMethod && {
         setup_future_usage: 'off_session',
       }),
-    });
+    };
+
+    // If a payment method ID is provided, attach it and confirm immediately
+    if (paymentMethodId) {
+      paymentIntentData.payment_method = paymentMethodId;
+      paymentIntentData.confirmation_method = 'manual';
+      paymentIntentData.confirm = true;
+      console.log(`Attaching payment method: ${paymentMethodId}`);
+    } else {
+      paymentIntentData.automatic_payment_methods = {
+        enabled: true,
+      };
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create(paymentIntentData);
 
     console.log(`Payment intent created: ${paymentIntent.id}`);
 

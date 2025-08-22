@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CreditCard, DollarSign } from "lucide-react";
-import { EmbeddedStripePayment } from "./EmbeddedStripePayment";
+import { ImprovedStripePayment } from "./ImprovedStripePayment";
 
 interface StripePaymentDialogProps {
   open: boolean;
@@ -150,10 +150,9 @@ export const StripePaymentDialog = ({
             </div>
             
             {showPaymentForm && (
-              <EmbeddedStripePayment
+              <ImprovedStripePayment
                 amount={parseFloat(amount)}
                 companyId={companyId}
-                savePaymentMethod={savePaymentMethod}
                 onSuccess={handlePaymentSuccess}
                 onCancel={handleCancel}
               />
