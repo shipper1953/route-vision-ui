@@ -92,6 +92,7 @@ serve(async (req) => {
     } else {
       paymentIntentData.automatic_payment_methods = {
         enabled: true,
+        allow_redirects: 'never',
       };
     }
 
