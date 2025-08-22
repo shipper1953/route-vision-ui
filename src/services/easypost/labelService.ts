@@ -144,63 +144,18 @@ export class LabelService {
 
     console.log('Calling purchase-label edge function with:', requestBody);
 
-    try {
-      const response = await fetch(`${window.location.origin.replace('https://f60d16ad-630c-47ed-bfa7-82586b1ceebb.lovableproject.com', 'https://gidrlosmhpvdcogrkidj.supabase.co')}/functions/v1/purchase-label`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpZHJsb3NtaHB2ZGNvZ3JraWRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcyOTMzMzIsImV4cCI6MjA2Mjg2OTMzMn0.DJ5r3pTVbJ80xR_kBNsc_5B_wXpIc8At646Ts-ls35Q'
-        },
-        body: JSON.stringify(requestBody)
-      });
+    // Always use Supabase functions client to avoid URL/env issues
+    const { data, error } = await supabase.functions.invoke('purchase-label', {
+      body: requestBody,
+    });
 
-      const responseText = await response.text();
-      console.log('Raw edge function response:', responseText);
-      
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Failed to parse response as JSON:', parseError);
-        responseData = { raw_response: responseText };
-      }
-
-      if (!response.ok) {
-        console.error('Edge function returned error status:', response.status);
-        console.error('Error response data:', responseData);
-        
-        // Extract the most specific error message available
-        const errorMessage = responseData?.details || responseData?.error || `Edge function error (${response.status})`;
-        throw new Error(errorMessage);
-      }
-
-      console.log('Edge function success response:', responseData);
-      this.storeLabelData(responseData);
-      return responseData;
-
-    } catch (fetchError) {
-      console.error('Edge function fetch error:', fetchError);
-      
-      // If it's our custom error, re-throw it
-      if (fetchError.message && !fetchError.message.includes('fetch')) {
-        throw fetchError;
-      }
-      
-      // Fallback to supabase client for network issues
-      console.log('Falling back to supabase client...');
-      const { data, error } = await supabase.functions.invoke('purchase-label', {
-        body: requestBody
-      });
-      
-      if (error) {
-        console.error('Supabase client also failed:', error);
-        throw new Error(error.message || 'Failed to purchase label via edge function');
-      }
-      
-      this.storeLabelData(data);
-      return data;
+    if (error) {
+      console.error('Supabase purchase-label error:', error);
+      throw new Error(error.message || 'Failed to purchase label via edge function');
     }
+
+    this.storeLabelData(data as any);
+    return data;
   }
 
   private async purchaseMultipleLabelsViaEdgeFunction(params: {
