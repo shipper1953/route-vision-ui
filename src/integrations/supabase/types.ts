@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -115,6 +115,7 @@ export type Database = {
           name: string
           phone: string | null
           settings: Json | null
+          stripe_customer_id: string | null
           updated_at: string
         }
         Insert: {
@@ -128,6 +129,7 @@ export type Database = {
           name: string
           phone?: string | null
           settings?: Json | null
+          stripe_customer_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -141,6 +143,7 @@ export type Database = {
           name?: string
           phone?: string | null
           settings?: Json | null
+          stripe_customer_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -856,14 +859,14 @@ export type Database = {
       get_company_boxes_for_cartonization: {
         Args: { p_company_id: string }
         Returns: {
-          id: string
-          name: string
-          length: number
-          width: number
-          height: number
-          max_weight: number
-          cost: number
           box_type: string
+          cost: number
+          height: number
+          id: string
+          length: number
+          max_weight: number
+          name: string
+          width: number
         }[]
       }
       get_current_user_role: {
@@ -873,24 +876,24 @@ export type Database = {
       get_user_profile: {
         Args: { user_id: string }
         Returns: {
+          company_id: string
+          email: string
           id: string
           name: string
-          email: string
           role: Database["public"]["Enums"]["app_role"]
-          company_id: string
           warehouse_ids: Json
         }[]
       }
       update_order_cartonization: {
         Args: {
-          p_order_id: number
-          p_recommended_box_id: string
-          p_recommended_box_data: Json
-          p_utilization: number
-          p_confidence: number
-          p_total_weight: number
-          p_items_weight: number
           p_box_weight: number
+          p_confidence: number
+          p_items_weight: number
+          p_order_id: number
+          p_recommended_box_data: Json
+          p_recommended_box_id: string
+          p_total_weight: number
+          p_utilization: number
         }
         Returns: undefined
       }

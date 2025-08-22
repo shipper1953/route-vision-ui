@@ -13,112 +13,108 @@ serve(async (req) => {
   }
 
   try {
-    // Get auth token for user context
-    const authHeader = req.headers.get('Authorization');
-    
-    const { amount, companyId, savePaymentMethod = false, paymentMethodId } = await req.json();
+    const { action, amount, companyId, paymentMethodId } = await req.json();
 
-    if (!amount || !companyId) {
-      throw new Error("Amount and company ID are required");
-    }
+    if (!companyId) throw new Error("companyId is required");
+    if (!action) throw new Error("Action is required ('setup' or 'topup')");
 
-    console.log(`Creating payment intent for company ${companyId}, amount: $${(amount / 100).toFixed(2)}`);
+    const origin = req.headers.get("origin") || "https://gidrlosmhpvdcogrkidj.supabase.co";
 
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
 
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Create Supabase service client
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
-    // Get company information
+    // Get company info, including stored Stripe customer id if present
     const { data: company, error: companyError } = await supabase
       .from('companies')
-      .select('name, email')
+      .select('id, name, email, stripe_customer_id')
       .eq('id', companyId)
       .single();
 
-    if (companyError) {
-      throw new Error(`Company not found: ${companyError.message}`);
+    if (companyError || !company) {
+      throw new Error(`Company not found: ${companyError?.message || 'no record'}`);
     }
 
-    // Check if customer exists in Stripe
-    let customerId;
-    const customers = await stripe.customers.list({ 
-      email: company.email || `company-${companyId}@placeholder.com`,
-      limit: 1 
-    });
-
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-    } else {
-      // Create new customer
+    // Ensure Stripe customer exists and is saved on company
+    let customerId = (company as any).stripe_customer_id as string | null;
+    if (!customerId) {
       const customer = await stripe.customers.create({
         email: company.email || `company-${companyId}@placeholder.com`,
         name: company.name,
-        metadata: {
-          company_id: companyId,
-        },
+        metadata: { company_id: companyId },
       });
       customerId = customer.id;
+      await supabase
+        .from('companies')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', companyId);
     }
 
-    console.log(`Creating payment intent for company ${companyId}, amount: $${(amount / 100).toFixed(2)}`);
-    
-    // Create payment intent
-    const paymentIntentData: any = {
-      amount: amount, // amount in cents
-      currency: 'usd',
-      customer: customerId,
-      description: `Wallet Top-up - Add $${(amount / 100).toFixed(2)} to wallet`,
-      metadata: {
-        company_id: companyId,
-        wallet_topup: 'true',
-      },
-      ...(savePaymentMethod && {
-        setup_future_usage: 'off_session',
-      }),
-    };
+    if (action === 'setup') {
+      // Phase 1: Create SetupIntent to attach a new payment method
+      const setupIntent = await stripe.setupIntents.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        usage: 'off_session',
+        description: `Add payment method for ${company.name}`,
+        metadata: { company_id: companyId },
+      });
 
-    // If a payment method ID is provided, attach it and confirm immediately
-    if (paymentMethodId) {
-      paymentIntentData.payment_method = paymentMethodId;
-      paymentIntentData.confirmation_method = 'manual';
-      paymentIntentData.confirm = true;
-      paymentIntentData.return_url = `${req.headers.get("origin") || "https://gidrlosmhpvdcogrkidj.supabase.co"}/company-admin`;
-      console.log(`Attaching payment method: ${paymentMethodId}`);
-    } else {
-      paymentIntentData.automatic_payment_methods = {
-        enabled: true,
-        allow_redirects: 'never',
+      return new Response(
+        JSON.stringify({ clientSecret: setupIntent.client_secret, intentId: setupIntent.id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    if (action === 'topup') {
+      if (!amount || typeof amount !== 'number') {
+        throw new Error("Amount (in cents) is required for top-up");
+      }
+
+      const paymentIntentData: Record<string, any> = {
+        amount,
+        currency: 'usd',
+        customer: customerId,
+        description: `Wallet Top-up - Add $${(amount / 100).toFixed(2)} to wallet`,
+        metadata: { company_id: companyId, wallet_topup: 'true' },
       };
+
+      if (paymentMethodId) {
+        // We attach the provided payment method, return client secret for client-side confirmation
+        paymentIntentData.payment_method = paymentMethodId;
+        // Do NOT confirm server-side to allow Stripe.js to handle SCA if needed
+        // Provide return_url only as metadata for reference; client will pass confirmParams.return_url
+      } else {
+        // No specific PM yet, allow automatic payment methods and let client confirm with Elements
+        paymentIntentData.automatic_payment_methods = { enabled: true };
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create(paymentIntentData);
+      console.log(`Payment intent created: ${paymentIntent.id}, status: ${paymentIntent.status}`);
+
+      return new Response(
+        JSON.stringify({
+          clientSecret: paymentIntent.client_secret,
+          paymentIntentId: paymentIntent.id,
+          status: paymentIntent.status,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
     }
 
-    const paymentIntent = await stripe.paymentIntents.create(paymentIntentData);
-
-    console.log(`Payment intent created: ${paymentIntent.id}`);
-
-    return new Response(
-      JSON.stringify({ 
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id 
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
-    );
+    throw new Error("Invalid action");
   } catch (error) {
-    console.error("Error creating payment intent:", error);
+    console.error("[create-payment-intent] Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      }
+      JSON.stringify({ error: (error as Error).message }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });

@@ -54,68 +54,85 @@ const PaymentForm = ({ amount, companyId, onSuccess, onCancel }: PaymentFormProp
         return;
       }
 
-      // Then create a payment method from the validated form data
-      const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
-        elements,
-        params: {
-          type: 'card',
-        },
+      // Phase 1: Create SetupIntent and confirm to attach PM to customer
+      const { data: setupData, error: setupErr } = await supabase.functions.invoke('create-payment-intent', {
+        body: {
+          action: 'setup',
+          companyId,
+        }
       });
 
-      if (paymentMethodError) {
-        console.error('[ImprovedPayment] Payment method error:', paymentMethodError);
+      if (setupErr) {
+        throw setupErr;
+      }
+      if (!setupData?.clientSecret) {
+        throw new Error('No client secret returned for setup intent');
+      }
+
+      const setupResult = await stripe.confirmSetup({
+        clientSecret: setupData.clientSecret,
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/company-admin`,
+        },
+        redirect: 'if_required',
+      });
+
+      if (setupResult.error) {
+        console.error('[ImprovedPayment] Setup confirmation error:', setupResult.error);
         toast({
-          title: "Payment Method Error",
-          description: paymentMethodError.message,
-          variant: "destructive"
+          title: 'Card Setup Failed',
+          description: setupResult.error.message,
+          variant: 'destructive',
         });
         setPaymentStep('collecting');
         setLoading(false);
         return;
       }
 
-      console.log('[ImprovedPayment] Payment method created:', paymentMethod.id);
+      const pmId = setupResult.setupIntent?.payment_method as string | undefined;
+      if (!pmId) {
+        throw new Error('No payment method returned from setup intent');
+      }
 
-      // Now create the payment intent with the payment method
-      const { data, error } = await supabase.functions.invoke('create-payment-intent', {
+      // Phase 2: Create PaymentIntent (not confirmed server-side)
+      const { data: piData, error: piErr } = await supabase.functions.invoke('create-payment-intent', {
         body: {
+          action: 'topup',
           amount: Math.round(amount * 100),
           companyId,
-          paymentMethodId: paymentMethod.id
+          paymentMethodId: pmId,
         }
       });
 
-      if (error) {
-        throw error;
+      if (piErr) {
+        throw piErr;
+      }
+      if (!piData?.clientSecret) {
+        throw new Error('No client secret returned for payment intent');
       }
 
-      if (!data?.clientSecret) {
-        throw new Error('No client secret returned from payment intent');
-      }
-
-      console.log('[ImprovedPayment] Payment intent created, confirming...');
-
-      // Confirm the payment
+      // Confirm payment client-side to handle SCA if needed
       const { error: confirmError } = await stripe.confirmPayment({
-        clientSecret: data.clientSecret,
+        clientSecret: piData.clientSecret,
         confirmParams: {
-          return_url: window.location.href,
+          return_url: `${window.location.origin}/company-admin`,
         },
-        redirect: "if_required",
+        redirect: 'if_required',
       });
 
       if (confirmError) {
         console.error('[ImprovedPayment] Payment confirmation error:', confirmError);
         toast({
-          title: "Payment Failed",
+          title: 'Payment Failed',
           description: confirmError.message,
-          variant: "destructive"
+          variant: 'destructive',
         });
       } else {
         console.log('[ImprovedPayment] Payment successful');
         toast({
-          title: "Payment Successful",
-          description: `$${amount.toFixed(2)} added to wallet.`
+          title: 'Payment Successful',
+          description: `$${amount.toFixed(2)} added to wallet.`,
         });
         onSuccess();
       }
