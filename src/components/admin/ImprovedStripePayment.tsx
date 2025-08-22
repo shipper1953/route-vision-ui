@@ -40,7 +40,21 @@ const PaymentForm = ({ amount, companyId, onSuccess, onCancel }: PaymentFormProp
     setPaymentStep('processing');
 
     try {
-      // First, create a payment method from the form data
+      // First, submit the elements to validate the form
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        console.error('[ImprovedPayment] Form validation error:', submitError);
+        toast({
+          title: "Form Validation Error",
+          description: submitError.message,
+          variant: "destructive"
+        });
+        setPaymentStep('collecting');
+        setLoading(false);
+        return;
+      }
+
+      // Then create a payment method from the validated form data
       const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
         elements,
         params: {
