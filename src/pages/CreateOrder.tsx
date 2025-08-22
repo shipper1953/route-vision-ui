@@ -33,6 +33,8 @@ const CreateOrder = () => {
       customerPhone: "",
       requiredDeliveryDate: undefined,
       orderItems: [],
+      items: 0,
+      value: 0,
       street1: "",
       street2: "",
       city: "",

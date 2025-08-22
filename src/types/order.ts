@@ -16,6 +16,8 @@ export const orderFormSchema = z.object({
     required_error: "Required delivery date is required",
   }),
   orderItems: z.array(orderItemSchema).min(1, "At least one item is required"),
+  items: z.number().optional(), // Auto-calculated from orderItems
+  value: z.number().optional(), // Auto-calculated from orderItems
   street1: z.string().min(1, "Address line 1 is required"),
   street2: z.string().optional(),
   city: z.string().min(1, "City is required"),

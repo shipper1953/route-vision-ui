@@ -1,4 +1,4 @@
-
+import { useFormContext } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,24 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { OrderFormValues } from "@/types/order";
+import { useEffect } from "react";
 
 export const CustomerInfoSection = () => {
+  const form = useFormContext<OrderFormValues>();
+  
+  // Watch orderItems to auto-calculate items count and value
+  const orderItems = form.watch("orderItems") || [];
+  
+  // Auto-calculate values whenever orderItems changes
+  useEffect(() => {
+    const totalItems = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const totalValue = orderItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
+    
+    form.setValue("items", totalItems);
+    form.setValue("value", totalValue);
+  }, [orderItems, form]);
+
   return (
     <div className="space-y-4">
       <h3 className="font-medium text-lg">Customer Information</h3>
@@ -72,13 +88,13 @@ export const CustomerInfoSection = () => {
           name="items"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Number of Items*</FormLabel>
+              <FormLabel>Number of Items (Auto-calculated)</FormLabel>
               <FormControl>
                 <Input 
                   type="number" 
-                  min={1}
-                  onChange={e => field.onChange(parseInt(e.target.value) || 0)}
-                  value={field.value || ""}
+                  value={field.value || 0}
+                  disabled
+                  className="bg-muted text-muted-foreground cursor-not-allowed"
                 />
               </FormControl>
               <FormMessage />
@@ -90,9 +106,13 @@ export const CustomerInfoSection = () => {
           name="value"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Order Value*</FormLabel>
+              <FormLabel>Order Value (Auto-calculated)</FormLabel>
               <FormControl>
-                <Input placeholder="$100.00" {...field} />
+                <Input 
+                  value={`$${(field.value || 0).toFixed(2)}`}
+                  disabled
+                  className="bg-muted text-muted-foreground cursor-not-allowed"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
