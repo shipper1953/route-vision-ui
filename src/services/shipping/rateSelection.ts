@@ -123,7 +123,11 @@ export async function recommendRate(combined: any, requiredDeliveryDate?: string
       }
       return false;
     });
-    if (withinDate.length) candidates = withinDate;
+    // If any rates meet the required delivery date, recommend the cheapest among them
+    if (withinDate.length) {
+      const cheapestWithin = [...withinDate].sort((a, b) => a.rate - b.rate)[0];
+      return cheapestWithin;
+    }
   }
 
   // Sort by SLA preference
