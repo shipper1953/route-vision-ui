@@ -88,6 +88,7 @@ serve(async (req) => {
       paymentIntentData.payment_method = paymentMethodId;
       paymentIntentData.confirmation_method = 'manual';
       paymentIntentData.confirm = true;
+      paymentIntentData.return_url = `${req.headers.get("origin") || "https://gidrlosmhpvdcogrkidj.supabase.co"}/company-admin`;
       console.log(`Attaching payment method: ${paymentMethodId}`);
     } else {
       paymentIntentData.automatic_payment_methods = {
