@@ -304,6 +304,53 @@ export type Database = {
           },
         ]
       }
+      order_packaging_recommendations: {
+        Row: {
+          calculated_volume: number | null
+          calculated_weight: number | null
+          confidence_score: number | null
+          created_at: string
+          id: string
+          order_id: number
+          potential_savings: number | null
+          recommended_billable_weight: number | null
+          recommended_master_list_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          calculated_volume?: number | null
+          calculated_weight?: number | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          order_id: number
+          potential_savings?: number | null
+          recommended_billable_weight?: number | null
+          recommended_master_list_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          calculated_volume?: number | null
+          calculated_weight?: number | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          order_id?: number
+          potential_savings?: number | null
+          recommended_billable_weight?: number | null
+          recommended_master_list_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_packaging_recommendations_recommended_master_list_id_fkey"
+            columns: ["recommended_master_list_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_master_list"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_shipments: {
         Row: {
           created_at: string | null
@@ -421,6 +468,170 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      packaging_alerts: {
+        Row: {
+          alert_type: string
+          company_id: string
+          created_at: string
+          id: string
+          is_resolved: boolean
+          message: string
+          metadata: Json | null
+          severity: string
+        }
+        Insert: {
+          alert_type: string
+          company_id: string
+          created_at?: string
+          id?: string
+          is_resolved?: boolean
+          message: string
+          metadata?: Json | null
+          severity?: string
+        }
+        Update: {
+          alert_type?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_resolved?: boolean
+          message?: string
+          metadata?: Json | null
+          severity?: string
+        }
+        Relationships: []
+      }
+      packaging_intelligence_reports: {
+        Row: {
+          analysis_period: string
+          company_id: string
+          generated_at: string
+          id: string
+          inventory_suggestions: Json
+          potential_savings: number
+          projected_packaging_need: Json
+          report_data: Json
+          top_5_box_discrepancies: Json
+          top_5_most_used_boxes: Json
+          total_orders_analyzed: number
+        }
+        Insert: {
+          analysis_period?: string
+          company_id: string
+          generated_at?: string
+          id?: string
+          inventory_suggestions?: Json
+          potential_savings?: number
+          projected_packaging_need?: Json
+          report_data?: Json
+          top_5_box_discrepancies?: Json
+          top_5_most_used_boxes?: Json
+          total_orders_analyzed?: number
+        }
+        Update: {
+          analysis_period?: string
+          company_id?: string
+          generated_at?: string
+          id?: string
+          inventory_suggestions?: Json
+          potential_savings?: number
+          projected_packaging_need?: Json
+          report_data?: Json
+          top_5_box_discrepancies?: Json
+          top_5_most_used_boxes?: Json
+          total_orders_analyzed?: number
+        }
+        Relationships: []
+      }
+      packaging_inventory: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          master_list_id: string
+          quantity_on_hand: number
+          reorder_quantity: number
+          reorder_threshold: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          master_list_id: string
+          quantity_on_hand?: number
+          reorder_quantity?: number
+          reorder_threshold?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          master_list_id?: string
+          quantity_on_hand?: number
+          reorder_quantity?: number
+          reorder_threshold?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packaging_inventory_master_list_id_fkey"
+            columns: ["master_list_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_master_list"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packaging_master_list: {
+        Row: {
+          cost: number
+          created_at: string
+          height_in: number
+          id: string
+          is_active: boolean
+          length_in: number
+          name: string
+          type: string
+          updated_at: string
+          vendor: string
+          vendor_sku: string
+          weight_oz: number
+          width_in: number
+        }
+        Insert: {
+          cost?: number
+          created_at?: string
+          height_in: number
+          id?: string
+          is_active?: boolean
+          length_in: number
+          name: string
+          type: string
+          updated_at?: string
+          vendor?: string
+          vendor_sku: string
+          weight_oz?: number
+          width_in: number
+        }
+        Update: {
+          cost?: number
+          created_at?: string
+          height_in?: number
+          id?: string
+          is_active?: boolean
+          length_in?: number
+          name?: string
+          type?: string
+          updated_at?: string
+          vendor?: string
+          vendor_sku?: string
+          weight_oz?: number
+          width_in?: number
+        }
+        Relationships: []
       }
       qboid_events: {
         Row: {
