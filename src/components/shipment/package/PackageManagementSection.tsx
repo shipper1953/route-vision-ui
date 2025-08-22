@@ -139,7 +139,7 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                 <SelectContent className="z-50 bg-background">
                   {availableBoxes.map((availableBox) => (
                     <SelectItem key={availableBox.id} value={availableBox.id}>
                       <div className="flex items-center justify-between w-full">
@@ -213,7 +213,7 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Add" />
                 </SelectTrigger>
-                <SelectContent>
+                 <SelectContent className="z-50 bg-background">
                   {orderItems.filter(item => 
                     !assignedItems.some(assigned => assigned.id === item.id)
                   ).map((item) => (
@@ -264,7 +264,7 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
                         <SelectTrigger className="w-20 h-6">
                           <SelectValue placeholder="Move" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-50 bg-background">
                           {Array.from({ length: totalPackages }, (_, i) => i)
                             .filter(i => i !== packageIndex)
                             .map((i) => (
@@ -349,6 +349,14 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
           weight: Math.max(1, Math.round((pkg as any).packageWeight || 1)),
         }));
         (form as any).setValue('multiParcels', parcels);
+        // Also sync the primary parcel fields for validation/rate shopping
+        if (parcels.length) {
+          const first = parcels[0];
+          form.setValue('length', first.length);
+          form.setValue('width', first.width);
+          form.setValue('height', first.height);
+          form.setValue('weight', first.weight);
+        }
         localStorage.setItem('multiParcels', JSON.stringify(parcels));
       } catch (e) {
         console.warn('Failed to prepare multiParcels:', e);
