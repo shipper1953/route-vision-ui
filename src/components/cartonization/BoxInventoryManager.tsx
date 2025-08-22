@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,11 +12,26 @@ import { useAuth } from "@/context";
 import { useCartonization } from "@/hooks/useCartonization";
 import { toast } from "sonner";
 
+interface PackagingMasterItem {
+  id: string;
+  name: string;
+  vendor_sku: string;
+  type: string;
+  length_in: number;
+  width_in: number;
+  height_in: number;
+  weight_oz: number;
+  cost: number;
+  vendor: string;
+}
+
 export const BoxInventoryManager = () => {
   const { boxes, loading, updateBoxInventory } = useCartonization();
   const { userProfile } = useAuth();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingBox, setEditingBox] = useState<any>(null);
+  const [masterList, setMasterList] = useState<PackagingMasterItem[]>([]);
+  const [selectedMasterItem, setSelectedMasterItem] = useState<string>('');
   const [newBox, setNewBox] = useState({
     name: '',
     length: 0,
@@ -29,6 +44,66 @@ export const BoxInventoryManager = () => {
     sku: '',
     description: ''
   });
+
+  useEffect(() => {
+    fetchMasterList();
+  }, []);
+
+  const fetchMasterList = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('packaging_master_list')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching master list:', error);
+        return;
+      }
+
+      setMasterList(data || []);
+    } catch (error) {
+      console.error('Error fetching master list:', error);
+    }
+  };
+
+  const handleMasterItemSelect = (masterItemId: string) => {
+    setSelectedMasterItem(masterItemId);
+    
+    if (masterItemId === 'custom') {
+      // Reset to custom entry
+      setNewBox({
+        name: '',
+        length: 0,
+        width: 0,
+        height: 0,
+        max_weight: 0,
+        cost: 0,
+        in_stock: 0,
+        box_type: 'box',
+        sku: '',
+        description: ''
+      });
+      return;
+    }
+
+    const masterItem = masterList.find(item => item.id === masterItemId);
+    if (masterItem) {
+      setNewBox({
+        name: masterItem.name,
+        length: masterItem.length_in,
+        width: masterItem.width_in,
+        height: masterItem.height_in,
+        max_weight: Math.round(masterItem.weight_oz / 16 * 10) / 10, // Convert oz to lbs and round
+        cost: masterItem.cost,
+        in_stock: 0,
+        box_type: masterItem.type as any,
+        sku: masterItem.vendor_sku,
+        description: `${masterItem.vendor} ${masterItem.name}`
+      });
+    }
+  };
 
   const handleAddBox = async () => {
     if (!newBox.name || !newBox.length || !newBox.width || !newBox.height) {
@@ -141,6 +216,7 @@ export const BoxInventoryManager = () => {
   };
 
   const resetForm = () => {
+    setSelectedMasterItem('');
     setNewBox({
       name: '',
       length: 0,
@@ -186,6 +262,22 @@ export const BoxInventoryManager = () => {
                 <DialogTitle>Add New Box</DialogTitle>
               </DialogHeader>
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label htmlFor="masterSelect">Select from Master List (Optional)</Label>
+                  <Select value={selectedMasterItem} onValueChange={handleMasterItemSelect}>
+                    <SelectTrigger className="bg-accent/50">
+                      <SelectValue placeholder="Choose from standard packaging or create custom" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border-border z-50">
+                      <SelectItem value="custom">📝 Custom Entry</SelectItem>
+                      {masterList.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          📦 {item.name} ({item.vendor_sku}) - {item.length_in}"×{item.width_in}"×{item.height_in}" - ${item.cost}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="col-span-2">
                   <Label htmlFor="boxName">Box Name</Label>
                   <Input

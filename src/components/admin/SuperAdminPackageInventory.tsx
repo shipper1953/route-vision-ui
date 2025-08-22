@@ -34,6 +34,19 @@ interface Company {
   name: string;
 }
 
+interface PackagingMasterItem {
+  id: string;
+  name: string;
+  vendor_sku: string;
+  type: string;
+  length_in: number;
+  width_in: number;
+  height_in: number;
+  weight_oz: number;
+  cost: number;
+  vendor: string;
+}
+
 export const SuperAdminPackageInventory = () => {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -41,6 +54,8 @@ export const SuperAdminPackageInventory = () => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingBox, setEditingBox] = useState<Box | null>(null);
+  const [masterList, setMasterList] = useState<PackagingMasterItem[]>([]);
+  const [selectedMasterItem, setSelectedMasterItem] = useState<string>('');
   const [newBox, setNewBox] = useState({
     name: '',
     length: 0,
@@ -55,7 +70,7 @@ export const SuperAdminPackageInventory = () => {
     company_id: ''
   });
 
-  // Fetch companies
+  // Fetch companies and master list
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
@@ -76,7 +91,27 @@ export const SuperAdminPackageInventory = () => {
       }
     };
 
+    const fetchMasterList = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('packaging_master_list')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
+
+        if (error) {
+          console.error('Error fetching master list:', error);
+          return;
+        }
+
+        setMasterList(data || []);
+      } catch (error) {
+        console.error('Error fetching master list:', error);
+      }
+    };
+
     fetchCompanies();
+    fetchMasterList();
   }, []);
 
   // Fetch boxes based on selected company
@@ -132,6 +167,44 @@ export const SuperAdminPackageInventory = () => {
 
     fetchBoxes();
   }, [selectedCompanyId]);
+
+  const handleMasterItemSelect = (masterItemId: string) => {
+    setSelectedMasterItem(masterItemId);
+    
+    if (masterItemId === 'custom') {
+      // Reset to custom entry, keeping the selected company
+      setNewBox({
+        name: '',
+        length: 0,
+        width: 0,
+        height: 0,
+        max_weight: 0,
+        cost: 0,
+        in_stock: 0,
+        box_type: 'box',
+        sku: '',
+        description: '',
+        company_id: newBox.company_id
+      });
+      return;
+    }
+
+    const masterItem = masterList.find(item => item.id === masterItemId);
+    if (masterItem) {
+      setNewBox({
+        ...newBox,
+        name: masterItem.name,
+        length: masterItem.length_in,
+        width: masterItem.width_in,
+        height: masterItem.height_in,
+        max_weight: Math.round(masterItem.weight_oz / 16 * 10) / 10, // Convert oz to lbs and round
+        cost: masterItem.cost,
+        box_type: masterItem.type as any,
+        sku: masterItem.vendor_sku,
+        description: `${masterItem.vendor} ${masterItem.name}`
+      });
+    }
+  };
 
   const handleAddBox = async () => {
     if (!newBox.name || !newBox.length || !newBox.width || !newBox.height || !newBox.company_id) {
@@ -241,6 +314,7 @@ export const SuperAdminPackageInventory = () => {
   };
 
   const resetForm = () => {
+    setSelectedMasterItem('');
     setNewBox({
       name: '',
       length: 0,
@@ -288,12 +362,12 @@ export const SuperAdminPackageInventory = () => {
               </DialogHeader>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <Label htmlFor="company">Company *</Label>
+                  <Label htmlFor="companySelect">Company *</Label>
                   <Select value={newBox.company_id} onValueChange={(value) => setNewBox({ ...newBox, company_id: value })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a company" />
+                      <SelectValue placeholder="Select company for this package" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-background border-border z-50">
                       {companies.map(company => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
@@ -303,9 +377,25 @@ export const SuperAdminPackageInventory = () => {
                   </Select>
                 </div>
                 <div className="col-span-2">
-                  <Label htmlFor="boxName">Package Name *</Label>
+                  <Label htmlFor="masterSelect">Select from Master List (Optional)</Label>
+                  <Select value={selectedMasterItem} onValueChange={handleMasterItemSelect}>
+                    <SelectTrigger className="bg-accent/50">
+                      <SelectValue placeholder="Choose from standard packaging or create custom" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border-border z-50">
+                      <SelectItem value="custom">📝 Custom Entry</SelectItem>
+                      {masterList.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          📦 {item.name} ({item.vendor_sku}) - {item.length_in}"×{item.width_in}"×{item.height_in}" - ${item.cost}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="packageName">Package Name *</Label>
                   <Input
-                    id="boxName"
+                    id="packageName"
                     value={newBox.name}
                     onChange={(e) => setNewBox({ ...newBox, name: e.target.value })}
                     placeholder="e.g., Small Box, Medium Poly Bag"
@@ -317,7 +407,7 @@ export const SuperAdminPackageInventory = () => {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-background border-border z-50">
                       <SelectItem value="box">Box</SelectItem>
                       <SelectItem value="poly_bag">Poly Bag</SelectItem>
                       <SelectItem value="envelope">Envelope</SelectItem>
@@ -422,7 +512,7 @@ export const SuperAdminPackageInventory = () => {
             <SelectTrigger className="w-64">
               <SelectValue placeholder="All companies" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-background border-border z-50">
               <SelectItem value="all">All companies</SelectItem>
               {companies.map(company => (
                 <SelectItem key={company.id} value={company.id}>
@@ -515,7 +605,7 @@ export const SuperAdminPackageInventory = () => {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-background border-border z-50">
                       <SelectItem value="box">Box</SelectItem>
                       <SelectItem value="poly_bag">Poly Bag</SelectItem>
                       <SelectItem value="envelope">Envelope</SelectItem>
