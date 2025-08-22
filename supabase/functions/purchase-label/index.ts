@@ -265,6 +265,50 @@ serve(async (req) => {
       const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId)
       if (linkSuccess) {
         console.log('✅ Order successfully linked to shipment')
+        // Fire Slack notification for "order shipped"
+        try {
+          const slackWebhook = Deno.env.get('SLACK_WEBHOOK_URL')
+          if (!slackWebhook) {
+            console.log('ℹ️ SLACK_WEBHOOK_URL not configured, skipping Slack alert')
+          } else {
+            const carrier = provider === 'shippo'
+              ? (purchaseResponse.rate?.provider || purchaseResponse.carrier_account || 'Unknown')
+              : (purchaseResponse.selected_rate?.carrier || 'Unknown')
+            const service = provider === 'shippo'
+              ? (purchaseResponse.rate?.servicelevel?.name || purchaseResponse.servicelevel?.name || 'Unknown')
+              : (purchaseResponse.selected_rate?.service || 'Unknown')
+            const tracking = provider === 'shippo'
+              ? (purchaseResponse.tracking_number || purchaseResponse.tracking_code || 'N/A')
+              : (purchaseResponse.tracking_code || purchaseResponse.tracking_number || 'N/A')
+            const trackUrl = provider === 'shippo'
+              ? (purchaseResponse.tracking_url_provider || purchaseResponse.label_url)
+              : (purchaseResponse.tracker?.public_url || purchaseResponse.postage_label?.label_url)
+            const est = provider === 'shippo'
+              ? (purchaseResponse.rate?.estimated_days ? `${purchaseResponse.rate.estimated_days} days` : null)
+              : (purchaseResponse.tracker?.est_delivery_date || null)
+
+            const text = `:truck: Order ${orderId} shipped via ${carrier} ${service}\nTracking: ${tracking}${trackUrl ? ` • ${trackUrl}` : ''}${est ? `\nETA: ${est}` : ''}`
+            const slackBody: Record<string, unknown> = {
+              username: 'Shipping Bot',
+              icon_emoji: ':truck:',
+              text,
+            }
+
+            const slackResp = await fetch(slackWebhook, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(slackBody),
+            })
+            if (!slackResp.ok) {
+              const errText = await slackResp.text()
+              console.error('❌ Slack webhook error:', slackResp.status, errText)
+            } else {
+              console.log('✅ Slack shipped alert sent')
+            }
+          }
+        } catch (slackErr) {
+          console.error('⚠️ Failed to send Slack shipped alert:', slackErr)
+        }
       } else {
         console.log('⚠️ Order linking failed, but shipment was created')
       }
