@@ -308,6 +308,7 @@ export const ImprovedStripePayment = ({
     mode: 'payment' as const,
     amount: Math.round(amount * 100),
     currency: 'usd',
+    paymentMethodCreation: 'manual' as const,
     appearance: {
       theme: 'stripe' as const,
     },
