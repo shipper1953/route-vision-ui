@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { LabelService } from "@/services/easypost/labelService";
 import { BulkShippingLabelDialog } from "@/components/cartonization/BulkShippingLabelDialog";
 import { MultiPackageRatesDisplay } from "./MultiPackageRatesDisplay";
+import { useNavigate } from "react-router-dom";
 
 interface ShippingRatesCardFooterProps {
   shipmentResponse: CombinedRateResponse;
@@ -35,11 +36,22 @@ export const ShippingRatesCardFooter = ({
   const [shipmentLabels, setShipmentLabels] = useState<Array<{ orderId: string; labelUrl: string; trackingNumber: string; carrier: string; service: string }>>([]);
   const form = useFormContext<ShipmentForm>();
   const { userProfile } = useAuth();
+  const navigate = useNavigate();
   
   // Safely get orderID from form context or URL fallback
   const formOrderId = form?.getValues ? form.getValues("orderId") : undefined;
   const urlOrderId = (() => { try { return new URLSearchParams(window.location.search).get('orderId'); } catch { return null; } })();
   const orderId = formOrderId || urlOrderId || undefined;
+
+  // Handle dialog close and navigate to orders page
+  const handleMultiDialogClose = () => {
+    setShowMultiLabelsDialog(false);
+    if (orderId) {
+      navigate(`/orders?highlight=${orderId}`);
+    } else {
+      navigate('/orders');
+    }
+  };
 
   // Fetch wallet balance when component mounts or user changes
   useEffect(() => {
@@ -290,7 +302,7 @@ export const ShippingRatesCardFooter = ({
 
       <BulkShippingLabelDialog
         isOpen={showMultiLabelsDialog}
-        onClose={() => setShowMultiLabelsDialog(false)}
+        onClose={handleMultiDialogClose}
         shipmentLabels={shipmentLabels}
       />
     </>
