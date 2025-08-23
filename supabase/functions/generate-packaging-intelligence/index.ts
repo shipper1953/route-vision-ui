@@ -207,12 +207,25 @@ serve(async (req) => {
       projected_packaging_need: boxUsageCount
     };
 
-    // 6. Save Report to Database with conflict handling
+    // 6. Save Report to Database - first delete existing reports for today, then insert new one
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Delete existing reports for today
+    const { error: deleteError } = await supabase
+      .from('packaging_intelligence_reports')
+      .delete()
+      .eq('company_id', company_id)
+      .gte('generated_at', `${today}T00:00:00Z`)
+      .lt('generated_at', `${today}T23:59:59Z`);
+
+    if (deleteError) {
+      console.warn('Could not delete existing reports:', deleteError);
+    }
+
+    // Insert the new report
     const { error: reportError } = await supabase
       .from('packaging_intelligence_reports')
-      .upsert([report], {
-        onConflict: 'company_id,generated_at'
-      });
+      .insert([report]);
 
     if (reportError) {
       console.error('Error saving report:', reportError);
