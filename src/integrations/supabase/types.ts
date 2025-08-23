@@ -787,6 +787,8 @@ export type Database = {
       shipments: {
         Row: {
           actual_delivery_date: string | null
+          actual_package_master_id: string | null
+          actual_package_sku: string | null
           carrier: string
           company_id: string | null
           cost: number | null
@@ -813,6 +815,8 @@ export type Database = {
         }
         Insert: {
           actual_delivery_date?: string | null
+          actual_package_master_id?: string | null
+          actual_package_sku?: string | null
           carrier: string
           company_id?: string | null
           cost?: number | null
@@ -839,6 +843,8 @@ export type Database = {
         }
         Update: {
           actual_delivery_date?: string | null
+          actual_package_master_id?: string | null
+          actual_package_sku?: string | null
           carrier?: string
           company_id?: string | null
           cost?: number | null
@@ -876,6 +882,13 @@ export type Database = {
             columns: ["warehouse_id"]
             isOneToOne: false
             referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_actual_package_master_id_fkey"
+            columns: ["actual_package_master_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_master_list"
             referencedColumns: ["id"]
           },
         ]
