@@ -134,10 +134,26 @@ export const ShippingLabelDialog = ({
               )}
               
               <div className="bg-slate-50 p-4 rounded-lg w-full">
-                <div className="text-center space-y-3">
-                  <div className="text-sm text-gray-600">
-                    PDF preview is temporarily unavailable. Use the buttons below to view or download your label.
+                <div className="space-y-3">
+                  <div className="text-sm text-gray-600 text-center">
+                    Shipping Label Preview
                   </div>
+                  
+                  {/* PDF Preview */}
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden bg-white">
+                    <iframe
+                      src={getProxyUrl(labelUrl)}
+                      className="w-full h-80 border-0"
+                      title="Shipping Label Preview"
+                      onLoad={() => console.log('Label iframe loaded successfully')}
+                      onError={(e) => console.error('Label iframe error:', e)}
+                    />
+                  </div>
+                  
+                  <div className="text-xs text-gray-500 text-center">
+                    If the preview doesn't load, try the buttons below
+                  </div>
+                  
                   <Button 
                     onClick={() => {
                       const proxyUrl = getProxyUrl(labelUrl);
