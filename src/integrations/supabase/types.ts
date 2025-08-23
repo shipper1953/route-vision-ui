@@ -469,6 +469,53 @@ export type Database = {
           },
         ]
       }
+      packages: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          freight_class: number | null
+          height: number
+          id: string
+          length: number
+          nmfc_code: string | null
+          shipment_id: number | null
+          weight: number
+          width: number
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          freight_class?: number | null
+          height: number
+          id?: string
+          length: number
+          nmfc_code?: string | null
+          shipment_id?: number | null
+          weight: number
+          width: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          freight_class?: number | null
+          height?: number
+          id?: string
+          length?: number
+          nmfc_code?: string | null
+          shipment_id?: number | null
+          weight?: number
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packages_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       packaging_alerts: {
         Row: {
           alert_type: string
@@ -687,6 +734,56 @@ export type Database = {
         }
         Relationships: []
       }
+      shipment_quotes: {
+        Row: {
+          carrier: string
+          carrier_quote_id: string | null
+          created_at: string | null
+          details: Json | null
+          estimated_days: number | null
+          id: string
+          is_selected: boolean | null
+          quote_type: string | null
+          rate: number
+          service: string
+          shipment_id: number | null
+        }
+        Insert: {
+          carrier: string
+          carrier_quote_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          estimated_days?: number | null
+          id?: string
+          is_selected?: boolean | null
+          quote_type?: string | null
+          rate: number
+          service: string
+          shipment_id?: number | null
+        }
+        Update: {
+          carrier?: string
+          carrier_quote_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          estimated_days?: number | null
+          id?: string
+          is_selected?: boolean | null
+          quote_type?: string | null
+          rate?: number
+          service?: string
+          shipment_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_quotes_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipments: {
         Row: {
           actual_delivery_date: string | null
@@ -696,14 +793,18 @@ export type Database = {
           created_at: string | null
           easypost_id: string | null
           estimated_delivery_date: string | null
+          from_address: Json | null
           id: number
           label_url: string | null
+          package_count: number | null
           package_dimensions: Json | null
           package_weights: Json | null
           rates: Json | null
           service: string
           smartrates: Json | null
           status: string
+          to_address: Json | null
+          total_weight: number | null
           tracking_number: string | null
           tracking_url: string | null
           user_id: string
@@ -718,14 +819,18 @@ export type Database = {
           created_at?: string | null
           easypost_id?: string | null
           estimated_delivery_date?: string | null
+          from_address?: Json | null
           id?: number
           label_url?: string | null
+          package_count?: number | null
           package_dimensions?: Json | null
           package_weights?: Json | null
           rates?: Json | null
           service: string
           smartrates?: Json | null
           status?: string
+          to_address?: Json | null
+          total_weight?: number | null
           tracking_number?: string | null
           tracking_url?: string | null
           user_id: string
@@ -740,14 +845,18 @@ export type Database = {
           created_at?: string | null
           easypost_id?: string | null
           estimated_delivery_date?: string | null
+          from_address?: Json | null
           id?: number
           label_url?: string | null
+          package_count?: number | null
           package_dimensions?: Json | null
           package_weights?: Json | null
           rates?: Json | null
           service?: string
           smartrates?: Json | null
           status?: string
+          to_address?: Json | null
+          total_weight?: number | null
           tracking_number?: string | null
           tracking_url?: string | null
           user_id?: string
