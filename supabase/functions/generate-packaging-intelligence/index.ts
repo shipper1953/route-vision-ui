@@ -182,30 +182,44 @@ serve(async (req) => {
               boxDiscrepancyCount[optimalPackaging.vendor_sku] = (boxDiscrepancyCount[optimalPackaging.vendor_sku] || 0) + 1;
             }
 
-            // Compare package volumes to flag suboptimal usage
+            // Compare package volumes to flag suboptimal usage (robustly handle array/object JSON)
             const pkgDims = (order.shipments[0] as any).package_dimensions as any;
-            let usedDims: any = null;
+            let parsedDims: any = null;
             try {
-              usedDims = pkgDims
+              parsedDims = pkgDims
                 ? (typeof pkgDims === 'string' ? JSON.parse(pkgDims) : pkgDims)
                 : null;
             } catch (_) {
-              usedDims = null;
+              parsedDims = null;
             }
 
-            if (usedDims?.length && usedDims?.width && usedDims?.height) {
-              const actualVolume = Number(usedDims.length) * Number(usedDims.width) * Number(usedDims.height);
+            const dims = Array.isArray(parsedDims) ? parsedDims[0] : parsedDims;
+            if (dims && typeof dims === 'object' && dims.length && dims.width && dims.height) {
+              const actualVolume = Number(dims.length) * Number(dims.width) * Number(dims.height);
               const optVolume = Number((optimalPackaging as any).length_in) * Number((optimalPackaging as any).width_in) * Number((optimalPackaging as any).height_in);
-              if (actualVolume > 0 && optVolume < actualVolume * 0.9) {
-                const volumeReductionPct = ((actualVolume - optVolume) / actualVolume) * 100;
+              if (actualVolume > optVolume * 1.4) { // 40% larger than optimal
+                const wastePercentage = Math.round(((actualVolume - optVolume) / optVolume) * 100);
+                // Record detailed discrepancy (volume-based)
+                detailedDiscrepancies.push({
+                  order_id: order.order_id,
+                  actual_box: `${dims.length}x${dims.width}x${dims.height}`,
+                  optimal_box: (optimalPackaging as any).vendor_sku,
+                  actual_volume: actualVolume,
+                  optimal_volume: optVolume,
+                  waste_percentage: wastePercentage,
+                  cost_difference: 0,
+                  potential_savings: 0
+                });
+
+                // Create alert for analytics
                 suboptimalAlerts.push({
                   company_id,
                   alert_type: 'suboptimal_package',
-                  message: `📦 Suboptimal packaging: Order ${order.order_id} used ${usedDims.length}x${usedDims.width}x${usedDims.height}, recommended ${ (optimalPackaging as any).vendor_sku } (${ (optimalPackaging as any).length_in }x${ (optimalPackaging as any).width_in }x${ (optimalPackaging as any).height_in }) would reduce volume by ${volumeReductionPct.toFixed(0)}%`,
+                  message: `📦 Suboptimal packaging: Order ${order.order_id} used ${dims.length}x${dims.width}x${dims.height}, recommended ${(optimalPackaging as any).vendor_sku} (${(optimalPackaging as any).length_in}x${(optimalPackaging as any).width_in}x${(optimalPackaging as any).height_in}) would reduce volume by ${wastePercentage}%`,
                   severity: 'info',
                   metadata: {
                     order_id: order.order_id,
-                    used_dimensions: usedDims,
+                    used_dimensions: dims,
                     recommended: {
                       sku: (optimalPackaging as any).vendor_sku,
                       name: (optimalPackaging as any).name,
