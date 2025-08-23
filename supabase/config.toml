@@ -73,6 +73,9 @@ url = ""
 [functions]
 # Configuration for Edge Functions.
 
+[functions.label-proxy]
+verify_jwt = false
+
 [functions.create-shipment]
 verify_jwt = false
 
