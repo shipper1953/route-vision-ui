@@ -20,6 +20,19 @@ interface CartonizationData {
   boxWeight: number;
 }
 
+interface ShipmentInfo {
+  id: string;
+  carrier: string;
+  service: string;
+  trackingNumber: string;
+  trackingUrl?: string;
+  estimatedDeliveryDate?: string;
+  actualDeliveryDate?: string;
+  cost?: number | string;
+  labelUrl?: string;
+  packageIndex?: number;
+}
+
 interface OrderTableRowProps {
   order: OrderData;
 }
@@ -27,6 +40,7 @@ interface OrderTableRowProps {
 export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const navigate = useNavigate();
   const [cartonizationData, setCartonizationData] = useState<CartonizationData | null>(null);
+  const [allShipments, setAllShipments] = useState<ShipmentInfo[]>([]);
 
   // Fetch cartonization data for this order
   useEffect(() => {
@@ -35,7 +49,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
         const { data, error } = await supabase
           .from('order_cartonization')
           .select('*')
-          .eq('order_id', parseInt(order.id))
+          .eq('order_id', typeof order.id === 'string' ? parseInt(order.id) : order.id)
           .single();
 
         if (!error && data) {
@@ -59,35 +73,97 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
     }
   }, [order.id, order.status]);
 
-  const getShippingInfo = (order: OrderData) => {
-    // First check if order has shipment info in the shipment field
-    if (order.shipment) {
-      return order.shipment;
-    }
-    
-    // Check if order has shipping data in shipping_address field (where bulk shipping stores it)
-    const shippingAddress = order.shippingAddress as any;
-    if (shippingAddress && typeof shippingAddress === 'object') {
-      const hasShippingInfo = shippingAddress.carrier || shippingAddress.trackingNumber;
-      if (hasShippingInfo) {
-        return {
-          id: shippingAddress.easypostShipmentId || '',
-          carrier: shippingAddress.carrier,
-          service: shippingAddress.service,
-          trackingNumber: shippingAddress.trackingNumber,
-          trackingUrl: shippingAddress.trackingUrl,
-          estimatedDeliveryDate: shippingAddress.estimatedDeliveryDate,
-          actualDeliveryDate: shippingAddress.actualDeliveryDate,
-          cost: shippingAddress.cost,
-          labelUrl: shippingAddress.labelUrl
-        };
-      }
-    }
-    
-    return null;
-  };
+  // Fetch all shipments for this order
+  useEffect(() => {
+    const fetchAllShipments = async () => {
+      try {
+        // First try to get from order_shipments table (for multi-package orders)
+        const { data: orderShipments, error: osError } = await supabase
+          .from('order_shipments')
+          .select(`
+            package_index,
+            package_info,
+            shipment_id,
+            shipments (
+              id,
+              easypost_id,
+              carrier,
+              service,
+              tracking_number,
+              tracking_url,
+              estimated_delivery_date,
+              actual_delivery_date,
+              cost,
+              label_url,
+              status
+            )
+          `)
+          .eq('order_id', typeof order.id === 'string' ? parseInt(order.id) : order.id)
+          .order('package_index');
 
-  const shippingInfo = getShippingInfo(order);
+        if (!osError && orderShipments?.length > 0) {
+          const shipmentInfos: ShipmentInfo[] = orderShipments.map((os) => ({
+            id: (os.shipments as any)?.easypost_id || (os.shipments as any)?.id?.toString() || '',
+            carrier: (os.shipments as any)?.carrier || 'Unknown',
+            service: (os.shipments as any)?.service || 'Unknown',
+            trackingNumber: (os.shipments as any)?.tracking_number || 'N/A',
+            trackingUrl: (os.shipments as any)?.tracking_url || '',
+            estimatedDeliveryDate: (os.shipments as any)?.estimated_delivery_date || '',
+            actualDeliveryDate: (os.shipments as any)?.actual_delivery_date || '',
+            cost: (os.shipments as any)?.cost || 0,
+            labelUrl: (os.shipments as any)?.label_url || '',
+            packageIndex: os.package_index || 0
+          }));
+          setAllShipments(shipmentInfos);
+          return;
+        }
+
+        // Fallback: get direct shipment from orders table
+        if (order.shipment) {
+          setAllShipments([{
+            id: order.shipment.id || '',
+            carrier: order.shipment.carrier || 'Unknown',
+            service: order.shipment.service || 'Unknown',
+            trackingNumber: order.shipment.trackingNumber || 'N/A',
+            trackingUrl: order.shipment.trackingUrl || '',
+            estimatedDeliveryDate: order.shipment.estimatedDeliveryDate || '',
+            actualDeliveryDate: order.shipment.actualDeliveryDate || '',
+            cost: order.shipment.cost || 0,
+            labelUrl: order.shipment.labelUrl || '',
+            packageIndex: 0
+          }]);
+          return;
+        }
+
+        // Final fallback: check shipping address field for bulk shipping data
+        const shippingAddress = order.shippingAddress as any;
+        if (shippingAddress && typeof shippingAddress === 'object') {
+          const hasShippingInfo = shippingAddress.carrier || shippingAddress.trackingNumber;
+          if (hasShippingInfo) {
+            setAllShipments([{
+              id: shippingAddress.easypostShipmentId || '',
+              carrier: shippingAddress.carrier || 'Unknown',
+              service: shippingAddress.service || 'Unknown',
+              trackingNumber: shippingAddress.trackingNumber || 'N/A',
+              trackingUrl: shippingAddress.trackingUrl || '',
+              estimatedDeliveryDate: shippingAddress.estimatedDeliveryDate || '',
+              actualDeliveryDate: shippingAddress.actualDeliveryDate || '',
+              cost: shippingAddress.cost || 0,
+              labelUrl: shippingAddress.labelUrl || '',
+              packageIndex: 0
+            }]);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching shipments for order:', order.id, error);
+      }
+    };
+
+    // Only fetch shipments for shipped/delivered orders
+    if (order.status === 'shipped' || order.status === 'delivered') {
+      fetchAllShipments();
+    }
+  }, [order.id, order.status, order.shipment, order.shippingAddress]);
 
   const handleCopyOrder = () => {
     const orderData = encodeURIComponent(JSON.stringify({
@@ -100,6 +176,29 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
     }));
     navigate(`/orders/create?copy=${orderData}`);
   };
+
+  // Get the earliest estimated delivery date from all shipments
+  const getEarliestEstimatedDelivery = () => {
+    if (!allShipments.length) return null;
+    const dates = allShipments
+      .map(s => s.estimatedDeliveryDate)
+      .filter(Boolean)
+      .map(d => new Date(d));
+    return dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+  };
+
+  // Get the latest actual delivery date from all shipments
+  const getLatestActualDelivery = () => {
+    if (!allShipments.length) return null;
+    const dates = allShipments
+      .map(s => s.actualDeliveryDate)
+      .filter(Boolean)
+      .map(d => new Date(d));
+    return dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+  };
+
+  const earliestEstimatedDelivery = getEarliestEstimatedDelivery();
+  const latestActualDelivery = getLatestActualDelivery();
 
   return (
     <TableRow key={order.id}>
@@ -121,41 +220,55 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
         </Badge>
       </TableCell>
       <TableCell>
-        {shippingInfo?.estimatedDeliveryDate 
-          ? format(new Date(shippingInfo.estimatedDeliveryDate), "MMM dd, yyyy")
+        {earliestEstimatedDelivery 
+          ? format(earliestEstimatedDelivery, "MMM dd, yyyy")
           : "-"
         }
       </TableCell>
       <TableCell>
-        {shippingInfo?.actualDeliveryDate 
-          ? format(new Date(shippingInfo.actualDeliveryDate), "MMM dd, yyyy")
+        {latestActualDelivery 
+          ? format(latestActualDelivery, "MMM dd, yyyy")
           : "-"
         }
       </TableCell>
       <TableCell>
-        {(order.status === 'shipped' || order.status === 'delivered') && shippingInfo ? (
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <Truck className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{shippingInfo.carrier} {shippingInfo.service}</span>
-            </div>
-            
-            <div className="flex items-center gap-1">
-              <Package className="h-4 w-4 text-muted-foreground" />
-              {shippingInfo.trackingUrl ? (
-                <a 
-                  href={shippingInfo.trackingUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                >
-                  {shippingInfo.trackingNumber}
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              ) : (
-                <span className="text-sm font-mono">{shippingInfo.trackingNumber}</span>
-              )}
-            </div>
+        {(order.status === 'shipped' || order.status === 'delivered') && allShipments.length > 0 ? (
+          <div className="space-y-2 max-w-xs">
+            {allShipments.length > 1 && (
+              <div className="text-xs font-medium text-tms-blue mb-1">
+                {allShipments.length} Packages
+              </div>
+            )}
+            {allShipments.map((shipment, index) => (
+              <div key={`${shipment.id}-${index}`} className="space-y-1 border-b border-gray-100 pb-1 last:border-b-0 last:pb-0">
+                {allShipments.length > 1 && (
+                  <div className="text-xs text-muted-foreground">
+                    Package {shipment.packageIndex !== undefined ? shipment.packageIndex + 1 : index + 1}
+                  </div>
+                )}
+                <div className="flex items-center gap-1">
+                  <Truck className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{shipment.carrier} {shipment.service}</span>
+                </div>
+                
+                <div className="flex items-center gap-1">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  {shipment.trackingUrl ? (
+                    <a 
+                      href={shipment.trackingUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                    >
+                      {shipment.trackingNumber}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-sm font-mono">{shipment.trackingNumber}</span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         ) : cartonizationData?.recommendedBox ? (
           <div className="flex items-center gap-2">
