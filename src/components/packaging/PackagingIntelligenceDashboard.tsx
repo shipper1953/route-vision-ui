@@ -266,7 +266,7 @@ export const PackagingIntelligenceDashboard = () => {
                     <p className="text-sm font-medium text-muted-foreground">Optimization Rate</p>
                     <p className="text-2xl font-bold text-blue-600">
                       {Array.isArray(report.top_5_box_discrepancies) && report.top_5_box_discrepancies.length > 0 
-                        ? `${((report.top_5_box_discrepancies.reduce((sum: number, [, count]: [string, number]) => sum + count, 0) / report.total_orders_analyzed) * 100).toFixed(1)}%`
+                        ? `${((report.top_5_box_discrepancies.length / report.total_orders_analyzed) * 100).toFixed(1)}%`
                         : '0%'
                       }
                     </p>
@@ -310,15 +310,24 @@ export const PackagingIntelligenceDashboard = () => {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {(Array.isArray(report.top_5_box_discrepancies) ? report.top_5_box_discrepancies : []).map(([boxId, count]: [string, number], index: number) => (
-                      <div key={boxId} className="flex items-center justify-between">
+                    {(Array.isArray(report.top_5_box_discrepancies) ? report.top_5_box_discrepancies : []).map((discrepancy: any, index: number) => (
+                      <div key={discrepancy.order_id || index} className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <Badge variant="outline">#{index + 1}</Badge>
-                          <span className="font-medium">{boxId}</span>
+                          <div>
+                            <div className="font-medium">{discrepancy.actual_box || discrepancy.order_id}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {discrepancy.optimal_box && `→ ${discrepancy.optimal_box}`}
+                            </div>
+                          </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-semibold text-orange-600">{count}</div>
-                          <div className="text-xs text-muted-foreground">opportunities</div>
+                          <div className="font-semibold text-orange-600">
+                            {discrepancy.potential_savings ? `$${discrepancy.potential_savings.toFixed(2)}` : `${discrepancy.waste_percentage || 0}%`}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {discrepancy.potential_savings ? 'savings' : 'waste'}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -344,14 +353,19 @@ export const PackagingIntelligenceDashboard = () => {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {(Array.isArray(report.top_5_most_used_boxes) ? report.top_5_most_used_boxes : []).map(([boxId, count]: [string, number], index: number) => (
-                      <div key={boxId} className="flex items-center justify-between">
+                    {(Array.isArray(report.top_5_most_used_boxes) ? report.top_5_most_used_boxes : []).map((box: any, index: number) => (
+                      <div key={box.box_sku || index} className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <Badge variant="outline">#{index + 1}</Badge>
-                          <span className="font-medium">{boxId}</span>
+                          <div>
+                            <div className="font-medium">{box.box_sku}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {box.percentage_of_orders}% of orders
+                            </div>
+                          </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-semibold text-green-600">{count}</div>
+                          <div className="font-semibold text-green-600">{box.total_usage || box.usage_count}</div>
                           <div className="text-xs text-muted-foreground">uses</div>
                         </div>
                       </div>
@@ -390,15 +404,15 @@ export const PackagingIntelligenceDashboard = () => {
                         <th className="text-center py-3 px-4">Status</th>
                       </tr>
                     </thead>
-                    <tbody>
+                     <tbody>
                       {(Array.isArray(report.inventory_suggestions) ? report.inventory_suggestions : []).map((item: any) => (
-                        <tr key={item.box_id} className="border-b hover:bg-muted/20">
-                          <td className="py-3 px-4 font-medium">{item.box_id}</td>
+                        <tr key={item.box_sku || item.box_id} className="border-b hover:bg-muted/20">
+                          <td className="py-3 px-4 font-medium">{item.box_sku || item.box_id}</td>
                           <td className="text-right py-3 px-4">{item.current_stock}</td>
-                          <td className="text-right py-3 px-4">{item.projected_need}</td>
-                          <td className="text-right py-3 px-4">{item.days_of_supply.toFixed(1)}</td>
+                          <td className="text-right py-3 px-4">{item.projected_need || item.projected_monthly_usage}</td>
+                          <td className="text-right py-3 px-4">{(item.days_of_supply || 0)}</td>
                           <td className="text-center py-3 px-4">
-                            <Badge variant={getSuggestionColor(item.suggestion)}>
+                            <Badge variant={item.urgency === 'high' ? 'destructive' : item.urgency === 'medium' ? 'secondary' : 'default'}>
                               {item.suggestion}
                             </Badge>
                           </td>
