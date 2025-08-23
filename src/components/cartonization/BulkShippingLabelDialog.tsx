@@ -23,40 +23,53 @@ export const BulkShippingLabelDialog = ({
 }: BulkShippingLabelDialogProps) => {
   const [isPrinting, setIsPrinting] = useState(false);
 
+  const getProxyUrl = (originalUrl: string) => {
+    const supabaseUrl = 'https://gidrlosmhpvdcogrkidj.supabase.co';
+    return `${supabaseUrl}/functions/v1/label-proxy?url=${encodeURIComponent(originalUrl)}`;
+  };
+
   const handlePrintAll = async () => {
     setIsPrinting(true);
     
     // Print each label in sequence
     for (const label of shipmentLabels) {
       if (label.labelUrl) {
-        const printWindow = window.open(label.labelUrl, '_blank');
-        if (printWindow) {
-          printWindow.addEventListener('load', () => {
-            setTimeout(() => {
-              printWindow.print();
-            }, 500);
-          });
-          // Wait a bit between opening windows
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+        const proxyUrl = getProxyUrl(label.labelUrl);
+        window.open(proxyUrl, '_blank');
+        // Wait a bit between opening windows
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
     
     setIsPrinting(false);
   };
 
-  const handleDownloadAll = () => {
-    shipmentLabels.forEach((label, index) => {
+  const handleDownloadAll = async () => {
+    for (const [index, label] of shipmentLabels.entries()) {
       if (label.labelUrl) {
-        const link = document.createElement('a');
-        link.href = label.labelUrl;
-        link.download = `shipping-label-${label.orderId}.pdf`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        try {
+          const proxyUrl = getProxyUrl(label.labelUrl);
+          const response = await fetch(proxyUrl);
+          
+          if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `shipping-label-${label.orderId}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+          }
+        } catch (error) {
+          console.error(`Failed to download label for order ${label.orderId}:`, error);
+        }
+        
+        // Add delay between downloads
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
-    });
+    }
   };
 
   return (
@@ -106,14 +119,8 @@ export const BulkShippingLabelDialog = ({
                       variant="outline"
                       onClick={() => {
                         if (label.labelUrl) {
-                          const printWindow = window.open(label.labelUrl, '_blank');
-                          if (printWindow) {
-                            printWindow.addEventListener('load', () => {
-                              setTimeout(() => {
-                                printWindow.print();
-                              }, 500);
-                            });
-                          }
+                          const proxyUrl = getProxyUrl(label.labelUrl);
+                          window.open(proxyUrl, '_blank');
                         }
                       }}
                     >
@@ -122,15 +129,26 @@ export const BulkShippingLabelDialog = ({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => {
+                      onClick={async () => {
                         if (label.labelUrl) {
-                          const link = document.createElement('a');
-                          link.href = label.labelUrl;
-                          link.download = `shipping-label-${label.orderId}.pdf`;
-                          link.target = '_blank';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
+                          try {
+                            const proxyUrl = getProxyUrl(label.labelUrl);
+                            const response = await fetch(proxyUrl);
+                            
+                            if (response.ok) {
+                              const blob = await response.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `shipping-label-${label.orderId}.pdf`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              window.URL.revokeObjectURL(url);
+                            }
+                          } catch (error) {
+                            console.error('Download failed:', error);
+                          }
                         }
                       }}
                     >
@@ -143,7 +161,7 @@ export const BulkShippingLabelDialog = ({
                 {label.labelUrl && (
                   <div className="bg-slate-50 rounded p-2 h-32 overflow-hidden">
                     <iframe
-                      src={label.labelUrl}
+                      src={getProxyUrl(label.labelUrl)}
                       className="w-full h-full border-0 scale-75 origin-top-left"
                       title={`Shipping Label ${label.orderId}`}
                     />

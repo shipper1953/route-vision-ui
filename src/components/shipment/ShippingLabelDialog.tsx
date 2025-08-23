@@ -32,11 +32,16 @@ export const ShippingLabelDialog = ({
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   
+  const getProxyUrl = (originalUrl: string) => {
+    const supabaseUrl = 'https://gidrlosmhpvdcogrkidj.supabase.co';
+    return `${supabaseUrl}/functions/v1/label-proxy?url=${encodeURIComponent(originalUrl)}`;
+  };
+
   const handlePrint = () => {
     if (!labelUrl) return;
     
-    // Open the PDF in a new window for printing
-    window.open(labelUrl, '_blank');
+    const proxyUrl = getProxyUrl(labelUrl);
+    window.open(proxyUrl, '_blank');
   };
   
   const handleDownload = async () => {
@@ -45,17 +50,28 @@ export const ShippingLabelDialog = ({
     setLoading(true);
     
     try {
-      // Fetch the PDF through CORS proxy
-      const response = await fetch(labelUrl, {
-        mode: 'no-cors'
-      });
+      const proxyUrl = getProxyUrl(labelUrl);
+      const response = await fetch(proxyUrl);
       
-      // Fallback: Just open the URL in a new tab for download
-      window.open(labelUrl, '_blank');
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `shipping-label-${shipmentId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        // Fallback: Open in new tab
+        window.open(proxyUrl, '_blank');
+      }
     } catch (error) {
-      console.log('Direct download failed, opening in new tab:', error);
-      // Fallback: Open the URL in a new tab
-      window.open(labelUrl, '_blank');
+      console.error('Download failed:', error);
+      // Fallback: Open in new tab
+      const proxyUrl = getProxyUrl(labelUrl);
+      window.open(proxyUrl, '_blank');
     }
     
     setLoading(false);
@@ -114,20 +130,12 @@ export const ShippingLabelDialog = ({
                 </div>
               )}
               
-              <div className="bg-slate-50 p-4 rounded-lg w-full">
-                <div className="text-center space-y-3">
-                  <div className="text-sm text-gray-600">
-                    Label preview is not available due to browser security restrictions.
-                  </div>
-                  <Button 
-                    onClick={() => window.open(labelUrl, '_blank')}
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                  >
-                    Open Label in New Tab
-                  </Button>
-                </div>
+              <div className="bg-slate-50 p-2 rounded-lg w-full h-64 overflow-hidden">
+                <iframe
+                  src={getProxyUrl(labelUrl)}
+                  className="w-full h-full border-0"
+                  title="Shipping Label"
+                />
               </div>
               
               <div className="flex gap-2 mt-2 w-full">
