@@ -7,6 +7,7 @@ import { BoxInventoryManager } from "@/components/cartonization/BoxInventoryMana
 import { CartonizationTestingEnvironment } from "@/components/cartonization/CartonizationTestingEnvironment";
 import { PackagingAlgorithm } from "@/components/cartonization/PackagingAlgorithm";
 import { BoxRecommendations } from "@/components/cartonization/BoxRecommendations";
+import { HistoricalBoxUsage } from "@/components/packaging/HistoricalBoxUsage";
 import { useCartonization } from "@/hooks/useCartonization";
 
 const Settings = () => {
@@ -58,10 +59,7 @@ const Settings = () => {
           </TabsContent>
           
           <TabsContent value="historical-usage" className="space-y-4">
-            <div className="text-center py-8">
-              <h3 className="text-lg font-semibold mb-2">Historical Box Usage</h3>
-              <p className="text-muted-foreground">Analytics and trends for box usage over time</p>
-            </div>
+            <HistoricalBoxUsage />
           </TabsContent>
           
           <TabsContent value="box-inventory" className="space-y-4">
