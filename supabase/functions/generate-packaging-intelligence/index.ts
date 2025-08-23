@@ -48,7 +48,8 @@ serve(async (req) => {
           id,
           cost,
           carrier,
-          service
+          service,
+          package_dimensions
         )
       `)
       .eq('company_id', company_id)
@@ -69,6 +70,7 @@ serve(async (req) => {
     const boxUsageCount: Record<string, number> = {};
     const boxDiscrepancyCount: Record<string, number> = {};
     const recommendationsToUpsert: any[] = [];
+    const suboptimalAlerts: any[] = [];
 
     // Get available packaging from master list
     const { data: availablePackaging, error: packagingError } = await supabase
@@ -131,7 +133,7 @@ serve(async (req) => {
 
           boxUsageCount[optimalPackaging.vendor_sku] = (boxUsageCount[optimalPackaging.vendor_sku] || 0) + 1;
 
-          // If order has shipment data, calculate potential savings
+          // If order has shipment data, calculate potential savings and detect suboptimal fit
           if (order.shipments?.length > 0) {
             const actualCost = order.shipments[0].cost || 0;
             const estimatedOptimalCost = actualCost * 0.9;
@@ -141,13 +143,47 @@ serve(async (req) => {
             if (savings > 0) {
               boxDiscrepancyCount[optimalPackaging.vendor_sku] = (boxDiscrepancyCount[optimalPackaging.vendor_sku] || 0) + 1;
             }
+
+            // Compare package volumes to flag suboptimal usage
+            const pkgDims = (order.shipments[0] as any).package_dimensions as any;
+            let usedDims: any = null;
+            try {
+              usedDims = pkgDims
+                ? (typeof pkgDims === 'string' ? JSON.parse(pkgDims) : pkgDims)
+                : null;
+            } catch (_) {
+              usedDims = null;
+            }
+
+            if (usedDims?.length && usedDims?.width && usedDims?.height) {
+              const actualVolume = Number(usedDims.length) * Number(usedDims.width) * Number(usedDims.height);
+              const optVolume = Number((optimalPackaging as any).length_in) * Number((optimalPackaging as any).width_in) * Number((optimalPackaging as any).height_in);
+              if (actualVolume > 0 && optVolume < actualVolume * 0.9) {
+                const volumeReductionPct = ((actualVolume - optVolume) / actualVolume) * 100;
+                suboptimalAlerts.push({
+                  company_id,
+                  alert_type: 'suboptimal_package',
+                  message: `📦 Suboptimal packaging: Order ${order.order_id} used ${usedDims.length}x${usedDims.width}x${usedDims.height}, recommended ${ (optimalPackaging as any).vendor_sku } (${ (optimalPackaging as any).length_in }x${ (optimalPackaging as any).width_in }x${ (optimalPackaging as any).height_in }) would reduce volume by ${volumeReductionPct.toFixed(0)}%`,
+                  severity: 'info',
+                  metadata: {
+                    order_id: order.order_id,
+                    used_dimensions: usedDims,
+                    recommended: {
+                      sku: (optimalPackaging as any).vendor_sku,
+                      name: (optimalPackaging as any).name,
+                      dims: { length: (optimalPackaging as any).length_in, width: (optimalPackaging as any).width_in, height: (optimalPackaging as any).height_in }
+                    }
+                  }
+                });
+              }
+            }
           }
         }
 
         orderAnalyses.push({
           order_id: order.order_id,
-          recommended_box_id: optimalPackaging?.vendor_sku,
-          potential_savings: 0 // Individual order savings would be calculated here
+          recommended_box_id: (optimalPackaging as any)?.vendor_sku,
+          potential_savings: 0
         });
 
       } catch (error) {
@@ -246,7 +282,7 @@ serve(async (req) => {
     }
 
     // 7. Generate Alerts for Critical Issues
-    const alerts = [];
+    const alerts = [...suboptimalAlerts];
 
     // Low stock alerts
     for (const suggestion of inventorySuggestions) {
