@@ -94,19 +94,24 @@ export const PackagingIntelligenceDashboard = () => {
 
     setGenerating(true);
     try {
-      const { error } = await supabase.functions.invoke('generate-packaging-intelligence', {
+      const { data, error } = await supabase.functions.invoke('generate-packaging-intelligence', {
         body: { company_id: userProfile.company_id }
       });
 
       if (error) {
         console.error('Error generating report:', error);
-        return;
+        throw error;
       }
 
+      console.log('Report generation result:', data);
+      
       // Fetch the newly generated report
       await fetchLatestReport();
+      await fetchAlerts();
     } catch (error) {
       console.error('Error generating report:', error);
+      // Show user-friendly error message
+      alert('Failed to generate packaging intelligence report. Please try again.');
     } finally {
       setGenerating(false);
     }

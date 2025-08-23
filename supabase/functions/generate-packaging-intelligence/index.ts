@@ -87,10 +87,13 @@ serve(async (req) => {
         // Calculate approximate volume and weight from items
         for (const item of items) {
           const quantity = item.quantity || 1;
-          const length = item.length || 6; // default dimensions if not provided
-          const width = item.width || 4;
-          const height = item.height || 2;
-          const weight = item.weight || 8; // default weight in oz
+          
+          // Get dimensions from nested dimensions object if available
+          const dimensions = item.dimensions || {};
+          const length = dimensions.length || item.length || 6; // default dimensions if not provided
+          const width = dimensions.width || item.width || 4;
+          const height = dimensions.height || item.height || 2;
+          const weight = dimensions.weight || item.weight || 8; // default weight in oz
 
           totalVolume += quantity * (length * width * height);
           totalWeight += quantity * weight;
@@ -109,8 +112,8 @@ serve(async (req) => {
         }
 
         if (optimalPackaging) {
-          // Store recommendation
-          await supabase
+          // Store recommendation with proper conflict handling
+          const { error: upsertError } = await supabase
             .from('order_packaging_recommendations')
             .upsert({
               order_id: order.id,
@@ -119,7 +122,13 @@ serve(async (req) => {
               calculated_weight: totalWeight,
               confidence_score: 85, // Simple confidence score
               potential_savings: 0 // Will be calculated if we have shipping data
+            }, {
+              onConflict: 'order_id'
             });
+          
+          if (upsertError) {
+            console.warn(`Failed to upsert recommendation for order ${order.id}:`, upsertError);
+          }
 
           boxUsageCount[optimalPackaging.vendor_sku] = (boxUsageCount[optimalPackaging.vendor_sku] || 0) + 1;
 
@@ -198,10 +207,12 @@ serve(async (req) => {
       projected_packaging_need: boxUsageCount
     };
 
-    // 6. Save Report to Database
+    // 6. Save Report to Database with conflict handling
     const { error: reportError } = await supabase
       .from('packaging_intelligence_reports')
-      .insert([report]);
+      .upsert([report], {
+        onConflict: 'company_id,generated_at'
+      });
 
     if (reportError) {
       console.error('Error saving report:', reportError);
