@@ -53,7 +53,8 @@ serve(async (req) => {
       `)
       .eq('company_id', company_id)
       .gte('created_at', thirtyDaysAgo.toISOString())
-      .limit(1000);
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (ordersError) {
       console.error('Error fetching orders:', ordersError);
@@ -67,13 +68,19 @@ serve(async (req) => {
     let totalPotentialSavings = 0;
     const boxUsageCount: Record<string, number> = {};
     const boxDiscrepancyCount: Record<string, number> = {};
+    const recommendationsToUpsert: any[] = [];
 
     // Get available packaging from master list
-    const { data: availablePackaging } = await supabase
+    const { data: availablePackaging, error: packagingError } = await supabase
       .from('packaging_master_list')
       .select('*')
       .eq('is_active', true)
       .order('cost', { ascending: true });
+
+    if (packagingError) {
+      console.error('Error fetching packaging options:', packagingError);
+      throw new Error(`Failed to fetch packaging options: ${packagingError.message}`);
+    }
 
     console.log(`Available packaging options: ${availablePackaging?.length || 0}`);
 
@@ -112,31 +119,22 @@ serve(async (req) => {
         }
 
         if (optimalPackaging) {
-          // Store recommendation with proper conflict handling
-          const { error: upsertError } = await supabase
-            .from('order_packaging_recommendations')
-            .upsert({
-              order_id: order.id,
-              recommended_master_list_id: optimalPackaging.id,
-              calculated_volume: totalVolume,
-              calculated_weight: totalWeight,
-              confidence_score: 85, // Simple confidence score
-              potential_savings: 0 // Will be calculated if we have shipping data
-            }, {
-              onConflict: 'order_id'
-            });
-          
-          if (upsertError) {
-            console.warn(`Failed to upsert recommendation for order ${order.id}:`, upsertError);
-          }
+          // Queue recommendation for batch upsert
+          recommendationsToUpsert.push({
+            order_id: order.id,
+            recommended_master_list_id: optimalPackaging.id,
+            calculated_volume: totalVolume,
+            calculated_weight: totalWeight,
+            confidence_score: 85,
+            potential_savings: 0
+          });
 
           boxUsageCount[optimalPackaging.vendor_sku] = (boxUsageCount[optimalPackaging.vendor_sku] || 0) + 1;
 
           // If order has shipment data, calculate potential savings
           if (order.shipments?.length > 0) {
             const actualCost = order.shipments[0].cost || 0;
-            // Simplified savings calculation - in reality this would be more complex
-            const estimatedOptimalCost = actualCost * 0.9; // Assume 10% potential savings
+            const estimatedOptimalCost = actualCost * 0.9;
             const savings = Math.max(0, actualCost - estimatedOptimalCost);
             totalPotentialSavings += savings;
 
@@ -157,8 +155,18 @@ serve(async (req) => {
       }
     }
 
+    // Batch upsert recommendations to reduce network round-trips
+    if (recommendationsToUpsert.length > 0) {
+      const { error: batchUpsertError } = await supabase
+        .from('order_packaging_recommendations')
+        .upsert(recommendationsToUpsert, { onConflict: 'order_id' });
+      if (batchUpsertError) {
+        console.warn('Failed to batch upsert recommendations:', batchUpsertError);
+      }
+    }
+
     // 3. Get Current Inventory Status
-    const { data: currentInventory } = await supabase
+    const { data: currentInventory, error: inventoryError } = await supabase
       .from('packaging_inventory')
       .select(`
         *,
@@ -169,6 +177,11 @@ serve(async (req) => {
         )
       `)
       .eq('company_id', company_id);
+
+    if (inventoryError) {
+      console.error('Error fetching inventory:', inventoryError);
+      throw new Error(`Failed to fetch inventory: ${inventoryError.message}`);
+    }
 
     // 4. Generate Inventory Suggestions
     const inventorySuggestions = (currentInventory || []).map(invItem => {
