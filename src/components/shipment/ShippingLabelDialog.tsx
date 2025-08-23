@@ -41,6 +41,7 @@ export const ShippingLabelDialog = ({
     if (!labelUrl) return;
     
     const proxyUrl = getProxyUrl(labelUrl);
+    console.log('Opening proxy URL for print:', proxyUrl);
     window.open(proxyUrl, '_blank');
   };
   
@@ -51,6 +52,7 @@ export const ShippingLabelDialog = ({
     
     try {
       const proxyUrl = getProxyUrl(labelUrl);
+      console.log('Attempting download via proxy:', proxyUrl);
       const response = await fetch(proxyUrl);
       
       if (response.ok) {
@@ -64,6 +66,7 @@ export const ShippingLabelDialog = ({
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
       } else {
+        console.error('Proxy response not ok:', response.status, response.statusText);
         // Fallback: Open in new tab
         window.open(proxyUrl, '_blank');
       }
@@ -130,12 +133,24 @@ export const ShippingLabelDialog = ({
                 </div>
               )}
               
-              <div className="bg-slate-50 p-2 rounded-lg w-full h-64 overflow-hidden">
-                <iframe
-                  src={getProxyUrl(labelUrl)}
-                  className="w-full h-full border-0"
-                  title="Shipping Label"
-                />
+              <div className="bg-slate-50 p-4 rounded-lg w-full">
+                <div className="text-center space-y-3">
+                  <div className="text-sm text-gray-600">
+                    PDF preview is temporarily unavailable. Use the buttons below to view or download your label.
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      const proxyUrl = getProxyUrl(labelUrl);
+                      console.log('Opening label in new tab:', proxyUrl);
+                      window.open(proxyUrl, '_blank');
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    Open Label in New Tab
+                  </Button>
+                </div>
               </div>
               
               <div className="flex gap-2 mt-2 w-full">
