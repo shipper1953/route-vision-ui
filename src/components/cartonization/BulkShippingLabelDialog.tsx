@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Printer, Download } from "lucide-react";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BulkShippingLabelDialogProps {
   isOpen: boolean;
@@ -24,7 +25,8 @@ export const BulkShippingLabelDialog = ({
   const [isPrinting, setIsPrinting] = useState(false);
 
   const getProxyUrl = (originalUrl: string) => {
-    const supabaseUrl = 'https://gidrlosmhpvdcogrkidj.supabase.co';
+    // Use environment variable to construct the Supabase URL to avoid Chrome blocking issues
+    const supabaseUrl = import.meta.env.REACT_APP_SUPABASE_URL || 'https://gidrlosmhpvdcogrkidj.supabase.co';
     return `${supabaseUrl}/functions/v1/label-proxy?url=${encodeURIComponent(originalUrl)}`;
   };
 

@@ -5,6 +5,7 @@ import { FileText, Printer, PackageCheck } from "lucide-react";
 import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface OrderDetails {
   carrier: string;
@@ -33,7 +34,8 @@ export const ShippingLabelDialog = ({
   const navigate = useNavigate();
   
   const getProxyUrl = (originalUrl: string) => {
-    const supabaseUrl = 'https://gidrlosmhpvdcogrkidj.supabase.co';
+    // Use environment variable to construct the Supabase URL to avoid Chrome blocking issues  
+    const supabaseUrl = import.meta.env.REACT_APP_SUPABASE_URL || 'https://gidrlosmhpvdcogrkidj.supabase.co';
     return `${supabaseUrl}/functions/v1/label-proxy?url=${encodeURIComponent(originalUrl)}`;
   };
 
