@@ -78,6 +78,13 @@ const CreateOrder = () => {
           }));
           form.setValue("orderItems", formattedItems);
         }
+        
+        // Set default delivery date if not provided (3 days from today)
+        if (!orderData.requiredDeliveryDate) {
+          const defaultDate = new Date();
+          defaultDate.setDate(defaultDate.getDate() + 3);
+          form.setValue("requiredDeliveryDate", defaultDate);
+        }
       } catch (error) {
         console.error("Failed to parse copied order data:", error);
       }
