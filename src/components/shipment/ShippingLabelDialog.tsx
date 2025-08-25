@@ -31,6 +31,7 @@ export const ShippingLabelDialog = ({
   orderDetails
 }: ShippingLabelDialogProps) => {
   const [loading, setLoading] = useState(false);
+  const [iframeError, setIframeError] = useState(false);
   const navigate = useNavigate();
   
   const getProxyUrl = (originalUrl: string) => {
@@ -143,13 +144,33 @@ export const ShippingLabelDialog = ({
                   
                   {/* PDF Preview */}
                   <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden bg-white">
-                    <iframe
-                      src={getProxyUrl(labelUrl)}
-                      className="w-full h-80 border-0"
-                      title="Shipping Label Preview"
-                      onLoad={() => console.log('Label iframe loaded successfully')}
-                      onError={(e) => console.error('Label iframe error:', e)}
-                    />
+                    {!iframeError ? (
+                      <iframe
+                        src={getProxyUrl(labelUrl)}
+                        className="w-full h-80 border-0"
+                        title="Shipping Label Preview"
+                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                        onLoad={() => {
+                          console.log('Label iframe loaded successfully');
+                          setIframeError(false);
+                        }}
+                        onError={(e) => {
+                          console.error('Label iframe error:', e);
+                          setIframeError(true);
+                        }}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-80 space-y-4">
+                        <p className="text-muted-foreground">Unable to preview label in browser</p>
+                        <Button 
+                          onClick={handlePrint} 
+                          variant="outline"
+                          size="sm"
+                        >
+                          Open Label in New Tab
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="text-xs text-gray-500 text-center">

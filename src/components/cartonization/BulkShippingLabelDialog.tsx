@@ -23,6 +23,7 @@ export const BulkShippingLabelDialog = ({
   shipmentLabels
 }: BulkShippingLabelDialogProps) => {
   const [isPrinting, setIsPrinting] = useState(false);
+  const [iframeErrors, setIframeErrors] = useState<Record<string, boolean>>({});
 
   const getProxyUrl = (originalUrl: string) => {
     // Use environment variable to construct the Supabase URL to avoid Chrome blocking issues
@@ -162,11 +163,27 @@ export const BulkShippingLabelDialog = ({
                 {/* Label preview */}
                 {label.labelUrl && (
                   <div className="bg-slate-50 rounded p-2 h-32 overflow-hidden">
-                    <iframe
-                      src={getProxyUrl(label.labelUrl)}
-                      className="w-full h-full border-0 scale-75 origin-top-left"
-                      title={`Shipping Label ${label.orderId}`}
-                    />
+                    {!iframeErrors[label.orderId] ? (
+                      <iframe
+                        src={getProxyUrl(label.labelUrl)}
+                        className="w-full h-full border-0 scale-75 origin-top-left"
+                        title={`Shipping Label ${label.orderId}`}
+                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                        onLoad={() => setIframeErrors(prev => ({ ...prev, [label.orderId]: false }))}
+                        onError={() => setIframeErrors(prev => ({ ...prev, [label.orderId]: true }))}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full space-y-2">
+                        <p className="text-xs text-muted-foreground">Preview unavailable</p>
+                        <Button 
+                          onClick={() => window.open(getProxyUrl(label.labelUrl), '_blank')} 
+                          variant="outline" 
+                          size="sm"
+                        >
+                          Open
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

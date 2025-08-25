@@ -3,6 +3,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Security-Policy': "frame-ancestors 'self' https://*.lovable.dev https://*.supabase.co; object-src 'self'",
+  'X-Frame-Options': 'SAMEORIGIN',
+  'X-Content-Type-Options': 'nosniff'
 }
 
 serve(async (req) => {
@@ -64,13 +67,15 @@ serve(async (req) => {
     // Get the PDF content
     const pdfContent = await response.arrayBuffer();
     
-    // Return the PDF with proper headers
+    // Return the PDF with proper headers for iframe embedding
     return new Response(pdfContent, {
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'inline; filename="shipping-label.pdf"',
         'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+        'Cross-Origin-Embedder-Policy': 'unsafe-none',
+        'Cross-Origin-Opener-Policy': 'unsafe-none'
       },
     });
 
