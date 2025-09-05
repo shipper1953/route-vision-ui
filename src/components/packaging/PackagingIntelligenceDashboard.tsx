@@ -49,18 +49,18 @@ export const PackagingIntelligenceDashboard = () => {
     try {
       const { data, error } = await supabase
         .from('packaging_intelligence_reports')
-        .select('*')
+        .select('id, generated_at, total_orders_analyzed, potential_savings, top_5_most_used_boxes, top_5_box_discrepancies, inventory_suggestions, projected_packaging_need')
         .eq('company_id', userProfile.company_id)
         .order('generated_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error fetching report:', error);
         return;
       }
 
-      setReport(data);
+      setReport(data ?? null);
     } catch (error) {
       console.error('Error fetching report:', error);
     }
