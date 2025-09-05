@@ -76,19 +76,20 @@ serve(async (req) => {
     const recommendationsToUpsert: any[] = [];
     const suboptimalAlerts: any[] = [];
 
-    // Get available packaging from master list
+    // Get available packaging from company's boxes
     const { data: availablePackaging, error: packagingError } = await supabase
-      .from('packaging_master_list')
-      .select('*')
+      .from('boxes')
+      .select('id, name, sku, length, width, height, cost, max_weight')
+      .eq('company_id', company_id)
       .eq('is_active', true)
       .order('cost', { ascending: true });
 
     if (packagingError) {
-      console.error('Error fetching packaging options:', packagingError);
-      throw new Error(`Failed to fetch packaging options: ${packagingError.message}`);
+      console.error('Error fetching company boxes:', packagingError);
+      throw new Error(`Failed to fetch company boxes: ${packagingError.message}`);
     }
 
-    console.log(`Available packaging options: ${availablePackaging?.length || 0}`);
+    console.log(`Available company boxes: ${availablePackaging?.length || 0}`);
 
     for (const order of recentOrders || []) {
       try {
@@ -117,25 +118,18 @@ serve(async (req) => {
         let optimalCost = Infinity;
 
         for (const pkg of availablePackaging || []) {
-          const packageVolume = pkg.length_in * pkg.width_in * pkg.height_in;
-          if (packageVolume >= totalVolume && pkg.cost < optimalCost) {
+          const packageVolume = Number(pkg.length) * Number(pkg.width) * Number(pkg.height);
+          const maxWeight = Number(pkg.max_weight);
+          if (packageVolume >= totalVolume && totalWeight <= maxWeight && pkg.cost < optimalCost) {
             optimalPackaging = pkg;
             optimalCost = pkg.cost;
           }
         }
 
         if (optimalPackaging) {
-          // Queue recommendation for batch upsert
-          recommendationsToUpsert.push({
-            order_id: order.id,
-            recommended_master_list_id: optimalPackaging.id,
-            calculated_volume: totalVolume,
-            calculated_weight: totalWeight,
-            confidence_score: 85,
-            potential_savings: 0
-          });
-
-          boxUsageCount[optimalPackaging.vendor_sku] = (boxUsageCount[optimalPackaging.vendor_sku] || 0) + 1;
+          const boxSku = optimalPackaging.sku || optimalPackaging.name;
+          
+          boxUsageCount[boxSku] = (boxUsageCount[boxSku] || 0) + 1;
 
           // Track actual packaging usage if available
           if (order.shipments?.length > 0 && order.shipments[0].actual_package_sku) {
@@ -143,23 +137,23 @@ serve(async (req) => {
             actualBoxUsageCount[actualSku] = (actualBoxUsageCount[actualSku] || 0) + 1;
 
             // Compare actual vs optimal packaging for cost analysis
-            if (actualSku !== optimalPackaging.vendor_sku) {
-              const actualPackaging = availablePackaging?.find(pkg => pkg.vendor_sku === actualSku);
+            if (actualSku !== boxSku) {
+              const actualPackaging = availablePackaging?.find(pkg => (pkg.sku || pkg.name) === actualSku);
               if (actualPackaging) {
                 const costDifference = actualPackaging.cost - optimalPackaging.cost;
                 if (costDifference > 0) {
                   totalPotentialSavings += costDifference;
-                  boxDiscrepancyCount[optimalPackaging.vendor_sku] = (boxDiscrepancyCount[optimalPackaging.vendor_sku] || 0) + 1;
+                  boxDiscrepancyCount[boxSku] = (boxDiscrepancyCount[boxSku] || 0) + 1;
                   
                   // Add to detailed discrepancies
-                  const actualVolume = actualPackaging.length_in * actualPackaging.width_in * actualPackaging.height_in;
-                  const optimalVolume = optimalPackaging.length_in * optimalPackaging.width_in * optimalPackaging.height_in;
+                  const actualVolume = Number(actualPackaging.length) * Number(actualPackaging.width) * Number(actualPackaging.height);
+                  const optimalVolume = Number(optimalPackaging.length) * Number(optimalPackaging.width) * Number(optimalPackaging.height);
                   const wastePercentage = Math.round(((actualVolume - optimalVolume) / optimalVolume) * 100);
                   
                   detailedDiscrepancies.push({
                     order_id: order.order_id,
                     actual_box: actualSku,
-                    optimal_box: optimalPackaging.vendor_sku,
+                    optimal_box: boxSku,
                     actual_volume: actualVolume,
                     optimal_volume: optimalVolume,
                     waste_percentage: wastePercentage,
@@ -179,7 +173,7 @@ serve(async (req) => {
             totalPotentialSavings += savings;
 
             if (savings > 0) {
-              boxDiscrepancyCount[optimalPackaging.vendor_sku] = (boxDiscrepancyCount[optimalPackaging.vendor_sku] || 0) + 1;
+              boxDiscrepancyCount[boxSku] = (boxDiscrepancyCount[boxSku] || 0) + 1;
             }
 
             // Compare package volumes to flag suboptimal usage (robustly handle array/object JSON)
@@ -196,14 +190,14 @@ serve(async (req) => {
             const dims = Array.isArray(parsedDims) ? parsedDims[0] : parsedDims;
             if (dims && typeof dims === 'object' && dims.length && dims.width && dims.height) {
               const actualVolume = Number(dims.length) * Number(dims.width) * Number(dims.height);
-              const optVolume = Number((optimalPackaging as any).length_in) * Number((optimalPackaging as any).width_in) * Number((optimalPackaging as any).height_in);
+              const optVolume = Number(optimalPackaging.length) * Number(optimalPackaging.width) * Number(optimalPackaging.height);
               if (actualVolume > optVolume * 1.4) { // 40% larger than optimal
                 const wastePercentage = Math.round(((actualVolume - optVolume) / optVolume) * 100);
                 // Record detailed discrepancy (volume-based)
                 detailedDiscrepancies.push({
                   order_id: order.order_id,
                   actual_box: `${dims.length}x${dims.width}x${dims.height}`,
-                  optimal_box: (optimalPackaging as any).vendor_sku,
+                  optimal_box: boxSku,
                   actual_volume: actualVolume,
                   optimal_volume: optVolume,
                   waste_percentage: wastePercentage,
@@ -215,15 +209,15 @@ serve(async (req) => {
                 suboptimalAlerts.push({
                   company_id,
                   alert_type: 'suboptimal_package',
-                  message: `📦 Suboptimal packaging: Order ${order.order_id} used ${dims.length}x${dims.width}x${dims.height}, recommended ${(optimalPackaging as any).vendor_sku} (${(optimalPackaging as any).length_in}x${(optimalPackaging as any).width_in}x${(optimalPackaging as any).height_in}) would reduce volume by ${wastePercentage}%`,
+                  message: `📦 Suboptimal packaging: Order ${order.order_id} used ${dims.length}x${dims.width}x${dims.height}, recommended ${boxSku} (${optimalPackaging.length}x${optimalPackaging.width}x${optimalPackaging.height}) would reduce volume by ${wastePercentage}%`,
                   severity: 'info',
                   metadata: {
                     order_id: order.order_id,
                     used_dimensions: dims,
                     recommended: {
-                      sku: (optimalPackaging as any).vendor_sku,
-                      name: (optimalPackaging as any).name,
-                      dims: { length: (optimalPackaging as any).length_in, width: (optimalPackaging as any).width_in, height: (optimalPackaging as any).height_in }
+                      sku: boxSku,
+                      name: optimalPackaging.name,
+                      dims: { length: optimalPackaging.length, width: optimalPackaging.width, height: optimalPackaging.height }
                     }
                   }
                 });
@@ -234,7 +228,7 @@ serve(async (req) => {
 
         orderAnalyses.push({
           order_id: order.order_id,
-          recommended_box_id: (optimalPackaging as any)?.vendor_sku,
+          recommended_box_id: optimalPackaging ? (optimalPackaging.sku || optimalPackaging.name) : null,
           potential_savings: 0
         });
 
@@ -243,54 +237,39 @@ serve(async (req) => {
       }
     }
 
-    // Batch upsert recommendations to reduce network round-trips
-    if (recommendationsToUpsert.length > 0) {
-      const { error: batchUpsertError } = await supabase
-        .from('order_packaging_recommendations')
-        .upsert(recommendationsToUpsert, { onConflict: 'order_id' });
-      if (batchUpsertError) {
-        console.warn('Failed to batch upsert recommendations:', batchUpsertError);
-      }
-    }
-
-    // 3. Get Current Inventory Status
+    // 3. Get Current Box Inventory Status (use company's boxes instead of packaging_inventory)
     const { data: currentInventory, error: inventoryError } = await supabase
-      .from('packaging_inventory')
-      .select(`
-        *,
-        packaging_master_list (
-          vendor_sku,
-          name,
-          cost
-        )
-      `)
-      .eq('company_id', company_id);
+      .from('boxes')
+      .select('id, name, sku, cost, in_stock, length, width, height')
+      .eq('company_id', company_id)
+      .eq('is_active', true);
 
     if (inventoryError) {
-      console.error('Error fetching inventory:', inventoryError);
-      throw new Error(`Failed to fetch inventory: ${inventoryError.message}`);
+      console.error('Error fetching box inventory:', inventoryError);
+      throw new Error(`Failed to fetch box inventory: ${inventoryError.message}`);
     }
 
-    // 4. Generate Enhanced Inventory Suggestions
-    const inventorySuggestions = (currentInventory || []).map(invItem => {
-      const sku = invItem.packaging_master_list?.vendor_sku || 'Unknown';
-      const recommendedUsage = boxUsageCount[sku] || 0;
-      const actualUsage = actualBoxUsageCount[sku] || 0;
+    // 4. Generate Enhanced Inventory Suggestions based on company's actual boxes
+    const inventorySuggestions = (currentInventory || []).map(box => {
+      const boxSku = box.sku || box.name;
+      const recommendedUsage = boxUsageCount[boxSku] || 0;
+      const actualUsage = actualBoxUsageCount[boxSku] || 0;
       const totalUsage = Math.max(recommendedUsage, actualUsage);
       const historicalUsageRate = totalUsage / 30; // Daily average
-      const daysOfSupply = historicalUsageRate > 0 ? invItem.quantity_on_hand / historicalUsageRate : 999;
-      const cost = invItem.packaging_master_list?.cost || 0;
-
+      const currentStock = box.in_stock || 0;
+      const daysOfSupply = historicalUsageRate > 0 ? currentStock / historicalUsageRate : 999;
+      const reorderThreshold = 10; // Default threshold
+      
       let suggestion = 'Adequate stock';
       let urgency = 'low';
       
-      if (invItem.quantity_on_hand <= invItem.reorder_threshold) {
-        suggestion = `REORDER NOW - Below threshold (${invItem.reorder_threshold} units)`;
+      if (currentStock <= reorderThreshold) {
+        suggestion = `REORDER NOW - Below threshold (${reorderThreshold} units)`;
         urgency = 'high';
       } else if (daysOfSupply <= 14 && totalUsage > 0) {
         suggestion = `Consider reordering - Only ${Math.round(daysOfSupply)} days of supply remaining`;
         urgency = 'medium';
-      } else if (totalUsage === 0 && invItem.quantity_on_hand > 50) {
+      } else if (totalUsage === 0 && currentStock > 50) {
         suggestion = 'Excess inventory - No usage detected in 30 days';
         urgency = 'low';
       } else if (daysOfSupply > 90) {
@@ -299,15 +278,15 @@ serve(async (req) => {
       }
 
       return {
-        box_id: sku,
-        current_stock: invItem.quantity_on_hand,
+        box_id: boxSku,
+        current_stock: currentStock,
         projected_need: totalUsage,
         recommended_usage: recommendedUsage,
         actual_usage: actualUsage,
         days_of_supply: Math.round(daysOfSupply),
-        reorder_threshold: invItem.reorder_threshold,
-        suggested_order_quantity: invItem.reorder_quantity,
-        cost_per_unit: cost,
+        reorder_threshold: reorderThreshold,
+        suggested_order_quantity: 100,
+        cost_per_unit: box.cost || 0,
         suggestion,
         urgency
       };
