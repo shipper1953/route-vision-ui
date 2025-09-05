@@ -55,6 +55,7 @@ serve(async (req) => {
         )
       `)
       .eq('company_id', company_id)
+      .in('status', ['shipped','delivered'])
       .gte('created_at', thirtyDaysAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(200);
@@ -76,20 +77,19 @@ serve(async (req) => {
     const recommendationsToUpsert: any[] = [];
     const suboptimalAlerts: any[] = [];
 
-    // Get available packaging from company's boxes
+    // Get available packaging options from Uline master list (uploaded catalog)
     const { data: availablePackaging, error: packagingError } = await supabase
-      .from('boxes')
-      .select('id, name, sku, length, width, height, cost, max_weight')
-      .eq('company_id', company_id)
+      .from('packaging_master_list')
+      .select('id, vendor_sku, name, length_in, width_in, height_in, weight_oz, cost, is_active')
       .eq('is_active', true)
       .order('cost', { ascending: true });
 
     if (packagingError) {
-      console.error('Error fetching company boxes:', packagingError);
-      throw new Error(`Failed to fetch company boxes: ${packagingError.message}`);
+      console.error('Error fetching packaging options:', packagingError);
+      throw new Error(`Failed to fetch packaging options: ${packagingError.message}`);
     }
 
-    console.log(`Available company boxes: ${availablePackaging?.length || 0}`);
+    console.log(`Available packaging options: ${availablePackaging?.length || 0}`);
 
     for (const order of recentOrders || []) {
       try {
@@ -118,65 +118,65 @@ serve(async (req) => {
         let optimalCost = Infinity;
 
         for (const pkg of availablePackaging || []) {
-          const packageVolume = Number(pkg.length) * Number(pkg.width) * Number(pkg.height);
-          const maxWeight = Number(pkg.max_weight);
-          if (packageVolume >= totalVolume && totalWeight <= maxWeight && pkg.cost < optimalCost) {
+          const packageVolume = Number((pkg as any).length_in) * Number((pkg as any).width_in) * Number((pkg as any).height_in);
+          if (packageVolume >= totalVolume && (pkg as any).cost < optimalCost) {
             optimalPackaging = pkg;
-            optimalCost = pkg.cost;
+            optimalCost = (pkg as any).cost;
           }
         }
 
         if (optimalPackaging) {
-          const boxSku = optimalPackaging.sku || optimalPackaging.name;
+          const optimalSku = (optimalPackaging as any).vendor_sku as string;
           
-          boxUsageCount[boxSku] = (boxUsageCount[boxSku] || 0) + 1;
+          boxUsageCount[optimalSku] = (boxUsageCount[optimalSku] || 0) + 1;
 
-          // Track actual packaging usage if available
-          if (order.shipments?.length > 0 && order.shipments[0].actual_package_sku) {
-            const actualSku = order.shipments[0].actual_package_sku;
-            actualBoxUsageCount[actualSku] = (actualBoxUsageCount[actualSku] || 0) + 1;
+          // If order has shipment data, analyze actual packaging usage and discrepancies
+          if (order.shipments?.length > 0) {
+            const actualSku = (order.shipments[0] as any).actual_package_sku as string | null;
+            const actualMasterId = (order.shipments[0] as any).actual_package_master_id as string | null;
 
-            // Compare actual vs optimal packaging for cost analysis
-            if (actualSku !== boxSku) {
-              const actualPackaging = availablePackaging?.find(pkg => (pkg.sku || pkg.name) === actualSku);
-              if (actualPackaging) {
-                const costDifference = actualPackaging.cost - optimalPackaging.cost;
-                if (costDifference > 0) {
-                  totalPotentialSavings += costDifference;
-                  boxDiscrepancyCount[boxSku] = (boxDiscrepancyCount[boxSku] || 0) + 1;
-                  
-                  // Add to detailed discrepancies
-                  const actualVolume = Number(actualPackaging.length) * Number(actualPackaging.width) * Number(actualPackaging.height);
-                  const optimalVolume = Number(optimalPackaging.length) * Number(optimalPackaging.width) * Number(optimalPackaging.height);
-                  const wastePercentage = Math.round(((actualVolume - optimalVolume) / optimalVolume) * 100);
-                  
-                  detailedDiscrepancies.push({
-                    order_id: order.order_id,
-                    actual_box: actualSku,
-                    optimal_box: boxSku,
-                    actual_volume: actualVolume,
-                    optimal_volume: optimalVolume,
-                    waste_percentage: wastePercentage,
-                    cost_difference: costDifference,
-                    potential_savings: costDifference
-                  });
+            // 1) SKU/ID-based comparison when actual package is identifiable
+            let resolvedActualSku: string | null = actualSku;
+            let actualPackagingById: any = null;
+            if (!resolvedActualSku && actualMasterId) {
+              actualPackagingById = (availablePackaging as any)?.find((pkg: any) => pkg.id === actualMasterId);
+              if (actualPackagingById) {
+                resolvedActualSku = actualPackagingById.vendor_sku;
+              }
+            }
+
+            if (resolvedActualSku) {
+              const resolvedSku = resolvedActualSku as string;
+              actualBoxUsageCount[resolvedSku] = (actualBoxUsageCount[resolvedSku] || 0) + 1;
+
+              if (resolvedSku !== optimalSku) {
+                const actualPackaging = actualPackagingById || (availablePackaging as any)?.find((pkg: any) => pkg.vendor_sku === resolvedSku);
+                if (actualPackaging) {
+                  const costDifference = Number(actualPackaging.cost) - Number((optimalPackaging as any).cost);
+                  if (costDifference > 0) {
+                    totalPotentialSavings += costDifference;
+                    boxDiscrepancyCount[optimalSku] = (boxDiscrepancyCount[optimalSku] || 0) + 1;
+                    
+                    const actualVolume = Number(actualPackaging.length_in) * Number(actualPackaging.width_in) * Number(actualPackaging.height_in);
+                    const optimalVolume = Number((optimalPackaging as any).length_in) * Number((optimalPackaging as any).width_in) * Number((optimalPackaging as any).height_in);
+                    const wastePercentage = Math.max(0, Math.round(((actualVolume - optimalVolume) / Math.max(optimalVolume, 1)) * 100));
+                    
+                    detailedDiscrepancies.push({
+                      order_id: order.order_id,
+                      actual_box: resolvedSku,
+                      optimal_box: optimalSku,
+                      actual_volume: actualVolume,
+                      optimal_volume: optimalVolume,
+                      waste_percentage: wastePercentage,
+                      cost_difference: costDifference,
+                      potential_savings: costDifference
+                    });
+                  }
                 }
               }
             }
-          }
 
-          // If order has shipment data, calculate potential savings and detect suboptimal fit
-          if (order.shipments?.length > 0) {
-            const actualCost = order.shipments[0].cost || 0;
-            const estimatedOptimalCost = actualCost * 0.9;
-            const savings = Math.max(0, actualCost - estimatedOptimalCost);
-            totalPotentialSavings += savings;
-
-            if (savings > 0) {
-              boxDiscrepancyCount[boxSku] = (boxDiscrepancyCount[boxSku] || 0) + 1;
-            }
-
-            // Compare package volumes to flag suboptimal usage (robustly handle array/object JSON)
+            // 2) Volume-based discrepancy using captured package dimensions
             const pkgDims = (order.shipments[0] as any).package_dimensions as any;
             let parsedDims: any = null;
             try {
@@ -190,14 +190,14 @@ serve(async (req) => {
             const dims = Array.isArray(parsedDims) ? parsedDims[0] : parsedDims;
             if (dims && typeof dims === 'object' && dims.length && dims.width && dims.height) {
               const actualVolume = Number(dims.length) * Number(dims.width) * Number(dims.height);
-              const optVolume = Number(optimalPackaging.length) * Number(optimalPackaging.width) * Number(optimalPackaging.height);
-              if (actualVolume > optVolume * 1.4) { // 40% larger than optimal
-                const wastePercentage = Math.round(((actualVolume - optVolume) / optVolume) * 100);
+              const optVolume = Number((optimalPackaging as any).length_in) * Number((optimalPackaging as any).width_in) * Number((optimalPackaging as any).height_in);
+              if (actualVolume > optVolume * 1.15) { // 15% larger than optimal
+                const wastePercentage = Math.round(((actualVolume - optVolume) / Math.max(optVolume, 1)) * 100);
                 // Record detailed discrepancy (volume-based)
                 detailedDiscrepancies.push({
                   order_id: order.order_id,
                   actual_box: `${dims.length}x${dims.width}x${dims.height}`,
-                  optimal_box: boxSku,
+                  optimal_box: optimalSku,
                   actual_volume: actualVolume,
                   optimal_volume: optVolume,
                   waste_percentage: wastePercentage,
@@ -209,26 +209,35 @@ serve(async (req) => {
                 suboptimalAlerts.push({
                   company_id,
                   alert_type: 'suboptimal_package',
-                  message: `📦 Suboptimal packaging: Order ${order.order_id} used ${dims.length}x${dims.width}x${dims.height}, recommended ${boxSku} (${optimalPackaging.length}x${optimalPackaging.width}x${optimalPackaging.height}) would reduce volume by ${wastePercentage}%`,
+                  message: `📦 Suboptimal packaging: Order ${order.order_id} used ${dims.length}x${dims.width}x${dims.height}, recommended ${optimalSku} (${(optimalPackaging as any).length_in}x${(optimalPackaging as any).width_in}x${(optimalPackaging as any).height_in}) would reduce volume by ${wastePercentage}%`,
                   severity: 'info',
                   metadata: {
                     order_id: order.order_id,
                     used_dimensions: dims,
                     recommended: {
-                      sku: boxSku,
-                      name: optimalPackaging.name,
-                      dims: { length: optimalPackaging.length, width: optimalPackaging.width, height: optimalPackaging.height }
+                      sku: optimalSku,
+                      name: (optimalPackaging as any).name,
+                      dims: { length: (optimalPackaging as any).length_in, width: (optimalPackaging as any).width_in, height: (optimalPackaging as any).height_in }
                     }
                   }
                 });
               }
+            }
+
+            // 3) Cost opportunity proxy from rates if present
+            const actualCost = (order.shipments[0] as any).cost || 0;
+            const estimatedOptimalCost = actualCost * 0.9; // proxy improvement
+            const savings = Math.max(0, actualCost - estimatedOptimalCost);
+            totalPotentialSavings += savings;
+            if (savings > 0) {
+              boxDiscrepancyCount[optimalSku] = (boxDiscrepancyCount[optimalSku] || 0) + 1;
             }
           }
         }
 
         orderAnalyses.push({
           order_id: order.order_id,
-          recommended_box_id: optimalPackaging ? (optimalPackaging.sku || optimalPackaging.name) : null,
+          recommended_box_id: optimalPackaging ? (optimalPackaging as any).vendor_sku : null,
           potential_savings: 0
         });
 
