@@ -94,7 +94,7 @@ serve(async (req) => {
     // Step 3: Analyze packaging efficiency using proper cartonization algorithm
     console.log('Analyzing packaging efficiency with advanced cartonization...');
     const discrepancies = [];
-    let totalPotentialSavings = 0;
+    totalPotentialSavings = 0; // Reset for this analysis
     
     // Import the CartonizationEngine class (inline for edge function)
     class EnhancedCartonizationEngine {
