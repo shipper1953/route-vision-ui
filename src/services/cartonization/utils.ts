@@ -5,6 +5,32 @@ export class CartonizationUtils {
     return (box.length * box.width * box.height) / dimensionalWeightFactor;
   }
 
+  static calculateShippingCostImpact(
+    currentBox: Box, 
+    optimalBox: Box, 
+    actualWeight: number,
+    dimensionalWeightFactor: number = 139,
+    costPerPound: number = 0.15
+  ): { currentShippingCost: number; optimalShippingCost: number; savings: number } {
+    // Calculate dimensional weights
+    const currentDimWeight = this.calculateDimensionalWeight(currentBox, dimensionalWeightFactor);
+    const optimalDimWeight = this.calculateDimensionalWeight(optimalBox, dimensionalWeightFactor);
+    
+    // Billable weight is the greater of actual weight or dimensional weight
+    const currentBillableWeight = Math.max(actualWeight, currentDimWeight);
+    const optimalBillableWeight = Math.max(actualWeight, optimalDimWeight);
+    
+    // Calculate shipping costs
+    const currentShippingCost = currentBillableWeight * costPerPound;
+    const optimalShippingCost = optimalBillableWeight * costPerPound;
+    
+    return {
+      currentShippingCost,
+      optimalShippingCost,
+      savings: currentShippingCost - optimalShippingCost
+    };
+  }
+
   static calculateConfidence(
     actualUtilization: number,
     totalWeight: number,
