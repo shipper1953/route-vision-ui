@@ -89,6 +89,48 @@ export const PackagingIntelligenceDashboard = () => {
     }
   };
 
+  const processExistingOrders = async () => {
+    if (!userProfile?.company_id) return;
+
+    setGenerating(true);
+    try {
+      console.log('Processing existing orders for cartonization...');
+      const { data: processData, error: processError } = await supabase.functions.invoke('process-existing-orders', {
+        body: { company_id: userProfile.company_id }
+      });
+
+      if (processError) {
+        console.error('Error processing orders:', processError);
+        throw processError;
+      }
+
+      console.log('Order processing result:', processData);
+      
+      // Now generate the intelligence report
+      const { data: reportData, error: reportError } = await supabase.functions.invoke('generate-packaging-intelligence', {
+        body: { company_id: userProfile.company_id }
+      });
+
+      if (reportError) {
+        console.error('Error generating report:', reportError);
+        throw reportError;
+      }
+
+      console.log('Report generation result:', reportData);
+      
+      // Fetch the newly generated report and alerts
+      await fetchLatestReport();
+      await fetchAlerts();
+      
+      alert(`Successfully processed ${processData?.processed || 0} orders and generated intelligence report!`);
+    } catch (error) {
+      console.error('Error processing orders and generating report:', error);
+      alert('Failed to process orders and generate report. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const generateReport = async () => {
     if (!userProfile?.company_id) return;
 
@@ -173,14 +215,25 @@ export const PackagingIntelligenceDashboard = () => {
           <h2 className="text-2xl font-bold text-primary">📦 Packaging Intelligence Center</h2>
           <p className="text-muted-foreground">Strategic cost optimization and inventory insights</p>
         </div>
-        <Button 
-          onClick={generateReport}
-          disabled={generating}
-          className="gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
-          {generating ? 'Generating...' : 'Generate New Report'}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={processExistingOrders}
+            disabled={generating}
+            className="gap-2"
+            variant="outline"
+          >
+            <Package className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
+            {generating ? 'Processing...' : 'Process Orders & Generate Report'}
+          </Button>
+          <Button 
+            onClick={generateReport}
+            disabled={generating}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
+            {generating ? 'Generating...' : 'Generate New Report'}
+          </Button>
+        </div>
       </div>
 
       {/* Active Alerts */}
@@ -221,10 +274,16 @@ export const PackagingIntelligenceDashboard = () => {
             <p className="text-muted-foreground mb-4">
               Generate your first packaging intelligence report to see cost optimization opportunities.
             </p>
-            <Button onClick={generateReport} disabled={generating} className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Generate First Report
-            </Button>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={processExistingOrders} disabled={generating} className="gap-2" variant="outline">
+                <Package className="h-4 w-4" />
+                Process Orders First
+              </Button>
+              <Button onClick={generateReport} disabled={generating} className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Generate Report Only
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
