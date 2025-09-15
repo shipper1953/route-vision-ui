@@ -26,10 +26,18 @@ export class OrderProcessor {
         console.log(`Created cartonization items for order ${order.id}:`, items);
         
         if (items.length > 0) {
-          const engine = new CartonizationEngine(this.boxes);
-          console.log(`Running cartonization for order ${order.id} with ${this.boxes.length} available boxes`);
+          const engine = new CartonizationEngine(this.boxes, {
+            fillRateThreshold: 45,
+            maxPackageWeight: 50,
+            dimensionalWeightFactor: 139,
+            packingEfficiency: 85,
+            allowPartialFill: true,
+            optimizeForCost: true, // Enable cost optimization for bulk shipping
+            optimizeForSpace: true
+          });
+          console.log(`Running enhanced cartonization for order ${order.id} with ${this.boxes.length} available boxes`);
           const result = engine.calculateOptimalBox(items);
-          console.log(`Cartonization result for order ${order.id}:`, result);
+          console.log(`Enhanced cartonization result for order ${order.id}:`, result);
           
           if (result && result.recommendedBox) {
             console.log(`✅ Found recommended box for order ${order.id}:`, result.recommendedBox.name);
