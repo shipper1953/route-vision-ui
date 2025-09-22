@@ -1,41 +1,56 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface OrderAnalysis {
   order_id: string;
-  recommended_box_id?: string;
-  actual_box_id?: string;
-  shipping_cost?: number;
-  potential_savings?: number;
+  items: any[];
+  recommendedBoxes: any[];
+  currentPackaging?: any;
+  potentialSavings: number;
+  confidence: number;
+}
+
+interface InventorySuggestion {
+  box_id: string;
+  box_name: string;
+  current_stock: number;
+  projected_need: number;
+  days_of_supply: number;
+  suggestion: string;
+  urgency: 'low' | 'medium' | 'high';
+  cost_per_unit: number;
+  orders_needing_this_box: string[];
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { company_id } = await req.json();
-    
+
     if (!company_id) {
-      throw new Error("Company ID is required");
+      throw new Error('Company ID is required');
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     console.log(`Generating packaging intelligence report for company: ${company_id}`);
-
-    // 1. Analyze Recent Orders (last 30 days)
+    
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    // Step 1: Get all recent orders (both historical and current)
     const { data: recentOrders, error: ordersError } = await supabase
       .from('orders')
       .select(`
@@ -51,11 +66,11 @@ serve(async (req) => {
           service,
           package_dimensions,
           actual_package_sku,
-          actual_package_master_id
+          actual_package_master_id,
+          total_weight
         )
       `)
       .eq('company_id', company_id)
-      .in('status', ['shipped','delivered'])
       .gte('created_at', thirtyDaysAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(200);
@@ -67,17 +82,22 @@ serve(async (req) => {
 
     console.log(`Found ${recentOrders?.length || 0} recent orders to analyze`);
 
-    // 2. Run Enhanced Cartonization Analysis on Each Order
-    const orderAnalyses: OrderAnalysis[] = [];
-    let totalPotentialSavings = 0;
-    const boxUsageCount: Record<string, number> = {};
-    const actualBoxUsageCount: Record<string, number> = {};
-    const boxDiscrepancyCount: Record<string, number> = {};
-    const detailedDiscrepancies: any[] = [];
-    const recommendationsToUpsert: any[] = [];
-    const suboptimalAlerts: any[] = [];
+    // Step 2: Get current company box inventory
+    const { data: companyBoxes, error: companyBoxError } = await supabase
+      .from('boxes')
+      .select('id, name, sku, length, width, height, max_weight, cost, is_active')
+      .eq('company_id', company_id)
+      .eq('is_active', true)
+      .order('cost', { ascending: true });
 
-    // Get available packaging options from Uline master list (uploaded catalog)
+    if (companyBoxError) {
+      console.error('Error fetching company boxes:', companyBoxError);
+      throw new Error(`Failed to fetch company boxes: ${companyBoxError.message}`);
+    }
+
+    console.log(`Company has ${companyBoxes?.length || 0} box types in inventory`);
+
+    // Step 3: Get all Uline packaging options
     const { data: availablePackaging, error: packagingError } = await supabase
       .from('packaging_master_list')
       .select('id, vendor_sku, name, length_in, width_in, height_in, weight_oz, cost, is_active')
@@ -89,324 +109,256 @@ serve(async (req) => {
       throw new Error(`Failed to fetch packaging options: ${packagingError.message}`);
     }
 
-    console.log(`Available packaging options: ${availablePackaging?.length || 0}`);
+    console.log(`Uline catalog has ${availablePackaging?.length || 0} packaging options available`);
 
-    // Step 3: Analyze packaging efficiency using proper cartonization algorithm
-    console.log('Analyzing packaging efficiency with advanced cartonization...');
-    const discrepancies = [];
-    totalPotentialSavings = 0; // Reset for this analysis
-    
-    // Import the CartonizationEngine class (inline for edge function)
-    class EnhancedCartonizationEngine {
-      constructor(private boxes: any[]) {}
+    // Step 4: Enhanced Cartonization Engine
+    class PackagingIntelligenceEngine {
+      constructor(private companyBoxes: any[], private ulineBoxes: any[]) {}
       
-      findOptimalBox(items: any[]): any {
-        const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-        const totalVolume = items.reduce((sum, item) => 
-          sum + (item.length * item.width * item.height * item.quantity), 0);
-        
-        // Filter boxes that can handle the weight
-        const suitableBoxes = this.boxes.filter(box => {
-          const maxWeight = box.weight_oz ? (box.weight_oz / 16) * 10 : 50;
-          return totalWeight <= maxWeight;
-        });
-        
-        if (!suitableBoxes.length) return null;
-        
-        // Sort by volume (smallest first) for space optimization
-        const sortedBoxes = suitableBoxes.sort((a, b) => {
-          const volumeA = a.length_in * a.width_in * a.height_in;
-          const volumeB = b.length_in * b.width_in * b.height_in;
-          return volumeA - volumeB;
-        });
-        
-        // Find the smallest box that can actually fit all items
-        for (const box of sortedBoxes) {
-          if (this.checkItemsFit(items, box)) {
-            return box;
-          }
-        }
-        
-        return null;
-      }
-      
-      private checkItemsFit(items: any[], box: any): boolean {
-        // Enhanced 3D bin packing check
-        const totalVolume = items.reduce((sum, item) => 
-          sum + (item.length * item.width * item.height * item.quantity), 0);
-        const boxVolume = box.length_in * box.width_in * box.height_in;
-        
-        // Volume check with 85% efficiency
-        if (totalVolume > boxVolume * 0.85) return false;
-        
-        // Check if largest item fits in any orientation
-        const largestItem = items.reduce((max, item) => {
-          const volume = item.length * item.width * item.height;
-          return volume > (max.length * max.width * max.height) ? item : max;
-        });
-        
-        const itemDims = [largestItem.length, largestItem.width, largestItem.height].sort((a, b) => b - a);
-        const boxDims = [box.length_in, box.width_in, box.height_in].sort((a, b) => b - a);
-        
-        return itemDims[0] <= boxDims[0] && itemDims[1] <= boxDims[1] && itemDims[2] <= boxDims[2];
-      }
-      
-      calculateShippingCostImpact(currentBox: any, optimalBox: any, actualWeight: number) {
-        const dimWeightFactor = 139;
-        const costPerPound = 0.15;
-        
-        const currentDimWeight = (currentBox.length_in * currentBox.width_in * currentBox.height_in) / dimWeightFactor;
-        const optimalDimWeight = (optimalBox.length_in * optimalBox.width_in * optimalBox.height_in) / dimWeightFactor;
-        
-        const currentBillableWeight = Math.max(actualWeight, currentDimWeight);
-        const optimalBillableWeight = Math.max(actualWeight, optimalDimWeight);
-        
-        const currentShippingCost = currentBillableWeight * costPerPound;
-        const optimalShippingCost = optimalBillableWeight * costPerPound;
-        
-        return {
-          currentShippingCost,
-          optimalShippingCost,
-          savings: currentShippingCost - optimalShippingCost
-        };
-      }
-    }
-    
-    const cartonizationEngine = new EnhancedCartonizationEngine(availablePackaging || []);
-    
-    for (const order of recentOrders || []) {
-      try {
-        // Convert order items to cartonization format
+      analyzeOrder(order: any) {
         const items = Array.isArray(order.items) ? order.items : [];
+        if (!items.length) return null;
+
+        // Convert order items to cartonization format
         const cartonItems = items.map((item: any) => {
           const dimensions = item.dimensions || {};
           return {
             name: item.name || 'Unknown Item',
             length: dimensions.length || item.length || 6,
-            width: dimensions.width || item.width || 4,
+            width: dimensions.width || item.width || 4,  
             height: dimensions.height || item.height || 2,
             weight: (dimensions.weight || item.weight || 8) / 16, // Convert oz to lbs
             quantity: item.quantity || 1,
-            category: item.category || 'general',
-            fragile: false
+            category: item.category || 'general'
           };
         });
-        
-        if (!cartonItems.length) continue;
-        
-        // Calculate order weight
+
         const orderWeight = cartonItems.reduce((sum, item) => 
           sum + (item.weight * item.quantity), 0
         );
+
+        // Try company inventory first
+        let companyBoxResult = this.findOptimalBox(cartonItems, this.companyBoxes, 'company');
         
-        // Find optimal packaging using enhanced cartonization
-        const optimalPackaging = cartonizationEngine.findOptimalBox(cartonItems);
-        if (!optimalPackaging) continue;
-        
-        const optimalSku = optimalPackaging.vendor_sku;
-        boxUsageCount[optimalSku] = (boxUsageCount[optimalSku] || 0) + 1;
-        
-        // Analyze actual packaging usage if shipment data exists
-        if (order.shipments?.length > 0) {
-          const shipment = order.shipments[0];
-          const actualSku = shipment.actual_package_sku;
-          const actualMasterId = shipment.actual_package_master_id;
-          
-          let actualPackaging = null;
-          let resolvedActualSku = actualSku;
-          
-          // Resolve actual packaging from SKU or ID
-          if (actualSku) {
-            actualPackaging = (availablePackaging || []).find(pkg => pkg.vendor_sku === actualSku);
-          } else if (actualMasterId) {
-            actualPackaging = (availablePackaging || []).find(pkg => pkg.id === actualMasterId);
-            if (actualPackaging) {
-              resolvedActualSku = actualPackaging.vendor_sku;
-            }
-          }
-          
-          if (resolvedActualSku) {
-            actualBoxUsageCount[resolvedActualSku] = (actualBoxUsageCount[resolvedActualSku] || 0) + 1;
-          }
-          
-          // Direct comparison if we have actual packaging data
-          if (actualPackaging && resolvedActualSku !== optimalSku) {
-            const materialSavings = Math.max(0, actualPackaging.cost - optimalPackaging.cost);
-            const shippingImpact = cartonizationEngine.calculateShippingCostImpact(
-              actualPackaging, optimalPackaging, orderWeight
-            );
-            
-            const totalSavings = materialSavings + shippingImpact.savings;
-            
-            if (totalSavings > 0.10) { // Only flag if savings are meaningful (>$0.10)
-              totalPotentialSavings += totalSavings;
-              boxDiscrepancyCount[optimalSku] = (boxDiscrepancyCount[optimalSku] || 0) + 1;
-              
-              const actualVolume = actualPackaging.length_in * actualPackaging.width_in * actualPackaging.height_in;
-              const optimalVolume = optimalPackaging.length_in * optimalPackaging.width_in * optimalPackaging.height_in;
-              const volumeReduction = ((actualVolume - optimalVolume) / actualVolume * 100);
-              
-              detailedDiscrepancies.push({
-                order_id: order.order_id,
-                actual_box: `${actualPackaging.name} (${resolvedActualSku})`,
-                optimal_box: `${optimalPackaging.name} (${optimalSku})`,
-                actual_volume: actualVolume,
-                optimal_volume: optimalVolume,
-                volume_reduction_percent: volumeReduction,
-                material_savings: materialSavings,
-                shipping_savings: shippingImpact.savings,
-                total_savings: totalSavings,
-                actual_dimensions: `${actualPackaging.length_in}"×${actualPackaging.width_in}"×${actualPackaging.height_in}"`,
-                optimal_dimensions: `${optimalPackaging.length_in}"×${optimalPackaging.width_in}"×${optimalPackaging.height_in}"`,
-                confidence: shippingImpact.savings > 0.50 ? 95 : 85,
-                potential_savings: totalSavings
-              });
-            }
-          }
-          
-          // Volume-based analysis using package dimensions if no direct match
-          const packageDims = shipment.package_dimensions;
-          let parsedDims = null;
-          
-          try {
-            parsedDims = packageDims ? (typeof packageDims === 'string' ? JSON.parse(packageDims) : packageDims) : null;
-          } catch (_) {
-            parsedDims = null;
-          }
-          
-          const dims = Array.isArray(parsedDims) ? parsedDims[0] : parsedDims;
-          if (!actualPackaging && dims && typeof dims === 'object' && dims.length && dims.width && dims.height) {
-            const actualVolume = dims.length * dims.width * dims.height;
-            const optimalVolume = optimalPackaging.length_in * optimalPackaging.width_in * optimalPackaging.height_in;
-            
-            // Flag significant volume waste (20%+ larger than optimal)
-            if (actualVolume > optimalVolume * 1.20) {
-              const estimatedActualBox = {
-                name: `${dims.length}"×${dims.width}"×${dims.height}" Box`,
-                cost: optimalPackaging.cost * 1.3, // Estimate 30% higher cost
-                length_in: dims.length,
-                width_in: dims.width,
-                height_in: dims.height,
-                vendor_sku: 'ESTIMATED-OVERSIZED',
-                weight_oz: optimalPackaging.weight_oz
-              };
-              
-              const shippingImpact = cartonizationEngine.calculateShippingCostImpact(
-                estimatedActualBox, optimalPackaging, orderWeight
-              );
-              
-              const estimatedMaterialSavings = estimatedActualBox.cost - optimalPackaging.cost;
-              const totalSavings = estimatedMaterialSavings + shippingImpact.savings;
-              
-              if (totalSavings > 0.25) { // Higher threshold for estimated savings
-                totalPotentialSavings += totalSavings;
-                
-                const volumeReduction = ((actualVolume - optimalVolume) / actualVolume * 100);
-                
-                detailedDiscrepancies.push({
-                  order_id: order.order_id,
-                  actual_box: `${dims.length}"×${dims.width}"×${dims.height}" (Estimated)`,
-                  optimal_box: `${optimalPackaging.name} (${optimalSku})`,
-                  actual_volume: actualVolume,
-                  optimal_volume: optimalVolume,
-                  volume_reduction_percent: volumeReduction,
-                  material_savings: estimatedMaterialSavings,
-                  shipping_savings: shippingImpact.savings,
-                  total_savings: totalSavings,
-                  actual_dimensions: `${dims.length}"×${dims.width}"×${dims.height}"`,
-                  optimal_dimensions: `${optimalPackaging.length_in}"×${optimalPackaging.width_in}"×${optimalPackaging.height_in}"`,
-                  confidence: 75, // Lower confidence for estimated boxes
-                  potential_savings: totalSavings
-                });
-              }
-            }
-          }
-        }
-        
-        orderAnalyses.push({
+        // Try Uline catalog for comparison or if no company box found
+        let ulineBoxResult = this.findOptimalBox(cartonItems, this.ulineBoxes, 'uline');
+
+        return {
           order_id: order.order_id,
-          recommended_box_id: optimalSku,
-          potential_savings: 0
+          items: cartonItems,
+          orderWeight,
+          companyBoxResult,
+          ulineBoxResult,
+          actualShipment: order.shipments?.[0] || null
+        };
+      }
+      
+      findOptimalBox(items: any[], boxes: any[], source: 'company' | 'uline') {
+        const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+        const totalVolume = items.reduce((sum, item) => 
+          sum + (item.length * item.width * item.height * item.quantity), 0);
+        
+        // Filter boxes that can handle the weight and volume
+        const suitableBoxes = boxes.filter(box => {
+          const lengthKey = source === 'uline' ? 'length_in' : 'length';
+          const widthKey = source === 'uline' ? 'width_in' : 'width';
+          const heightKey = source === 'uline' ? 'height_in' : 'height';
+          const weightKey = source === 'uline' ? 'weight_oz' : 'max_weight';
+          
+          const boxVolume = box[lengthKey] * box[widthKey] * box[heightKey];
+          const maxWeight = source === 'uline' 
+            ? (box[weightKey] ? (box[weightKey] / 16) * 10 : 50)
+            : box[weightKey];
+          
+          return totalWeight <= maxWeight && this.canItemsFit(items, box, source);
         });
         
-      } catch (error) {
-        console.error(`Error analyzing order ${order.id}:`, error);
+        if (!suitableBoxes.length) return null;
+        
+        // Sort by efficiency (cost + volume efficiency)
+        const sortedBoxes = suitableBoxes.map(box => {
+          const lengthKey = source === 'uline' ? 'length_in' : 'length';
+          const widthKey = source === 'uline' ? 'width_in' : 'width';
+          const heightKey = source === 'uline' ? 'height_in' : 'height';
+          
+          const boxVolume = box[lengthKey] * box[widthKey] * box[heightKey];
+          const utilization = (totalVolume / boxVolume) * 100;
+          const costEfficiency = box.cost / boxVolume;
+          
+          return {
+            ...box,
+            utilization,
+            costEfficiency,
+            boxVolume,
+            score: utilization - (costEfficiency * 100) // Higher utilization, lower cost per volume
+          };
+        }).sort((a, b) => b.score - a.score);
+        
+        return sortedBoxes[0];
+      }
+      
+      canItemsFit(items: any[], box: any, source: 'company' | 'uline'): boolean {
+        const lengthKey = source === 'uline' ? 'length_in' : 'length';
+        const widthKey = source === 'uline' ? 'width_in' : 'width';
+        const heightKey = source === 'uline' ? 'height_in' : 'height';
+        
+        // Check if largest item can fit in any orientation
+        for (const item of items) {
+          const itemDims = [item.length, item.width, item.height].sort((a, b) => b - a);
+          const boxDims = [box[lengthKey], box[widthKey], box[heightKey]].sort((a, b) => b - a);
+          
+          if (itemDims[0] > boxDims[0] || itemDims[1] > boxDims[1] || itemDims[2] > boxDims[2]) {
+            return false;
+          }
+        }
+        return true;
+      }
+      
+      calculateSavings(currentBox: any, optimalBox: any, weight: number, currentSource: string, optimalSource: string) {
+        const dimWeightFactor = 139;
+        const shippingCostPerLb = 0.15;
+        
+        const currentLengthKey = currentSource === 'uline' ? 'length_in' : 'length';
+        const currentWidthKey = currentSource === 'uline' ? 'width_in' : 'width'; 
+        const currentHeightKey = currentSource === 'uline' ? 'height_in' : 'height';
+        
+        const optimalLengthKey = optimalSource === 'uline' ? 'length_in' : 'length';
+        const optimalWidthKey = optimalSource === 'uline' ? 'width_in' : 'width';
+        const optimalHeightKey = optimalSource === 'uline' ? 'height_in' : 'height';
+        
+        const currentVolume = currentBox[currentLengthKey] * currentBox[currentWidthKey] * currentBox[currentHeightKey];
+        const optimalVolume = optimalBox[optimalLengthKey] * optimalBox[optimalWidthKey] * optimalBox[optimalHeightKey];
+        
+        const currentDimWeight = currentVolume / dimWeightFactor;
+        const optimalDimWeight = optimalVolume / dimWeightFactor;
+        
+        const currentBillableWeight = Math.max(weight, currentDimWeight);
+        const optimalBillableWeight = Math.max(weight, optimalDimWeight);
+        
+        const materialSavings = Math.max(0, currentBox.cost - optimalBox.cost);
+        const shippingSavings = (currentBillableWeight - optimalBillableWeight) * shippingCostPerLb;
+        
+        return {
+          materialSavings,
+          shippingSavings,
+          totalSavings: materialSavings + shippingSavings,
+          currentVolume,
+          optimalVolume,
+          volumeReduction: ((currentVolume - optimalVolume) / currentVolume) * 100
+        };
       }
     }
 
-    // 3. Get Current Box Inventory Status (use company's boxes instead of packaging_inventory)
-    const { data: currentInventory, error: inventoryError } = await supabase
-      .from('boxes')
-      .select('id, name, sku, cost, in_stock, length, width, height')
-      .eq('company_id', company_id)
-      .eq('is_active', true);
+    // Step 5: Analyze all orders
+    console.log('Analyzing packaging efficiency with enhanced algorithm...');
+    
+    const engine = new PackagingIntelligenceEngine(companyBoxes || [], availablePackaging || []);
+    const orderAnalyses: any[] = [];
+    const unpackageableOrders: any[] = [];
+    const boxRecommendations: Map<string, InventorySuggestion> = new Map();
+    const boxUsageCount: Record<string, number> = {};
+    const actualBoxUsageCount: Record<string, number> = {};
+    const detailedDiscrepancies: any[] = [];
+    let totalPotentialSavings = 0;
 
-    if (inventoryError) {
-      console.error('Error fetching box inventory:', inventoryError);
-      throw new Error(`Failed to fetch box inventory: ${inventoryError.message}`);
+    for (const order of recentOrders || []) {
+      const analysis = engine.analyzeOrder(order);
+      if (!analysis) continue;
+      
+      orderAnalyses.push(analysis);
+      
+      // Track what happened with this order
+      if (!analysis.companyBoxResult) {
+        // Order can't be packaged with company inventory
+        unpackageableOrders.push(analysis);
+        
+        if (analysis.ulineBoxResult) {
+          // But can be packaged with Uline box - add to recommendations
+          const ulineBox = analysis.ulineBoxResult;
+          const sku = ulineBox.vendor_sku;
+          
+          if (!boxRecommendations.has(sku)) {
+            boxRecommendations.set(sku, {
+              box_id: sku,
+              box_name: ulineBox.name,
+              current_stock: 0, // Not in inventory
+              projected_need: 0,
+              days_of_supply: 0,
+              suggestion: `Add ${ulineBox.name} to inventory - needed for ${1} order`,
+              urgency: 'medium',
+              cost_per_unit: ulineBox.cost,
+              orders_needing_this_box: []
+            });
+          }
+          
+          const recommendation = boxRecommendations.get(sku)!;
+          recommendation.projected_need += 1;
+          recommendation.orders_needing_this_box.push(order.order_id);
+          recommendation.suggestion = `Add ${ulineBox.name} to inventory - needed for ${recommendation.projected_need} orders`;
+          
+          if (recommendation.projected_need >= 5) {
+            recommendation.urgency = 'high';
+          } else if (recommendation.projected_need >= 2) {
+            recommendation.urgency = 'medium';
+          }
+        }
+      } else {
+        // Order can be packaged with company inventory
+        const companySku = analysis.companyBoxResult.sku || analysis.companyBoxResult.name;
+        boxUsageCount[companySku] = (boxUsageCount[companySku] || 0) + 1;
+        
+        // Check if there's a better Uline option
+        if (analysis.ulineBoxResult) {
+          const savings = engine.calculateSavings(
+            analysis.companyBoxResult, 
+            analysis.ulineBoxResult,
+            analysis.orderWeight,
+            'company',
+            'uline'
+          );
+          
+          if (savings.totalSavings > 0.25) { // Significant savings
+            totalPotentialSavings += savings.totalSavings;
+            
+            detailedDiscrepancies.push({
+              order_id: order.order_id,
+              actual_box: `${analysis.companyBoxResult.name} (Current Inventory)`,
+              optimal_box: `${analysis.ulineBoxResult.name} (${analysis.ulineBoxResult.vendor_sku})`,
+              actual_volume: savings.currentVolume,
+              optimal_volume: savings.optimalVolume,
+              volume_reduction_percent: savings.volumeReduction,
+              material_savings: savings.materialSavings,
+              shipping_savings: savings.shippingSavings,
+              total_savings: savings.totalSavings,
+              confidence: savings.totalSavings > 1.0 ? 95 : 85,
+              potential_savings: savings.totalSavings
+            });
+          }
+        }
+      }
+      
+      // Track actual usage for shipped orders
+      if (analysis.actualShipment?.actual_package_sku) {
+        const actualSku = analysis.actualShipment.actual_package_sku;
+        actualBoxUsageCount[actualSku] = (actualBoxUsageCount[actualSku] || 0) + 1;
+      }
     }
 
-    // 4. Generate Enhanced Inventory Suggestions based on company's actual boxes
-    const inventorySuggestions = (currentInventory || []).map(box => {
-      const boxSku = box.sku || box.name;
-      const recommendedUsage = boxUsageCount[boxSku] || 0;
-      const actualUsage = actualBoxUsageCount[boxSku] || 0;
-      const totalUsage = Math.max(recommendedUsage, actualUsage);
-      const historicalUsageRate = totalUsage / 30; // Daily average
-      const currentStock = box.in_stock || 0;
-      const daysOfSupply = historicalUsageRate > 0 ? currentStock / historicalUsageRate : 999;
-      const reorderThreshold = 10; // Default threshold
-      
-      let suggestion = 'Adequate stock';
-      let urgency = 'low';
-      
-      if (currentStock <= reorderThreshold) {
-        suggestion = `REORDER NOW - Below threshold (${reorderThreshold} units)`;
-        urgency = 'high';
-      } else if (daysOfSupply <= 14 && totalUsage > 0) {
-        suggestion = `Consider reordering - Only ${Math.round(daysOfSupply)} days of supply remaining`;
-        urgency = 'medium';
-      } else if (totalUsage === 0 && currentStock > 50) {
-        suggestion = 'Excess inventory - No usage detected in 30 days';
-        urgency = 'low';
-      } else if (daysOfSupply > 90) {
-        suggestion = 'Overstocked - Consider reducing future orders';
-        urgency = 'low';
-      }
+    console.log(`Found ${unpackageableOrders.length} orders that can't be packaged with current inventory`);
+    console.log(`Generated ${boxRecommendations.size} box addition recommendations`);
 
-      return {
-        box_id: boxSku,
-        current_stock: currentStock,
-        projected_need: totalUsage,
-        recommended_usage: recommendedUsage,
-        actual_usage: actualUsage,
-        days_of_supply: Math.round(daysOfSupply),
-        reorder_threshold: reorderThreshold,
-        suggested_order_quantity: 100,
-        cost_per_unit: box.cost || 0,
-        suggestion,
-        urgency
-      };
-    }).filter(item => item.urgency !== 'low' || item.projected_need > 0)
-      .sort((a, b) => {
-        const urgencyOrder = { high: 3, medium: 2, low: 1 };
-        const urgencyDiff = urgencyOrder[b.urgency as keyof typeof urgencyOrder] - urgencyOrder[a.urgency as keyof typeof urgencyOrder];
-        if (urgencyDiff !== 0) return urgencyDiff;
-        return b.projected_need - a.projected_need;
-      });
+    // Step 6: Compile final report
+    const inventorySuggestions = Array.from(boxRecommendations.values())
+      .sort((a, b) => b.projected_need - a.projected_need);
 
-    // 5. Generate Enhanced Report
-    // Combine actual and recommended box usage for comprehensive view
     const combinedBoxUsage: Record<string, { recommended: number, actual: number, total: number }> = {};
     
-    // Add recommended usage
     Object.entries(boxUsageCount).forEach(([sku, count]) => {
       if (!combinedBoxUsage[sku]) combinedBoxUsage[sku] = { recommended: 0, actual: 0, total: 0 };
       combinedBoxUsage[sku].recommended = count;
       combinedBoxUsage[sku].total += count;
     });
     
-    // Add actual usage
     Object.entries(actualBoxUsageCount).forEach(([sku, count]) => {
       if (!combinedBoxUsage[sku]) combinedBoxUsage[sku] = { recommended: 0, actual: 0, total: 0 };
       combinedBoxUsage[sku].actual = count;
@@ -430,26 +382,27 @@ serve(async (req) => {
           percentage_of_orders: Math.round((usage.total / Math.max(recentOrders?.length || 1, 1)) * 100)
         })),
       top_5_box_discrepancies: detailedDiscrepancies
-        .sort((a, b) => (b.potential_savings || b.waste_percentage || 0) - (a.potential_savings || a.waste_percentage || 0))
+        .sort((a, b) => (b.potential_savings || 0) - (a.potential_savings || 0))
         .slice(0, 5),
       inventory_suggestions: inventorySuggestions.slice(0, 10),
       projected_packaging_need: Object.entries(combinedBoxUsage).reduce((acc, [sku, usage]) => {
-        acc[sku] = Math.ceil(usage.total * 1.1); // 10% buffer for next month
+        acc[sku] = Math.ceil(usage.total * 1.1);
         return acc;
       }, {} as Record<string, number>),
       report_data: {
-        orders_with_actual_packaging: recentOrders?.filter(o => o.shipments?.[0]?.actual_package_sku).length || 0,
+        orders_with_current_inventory: orderAnalyses.filter(a => a.companyBoxResult).length,
+        orders_needing_new_boxes: unpackageableOrders.length,
         total_discrepancies_found: detailedDiscrepancies.length,
         average_cost_per_discrepancy: detailedDiscrepancies.length > 0 
           ? (detailedDiscrepancies.reduce((sum, d) => sum + (d.potential_savings || 0), 0) / detailedDiscrepancies.length).toFixed(2)
-          : 0
+          : 0,
+        total_box_recommendations: inventorySuggestions.length
       }
     };
 
-    // 6. Save Report to Database - first delete existing reports for today, then insert new one
+    // Step 7: Save Report
     const today = new Date().toISOString().split('T')[0];
     
-    // Delete existing reports for today
     const { error: deleteError } = await supabase
       .from('packaging_intelligence_reports')
       .delete()
@@ -461,7 +414,6 @@ serve(async (req) => {
       console.warn('Could not delete existing reports:', deleteError);
     }
 
-    // Insert the new report
     const { error: reportError } = await supabase
       .from('packaging_intelligence_reports')
       .insert([report]);
@@ -471,28 +423,29 @@ serve(async (req) => {
       throw new Error(`Failed to save report: ${reportError.message}`);
     }
 
-    // 7. Generate Alerts for Critical Issues
-    const alerts = [...suboptimalAlerts];
+    // Step 8: Generate Alerts
+    const alerts = [];
 
-    // Low stock alerts
-    for (const suggestion of inventorySuggestions) {
-      if (suggestion.urgency === 'high') {
-        alerts.push({
-          company_id,
-          alert_type: 'low_stock',
-          message: `🚨 LOW STOCK: ${suggestion.box_id} has only ${suggestion.current_stock} units left (${suggestion.days_of_supply} days supply)`,
-          severity: 'warning',
-          metadata: { box_id: suggestion.box_id, stock: suggestion.current_stock, days_supply: suggestion.days_of_supply }
-        });
-      }
+    // Alert for orders that can't be packaged
+    if (unpackageableOrders.length > 0) {
+      alerts.push({
+        company_id,
+        alert_type: 'missing_inventory',
+        message: `📦 INVENTORY OPPORTUNITY: ${unpackageableOrders.length} recent orders can't be packaged with current inventory. Consider adding recommended Uline boxes.`,
+        severity: 'warning',
+        metadata: { 
+          unpackageable_orders: unpackageableOrders.length,
+          recommended_boxes: inventorySuggestions.length
+        }
+      });
     }
 
-    // Cost opportunity alerts
-    if (totalPotentialSavings > 50) {
+    // Alert for potential savings
+    if (totalPotentialSavings > 25) {
       alerts.push({
         company_id,
         alert_type: 'cost_opportunity',
-        message: `💰 COST OPPORTUNITY: You could save $${totalPotentialSavings.toFixed(2)} by optimizing packaging choices`,
+        message: `💰 COST OPPORTUNITY: You could save $${totalPotentialSavings.toFixed(2)} by switching to more efficient Uline boxes.`,
         severity: 'info',
         metadata: { potential_savings: totalPotentialSavings }
       });
@@ -516,7 +469,10 @@ serve(async (req) => {
         success: true, 
         report_id: report,
         alerts_created: alerts.length,
-        total_savings: totalPotentialSavings
+        total_savings: totalPotentialSavings,
+        orders_analyzed: recentOrders?.length || 0,
+        unpackageable_orders: unpackageableOrders.length,
+        box_recommendations: inventorySuggestions.length
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
