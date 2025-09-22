@@ -296,10 +296,12 @@ serve(async (req) => {
     }
     
     // Save shipment to database
+    let finalShipmentId;
     try {
       console.log('💾 Saving shipment to database...')
       console.log('📦 Selected box info:', selectedBox)
-      const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, defaultUserId, provider || 'easypost', selectedBox)
+      const result = await saveShipmentToDatabase(purchaseResponse, orderId, defaultUserId, provider || 'easypost', selectedBox)
+      finalShipmentId = result.finalShipmentId;
       console.log('✅ Shipment saved to database with ID:', finalShipmentId)
     } catch (saveError) {
       console.error('❌ Database save failed:', saveError)
