@@ -11,13 +11,14 @@ import { OrderLookupSection } from "./form/OrderLookupSection";
 import { ShipmentFormSubmission } from "./form/ShipmentFormSubmission";
 
 interface ShipmentFormProps {
-  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null) => void;
+  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
 }
 
 export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   const [loading, setLoading] = useState(false);
   const [orderLookupComplete, setOrderLookupComplete] = useState(false);
   const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [selectedBoxData, setSelectedBoxData] = useState<any>(null);
   const { getDefaultShippingAddress, warehouseAddress } = useDefaultAddressValues();
   
   const form = useForm<ShipmentFormType>({
@@ -98,7 +99,12 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
         <ShipmentFormSubmission 
           loading={loading}
           setLoading={setLoading}
-          onShipmentCreated={onShipmentCreated}
+          onShipmentCreated={(response, selectedRate, boxData) => {
+            if (boxData) {
+              setSelectedBoxData(boxData);
+            }
+            onShipmentCreated(response, selectedRate, boxData);
+          }}
         />
       </form>
     </FormProvider>

@@ -32,10 +32,11 @@ export const useShipment = (initialOrderId?: string | null) => {
     setRecommendedRate(null);
   };
 
-  const purchaseLabel = async (shipmentId: string, rateId: string) => {
+  const purchaseLabel = async (shipmentId: string, rateId: string, selectedBoxData?: any) => {
     try {
       console.log('Purchasing label with orderId:', initialOrderId);
       console.log('Selected rate:', selectedRate);
+      console.log('Selected box data for purchase:', selectedBoxData);
       
       // Determine which shipment ID to use based on the selected rate's provider
       let actualShipmentId = shipmentId;
@@ -50,8 +51,8 @@ export const useShipment = (initialOrderId?: string | null) => {
       
       const labelService = new LabelService('');
       
-      // Call the edge function with orderId and provider if available
-      const result = await labelService.purchaseLabel(actualShipmentId, rateId, initialOrderId, selectedRate?.provider);
+      // Call the edge function with orderId, provider, and selected box data
+      const result = await labelService.purchaseLabel(actualShipmentId, rateId, initialOrderId, selectedRate?.provider, selectedBoxData);
       
       console.log('Label purchase result:', result);
       await logEvent('label_purchased', {

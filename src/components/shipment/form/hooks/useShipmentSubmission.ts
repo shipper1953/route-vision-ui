@@ -13,7 +13,7 @@ import { logEvent } from "@/services/shipping/analytics";
 interface UseShipmentSubmissionProps {
   loading: boolean;
   setLoading: (loading: boolean) => void;
-  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null) => void;
+  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
 }
 
 export const useShipmentSubmission = ({ 
@@ -110,8 +110,16 @@ export const useShipmentSubmission = ({
         } : null,
       });
 
+      // Store selected box information from form context  
+      const selectedBoxData = {
+        selectedBoxId: data.selectedBoxId,
+        selectedBoxSku: data.selectedBoxSku || data.selectedBoxName, // Use name as fallback for SKU
+        selectedBoxName: data.selectedBoxName,
+        selectedBoxes: data.selectedBoxes
+      };
+
       toast.success(`Found ${totalRates} rates from multiple providers (EasyPost: ${easyPostCount}, Shippo: ${shippoCount})`);
-      onShipmentCreated(response, recommendedRate as any);
+      onShipmentCreated(response, recommendedRate as any, selectedBoxData);
     } catch (error) {
       console.error("Error creating shipment:", error);
       

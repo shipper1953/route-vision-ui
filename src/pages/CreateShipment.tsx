@@ -30,6 +30,7 @@ const CreateShipment = () => {
 
   const [labelData, setLabelData] = useState<any>(null);
   const [showLabelDialog, setShowLabelDialog] = useState(false);
+  const [selectedBoxData, setSelectedBoxData] = useState<any>(null);
 
   // Log user context for debugging
   useEffect(() => {
@@ -130,7 +131,12 @@ const CreateShipment = () => {
       </div>
 
       {!shipmentResponse ? (
-        <ShipmentForm onShipmentCreated={handleShipmentCreated} />
+        <ShipmentForm onShipmentCreated={(response, selectedRate, boxData) => {
+          if (boxData) {
+            setSelectedBoxData(boxData);
+          }
+          handleShipmentCreated(response);
+        }} />
       ) : (
         <div className="space-y-8">
           <ShippingRatesCard
@@ -140,7 +146,8 @@ const CreateShipment = () => {
             recommendedRate={recommendedRate}
             onBack={resetShipment}
             onBuyLabel={async (shipmentId, rateId) => {
-              const result = await purchaseLabel(shipmentId, rateId);
+              console.log('Purchasing label with selected box data:', selectedBoxData);
+              const result = await purchaseLabel(shipmentId, rateId, selectedBoxData);
               if (result) {
                 // Client-side fallback: mark order shipped and link shipment if provided
                 try {

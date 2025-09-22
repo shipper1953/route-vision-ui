@@ -7,7 +7,7 @@ import { useShipmentSubmission } from "./hooks/useShipmentSubmission";
 interface ShipmentFormSubmissionProps {
   loading: boolean;
   setLoading: (loading: boolean) => void;
-  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null) => void;
+  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
 }
 
 export const ShipmentFormSubmission = ({ 
