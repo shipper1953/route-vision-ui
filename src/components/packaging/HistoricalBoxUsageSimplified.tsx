@@ -29,66 +29,94 @@ export const HistoricalBoxUsageSimplified = () => {
       return;
     }
 
-    console.log('Fetching box usage for company:', userProfile.company_id);
+    console.log('Fetching comprehensive box usage for company:', userProfile.company_id);
 
     try {
       setLoading(true);
 
-      // First check if there are any orders for this company
-      const { data: orderCheck, error: orderError } = await supabase
+      // Get total orders count
+      const { data: orderCount } = await supabase
         .from('orders')
-        .select('id, order_id, company_id')
-        .eq('company_id', userProfile.company_id)
-        .limit(5);
+        .select('id', { count: 'exact' })
+        .eq('company_id', userProfile.company_id);
 
-      console.log('Order check result:', { orderCheck, orderError, count: orderCheck?.length });
+      const totalOrders = orderCount?.length || 0;
+      console.log('Total orders for company:', totalOrders);
 
-      // Get the latest packaging intelligence report
-      const { data: report, error } = await supabase
+      // Get data from packaging intelligence reports
+      const { data: reports, error: reportError } = await supabase
         .from('packaging_intelligence_reports')
-        .select('top_5_most_used_boxes, generated_at, total_orders_analyzed')
+        .select('top_5_most_used_boxes, total_orders_analyzed')
         .eq('company_id', userProfile.company_id)
-        .order('generated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('generated_at', { ascending: false });
 
-      console.log('Report fetch result:', { report, error });
+      console.log('Reports found:', reports?.length || 0);
 
-      if (error) {
-        console.error('Error fetching report:', error);
-        setBoxUsageData([]);
-        return;
+      // Get data from order cartonization
+      const { data: cartonization, error: cartonError } = await supabase
+        .from('order_cartonization')
+        .select(`
+          recommended_box_data,
+          order_id,
+          orders!inner(company_id)
+        `)
+        .eq('orders.company_id', userProfile.company_id);
+
+      console.log('Cartonization records found:', cartonization?.length || 0);
+
+      // Aggregate box usage from all sources
+      const boxUsage = new Map<string, { count: number, orders: Set<number> }>();
+
+      // Process packaging intelligence reports
+      if (reports && !reportError) {
+        reports.forEach(report => {
+          if (report.top_5_most_used_boxes && Array.isArray(report.top_5_most_used_boxes)) {
+            report.top_5_most_used_boxes.forEach((box: any) => {
+              const sku = box.box_sku || 'Unknown';
+              const usage = box.total_usage || box.recommended_usage || 0;
+              
+              if (!boxUsage.has(sku)) {
+                boxUsage.set(sku, { count: 0, orders: new Set() });
+              }
+              boxUsage.get(sku)!.count += usage;
+            });
+          }
+        });
       }
 
-      if (!report) {
-        console.log('No packaging intelligence report found for company:', userProfile.company_id);
-        setBoxUsageData([]);
-        return;
+      // Process cartonization data
+      if (cartonization && !cartonError) {
+        cartonization.forEach(record => {
+          if (record.recommended_box_data) {
+            const boxData = record.recommended_box_data as any;
+            const sku = boxData.name || boxData.sku || 'Unknown';
+            
+            if (!boxUsage.has(sku)) {
+              boxUsage.set(sku, { count: 0, orders: new Set() });
+            }
+            
+            boxUsage.get(sku)!.count += 1;
+            boxUsage.get(sku)!.orders.add(record.order_id);
+          }
+        });
       }
 
-      if (!report.top_5_most_used_boxes) {
-        console.log('No box usage data found in report');
-        setBoxUsageData([]);
-        return;
-      }
+      // Convert to array and calculate percentages
+      const usageData: BoxUsageData[] = Array.from(boxUsage.entries())
+        .map(([sku, data]) => ({
+          box_sku: sku,
+          usage_count: data.count,
+          percentage_of_orders: totalOrders > 0 ? Math.round((data.orders.size / totalOrders) * 100) : 0
+        }))
+        .sort((a, b) => b.usage_count - a.usage_count)
+        .slice(0, 10); // Show top 10
 
-      // Parse the box usage data safely
-      let usageData: BoxUsageData[] = [];
+      console.log('Final aggregated usage data:', usageData);
+      console.log('Total unique boxes found:', usageData.length);
       
-      console.log('Raw box usage data:', report.top_5_most_used_boxes);
-      
-      if (Array.isArray(report.top_5_most_used_boxes)) {
-        usageData = report.top_5_most_used_boxes.map((item: any) => ({
-          box_sku: item.box_sku || 'Unknown',
-          usage_count: item.total_usage || item.usage_count || 0,
-          percentage_of_orders: item.percentage_of_orders || 0
-        }));
-      }
-
-      console.log('Processed usage data:', usageData);
       setBoxUsageData(usageData);
     } catch (error) {
-      console.error('Error fetching box usage:', error);
+      console.error('Error fetching comprehensive box usage:', error);
       setBoxUsageData([]);
     } finally {
       setLoading(false);
