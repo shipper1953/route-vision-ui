@@ -142,12 +142,15 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
 
   const { data: newShipment, error: insertError } = await supabaseService
     .from('shipments')
-    .insert(shipmentData)
+    .upsert(shipmentData, { 
+      onConflict: 'easypost_id',
+      ignoreDuplicates: false 
+    })
     .select()
     .single();
 
   if (insertError) {
-    console.error("Error inserting shipment:", insertError);
+    console.error("Error upserting shipment:", insertError);
     throw new Error(`Failed to save shipment: ${insertError.message}`);
   }
 
