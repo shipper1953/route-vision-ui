@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { 
@@ -8,65 +7,32 @@ import {
   CardTitle, 
 } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { fetchOrders, OrderData } from "@/services/orderService";
 import { OrdersHeader } from "@/components/order/OrdersHeader";
 import { OrdersSearch } from "@/components/order/OrdersSearch";
 import { OrdersTable } from "@/components/order/OrdersTable";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { OrdersPagination } from "@/components/order/OrdersPagination";
+import { usePaginatedOrders } from "@/hooks/usePaginatedOrders";
+
 const Orders = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [orders, setOrders] = useState<OrderData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const highlightedOrderId = searchParams.get('highlight');
   
-  useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        setLoading(true);
-        const orderData = await fetchOrders();
-        console.log("Orders loaded from Supabase:", orderData.length);
-        setOrders(orderData);
-      } catch (error) {
-        console.error("Error loading orders:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadOrders();
-
-    // Realtime updates for order status/linking
-    const channel = supabase
-      .channel('public:orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
-        console.log('Realtime order update:', payload);
-        try {
-          const orderData = await fetchOrders();
-          setOrders(orderData);
-          if (payload.eventType === 'UPDATE' && payload.new?.status === 'shipped') {
-            toast.success(`Order ${payload.new.id} marked as shipped`);
-          }
-        } catch (e) {
-          console.warn('Failed to refresh orders on realtime update:', e);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    // Only depend on the specific highlight parameter value, not the entire searchParams object
-  }, [highlightedOrderId]);
-  
-  const filteredOrders = orders.filter(order => {
-    const orderId = String(order.id || '').toLowerCase();
-    const customerName = String(order.customerName || '').toLowerCase();
-    const searchLower = searchTerm.toLowerCase();
-    
-    return orderId.includes(searchLower) || customerName.includes(searchLower);
-  });
+  const {
+    orders,
+    loading,
+    searchLoading,
+    currentPage,
+    totalCount,
+    totalPages,
+    hasNextPage,
+    hasPreviousPage,
+    searchTerm,
+    setSearchTerm,
+    goToPage,
+    nextPage,
+    previousPage,
+    pageSize
+  } = usePaginatedOrders(10);
 
   return (
     <TmsLayout>
@@ -78,21 +44,40 @@ const Orders = () => {
           <OrdersSearch 
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
-            filteredCount={filteredOrders.length}
-            totalCount={orders.length}
-            isLoading={loading}
+            filteredCount={orders.length}
+            totalCount={totalCount}
+            isLoading={loading || searchLoading}
           />
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center items-center py-8">
               <LoadingSpinner size={24} />
             </div>
           ) : (
-            <OrdersTable 
-              orders={filteredOrders}
-              loading={loading}
-            />
+            <>
+              <div className="p-6">
+                <OrdersTable 
+                  orders={orders}
+                  loading={searchLoading}
+                />
+              </div>
+              
+              {totalCount > 0 && (
+                <OrdersPagination 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalCount={totalCount}
+                  pageSize={pageSize}
+                  hasNextPage={hasNextPage}
+                  hasPreviousPage={hasPreviousPage}
+                  onPageChange={goToPage}
+                  onNextPage={nextPage}
+                  onPreviousPage={previousPage}
+                  loading={searchLoading}
+                />
+              )}
+            </>
           )}
         </CardContent>
       </Card>
