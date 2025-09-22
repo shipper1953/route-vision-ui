@@ -19,19 +19,40 @@ export const HistoricalBoxUsageSimplified = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchLatestBoxUsage = async () => {
-    if (!userProfile?.company_id) return;
+    if (!userProfile?.company_id) {
+      console.log('No user profile or company_id found:', { 
+        userProfile, 
+        company_id: userProfile?.company_id 
+      });
+      setBoxUsageData([]);
+      setLoading(false);
+      return;
+    }
+
+    console.log('Fetching box usage for company:', userProfile.company_id);
 
     try {
       setLoading(true);
 
+      // First check if there are any orders for this company
+      const { data: orderCheck, error: orderError } = await supabase
+        .from('orders')
+        .select('id, order_id, company_id')
+        .eq('company_id', userProfile.company_id)
+        .limit(5);
+
+      console.log('Order check result:', { orderCheck, orderError, count: orderCheck?.length });
+
       // Get the latest packaging intelligence report
       const { data: report, error } = await supabase
         .from('packaging_intelligence_reports')
-        .select('top_5_most_used_boxes, generated_at')
+        .select('top_5_most_used_boxes, generated_at, total_orders_analyzed')
         .eq('company_id', userProfile.company_id)
         .order('generated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      console.log('Report fetch result:', { report, error });
 
       if (error) {
         console.error('Error fetching report:', error);
@@ -39,14 +60,22 @@ export const HistoricalBoxUsageSimplified = () => {
         return;
       }
 
-      if (!report || !report.top_5_most_used_boxes) {
-        console.log('No box usage data found in reports');
+      if (!report) {
+        console.log('No packaging intelligence report found for company:', userProfile.company_id);
+        setBoxUsageData([]);
+        return;
+      }
+
+      if (!report.top_5_most_used_boxes) {
+        console.log('No box usage data found in report');
         setBoxUsageData([]);
         return;
       }
 
       // Parse the box usage data safely
       let usageData: BoxUsageData[] = [];
+      
+      console.log('Raw box usage data:', report.top_5_most_used_boxes);
       
       if (Array.isArray(report.top_5_most_used_boxes)) {
         usageData = report.top_5_most_used_boxes.map((item: any) => ({
@@ -56,6 +85,7 @@ export const HistoricalBoxUsageSimplified = () => {
         }));
       }
 
+      console.log('Processed usage data:', usageData);
       setBoxUsageData(usageData);
     } catch (error) {
       console.error('Error fetching box usage:', error);

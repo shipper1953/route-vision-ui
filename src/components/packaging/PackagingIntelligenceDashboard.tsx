@@ -44,7 +44,15 @@ export const PackagingIntelligenceDashboard = () => {
   const [generating, setGenerating] = useState(false);
 
   const fetchLatestReport = async () => {
-    if (!userProfile?.company_id) return;
+    if (!userProfile?.company_id) {
+      console.log('PackagingIntelligenceDashboard: No user profile or company_id found:', { 
+        userProfile, 
+        company_id: userProfile?.company_id 
+      });
+      return;
+    }
+
+    console.log('PackagingIntelligenceDashboard: Fetching report for company:', userProfile.company_id);
 
     try {
       const { data, error } = await supabase
@@ -55,12 +63,15 @@ export const PackagingIntelligenceDashboard = () => {
         .limit(1)
         .maybeSingle();
 
+      console.log('PackagingIntelligenceDashboard: Report query result:', { data, error });
+
       if (error) {
         console.error('Error fetching report:', error);
         return;
       }
 
       setReport(data ?? null);
+      console.log('PackagingIntelligenceDashboard: Report set:', data);
     } catch (error) {
       console.error('Error fetching report:', error);
     }
