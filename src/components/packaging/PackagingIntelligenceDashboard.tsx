@@ -26,6 +26,20 @@ interface PackagingReport {
   top_5_box_discrepancies: any; // JSON field from database
   inventory_suggestions: any; // JSON field from database
   projected_packaging_need: any; // JSON field from database
+  report_data?: {
+    shipments_with_packaging_data?: number;
+    average_actual_utilization?: string;
+    total_discrepancies_found?: number;
+    total_potential_savings?: string;
+    high_efficiency_shipments?: number;
+    low_efficiency_shipments?: number;
+    utilization_distribution?: {
+      excellent?: number;
+      good?: number;
+      fair?: number;
+      poor?: number;
+    };
+  };
 }
 
 interface PackagingAlert {
@@ -224,7 +238,7 @@ export const PackagingIntelligenceDashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-primary">📦 Packaging Intelligence Center</h2>
-          <p className="text-muted-foreground">Strategic cost optimization and inventory insights</p>
+          <p className="text-muted-foreground">Real shipment performance analysis and cost optimization insights</p>
         </div>
         <div className="flex gap-2">
           <Button 
@@ -283,7 +297,7 @@ export const PackagingIntelligenceDashboard = () => {
             <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Intelligence Report Available</h3>
             <p className="text-muted-foreground mb-4">
-              Generate your first packaging intelligence report to see cost optimization opportunities.
+              Generate your first real performance report to see optimization opportunities based on actual shipment data.
             </p>
             <div className="flex gap-2 justify-center">
               <Button onClick={processExistingOrders} disabled={generating} className="gap-2" variant="outline">
@@ -333,10 +347,10 @@ export const PackagingIntelligenceDashboard = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Optimization Rate</p>
+                    <p className="text-sm font-medium text-muted-foreground">Avg Utilization</p>
                     <p className="text-2xl font-bold text-blue-600">
-                      {Array.isArray(report.top_5_box_discrepancies) && report.top_5_box_discrepancies.length > 0 
-                        ? `${((report.top_5_box_discrepancies.length / report.total_orders_analyzed) * 100).toFixed(1)}%`
+                      {report.report_data?.average_actual_utilization 
+                        ? `${report.report_data.average_actual_utilization}%` 
                         : '0%'
                       }
                     </p>
@@ -350,9 +364,9 @@ export const PackagingIntelligenceDashboard = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Report Age</p>
+                    <p className="text-sm font-medium text-muted-foreground">Shipments Analyzed</p>
                     <p className="text-2xl font-bold text-muted-foreground">
-                      {new Date(report.generated_at).toLocaleDateString()}
+                      {report.report_data?.shipments_with_packaging_data || 0}
                     </p>
                   </div>
                   <RefreshCw className="h-8 w-8 text-muted-foreground" />
@@ -369,9 +383,9 @@ export const PackagingIntelligenceDashboard = () => {
                   <AlertTriangle className="h-5 w-5 text-orange-600" />
                   Top Packaging Opportunities
                 </CardTitle>
-                 <CardDescription>
-                   Consolidated opportunities across all analyzed orders
-                 </CardDescription>
+                  <CardDescription>
+                    Real performance opportunities based on actual shipment data
+                  </CardDescription>
               </CardHeader>
               <CardContent>
                 {!Array.isArray(report.top_5_box_discrepancies) || report.top_5_box_discrepancies.length === 0 ? (
