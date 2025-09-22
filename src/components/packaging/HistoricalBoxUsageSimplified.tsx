@@ -165,28 +165,46 @@ export const HistoricalBoxUsageSimplified = () => {
               </Button>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/20 rounded-lg">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{boxUsageData.length}</div>
-                  <div className="text-sm text-muted-foreground">Box Types Used</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {boxUsageData.reduce((sum, item) => sum + item.usage_count, 0)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Total Uses</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {boxUsageData[0]?.box_sku || 'N/A'}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Most Popular</div>
-                </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/20 rounded-lg">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">{boxUsageData.length}</div>
+                <div className="text-sm text-muted-foreground">Box Types Used</div>
               </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {boxUsageData.reduce((sum, item) => sum + item.usage_count, 0)}
+                </div>
+                <div className="text-sm text-muted-foreground">Total Uses</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {boxUsageData[0]?.box_sku || 'N/A'}
+                </div>
+                <div className="text-sm text-muted-foreground">Most Popular</div>
+              </div>
+            </div>
 
-              <div className="space-y-3">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
                 <h4 className="font-semibold">Most Used Boxes</h4>
+                <Button 
+                  onClick={async () => {
+                    const { data, error } = await supabase.functions.invoke('backfill-shipment-boxes', {
+                      body: { company_id: userProfile?.company_id }
+                    });
+                    if (!error) {
+                      console.log('Backfill result:', data);
+                      fetchLatestBoxUsage(); // Refresh data
+                    }
+                  }} 
+                  variant="outline" 
+                  size="sm"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Update Box Data
+                </Button>
+              </div>
                 {boxUsageData.map((box, index) => (
                   <div key={box.box_sku} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
