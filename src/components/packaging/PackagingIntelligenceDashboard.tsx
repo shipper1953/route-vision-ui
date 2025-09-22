@@ -365,27 +365,27 @@ export const PackagingIntelligenceDashboard = () => {
               <CardContent>
                 {!Array.isArray(report.top_5_box_discrepancies) || report.top_5_box_discrepancies.length === 0 ? (
                   <p className="text-muted-foreground text-center py-4">
-                    No optimization opportunities found. Great job!
+                    No optimization opportunities found. Your packaging choices look efficient!
                   </p>
                 ) : (
                   <div className="space-y-3">
                     {(Array.isArray(report.top_5_box_discrepancies) ? report.top_5_box_discrepancies : []).map((discrepancy: any, index: number) => (
-                      <div key={discrepancy.order_id || index} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline">#{index + 1}</Badge>
-                          <div>
-                            <div className="font-medium">{discrepancy.actual_box || discrepancy.order_id}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {discrepancy.optimal_box && `→ ${discrepancy.optimal_box}`}
-                            </div>
+                      <div key={discrepancy.order_id || index} className="p-3 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">#{index + 1}</Badge>
+                            <span className="font-medium text-sm">Order {discrepancy.order_id}</span>
                           </div>
+                          <Badge variant="destructive" className="text-xs">
+                            ${discrepancy.total_savings?.toFixed(2)} savings
+                          </Badge>
                         </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-orange-600">
-                            {discrepancy.potential_savings ? `$${discrepancy.potential_savings.toFixed(2)}` : `${discrepancy.waste_percentage || 0}%`}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {discrepancy.potential_savings ? 'savings' : 'waste'}
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <div><strong>Current:</strong> {discrepancy.actual_box}</div>
+                          <div><strong>Better Option:</strong> {discrepancy.optimal_box}</div>
+                          <div className="flex gap-4">
+                            <span>Cube: {discrepancy.actual_cube} → {discrepancy.optimal_cube} cu.in</span>
+                            <span>Utilization: {discrepancy.current_utilization}% → {discrepancy.optimal_utilization}%</span>
                           </div>
                         </div>
                       </div>
@@ -442,42 +442,49 @@ export const PackagingIntelligenceDashboard = () => {
                 <Package className="h-5 w-5 text-blue-600" />
                 Inventory Health Dashboard
               </CardTitle>
-              <CardDescription>
-                Current stock levels vs. projected needs
-              </CardDescription>
+               <CardDescription>
+                 Recommended Uline boxes to add to your inventory
+               </CardDescription>
             </CardHeader>
             <CardContent>
               {!Array.isArray(report.inventory_suggestions) || report.inventory_suggestions.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  No inventory data available. Set up packaging inventory to see recommendations.
-                </p>
+                 <p className="text-muted-foreground text-center py-8">
+                   No inventory recommendations available. Great job - your current packaging choices look optimal!
+                 </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left py-3 px-4">Box ID</th>
-                        <th className="text-right py-3 px-4">Current Stock</th>
-                        <th className="text-right py-3 px-4">Projected Need</th>
-                        <th className="text-right py-3 px-4">Days Supply</th>
-                        <th className="text-center py-3 px-4">Status</th>
+                         <th className="text-left py-3 px-4">Uline Box SKU</th>
+                         <th className="text-left py-3 px-4">Box Name</th>
+                         <th className="text-right py-3 px-4">Orders Needing</th>
+                         <th className="text-right py-3 px-4">Cost per Unit</th>
+                         <th className="text-center py-3 px-4">Urgency</th>
                       </tr>
                     </thead>
-                     <tbody>
-                      {(Array.isArray(report.inventory_suggestions) ? report.inventory_suggestions : []).map((item: any) => (
-                        <tr key={item.box_sku || item.box_id} className="border-b hover:bg-muted/20">
-                          <td className="py-3 px-4 font-medium">{item.box_sku || item.box_id}</td>
-                          <td className="text-right py-3 px-4">{item.current_stock}</td>
-                          <td className="text-right py-3 px-4">{item.projected_need || item.projected_monthly_usage}</td>
-                          <td className="text-right py-3 px-4">{(item.days_of_supply || 0)}</td>
-                          <td className="text-center py-3 px-4">
-                            <Badge variant={item.urgency === 'high' ? 'destructive' : item.urgency === 'medium' ? 'secondary' : 'default'}>
-                              {item.suggestion}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
+                      <tbody>
+                       {(Array.isArray(report.inventory_suggestions) ? report.inventory_suggestions : []).map((item: any) => (
+                         <tr key={item.box_sku || item.box_id} className="border-b hover:bg-muted/20">
+                           <td className="py-3 px-4 font-medium text-sm">{item.box_id}</td>
+                           <td className="py-3 px-4 text-sm">{item.box_name}</td>
+                           <td className="text-right py-3 px-4">
+                             <Badge variant="outline">{item.projected_need}</Badge>
+                           </td>
+                           <td className="text-right py-3 px-4">
+                             <span className="text-sm font-medium">${item.cost_per_unit?.toFixed(2) || '0.00'}</span>
+                           </td>
+                           <td className="text-center py-3 px-4">
+                             <Badge variant={
+                               item.urgency === 'high' ? 'destructive' :
+                               item.urgency === 'medium' ? 'secondary' : 'default'
+                             }>
+                               {item.urgency?.toUpperCase() || 'LOW'}
+                             </Badge>
+                           </td>
+                         </tr>
+                       ))}
+                     </tbody>
                   </table>
                 </div>
               )}
