@@ -61,8 +61,17 @@ export const HistoricalBoxUsageSimplified = () => {
 
       shipmentsWithDimensions?.forEach(shipment => {
         const dims = shipment.package_dimensions as any;
-        if (dims && dims.length && dims.width && dims.height) {
-          const dimensionKey = `${parseFloat(dims.length).toFixed(1)}" × ${parseFloat(dims.width).toFixed(1)}" × ${parseFloat(dims.height).toFixed(1)}"`;
+        if (dims && dims.length) {
+          let dimensionKey = `${parseFloat(dims.length).toFixed(1)}"`;
+          
+          if (dims.width && dims.height) {
+            dimensionKey = `${parseFloat(dims.length).toFixed(1)}" × ${parseFloat(dims.width).toFixed(1)}" × ${parseFloat(dims.height).toFixed(1)}"`;
+          } else if (dims.width) {
+            dimensionKey = `${parseFloat(dims.length).toFixed(1)}" × ${parseFloat(dims.width).toFixed(1)}" × ?`;
+          } else {
+            dimensionKey = `${parseFloat(dims.length).toFixed(1)}" × ? × ?`;
+          }
+          
           dimensionUsage.set(dimensionKey, (dimensionUsage.get(dimensionKey) || 0) + 1);
         }
       });
