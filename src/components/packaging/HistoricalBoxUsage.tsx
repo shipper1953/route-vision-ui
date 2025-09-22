@@ -71,7 +71,7 @@ export const HistoricalBoxUsage = () => {
       // Combine data from reports and shipments
       const boxUsageMap = new Map<string, { count: number, lastUsed: Date, name?: string }>();
 
-      // Process intelligence reports
+      // Process intelligence reports - fix data structure handling
       reports?.forEach(report => {
         if (report.projected_packaging_need && typeof report.projected_packaging_need === 'object') {
           Object.entries(report.projected_packaging_need as Record<string, number>).forEach(([sku, count]) => {
@@ -83,12 +83,26 @@ export const HistoricalBoxUsage = () => {
           });
         }
 
+        // Handle top_5_most_used_boxes - fix iteration issue
         if (Array.isArray(report.top_5_most_used_boxes)) {
-          report.top_5_most_used_boxes.forEach(([sku, count]: [string, number]) => {
+          report.top_5_most_used_boxes.forEach((box: any) => {
+            let sku: string, count: number;
+            
+            // Handle different data formats
+            if (typeof box === 'object' && box.box_sku) {
+              sku = box.box_sku;
+              count = box.total_usage || box.usage_count || 1;
+            } else if (Array.isArray(box) && box.length >= 2) {
+              [sku, count] = box;
+            } else {
+              return; // Skip invalid entries
+            }
+            
             const existing = boxUsageMap.get(sku) || { count: 0, lastUsed: new Date(0) };
             boxUsageMap.set(sku, {
               count: Math.max(existing.count, count),
-              lastUsed: new Date(Math.max(existing.lastUsed.getTime(), new Date(report.generated_at).getTime()))
+              lastUsed: new Date(Math.max(existing.lastUsed.getTime(), new Date(report.generated_at).getTime())),
+              name: sku
             });
           });
         }

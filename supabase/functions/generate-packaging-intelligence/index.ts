@@ -96,6 +96,96 @@ serve(async (req) => {
     const itemsMap = new Map(companyItems?.map(item => [item.id, item]) || []);
 
     console.log(`Found ${recentOrders?.length || 0} recent orders to analyze`);
+    
+    if (!recentOrders || recentOrders.length === 0) {
+      console.log('No recent orders found, returning basic report');
+      
+      // Return a basic report structure when no orders are found
+      const basicReport = {
+        company_id,
+        generated_at: new Date().toISOString(),
+        analysis_period: 'Last 30 days',
+        total_orders_analyzed: 0,
+        potential_savings: 0,
+        top_5_most_used_boxes: [],
+        top_5_box_discrepancies: [],
+        inventory_suggestions: [],
+        projected_packaging_need: {},
+        report_data: {
+          orders_with_current_inventory: 0,
+          orders_needing_new_boxes: 0,
+          total_discrepancies_found: 0,
+          total_orders_with_opportunities: 0,
+          average_cost_per_discrepancy: 0,
+          total_box_recommendations: 0,
+          high_impact_opportunities: 0
+        }
+      };
+
+      // Save basic report
+      const { error: reportError } = await supabase
+        .from('packaging_intelligence_reports')
+        .insert([basicReport]);
+
+      if (reportError) {
+        console.error('Error saving basic report:', reportError);
+        throw new Error(`Failed to save basic report: ${reportError.message}`);
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'No orders to analyze, basic report generated',
+          orders_analyzed: 0
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (!recentOrders || recentOrders.length === 0) {
+      console.log('No recent orders found, returning basic report');
+      
+      // Return a basic report structure when no orders are found
+      const basicReport = {
+        company_id,
+        generated_at: new Date().toISOString(),
+        analysis_period: 'Last 30 days',
+        total_orders_analyzed: 0,
+        potential_savings: 0,
+        top_5_most_used_boxes: [],
+        top_5_box_discrepancies: [],
+        inventory_suggestions: [],
+        projected_packaging_need: {},
+        report_data: {
+          orders_with_current_inventory: 0,
+          orders_needing_new_boxes: 0,
+          total_discrepancies_found: 0,
+          total_orders_with_opportunities: 0,
+          average_cost_per_discrepancy: 0,
+          total_box_recommendations: 0,
+          high_impact_opportunities: 0
+        }
+      };
+
+      // Save basic report
+      const { error: reportError } = await supabase
+        .from('packaging_intelligence_reports')
+        .insert([basicReport]);
+
+      if (reportError) {
+        console.error('Error saving basic report:', reportError);
+        throw new Error(`Failed to save basic report: ${reportError.message}`);
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'No orders to analyze, basic report generated',
+          orders_analyzed: 0
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     console.log(`Found ${companyItems?.length || 0} items in company master data`);
 
     // Step 2: Get current company box inventory

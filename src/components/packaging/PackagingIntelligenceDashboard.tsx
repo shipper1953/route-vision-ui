@@ -358,9 +358,9 @@ export const PackagingIntelligenceDashboard = () => {
                   <AlertTriangle className="h-5 w-5 text-orange-600" />
                   Top Packaging Opportunities
                 </CardTitle>
-                <CardDescription>
-                  Boxes most often replaced with better options
-                </CardDescription>
+                 <CardDescription>
+                   Consolidated opportunities across all analyzed orders
+                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {!Array.isArray(report.top_5_box_discrepancies) || report.top_5_box_discrepancies.length === 0 ? (
@@ -406,9 +406,9 @@ export const PackagingIntelligenceDashboard = () => {
                   <TrendingUp className="h-5 w-5 text-green-600" />
                   Most Used Boxes
                 </CardTitle>
-                <CardDescription>
-                  Your highest volume packaging
-                </CardDescription>
+                 <CardDescription>
+                   High-volume packaging from recent shipments and analysis
+                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {!Array.isArray(report.top_5_most_used_boxes) || report.top_5_most_used_boxes.length === 0 ? (
@@ -447,8 +447,8 @@ export const PackagingIntelligenceDashboard = () => {
                 <Package className="h-5 w-5 text-blue-600" />
                 Inventory Health Dashboard
               </CardTitle>
-               <CardDescription>
-                 Recommended Uline boxes to add to your inventory
+                <CardDescription>
+                 Prioritized Uline boxes to optimize your shipping costs and efficiency
                </CardDescription>
             </CardHeader>
             <CardContent>
