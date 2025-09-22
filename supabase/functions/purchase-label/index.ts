@@ -55,6 +55,30 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
   
   if (!response.ok) {
     console.error('❌ EasyPost API error:', responseData)
+    
+    // Handle the specific case where postage already exists
+    if (responseData.error?.code === 'SHIPMENT.POSTAGE.EXISTS') {
+      console.log('⚠️ Postage already exists, attempting to retrieve existing shipment data')
+      try {
+        // Try to get the existing shipment data
+        const existingResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        
+        if (existingResponse.ok) {
+          const existingData = await existingResponse.json()
+          console.log('✅ Retrieved existing shipment data successfully')
+          return existingData
+        }
+      } catch (retrieveError) {
+        console.error('❌ Failed to retrieve existing shipment:', retrieveError)
+      }
+    }
+    
     throw new Error(responseData.error?.message || 'Failed to purchase label')
   }
   
