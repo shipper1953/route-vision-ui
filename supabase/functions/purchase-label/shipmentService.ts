@@ -100,8 +100,9 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
       company_id: companyId,
       warehouse_id: warehouseId,
       // Add selected box information
-      actual_package_sku: selectedBox?.boxSku || selectedBox?.selectedBoxes?.[0]?.boxSku || null,
-      actual_package_master_id: selectedBox?.boxId || selectedBox?.selectedBoxes?.[0]?.boxId || null
+      actual_package_sku: selectedBox?.selectedBoxSku || selectedBox?.selectedBoxName || null,
+      // Don't set actual_package_master_id for boxes table entries since it expects packaging_master_list IDs
+      actual_package_master_id: null
     };
   } else {
     // EasyPost response structure (default)
@@ -131,8 +132,9 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
       company_id: companyId,
       warehouse_id: warehouseId,
       // Add selected box information
-      actual_package_sku: selectedBox?.boxSku || selectedBox?.selectedBoxes?.[0]?.boxSku || null,
-      actual_package_master_id: selectedBox?.boxId || selectedBox?.selectedBoxes?.[0]?.boxId || null
+      actual_package_sku: selectedBox?.selectedBoxSku || selectedBox?.selectedBoxName || null,
+      // Don't set actual_package_master_id for boxes table entries since it expects packaging_master_list IDs
+      actual_package_master_id: null
     };
   }
 
