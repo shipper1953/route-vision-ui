@@ -123,7 +123,23 @@ export const usePackagingIntelligence = () => {
 
         // Send to Slack analytics channel (non-critical)
         await sendSlackAlert(alertMessage, '#wms-analytics');
+      } else if (recommendedSku && scannedBoxSku === recommendedSku) {
+        // Positive reinforcement for good choices
+        toast.success(`✅ Great choice! ${scannedBoxSku} is optimal for this order`);
       }
+
+      // Update the shipment with actual package SKU for historical tracking
+      const { error: updateError } = await supabase
+        .from('shipments')
+        .update({ 
+          actual_package_sku: scannedBoxSku
+        })
+        .eq('id', orderId);
+      
+      if (updateError) {
+        console.warn('Could not update shipment with actual package SKU:', updateError);
+      }
+        
     } catch (error) {
       console.error('Error checking package optimization:', error);
     }

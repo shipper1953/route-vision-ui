@@ -467,10 +467,80 @@ serve(async (req) => {
     console.log(`Found ${unpackageableOrders.length} orders that can't be packaged with current inventory`);
     console.log(`Generated ${boxRecommendations.size} box addition recommendations`);
 
-    // Step 6: Compile final report
-    const inventorySuggestions = Array.from(boxRecommendations.values())
-      .sort((a, b) => b.projected_need - a.projected_need);
+    // Step 6: Aggregate and group packaging opportunities
+    
+    // Group opportunities by recommended Uline box
+    const groupedOpportunities = new Map<string, {
+      uline_sku: string,
+      uline_name: string,
+      orders: string[],
+      total_savings: number,
+      avg_utilization_improvement: number,
+      cost_per_unit: number,
+      urgency: string
+    }>();
 
+    detailedDiscrepancies.forEach(disc => {
+      const ulineSku = disc.optimal_box.split('(')[1]?.replace(')', '') || disc.optimal_box;
+      const existing = groupedOpportunities.get(ulineSku) || {
+        uline_sku: ulineSku,
+        uline_name: disc.optimal_box.split(' (')[0] || disc.optimal_box,
+        orders: [],
+        total_savings: 0,
+        avg_utilization_improvement: 0,
+        cost_per_unit: 0,
+        urgency: 'low'
+      };
+
+      existing.orders.push(disc.order_id);
+      existing.total_savings += disc.total_savings;
+      existing.avg_utilization_improvement += parseFloat(disc.optimal_utilization) - parseFloat(disc.current_utilization);
+
+      // Update urgency based on frequency and savings
+      if (existing.orders.length >= 5 && existing.total_savings >= 10) {
+        existing.urgency = 'high';
+      } else if (existing.orders.length >= 3 || existing.total_savings >= 5) {
+        existing.urgency = 'medium';
+      }
+
+      groupedOpportunities.set(ulineSku, existing);
+    });
+
+    // Convert grouped opportunities to detailed discrepancies for display
+    const aggregatedDiscrepancies = Array.from(groupedOpportunities.values()).map(group => ({
+      order_id: `${group.orders.length} orders`,
+      actual_box: `Current Inventory (Multiple)`,
+      optimal_box: `${group.uline_name} (${group.uline_sku})`,
+      actual_cube: 'Various',
+      optimal_cube: 'Optimized',
+      current_utilization: 'Various',
+      optimal_utilization: 'Improved',
+      cube_reduction: 'Positive',
+      material_savings: group.total_savings * 0.7, // Estimate material portion
+      shipping_savings: group.total_savings * 0.3, // Estimate shipping portion
+      total_savings: group.total_savings,
+      confidence: group.orders.length >= 5 ? 95 : group.orders.length >= 3 ? 85 : 75,
+      potential_savings: group.total_savings,
+      orders_affected: group.orders.length,
+      avg_utilization_improvement: group.avg_utilization_improvement / group.orders.length
+    })).sort((a, b) => b.total_savings - a.total_savings);
+
+    // Step 7: Compile final inventory suggestions with enhanced data
+    const enhancedInventorySuggestions = Array.from(boxRecommendations.values())
+      .map(rec => ({
+        ...rec,
+        urgency: rec.projected_need >= 10 ? 'high' : rec.projected_need >= 5 ? 'medium' : 'low',
+        total_potential_savings: groupedOpportunities.get(rec.box_id)?.total_savings || 0
+      }))
+      .sort((a, b) => {
+        // Sort by total potential savings first, then by projected need
+        if (a.total_potential_savings !== b.total_potential_savings) {
+          return b.total_potential_savings - a.total_potential_savings;
+        }
+        return b.projected_need - a.projected_need;
+      });
+
+    // Step 8: Compile box usage data (focus on actual usage from shipments)
     const combinedBoxUsage: Record<string, { recommended: number, actual: number, total: number }> = {};
     
     Object.entries(boxUsageCount).forEach(([sku, count]) => {
@@ -501,10 +571,8 @@ serve(async (req) => {
           actual_usage: usage.actual,
           percentage_of_orders: Math.round((usage.total / Math.max(recentOrders?.length || 1, 1)) * 100)
         })),
-      top_5_box_discrepancies: detailedDiscrepancies
-        .sort((a, b) => (b.potential_savings || 0) - (a.potential_savings || 0))
-        .slice(0, 5),
-      inventory_suggestions: inventorySuggestions.slice(0, 10),
+      top_5_box_discrepancies: aggregatedDiscrepancies.slice(0, 5),
+      inventory_suggestions: enhancedInventorySuggestions.slice(0, 10),
       projected_packaging_need: Object.entries(combinedBoxUsage).reduce((acc, [sku, usage]) => {
         acc[sku] = Math.ceil(usage.total * 1.1);
         return acc;
@@ -512,11 +580,13 @@ serve(async (req) => {
       report_data: {
         orders_with_current_inventory: orderAnalyses.filter(a => a.companyBoxResult).length,
         orders_needing_new_boxes: unpackageableOrders.length,
-        total_discrepancies_found: detailedDiscrepancies.length,
-        average_cost_per_discrepancy: detailedDiscrepancies.length > 0 
-          ? (detailedDiscrepancies.reduce((sum, d) => sum + (d.potential_savings || 0), 0) / detailedDiscrepancies.length).toFixed(2)
+        total_discrepancies_found: aggregatedDiscrepancies.length,
+        total_orders_with_opportunities: aggregatedDiscrepancies.reduce((sum, d) => sum + (d.orders_affected || 1), 0),
+        average_cost_per_discrepancy: aggregatedDiscrepancies.length > 0 
+          ? (aggregatedDiscrepancies.reduce((sum, d) => sum + (d.potential_savings || 0), 0) / aggregatedDiscrepancies.length).toFixed(2)
           : 0,
-        total_box_recommendations: inventorySuggestions.length
+        total_box_recommendations: enhancedInventorySuggestions.length,
+        high_impact_opportunities: aggregatedDiscrepancies.filter(d => (d.orders_affected || 0) >= 5).length
       }
     };
 

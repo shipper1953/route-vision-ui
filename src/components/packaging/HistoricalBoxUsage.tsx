@@ -49,20 +49,20 @@ export const HistoricalBoxUsage = () => {
         return;
       }
 
-      // Also fetch actual shipment data for more complete picture
+      // Fetch actual shipment data with real package SKUs
       const { data: shipments, error: shipmentsError } = await supabase
         .from('shipments')
         .select(`
-          package_dimensions,
+          actual_package_sku,
+          actual_package_master_id,
           created_at,
-          packages (
-            description
-          )
+          status
         `)
         .eq('company_id', userProfile.company_id)
-        .not('package_dimensions', 'is', null)
+        .not('actual_package_sku', 'is', null)
+        .in('status', ['shipped', 'delivered'])
         .order('created_at', { ascending: false })
-        .limit(500);
+        .limit(1000);
 
       if (shipmentsError) {
         console.error('Error fetching shipments:', shipmentsError);
@@ -94,32 +94,16 @@ export const HistoricalBoxUsage = () => {
         }
       });
 
-      // Process shipment dimensions to extract box types
+      // Process actual shipped packages with real SKUs
       shipments?.forEach(shipment => {
-        try {
-          let dims = shipment.package_dimensions;
-          if (typeof dims === 'string') {
-            dims = JSON.parse(dims);
-          }
-          
-          if (dims && typeof dims === 'object' && 'length' in dims && 'width' in dims && 'height' in dims) {
-            const length = dims.length as number;
-            const width = dims.width as number;
-            const height = dims.height as number;
-            
-            if (length && width && height) {
-              // Create a dimension-based identifier
-              const dimKey = `${length}x${width}x${height}`;
-              const existing = boxUsageMap.get(dimKey) || { count: 0, lastUsed: new Date(0) };
-              boxUsageMap.set(dimKey, {
-                count: existing.count + 1,
-                lastUsed: new Date(Math.max(existing.lastUsed.getTime(), new Date(shipment.created_at).getTime())),
-                name: `${length}" × ${width}" × ${height}"`
-              });
-            }
-          }
-        } catch (error) {
-          // Skip invalid dimension data
+        if (shipment.actual_package_sku) {
+          const sku = shipment.actual_package_sku;
+          const existing = boxUsageMap.get(sku) || { count: 0, lastUsed: new Date(0) };
+          boxUsageMap.set(sku, {
+            count: existing.count + 1,
+            lastUsed: new Date(Math.max(existing.lastUsed.getTime(), new Date(shipment.created_at).getTime())),
+            name: sku // Use the SKU as the display name
+          });
         }
       });
 
@@ -207,9 +191,12 @@ export const HistoricalBoxUsage = () => {
             <Package className="h-5 w-5 text-primary" />
             Historical Box Usage Analytics
           </CardTitle>
-          <CardDescription>
-            Complete usage history for all packaging across {boxUsageData.length} different box types
-          </CardDescription>
+            <CardDescription>
+              {boxUsageData.length === 0 
+                ? "Track actual box usage from shipped orders. Start scanning boxes during shipping to populate this data."
+                : `Actual box usage from ${boxUsageData.length} different box types in shipped orders`
+              }
+            </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Controls */}
@@ -285,10 +272,10 @@ export const HistoricalBoxUsage = () => {
           {filteredAndSortedData.length === 0 ? (
             <div className="text-center py-8">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Usage Data Found</h3>
+              <h3 className="text-lg font-semibold mb-2">No Actual Usage Data Found</h3>
               <p className="text-muted-foreground">
                 {boxUsageData.length === 0 
-                  ? "Generate packaging intelligence reports to see historical usage data."
+                  ? "Start scanning box SKUs during the shipping process to track actual usage. This data comes from the 'actual_package_sku' field in shipped orders."
                   : "Try adjusting your search criteria."}
               </p>
               {boxUsageData.length === 0 && (

@@ -369,27 +369,32 @@ export const PackagingIntelligenceDashboard = () => {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {(Array.isArray(report.top_5_box_discrepancies) ? report.top_5_box_discrepancies : []).map((discrepancy: any, index: number) => (
-                      <div key={discrepancy.order_id || index} className="p-3 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline">#{index + 1}</Badge>
-                            <span className="font-medium text-sm">Order {discrepancy.order_id}</span>
-                          </div>
-                          <Badge variant="destructive" className="text-xs">
-                            ${discrepancy.total_savings?.toFixed(2)} savings
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <div><strong>Current:</strong> {discrepancy.actual_box}</div>
-                          <div><strong>Better Option:</strong> {discrepancy.optimal_box}</div>
-                          <div className="flex gap-4">
-                            <span>Cube: {discrepancy.actual_cube} → {discrepancy.optimal_cube} cu.in</span>
-                            <span>Utilization: {discrepancy.current_utilization}% → {discrepancy.optimal_utilization}%</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                     {(Array.isArray(report.top_5_box_discrepancies) ? report.top_5_box_discrepancies : []).map((opportunity: any, index: number) => (
+                       <div key={opportunity.order_id || index} className="p-3 border rounded-lg">
+                         <div className="flex items-center justify-between mb-2">
+                           <div className="flex items-center gap-2">
+                             <Badge variant="outline">#{index + 1}</Badge>
+                             <span className="font-medium text-sm">
+                               {opportunity.orders_affected ? `${opportunity.orders_affected} Orders` : `Order ${opportunity.order_id}`}
+                             </span>
+                           </div>
+                           <Badge variant="destructive" className="text-xs">
+                             ${opportunity.total_savings?.toFixed(2)} total savings
+                           </Badge>
+                         </div>
+                         <div className="text-xs text-muted-foreground space-y-1">
+                           <div><strong>Current:</strong> {opportunity.actual_box}</div>
+                           <div><strong>Better Option:</strong> {opportunity.optimal_box}</div>
+                           {opportunity.orders_affected && (
+                             <div><strong>Impact:</strong> {opportunity.orders_affected} orders could benefit</div>
+                           )}
+                           <div className="flex gap-4">
+                             <span>Avg Savings: ${(opportunity.total_savings / (opportunity.orders_affected || 1)).toFixed(2)} per order</span>
+                             <span>Priority: {opportunity.orders_affected >= 5 ? 'HIGH' : opportunity.orders_affected >= 3 ? 'MEDIUM' : 'LOW'}</span>
+                           </div>
+                         </div>
+                       </div>
+                     ))}
                   </div>
                 )}
               </CardContent>
@@ -456,11 +461,12 @@ export const PackagingIntelligenceDashboard = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                         <th className="text-left py-3 px-4">Uline Box SKU</th>
-                         <th className="text-left py-3 px-4">Box Name</th>
-                         <th className="text-right py-3 px-4">Orders Needing</th>
-                         <th className="text-right py-3 px-4">Cost per Unit</th>
-                         <th className="text-center py-3 px-4">Urgency</th>
+                          <th className="text-left py-3 px-4">Uline Box SKU</th>
+                          <th className="text-left py-3 px-4">Box Name</th>
+                          <th className="text-right py-3 px-4">Orders Needing</th>
+                          <th className="text-right py-3 px-4">Total Savings</th>
+                          <th className="text-right py-3 px-4">Cost per Unit</th>
+                          <th className="text-center py-3 px-4">Urgency</th>
                       </tr>
                     </thead>
                       <tbody>
@@ -468,20 +474,25 @@ export const PackagingIntelligenceDashboard = () => {
                          <tr key={item.box_sku || item.box_id} className="border-b hover:bg-muted/20">
                            <td className="py-3 px-4 font-medium text-sm">{item.box_id}</td>
                            <td className="py-3 px-4 text-sm">{item.box_name}</td>
-                           <td className="text-right py-3 px-4">
-                             <Badge variant="outline">{item.projected_need}</Badge>
-                           </td>
-                           <td className="text-right py-3 px-4">
-                             <span className="text-sm font-medium">${item.cost_per_unit?.toFixed(2) || '0.00'}</span>
-                           </td>
-                           <td className="text-center py-3 px-4">
-                             <Badge variant={
-                               item.urgency === 'high' ? 'destructive' :
-                               item.urgency === 'medium' ? 'secondary' : 'default'
-                             }>
-                               {item.urgency?.toUpperCase() || 'LOW'}
-                             </Badge>
-                           </td>
+                            <td className="text-right py-3 px-4">
+                              <Badge variant="outline">{item.projected_need}</Badge>
+                            </td>
+                            <td className="text-right py-3 px-4">
+                              <span className="text-sm font-medium text-green-600">
+                                ${item.total_potential_savings?.toFixed(2) || '0.00'}
+                              </span>
+                            </td>
+                            <td className="text-right py-3 px-4">
+                              <span className="text-sm font-medium">${item.cost_per_unit?.toFixed(2) || '0.00'}</span>
+                            </td>
+                            <td className="text-center py-3 px-4">
+                              <Badge variant={
+                                item.urgency === 'high' ? 'destructive' :
+                                item.urgency === 'medium' ? 'secondary' : 'default'
+                              }>
+                                {item.urgency?.toUpperCase() || 'LOW'}
+                              </Badge>
+                            </td>
                          </tr>
                        ))}
                      </tbody>
