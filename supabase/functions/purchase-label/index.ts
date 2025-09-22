@@ -163,10 +163,12 @@ serve(async (req) => {
     }
     console.log('✅ Environment variables configured')
     
-    // Parse request body
+    // Parse request body with better error handling
     let requestBody
     try {
-      requestBody = await req.json()
+      const rawBody = await req.text()
+      console.log('📥 Raw request body:', rawBody)
+      requestBody = JSON.parse(rawBody)
       console.log('📥 Request body parsed:', JSON.stringify(requestBody, null, 2))
     } catch (parseError) {
       console.error('❌ Failed to parse request body:', parseError)
@@ -174,6 +176,9 @@ serve(async (req) => {
     }
     
     const { shipmentId, rateId, orderId, provider, selectedBox } = requestBody
+    
+    console.log('🔍 Extracted parameters:', { shipmentId, rateId, orderId, provider })
+    console.log('🔍 Selected box data:', selectedBox)
     
     if (!shipmentId || !rateId) {
       console.error('❌ Missing required parameters:', { shipmentId, rateId })
@@ -184,134 +189,156 @@ serve(async (req) => {
 
     // Purchase label from the appropriate provider
     let purchaseResponse
-    if (provider === 'shippo') {
-      console.log('📡 Calling Shippo API...')
-      const shippoApiKey = Deno.env.get('SHIPPO_API_KEY')
-      if (!shippoApiKey) {
-        console.error('❌ Missing Shippo API key')
-        return createErrorResponse('Shippo API key not configured', null, 500)
+    try {
+      if (provider === 'shippo') {
+        console.log('📡 Calling Shippo API...')
+        const shippoApiKey = Deno.env.get('SHIPPO_API_KEY')
+        if (!shippoApiKey) {
+          console.error('❌ Missing Shippo API key')
+          return createErrorResponse('Shippo API key not configured', null, 500)
+        }
+        purchaseResponse = await purchaseShippoLabel(shipmentId, rateId, shippoApiKey)
+        console.log('✅ Label purchased successfully from Shippo:', purchaseResponse.object_id)
+      } else {
+        console.log('📡 Calling EasyPost API...')
+        purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
+        console.log('✅ Label purchased successfully from EasyPost:', purchaseResponse.id)
       }
-      purchaseResponse = await purchaseShippoLabel(shipmentId, rateId, shippoApiKey)
-      console.log('✅ Label purchased successfully from Shippo:', purchaseResponse.object_id)
-    } else {
-      console.log('📡 Calling EasyPost API...')
-      purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
-      console.log('✅ Label purchased successfully from EasyPost:', purchaseResponse.id)
+    } catch (labelError) {
+      console.error('❌ Label purchase failed:', labelError)
+      return createErrorResponse('Failed to purchase label', labelError.message, 500)
     }
     
     // Create Supabase client with service role for database operations
+    console.log('🔑 Creating Supabase client...')
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
     
     // Determine company_id for wallet processing. Prefer order.company_id when orderId is provided.
     let companyIdForWallet: string | null = null;
     const defaultUserId = "00be6af7-a275-49fe-842f-1bd402bf113b" // TODO: replace when auth is wired in
 
-    if (orderId) {
-      const numericOrderId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
-      console.log('🔎 Looking up order company_id for order:', numericOrderId);
-      const { data: orderRow, error: orderErr } = await supabase
-        .from('orders')
-        .select('company_id')
-        .eq('id', numericOrderId)
-        .maybeSingle();
-      if (orderErr) {
-        console.error('❌ Failed to fetch order for company_id:', orderErr);
-      } else if (orderRow?.company_id) {
-        companyIdForWallet = orderRow.company_id;
-        console.log('✅ Using company_id from order:', companyIdForWallet);
-      } else {
-        console.warn('⚠️ Order found but company_id missing');
+    try {
+      if (orderId) {
+        const numericOrderId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
+        console.log('🔎 Looking up order company_id for order:', numericOrderId);
+        const { data: orderRow, error: orderErr } = await supabase
+          .from('orders')
+          .select('company_id')
+          .eq('id', numericOrderId)
+          .maybeSingle();
+        if (orderErr) {
+          console.error('❌ Failed to fetch order for company_id:', orderErr);
+        } else if (orderRow?.company_id) {
+          companyIdForWallet = orderRow.company_id;
+          console.log('✅ Using company_id from order:', companyIdForWallet);
+        } else {
+          console.warn('⚠️ Order found but company_id missing');
+        }
       }
-    }
 
-    // Fallback to default user profile company if order lookup failed
-    if (!companyIdForWallet) {
-      console.log('ℹ️ Falling back to default user company for wallet processing');
-      const { data: userProfile, error: userError } = await supabase
-        .from('users')
-        .select('company_id')
-        .eq('id', defaultUserId)
-        .maybeSingle();
+      // Fallback to default user profile company if order lookup failed
+      if (!companyIdForWallet) {
+        console.log('ℹ️ Falling back to default user company for wallet processing');
+        const { data: userProfile, error: userError } = await supabase
+          .from('users')
+          .select('company_id')
+          .eq('id', defaultUserId)
+          .maybeSingle();
 
-      if (userError || !userProfile?.company_id) {
-        console.error('❌ Could not resolve company_id for wallet processing:', userError);
-        return createErrorResponse('User profile not found or not assigned to a company', null, 400);
+        if (userError || !userProfile?.company_id) {
+          console.error('❌ Could not resolve company_id for wallet processing:', userError);
+          return createErrorResponse('User profile not found or not assigned to a company', null, 400);
+        }
+        companyIdForWallet = userProfile.company_id;
+        console.log('✅ Using fallback company_id:', companyIdForWallet);
       }
-      companyIdForWallet = userProfile.company_id;
-      console.log('✅ Using fallback company_id:', companyIdForWallet);
+
+      // Process wallet payment
+      const labelCost = provider === 'shippo' 
+        ? parseFloat(purchaseResponse.rate?.amount || '0')
+        : parseFloat(purchaseResponse.selected_rate?.rate || '0');
+      
+      const purchaseResponseId = provider === 'shippo' 
+        ? purchaseResponse.object_id 
+        : purchaseResponse.id;
+
+      console.log('💰 Processing wallet payment for company:', companyIdForWallet)
+      await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId);
+      console.log('✅ Wallet payment processed successfully')
+      
+    } catch (walletError) {
+      console.error('❌ Wallet processing failed:', walletError)
+      return createErrorResponse('Wallet processing failed', walletError.message, 500)
     }
-
-    // Process wallet payment
-    const labelCost = provider === 'shippo' 
-      ? parseFloat(purchaseResponse.rate?.amount || '0')
-      : parseFloat(purchaseResponse.selected_rate?.rate || '0');
-    
-    const purchaseResponseId = provider === 'shippo' 
-      ? purchaseResponse.object_id 
-      : purchaseResponse.id;
-
-    console.log('💰 Processing wallet payment for company:', companyIdForWallet)
-    await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId);
-    console.log('✅ Wallet payment processed successfully')
     
     // Save shipment to database
-    console.log('💾 Saving shipment to database...')
-    console.log('📦 Selected box info:', selectedBox)
-    const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, defaultUserId, provider || 'easypost', selectedBox)
-    console.log('✅ Shipment saved to database with ID:', finalShipmentId)
+    try {
+      console.log('💾 Saving shipment to database...')
+      console.log('📦 Selected box info:', selectedBox)
+      const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, defaultUserId, provider || 'easypost', selectedBox)
+      console.log('✅ Shipment saved to database with ID:', finalShipmentId)
+    } catch (saveError) {
+      console.error('❌ Database save failed:', saveError)
+      return createErrorResponse('Failed to save shipment to database', saveError.message, 500)
+    }
     
     // Link order to shipment if orderId provided
     if (orderId && finalShipmentId) {
-      console.log('🔗 Linking order to shipment...')
-      const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId)
-      if (linkSuccess) {
-        console.log('✅ Order successfully linked to shipment')
-        // Fire Slack notification for "order shipped"
-        try {
-          const slackWebhook = Deno.env.get('SLACK_WEBHOOK_URL')
-          if (!slackWebhook) {
-            console.log('ℹ️ SLACK_WEBHOOK_URL not configured, skipping Slack alert')
-          } else {
-            const carrier = provider === 'shippo'
-              ? (purchaseResponse.rate?.provider || purchaseResponse.carrier_account || 'Unknown')
-              : (purchaseResponse.selected_rate?.carrier || 'Unknown')
-            const service = provider === 'shippo'
-              ? (purchaseResponse.rate?.servicelevel?.name || purchaseResponse.servicelevel?.name || 'Unknown')
-              : (purchaseResponse.selected_rate?.service || 'Unknown')
-            const tracking = provider === 'shippo'
-              ? (purchaseResponse.tracking_number || purchaseResponse.tracking_code || 'N/A')
-              : (purchaseResponse.tracking_code || purchaseResponse.tracking_number || 'N/A')
-            const trackUrl = provider === 'shippo'
-              ? (purchaseResponse.tracking_url_provider || purchaseResponse.label_url)
-              : (purchaseResponse.tracker?.public_url || purchaseResponse.postage_label?.label_url)
-            const est = provider === 'shippo'
-              ? (purchaseResponse.rate?.estimated_days ? `${purchaseResponse.rate.estimated_days} days` : null)
-              : (purchaseResponse.tracker?.est_delivery_date || null)
-
-            const text = `:truck: Order ${orderId} shipped via ${carrier} ${service}\nTracking: ${tracking}${trackUrl ? ` • ${trackUrl}` : ''}${est ? `\nETA: ${est}` : ''}`
-            const slackBody: Record<string, unknown> = {
-              username: 'Shipping Bot',
-              icon_emoji: ':truck:',
-              text,
-            }
-
-            const slackResp = await fetch(slackWebhook, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(slackBody),
-            })
-            if (!slackResp.ok) {
-              const errText = await slackResp.text()
-              console.error('❌ Slack webhook error:', slackResp.status, errText)
+      try {
+        console.log('🔗 Linking order to shipment...')
+        const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId)
+        if (linkSuccess) {
+          console.log('✅ Order successfully linked to shipment')
+          // Fire Slack notification for "order shipped"
+          try {
+            const slackWebhook = Deno.env.get('SLACK_WEBHOOK_URL')
+            if (!slackWebhook) {
+              console.log('ℹ️ SLACK_WEBHOOK_URL not configured, skipping Slack alert')
             } else {
-              console.log('✅ Slack shipped alert sent')
+              const carrier = provider === 'shippo'
+                ? (purchaseResponse.rate?.provider || purchaseResponse.carrier_account || 'Unknown')
+                : (purchaseResponse.selected_rate?.carrier || 'Unknown')
+              const service = provider === 'shippo'
+                ? (purchaseResponse.rate?.servicelevel?.name || purchaseResponse.servicelevel?.name || 'Unknown')
+                : (purchaseResponse.selected_rate?.service || 'Unknown')
+              const tracking = provider === 'shippo'
+                ? (purchaseResponse.tracking_number || purchaseResponse.tracking_code || 'N/A')
+                : (purchaseResponse.tracking_code || purchaseResponse.tracking_number || 'N/A')
+              const trackUrl = provider === 'shippo'
+                ? (purchaseResponse.tracking_url_provider || purchaseResponse.label_url)
+                : (purchaseResponse.tracker?.public_url || purchaseResponse.postage_label?.label_url)
+              const est = provider === 'shippo'
+                ? (purchaseResponse.rate?.estimated_days ? `${purchaseResponse.rate.estimated_days} days` : null)
+                : (purchaseResponse.tracker?.est_delivery_date || null)
+
+              const text = `:truck: Order ${orderId} shipped via ${carrier} ${service}\nTracking: ${tracking}${trackUrl ? ` • ${trackUrl}` : ''}${est ? `\nETA: ${est}` : ''}`
+              const slackBody: Record<string, unknown> = {
+                username: 'Shipping Bot',
+                icon_emoji: ':truck:',
+                text,
+              }
+
+              const slackResp = await fetch(slackWebhook, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(slackBody),
+              })
+              if (!slackResp.ok) {
+                const errText = await slackResp.text()
+                console.error('❌ Slack webhook error:', slackResp.status, errText)
+              } else {
+                console.log('✅ Slack shipped alert sent')
+              }
             }
+          } catch (slackErr) {
+            console.error('⚠️ Failed to send Slack shipped alert:', slackErr)
           }
-        } catch (slackErr) {
-          console.error('⚠️ Failed to send Slack shipped alert:', slackErr)
+        } else {
+          console.log('⚠️ Order linking failed, but shipment was created')
         }
-      } else {
-        console.log('⚠️ Order linking failed, but shipment was created')
+      } catch (linkError) {
+        console.error('❌ Order linking failed:', linkError)
+        // Don't return error - shipment was successful, just linking failed
       }
     }
     
