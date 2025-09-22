@@ -29,74 +29,71 @@ export const HistoricalBoxUsageSimplified = () => {
       return;
     }
 
-    console.log('Fetching comprehensive box usage for company:', userProfile.company_id);
+    console.log('Fetching ACTUAL shipment box usage for company:', userProfile.company_id);
 
     try {
       setLoading(true);
 
-      // Get total orders count
-      const { data: orderCount } = await supabase
-        .from('orders')
+      // Get total shipments count
+      const { data: totalShipmentsData } = await supabase
+        .from('shipments')
         .select('id', { count: 'exact' })
         .eq('company_id', userProfile.company_id);
 
-      const totalOrders = orderCount?.length || 0;
-      console.log('Total orders for company:', totalOrders);
+      const totalShipments = totalShipmentsData?.length || 0;
+      console.log('Total shipments for company:', totalShipments);
 
-      // Get data from packaging intelligence reports
+      // Get ACTUAL box usage from shipment records - this is the real historical data!
+      const { data: actualShipmentBoxes, error: shipmentError } = await supabase
+        .from('shipments')
+        .select('actual_package_sku, actual_package_master_id, status')
+        .eq('company_id', userProfile.company_id)
+        .not('actual_package_sku', 'is', null);
+
+      console.log('Shipment records with actual box data:', actualShipmentBoxes?.length || 0);
+
+      // Also get data from packaging intelligence reports as fallback
       const { data: reports, error: reportError } = await supabase
         .from('packaging_intelligence_reports')
         .select('top_5_most_used_boxes, total_orders_analyzed')
         .eq('company_id', userProfile.company_id)
         .order('generated_at', { ascending: false });
 
-      console.log('Reports found:', reports?.length || 0);
+      console.log('Intelligence reports found:', reports?.length || 0);
 
-      // Get data from order cartonization
-      const { data: cartonization, error: cartonError } = await supabase
-        .from('order_cartonization')
-        .select(`
-          recommended_box_data,
-          order_id,
-          orders!inner(company_id)
-        `)
-        .eq('orders.company_id', userProfile.company_id);
+      // Aggregate box usage - prioritize actual shipment data
+      const boxUsage = new Map<string, { count: number, shipments: Set<string> }>();
 
-      console.log('Cartonization records found:', cartonization?.length || 0);
+      // Process ACTUAL shipment box usage (highest priority)
+      if (actualShipmentBoxes && !shipmentError) {
+        actualShipmentBoxes.forEach(shipment => {
+          if (shipment.actual_package_sku) {
+            const sku = shipment.actual_package_sku;
+            
+            if (!boxUsage.has(sku)) {
+              boxUsage.set(sku, { count: 0, shipments: new Set() });
+            }
+            
+            boxUsage.get(sku)!.count += 1;
+            boxUsage.get(sku)!.shipments.add(`${shipment.actual_package_master_id}-${shipment.status}`);
+          }
+        });
+      }
 
-      // Aggregate box usage from all sources
-      const boxUsage = new Map<string, { count: number, orders: Set<number> }>();
-
-      // Process packaging intelligence reports
-      if (reports && !reportError) {
+      // If we don't have enough actual shipment data, supplement with intelligence reports
+      if (boxUsage.size < 3 && reports && !reportError) {
+        console.log('Supplementing with intelligence report data since limited actual shipment data');
         reports.forEach(report => {
           if (report.top_5_most_used_boxes && Array.isArray(report.top_5_most_used_boxes)) {
             report.top_5_most_used_boxes.forEach((box: any) => {
               const sku = box.box_sku || 'Unknown';
               const usage = box.total_usage || box.recommended_usage || 0;
               
+              // Only add if we don't already have this from actual shipments
               if (!boxUsage.has(sku)) {
-                boxUsage.set(sku, { count: 0, orders: new Set() });
+                boxUsage.set(sku, { count: usage, shipments: new Set() });
               }
-              boxUsage.get(sku)!.count += usage;
             });
-          }
-        });
-      }
-
-      // Process cartonization data
-      if (cartonization && !cartonError) {
-        cartonization.forEach(record => {
-          if (record.recommended_box_data) {
-            const boxData = record.recommended_box_data as any;
-            const sku = boxData.name || boxData.sku || 'Unknown';
-            
-            if (!boxUsage.has(sku)) {
-              boxUsage.set(sku, { count: 0, orders: new Set() });
-            }
-            
-            boxUsage.get(sku)!.count += 1;
-            boxUsage.get(sku)!.orders.add(record.order_id);
           }
         });
       }
@@ -106,17 +103,17 @@ export const HistoricalBoxUsageSimplified = () => {
         .map(([sku, data]) => ({
           box_sku: sku,
           usage_count: data.count,
-          percentage_of_orders: totalOrders > 0 ? Math.round((data.orders.size / totalOrders) * 100) : 0
+          percentage_of_orders: totalShipments > 0 ? Math.round((data.count / totalShipments) * 100) : 0
         }))
         .sort((a, b) => b.usage_count - a.usage_count)
         .slice(0, 10); // Show top 10
 
-      console.log('Final aggregated usage data:', usageData);
-      console.log('Total unique boxes found:', usageData.length);
+      console.log('Final ACTUAL box usage data:', usageData);
+      console.log('Data sources: Shipments:', actualShipmentBoxes?.length || 0, 'Reports:', reports?.length || 0);
       
       setBoxUsageData(usageData);
     } catch (error) {
-      console.error('Error fetching comprehensive box usage:', error);
+      console.error('Error fetching actual box usage:', error);
       setBoxUsageData([]);
     } finally {
       setLoading(false);
