@@ -65,6 +65,19 @@ export const shipmentSchema = z.object({
 
   // Multi-package parcels (optional, used for multi-label purchasing)
   multiParcels: z.array(parcelSchema).optional(),
+  
+  // Selected box information
+  selectedBoxId: z.string().optional(),
+  selectedBoxSku: z.string().optional(),
+  selectedBoxName: z.string().optional(),
+  
+  // Multi-package selected boxes
+  selectedBoxes: z.array(z.object({
+    boxId: z.string(),
+    boxSku: z.string().optional(),
+    boxName: z.string(),
+    packageIndex: z.number()
+  })).optional(),
 });
 
 export type ShipmentForm = z.infer<typeof shipmentSchema>;

@@ -39,7 +39,13 @@ export const useShipmentSubmission = ({
       toast.info("Getting shipping rates from multiple providers...");
       
       const shipmentData = buildShipmentData(data);
-      console.log("Creating shipment with data:", shipmentData);
+      console.log("Built shipment data:", shipmentData);
+      console.log("Selected box info from form:", {
+        selectedBoxId: data.selectedBoxId,
+        selectedBoxSku: data.selectedBoxSku, 
+        selectedBoxName: data.selectedBoxName,
+        selectedBoxes: data.selectedBoxes
+      });
       console.log("User company_id:", userProfile?.company_id);
       
       // DIAGNOSTIC: Test environment variables first

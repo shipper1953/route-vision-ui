@@ -55,6 +55,13 @@ export function buildShipmentData(data: ShipmentForm) {
       label_size: '4x6'
     },
     // Include order reference for linking
-    reference: orderReference
+    reference: orderReference,
+    // Include selected box information
+    selectedBox: {
+      boxId: data.selectedBoxId,
+      boxSku: data.selectedBoxSku,
+      boxName: data.selectedBoxName,
+      selectedBoxes: data.selectedBoxes
+    }
   };
 }

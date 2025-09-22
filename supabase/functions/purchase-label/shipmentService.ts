@@ -1,7 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-export async function saveShipmentToDatabase(purchaseResponse: any, orderId: string | null, userId: string, provider: string = 'easypost') {
+export async function saveShipmentToDatabase(purchaseResponse: any, orderId: string | null, userId: string, provider: string = 'easypost', selectedBox?: any) {
   console.log("Saving shipment to database with user_id:", userId);
   
   const supabaseService = createClient(
@@ -98,7 +98,10 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
       created_at: purchaseResponse.object_created,
       user_id: userId,
       company_id: companyId,
-      warehouse_id: warehouseId
+      warehouse_id: warehouseId,
+      // Add selected box information
+      actual_package_sku: selectedBox?.boxSku || selectedBox?.selectedBoxes?.[0]?.boxSku || null,
+      actual_package_master_id: selectedBox?.boxId || selectedBox?.selectedBoxes?.[0]?.boxId || null
     };
   } else {
     // EasyPost response structure (default)
@@ -126,7 +129,10 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
       created_at: purchaseResponse.created_at,
       user_id: userId,
       company_id: companyId,
-      warehouse_id: warehouseId
+      warehouse_id: warehouseId,
+      // Add selected box information
+      actual_package_sku: selectedBox?.boxSku || selectedBox?.selectedBoxes?.[0]?.boxSku || null,
+      actual_package_master_id: selectedBox?.boxId || selectedBox?.selectedBoxes?.[0]?.boxId || null
     };
   }
 

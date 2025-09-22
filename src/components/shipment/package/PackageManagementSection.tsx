@@ -338,7 +338,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
     }
   }, [orderItems, masterItems, createItemsFromOrderData, calculateMultiPackage]);
 
-  // Expose multi-package parcels to the form
+  // Expose multi-package parcels and selected boxes to the form
   useEffect(() => {
     if (multiPackageResult) {
       try {
@@ -349,15 +349,32 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
           weight: Math.max(1, Math.round((pkg as any).packageWeight || 1)),
         }));
         (form as any).setValue('multiParcels', parcels);
+        
+        // Store selected boxes information
+        const selectedBoxes = multiPackageResult.packages.map((pkg, index) => ({
+          boxId: pkg.box.id,
+          boxSku: (pkg.box as any).sku || pkg.box.name,
+          boxName: pkg.box.name,
+          packageIndex: index
+        }));
+        (form as any).setValue('selectedBoxes', selectedBoxes);
+        
         // Also sync the primary parcel fields for validation/rate shopping
         if (parcels.length) {
           const first = parcels[0];
+          const firstBox = multiPackageResult.packages[0].box;
           form.setValue('length', first.length);
           form.setValue('width', first.width);
           form.setValue('height', first.height);
           form.setValue('weight', first.weight);
+          
+          // Set primary selected box info
+          form.setValue('selectedBoxId', firstBox.id);
+          form.setValue('selectedBoxSku', (firstBox as any).sku || firstBox.name);
+          form.setValue('selectedBoxName', firstBox.name);
         }
         localStorage.setItem('multiParcels', JSON.stringify(parcels));
+        localStorage.setItem('selectedBoxes', JSON.stringify(selectedBoxes));
       } catch (e) {
         console.warn('Failed to prepare multiParcels:', e);
       }

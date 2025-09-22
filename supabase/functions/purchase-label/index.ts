@@ -173,7 +173,7 @@ serve(async (req) => {
       return createErrorResponse('Invalid JSON in request body', parseError.message, 400)
     }
     
-    const { shipmentId, rateId, orderId, provider } = requestBody
+    const { shipmentId, rateId, orderId, provider, selectedBox } = requestBody
     
     if (!shipmentId || !rateId) {
       console.error('❌ Missing required parameters:', { shipmentId, rateId })
@@ -256,7 +256,8 @@ serve(async (req) => {
     
     // Save shipment to database
     console.log('💾 Saving shipment to database...')
-    const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, defaultUserId, provider || 'easypost')
+    console.log('📦 Selected box info:', selectedBox)
+    const { finalShipmentId } = await saveShipmentToDatabase(purchaseResponse, orderId, defaultUserId, provider || 'easypost', selectedBox)
     console.log('✅ Shipment saved to database with ID:', finalShipmentId)
     
     // Link order to shipment if orderId provided
