@@ -173,7 +173,7 @@ export class CartonizationEngine {
     if (this.parameters.optimizeForCost) {
       rulesApplied.push('Cost Optimization Rule');
     } else if (this.parameters.optimizeForSpace) {
-      rulesApplied.push('Space Optimization Rule (Smallest Box Priority)');
+      rulesApplied.push('Highest Utilization Under 100% Rule');
     } else {
       rulesApplied.push('Balanced Optimization Rule');
     }
@@ -278,38 +278,27 @@ export class CartonizationEngine {
     };
   }
 
-  // Add new sorting method that prioritizes smallest boxes
+  // Modified sorting method that prioritizes highest utilization under 100%
   private sortBoxesByOptimization(analyses: any[]): any[] {
-    return analyses.sort((a, b) => {
-      // PRIMARY: Size preference - always prefer smaller boxes
-      const volumeA = a.box.length * a.box.width * a.box.height;
-      const volumeB = b.box.length * b.box.width * b.box.height;
-      
-      // If volumes are significantly different, prefer smaller
-      const volumeDiff = Math.abs(volumeA - volumeB);
-      const largerVolume = Math.max(volumeA, volumeB);
-      const volumeVariation = volumeDiff / largerVolume;
-      
-      if (volumeVariation > 0.15) { // 15% difference threshold
-        return volumeA - volumeB; // Smaller volume first
+    // Filter out boxes with 100% or higher utilization
+    const viableBoxes = analyses.filter(analysis => analysis.utilization < 100);
+    
+    return viableBoxes.sort((a, b) => {
+      // PRIMARY: Highest utilization under 100% (descending order)
+      const utilizationDiff = b.utilization - a.utilization;
+      if (Math.abs(utilizationDiff) > 2) { // 2% difference threshold
+        return utilizationDiff; // Higher utilization first
       }
 
-      // SECONDARY: Confidence (higher is better) for similar-sized boxes
+      // SECONDARY: Confidence (higher is better) for similar utilization
       if (Math.abs(a.confidence - b.confidence) > 5) {
         return b.confidence - a.confidence;
       }
 
-      // TERTIARY: Optimization preference for final tiebreaker
-      if (this.parameters.optimizeForSpace) {
-        return b.utilization - a.utilization;
-      }
-      
-      if (this.parameters.optimizeForCost) {
-        return a.cost - b.cost;
-      }
-
-      // DEFAULT: Utilization (higher is better)
-      return b.utilization - a.utilization;
+      // TERTIARY: Size preference - prefer smaller boxes as tiebreaker
+      const volumeA = a.box.length * a.box.width * a.box.height;
+      const volumeB = b.box.length * b.box.width * b.box.height;
+      return volumeA - volumeB; // Smaller volume first
     });
   }
 
