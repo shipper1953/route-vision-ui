@@ -184,6 +184,29 @@ export const PackagingIntelligenceDashboard = () => {
     }
   };
 
+  const testShipmentData = async () => {
+    if (!userProfile?.company_id) return;
+    
+    try {
+      console.log('Testing shipment data for company:', userProfile.company_id);
+      
+      const { data, error } = await supabase.functions.invoke('test-shipments', {
+        body: { company_id: userProfile.company_id }
+      });
+
+      if (error) {
+        console.error('Error testing shipments:', error);
+        throw error;
+      }
+
+      console.log('Test shipment result:', data);
+      alert(`Test completed! Found ${data?.shipments_found || 0} shipments. Check console for details.`);
+    } catch (error) {
+      console.error('Error testing shipments:', error);
+      alert('Failed to test shipments. Check console for details.');
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -257,6 +280,15 @@ export const PackagingIntelligenceDashboard = () => {
           >
             <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
             {generating ? 'Generating...' : 'Generate New Report'}
+          </Button>
+          <Button 
+            onClick={testShipmentData}
+            disabled={generating}
+            className="gap-2"
+            variant="secondary"
+          >
+            <AlertTriangle className="h-4 w-4" />
+            Test Debug
           </Button>
         </div>
       </div>
