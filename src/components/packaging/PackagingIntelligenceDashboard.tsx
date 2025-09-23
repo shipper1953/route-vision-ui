@@ -281,15 +281,6 @@ export const PackagingIntelligenceDashboard = () => {
             <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
             {generating ? 'Generating...' : 'Generate New Report'}
           </Button>
-          <Button 
-            onClick={testShipmentData}
-            disabled={generating}
-            className="gap-2"
-            variant="secondary"
-          >
-            <AlertTriangle className="h-4 w-4" />
-            Test Debug
-          </Button>
         </div>
       </div>
 

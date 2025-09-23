@@ -82,18 +82,22 @@ serve(async (req) => {
 
     // Filter shipments by company and get associated orders
     const companyShipments = [];
+    let ordersData = null; // Declare for debugging scope
+    
     if (recentShipments && recentShipments.length > 0) {
       const shipmentIds = recentShipments.map(s => s.id);
       
-      const { data: ordersData, error: ordersError } = await supabase
+      const ordersResult = await supabase
         .from('orders')
         .select('id, order_id, items, company_id, shipment_id')
         .eq('company_id', company_id)
         .in('shipment_id', shipmentIds);
 
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-        throw new Error(`Failed to fetch orders: ${ordersError.message}`);
+      ordersData = ordersResult.data; // Assign for debugging
+      
+      if (ordersResult.error) {
+        console.error('Error fetching orders:', ordersResult.error);
+        throw new Error(`Failed to fetch orders: ${ordersResult.error.message}`);
       }
 
       // Match shipments with their orders
@@ -109,6 +113,32 @@ serve(async (req) => {
     }
 
     console.log(`Found ${companyShipments?.length || 0} recent shipments with actual packaging data`);
+    
+    // Debug: log the matched shipments
+    if (companyShipments && companyShipments.length > 0) {
+      console.log('📊 MATCHED SHIPMENTS DEBUG:');
+      companyShipments.forEach((ship, index) => {
+        console.log(`Shipment ${index + 1}:`, {
+          id: ship.id,
+          sku: ship.actual_package_sku,
+          dimensions: ship.package_dimensions,
+          order: ship.orders ? {
+            order_id: ship.orders.order_id,
+            items_count: ship.orders.items?.length || 0,
+            items: ship.orders.items
+          } : 'NO ORDER ATTACHED'
+        });
+      });
+    } else {
+      console.log('❌ NO MATCHED SHIPMENTS FOUND');
+      // Debug the individual queries
+      console.log('Debug info:', {
+        recentShipments: recentShipments?.length || 0,
+        ordersData: ordersData?.length || 0,
+        company_id,
+        thirtyDaysAgo: thirtyDaysAgo.toISOString()
+      });
+    }
     
     if (!companyShipments || companyShipments.length === 0) {
       console.log('No shipments with packaging data found, returning basic report');
