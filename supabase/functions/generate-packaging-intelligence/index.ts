@@ -67,15 +67,8 @@ serve(async (req) => {
         total_weight,
         actual_package_sku,
         actual_package_master_id,
-        created_at,
-        orders!left (
-          id,
-          order_id,
-          items,
-          company_id
-        )
+        created_at
       `)
-      .eq('orders.company_id', company_id)
       .gte('created_at', thirtyDaysAgo.toISOString())
       .not('actual_package_sku', 'is', null)
       .not('package_dimensions', 'is', null)
@@ -87,9 +80,37 @@ serve(async (req) => {
       throw new Error(`Failed to fetch shipments: ${shipmentsError.message}`);
     }
 
-    console.log(`Found ${recentShipments?.length || 0} recent shipments with actual packaging data`);
+    // Filter shipments by company and get associated orders
+    const companyShipments = [];
+    if (recentShipments && recentShipments.length > 0) {
+      const shipmentIds = recentShipments.map(s => s.id);
+      
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('id, order_id, items, company_id, shipment_id')
+        .eq('company_id', company_id)
+        .in('shipment_id', shipmentIds);
+
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+        throw new Error(`Failed to fetch orders: ${ordersError.message}`);
+      }
+
+      // Match shipments with their orders
+      for (const shipment of recentShipments) {
+        const order = ordersData?.find(o => o.shipment_id === shipment.id);
+        if (order) {
+          companyShipments.push({
+            ...shipment,
+            orders: order
+          });
+        }
+      }
+    }
+
+    console.log(`Found ${companyShipments?.length || 0} recent shipments with actual packaging data`);
     
-    if (!recentShipments || recentShipments.length === 0) {
+    if (!companyShipments || companyShipments.length === 0) {
       console.log('No shipments with packaging data found, returning basic report');
       
       const basicReport = {
@@ -132,7 +153,7 @@ serve(async (req) => {
     }
 
     // Debug the first few shipments
-    console.log('Sample shipment data:', JSON.stringify(recentShipments.slice(0, 2), null, 2));
+    console.log('Sample shipment data:', JSON.stringify(companyShipments.slice(0, 2), null, 2));
 
     // Step 2: Get company's item master data for volume calculations
     const { data: companyItems, error: itemsError } = await supabase
@@ -334,7 +355,7 @@ serve(async (req) => {
     const detailedDiscrepancies: any[] = [];
     let totalPotentialSavings = 0;
 
-    for (const shipment of recentShipments || []) {
+    for (const shipment of companyShipments || []) {
       const analysis = engine.analyzeShipment(shipment);
       if (!analysis) {
         console.log(`⚠️ Skipping shipment ${shipment.id} - analysis failed`);
