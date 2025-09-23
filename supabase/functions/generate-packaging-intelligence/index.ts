@@ -86,32 +86,52 @@ serve(async (req) => {
 
     console.log(`✅ Matched ${matchedShipments.length} shipments with orders`);
 
-    // Get company's available boxes for recommendations
-    const { data: availableBoxes, error: boxesError } = await supabase
+    // Get company's available boxes AND Uline catalog for recommendations
+    const { data: availableBoxes } = await supabase
       .from('boxes')
       .select('id, name, length, width, height, max_weight, cost, in_stock')
       .eq('company_id', company_id)
       .eq('is_active', true)
       .order('cost', { ascending: true });
 
-    console.log(`📦 Found ${availableBoxes?.length || 0} available boxes for optimization`);
+    const { data: ulineBoxes } = await supabase
+      .from('packaging_master_list')
+      .select('id, name, length_in, width_in, height_in, cost, vendor_sku, type')
+      .eq('is_active', true)
+      .eq('type', 'Box')
+      .order('cost', { ascending: true })
+      .limit(50);
 
-    // Analyze the first matched shipment if available
-    let analysisResult = null;
-    let utilizationCalculation = null;
+    const allAvailableBoxes = [
+      ...(availableBoxes || []).map(box => ({
+        ...box,
+        source: 'company',
+        length: box.length,
+        width: box.width,
+        height: box.height
+      })),
+      ...(ulineBoxes || []).map(box => ({
+        ...box,
+        source: 'uline',
+        length: box.length_in,
+        width: box.width_in,
+        height: box.height_in,
+        in_stock: 999 // Assume Uline has stock
+      }))
+    ];
 
-    if (matchedShipments.length > 0) {
-      const testShip = matchedShipments[0];
-      console.log('🧪 Analyzing test shipment:', {
-        id: testShip.shipment_id,
-        sku: testShip.actual_package_sku,
-        items_count: testShip.items_count
-      });
+    console.log(`📦 Found ${availableBoxes?.length || 0} company boxes and ${ulineBoxes?.length || 0} Uline boxes`);
 
-      if (testShip.order_items && testShip.order_items.length > 0) {
+    // Analyze ALL matched shipments
+    let allAnalysisResults = [];
+    let totalUtilization = 0;
+    let utilizationCount = 0;
+
+    for (const shipment of matchedShipments) {
+      if (shipment.order_items && shipment.order_items.length > 0) {
         // Calculate volume from order items
         let totalItemsVolume = 0;
-        for (const item of testShip.order_items) {
+        for (const item of shipment.order_items) {
           if (item.dimensions) {
             const itemVol = (item.dimensions.length || 6) * 
                            (item.dimensions.width || 4) * 
@@ -120,146 +140,182 @@ serve(async (req) => {
           }
         }
 
-        // Parse package dimensions (they might be stored as JSON string)
+        // Parse package dimensions
         let dims;
         try {
-          if (typeof testShip.package_dimensions === 'string') {
-            dims = JSON.parse(testShip.package_dimensions);
-            console.log('✅ Parsed dimensions from string:', dims);
+          if (typeof shipment.package_dimensions === 'string') {
+            dims = JSON.parse(shipment.package_dimensions);
           } else {
-            dims = testShip.package_dimensions;
-            console.log('✅ Using object dimensions:', dims);
+            dims = shipment.package_dimensions;
           }
         } catch (e) {
-          console.log('⚠️ Could not parse package dimensions:', testShip.package_dimensions);
           dims = null;
         }
         
         let boxVolume = 0;
         if (dims && typeof dims === 'object' && dims.length && dims.width && dims.height) {
           boxVolume = parseFloat(dims.length) * parseFloat(dims.width) * parseFloat(dims.height);
-          console.log('📦 Box volume calculated:', boxVolume, 'from dimensions:', dims);
-        } else {
-          console.log('❌ Invalid dimensions format:', dims);
         }
 
         const utilization = totalItemsVolume > 0 && boxVolume > 0 
           ? (totalItemsVolume / boxVolume) * 100 
           : 0;
 
-        console.log('📊 Utilization calculation:', {
-          itemsVolume: totalItemsVolume,
-          boxVolume: boxVolume,
-          utilization: utilization.toFixed(1) + '%'
-        });
+        if (utilization > 0) {
+          totalUtilization += utilization;
+          utilizationCount++;
+        }
 
-        // Find optimal box from available boxes
+        // Find optimal box from all available boxes
         let optimalBox = null;
         let bestUtilization = 0;
         
-        if (availableBoxes && availableBoxes.length > 0) {
-          for (const box of availableBoxes) {
-            const candidateVolume = box.length * box.width * box.height;
-            const candidateUtilization = totalItemsVolume > 0 && candidateVolume > 0 
-              ? (totalItemsVolume / candidateVolume) * 100 
-              : 0;
-            
-            // Look for boxes with 70-90% utilization (ideal range)
-            if (candidateUtilization >= 70 && candidateUtilization <= 90 && 
-                candidateUtilization > bestUtilization && 
-                candidateVolume >= totalItemsVolume) {
-              bestUtilization = candidateUtilization;
-              optimalBox = box;
-            }
-          }
+        for (const box of allAvailableBoxes) {
+          const candidateVolume = box.length * box.width * box.height;
+          const candidateUtilization = totalItemsVolume > 0 && candidateVolume > 0 
+            ? (totalItemsVolume / candidateVolume) * 100 
+            : 0;
           
-          // If no box in ideal range, find the smallest box that fits
-          if (!optimalBox) {
-            for (const box of availableBoxes) {
-              const candidateVolume = box.length * box.width * box.height;
-              if (candidateVolume >= totalItemsVolume) {
-                const candidateUtilization = totalItemsVolume > 0 && candidateVolume > 0 
-                  ? (totalItemsVolume / candidateVolume) * 100 
-                  : 0;
-                if (candidateUtilization > bestUtilization) {
-                  bestUtilization = candidateUtilization;
-                  optimalBox = box;
-                }
+          // Look for boxes with 70-90% utilization (ideal range)
+          if (candidateUtilization >= 70 && candidateUtilization <= 90 && 
+              candidateUtilization > bestUtilization && 
+              candidateVolume >= totalItemsVolume) {
+            bestUtilization = candidateUtilization;
+            optimalBox = box;
+          }
+        }
+        
+        // If no box in ideal range, find the smallest box that fits
+        if (!optimalBox) {
+          for (const box of allAvailableBoxes) {
+            const candidateVolume = box.length * box.width * box.height;
+            if (candidateVolume >= totalItemsVolume) {
+              const candidateUtilization = totalItemsVolume > 0 && candidateVolume > 0 
+                ? (totalItemsVolume / candidateVolume) * 100 
+                : 0;
+              if (candidateUtilization > bestUtilization) {
+                bestUtilization = candidateUtilization;
+                optimalBox = box;
               }
             }
           }
         }
 
-        utilizationCalculation = {
-          items_volume: totalItemsVolume,
-          box_volume: boxVolume,
-          utilization_percent: utilization,
-          optimal_box_volume: optimalBox ? (optimalBox.length * optimalBox.width * optimalBox.height) : null,
-          optimal_utilization: bestUtilization
-        };
-
-        analysisResult = {
-          shipment_id: testShip.shipment_id,
-          order_id: testShip.order_id,
-          actual_box_sku: testShip.actual_package_sku,
-          utilization: utilization,
-          items_analyzed: testShip.order_items.length,
-          optimal_box: optimalBox,
-          optimal_utilization: bestUtilization
-        };
+        if (utilization > 0 || optimalBox) {
+          allAnalysisResults.push({
+            shipment_id: shipment.shipment_id,
+            order_id: shipment.order_id,
+            actual_box_sku: shipment.actual_package_sku,
+            utilization: utilization,
+            items_analyzed: shipment.order_items.length,
+            optimal_box: optimalBox,
+            optimal_utilization: bestUtilization,
+            items_volume: totalItemsVolume,
+            box_volume: boxVolume
+          });
+        }
       }
     }
 
+    const averageUtilization = utilizationCount > 0 ? totalUtilization / utilizationCount : 0;
+    console.log(`📊 Analyzed ${allAnalysisResults.length} shipments with average utilization: ${averageUtilization.toFixed(1)}%`);
+
+    // Calculate most used boxes from all shipments
+    const boxUsage = {};
+    matchedShipments.forEach(shipment => {
+      const sku = shipment.actual_package_sku;
+      if (sku) {
+        boxUsage[sku] = (boxUsage[sku] || 0) + 1;
+      }
+    });
+
+    const mostUsedBoxes = Object.entries(boxUsage)
+      .map(([sku, count]) => ({
+        box_sku: sku,
+        usage_count: count,
+        percentage_of_shipments: ((count / matchedShipments.length) * 100).toFixed(1)
+      }))
+      .sort((a, b) => b.usage_count - a.usage_count)
+      .slice(0, 5);
+
+    // Get top discrepancies (biggest optimization opportunities)
+    const topDiscrepancies = allAnalysisResults
+      .filter(result => result.optimal_box && result.optimal_utilization > result.utilization)
+      .sort((a, b) => (b.optimal_utilization - b.utilization) - (a.optimal_utilization - a.utilization))
+      .slice(0, 5)
+      .map(result => ({
+        shipment_id: result.shipment_id,
+        order_id: result.order_id,
+        actual_box: result.actual_box_sku,
+        optimal_box: `${result.optimal_box.name} ${result.optimal_box.source === 'uline' ? '(Uline: ' + result.optimal_box.vendor_sku + ')' : '(Company)'}`,
+        actual_utilization: result.utilization.toFixed(1),
+        optimal_utilization: result.optimal_utilization.toFixed(1),
+        utilization_improvement: (result.optimal_utilization - result.utilization).toFixed(1),
+        potential_savings: parseFloat(((result.optimal_utilization - result.utilization) * 0.05).toFixed(2)),
+        confidence: result.optimal_box.source === 'uline' ? 75 : 85
+      }));
+
+    // Get inventory suggestions from top optimal boxes
+    const optimalBoxCounts = {};
+    allAnalysisResults.forEach(result => {
+      if (result.optimal_box) {
+        const key = result.optimal_box.source === 'uline' ? result.optimal_box.vendor_sku : result.optimal_box.name;
+        if (!optimalBoxCounts[key]) {
+          optimalBoxCounts[key] = {
+            box: result.optimal_box,
+            count: 0,
+            shipments: []
+          };
+        }
+        optimalBoxCounts[key].count++;
+        optimalBoxCounts[key].shipments.push(result.shipment_id);
+      }
+    });
+
+    const inventorySuggestions = Object.values(optimalBoxCounts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map(item => ({
+        box_id: item.box.source === 'uline' ? item.box.vendor_sku : item.box.id,
+        box_name: `${item.box.name} ${item.box.source === 'uline' ? '(Uline)' : '(Company)'}`,
+        current_stock: item.box.in_stock || 0,
+        projected_need: Math.ceil(item.count * 2),
+        days_of_supply: item.box.in_stock ? Math.floor(item.box.in_stock / (item.count / 30)) : 0,
+        suggestion: `${item.count} shipments could benefit from this box. ${item.box.source === 'uline' ? 'Consider adding to inventory.' : 'Ensure adequate stock.'}`,
+        urgency: (item.box.in_stock || 0) < item.count ? "high" : (item.box.in_stock || 0) < item.count * 2 ? "medium" : "low",
+        cost_per_unit: item.box.cost || 0,
+        shipments_needing_this_box: item.shipments.slice(0, 5),
+        actual_utilization_improvement: item.count
+      }));
+
     // Generate and save the report
+    const totalPotentialSavings = topDiscrepancies.reduce((sum, disc) => sum + disc.potential_savings, 0);
+    
     const report = {
       company_id,
       generated_at: new Date().toISOString(),
       analysis_period: 'Last 60 days',
       total_orders_analyzed: matchedShipments.length,
-      potential_savings: analysisResult ? parseFloat((analysisResult.utilization * 0.1).toFixed(2)) : 0,
-      top_5_most_used_boxes: matchedShipments.length > 0 ? [{
-        box_sku: matchedShipments[0].actual_package_sku,
-        usage_count: matchedShipments.filter(s => s.actual_package_sku === matchedShipments[0].actual_package_sku).length,
-        percentage_of_shipments: ((matchedShipments.filter(s => s.actual_package_sku === matchedShipments[0].actual_package_sku).length / matchedShipments.length) * 100).toFixed(1)
-      }] : [],
-      top_5_box_discrepancies: analysisResult ? [{
-        shipment_id: analysisResult.shipment_id,
-        order_id: analysisResult.order_id,
-        actual_box: analysisResult.actual_box_sku,
-        optimal_box: analysisResult.optimal_box ? analysisResult.optimal_box.name : "No optimal box found",
-        actual_utilization: analysisResult.utilization.toFixed(1),
-        optimal_utilization: analysisResult.optimal_utilization ? analysisResult.optimal_utilization.toFixed(1) : "N/A",
-        utilization_improvement: analysisResult.optimal_utilization ? Math.max(0, analysisResult.optimal_utilization - analysisResult.utilization).toFixed(1) : "0.0",
-        potential_savings: analysisResult.optimal_box ? parseFloat((Math.max(0, analysisResult.optimal_utilization - analysisResult.utilization) * 0.05).toFixed(2)) : 0,
-        confidence: analysisResult.optimal_box ? 85 : 50
-      }] : [],
-      inventory_suggestions: analysisResult && analysisResult.optimal_box ? [{
-        box_id: analysisResult.optimal_box.id,
-        box_name: analysisResult.optimal_box.name,
-        current_stock: analysisResult.optimal_box.in_stock,
-        projected_need: Math.ceil(matchedShipments.length / 30),
-        days_of_supply: Math.floor(analysisResult.optimal_box.in_stock / (matchedShipments.length / 30)),
-        suggestion: `Switch to ${analysisResult.optimal_box.name} for better utilization (${analysisResult.optimal_utilization.toFixed(1)}% vs current ${analysisResult.utilization.toFixed(1)}%)`,
-        urgency: analysisResult.optimal_box.in_stock < 10 ? "high" : analysisResult.optimal_box.in_stock < 30 ? "medium" : "low",
-        cost_per_unit: analysisResult.optimal_box.cost,
-        shipments_needing_this_box: [analysisResult.shipment_id],
-        actual_utilization_improvement: Math.max(0, analysisResult.optimal_utilization - analysisResult.utilization)
-      }] : [],
-      projected_packaging_need: matchedShipments.length > 0 ? {
-        [matchedShipments[0].actual_package_sku]: Math.ceil(matchedShipments.length / 30)
-      } : {},
+      potential_savings: parseFloat(totalPotentialSavings.toFixed(2)),
+      top_5_most_used_boxes: mostUsedBoxes,
+      top_5_box_discrepancies: topDiscrepancies,
+      inventory_suggestions: inventorySuggestions,
+      projected_packaging_need: mostUsedBoxes.reduce((acc, box) => {
+        acc[box.box_sku] = Math.ceil(box.usage_count * 2);
+        return acc;
+      }, {}),
       report_data: {
         shipments_with_packaging_data: matchedShipments.length,
-        average_actual_utilization: analysisResult ? analysisResult.utilization.toFixed(1) : "0.0",
-        total_discrepancies_found: analysisResult ? 1 : 0,
-        total_potential_savings: analysisResult ? (analysisResult.utilization * 0.1).toFixed(2) : "0.00",
-        high_efficiency_shipments: analysisResult && analysisResult.utilization >= 75 ? 1 : 0,
-        low_efficiency_shipments: analysisResult && analysisResult.utilization < 50 ? 1 : 0,
+        average_actual_utilization: averageUtilization.toFixed(1),
+        total_discrepancies_found: topDiscrepancies.length,
+        total_potential_savings: totalPotentialSavings.toFixed(2),
+        high_efficiency_shipments: allAnalysisResults.filter(r => r.utilization >= 75).length,
+        low_efficiency_shipments: allAnalysisResults.filter(r => r.utilization < 50).length,
         utilization_distribution: {
-          excellent: analysisResult && analysisResult.utilization >= 85 ? 1 : 0,
-          good: analysisResult && analysisResult.utilization >= 70 && analysisResult.utilization < 85 ? 1 : 0,
-          fair: analysisResult && analysisResult.utilization >= 50 && analysisResult.utilization < 70 ? 1 : 0,
-          poor: analysisResult && analysisResult.utilization < 50 ? 1 : 0
+          excellent: allAnalysisResults.filter(r => r.utilization >= 85).length,
+          good: allAnalysisResults.filter(r => r.utilization >= 70 && r.utilization < 85).length,
+          fair: allAnalysisResults.filter(r => r.utilization >= 50 && r.utilization < 70).length,
+          poor: allAnalysisResults.filter(r => r.utilization < 50).length
         }
       }
     };
@@ -291,14 +347,15 @@ serve(async (req) => {
         debug_info: {
           total_shipments_found: allShipments?.length || 0,
           matched_company_shipments: matchedShipments.length,
-          test_analysis: analysisResult,
-          utilization_calc: utilizationCalculation,
-          sample_shipment: matchedShipments.length > 0 ? matchedShipments[0] : null
+          analyzed_results: allAnalysisResults.length,
+          average_utilization: averageUtilization,
+          uline_boxes_available: ulineBoxes?.length || 0,
+          company_boxes_available: availableBoxes?.length || 0
         },
         shipments_analyzed: matchedShipments.length,
-        total_savings: analysisResult ? parseFloat((analysisResult.utilization * 0.1).toFixed(2)) : 0,
-        average_utilization: analysisResult ? analysisResult.utilization : 0,
-        optimization_opportunities: analysisResult ? 1 : 0
+        total_savings: totalPotentialSavings,
+        average_utilization: averageUtilization,
+        optimization_opportunities: topDiscrepancies.length
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
