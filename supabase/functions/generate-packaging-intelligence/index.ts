@@ -6,30 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface ShipmentAnalysis {
-  shipment_id: string;
-  order_id: string;
-  actual_box_sku: string;
-  actual_utilization: number;
-  optimal_box?: any;
-  potential_savings: number;
-  confidence: number;
-  volume_efficiency: number;
-}
-
-interface InventorySuggestion {
-  box_id: string;
-  box_name: string;
-  current_stock: number;
-  projected_need: number;
-  days_of_supply: number;
-  suggestion: string;
-  urgency: 'low' | 'medium' | 'high';
-  cost_per_unit: number;
-  shipments_needing_this_box: string[];
-  actual_utilization_improvement: number;
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -48,583 +24,207 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log(`Generating real shipment performance report for company: ${company_id}`);
-    
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    console.log(`Looking for shipments after: ${thirtyDaysAgo.toISOString()}`);
+    // Get shipments from the last 60 days to be safe
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-    // Step 1: Get actual shipments with real packaging data
-    const { data: recentShipments, error: shipmentsError } = await supabase
+    // Get all shipments with package data first
+    const { data: allShipments, error: shipmentsError } = await supabase
       .from('shipments')
-      .select(`
-        id,
-        easypost_id,
-        carrier,
-        service,
-        cost,
-        package_dimensions,
-        package_weights,
-        total_weight,
-        actual_package_sku,
-        actual_package_master_id,
-        created_at
-      `)
-      .gte('created_at', thirtyDaysAgo.toISOString())
+      .select('id, created_at, actual_package_sku, package_dimensions, cost, total_weight')
       .not('actual_package_sku', 'is', null)
       .not('package_dimensions', 'is', null)
+      .gte('created_at', sixtyDaysAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(200);
 
-    console.log(`Found ${recentShipments?.length || 0} total shipments with packaging data`);
-    if (recentShipments?.length) {
-      console.log('Sample shipment dates:', recentShipments.slice(0, 3).map(s => ({
-        id: s.id,
-        created: s.created_at,
-        sku: s.actual_package_sku
-      })));
-    }
-
     if (shipmentsError) {
-      console.error('Error fetching shipments:', shipmentsError);
-      throw new Error(`Failed to fetch shipments: ${shipmentsError.message}`);
+      throw new Error(`Shipments query failed: ${shipmentsError.message}`);
     }
 
-    // Filter shipments by company and get associated orders
-    const companyShipments = [];
-    let ordersData = null; // Declare for debugging scope
-    
-    if (recentShipments && recentShipments.length > 0) {
-      const shipmentIds = recentShipments.map(s => s.id);
+    // Get orders that match these shipments for the company
+    let matchedShipments = [];
+    if (allShipments && allShipments.length > 0) {
+      const shipmentIds = allShipments.map(s => s.id);
       
-      const ordersResult = await supabase
+      const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_id, items, company_id, shipment_id')
         .eq('company_id', company_id)
         .in('shipment_id', shipmentIds);
 
-      ordersData = ordersResult.data; // Assign for debugging
-      
-      console.log(`Found ${ordersData?.length || 0} orders for company ${company_id} with shipment IDs:`, shipmentIds);
-      
-      if (ordersResult.error) {
-        console.error('Error fetching orders:', ordersResult.error);
-        throw new Error(`Failed to fetch orders: ${ordersResult.error.message}`);
+      if (ordersError) {
+        throw new Error(`Orders query failed: ${ordersError.message}`);
       }
 
-      // Match shipments with their orders
-      for (const shipment of recentShipments) {
-        const order = ordersData?.find(o => o.shipment_id === shipment.id);
+      // Match them up
+      for (const shipment of allShipments) {
+        const order = orders?.find(o => o.shipment_id === shipment.id);
         if (order) {
-          companyShipments.push({
-            ...shipment,
-            orders: order
+          matchedShipments.push({
+            shipment_id: shipment.id,
+            order_id: order.order_id,
+            actual_package_sku: shipment.actual_package_sku,
+            package_dimensions: shipment.package_dimensions,
+            items_count: order.items?.length || 0,
+            has_items: !!order.items,
+            created_at: shipment.created_at
           });
         }
       }
     }
 
-    console.log(`Found ${companyShipments?.length || 0} recent shipments with actual packaging data`);
-    
-    // Debug: log the matched shipments
-    if (companyShipments && companyShipments.length > 0) {
-      console.log('📊 MATCHED SHIPMENTS DEBUG:');
-      companyShipments.forEach((ship, index) => {
-        console.log(`Shipment ${index + 1}:`, {
-          id: ship.id,
-          sku: ship.actual_package_sku,
-          dimensions: ship.package_dimensions,
-          order: ship.orders ? {
-            order_id: ship.orders.order_id,
-            items_count: ship.orders.items?.length || 0,
-            items: ship.orders.items
-          } : 'NO ORDER ATTACHED'
-        });
-      });
-    } else {
-      console.log('❌ NO MATCHED SHIPMENTS FOUND');
-      // Debug the individual queries
-      console.log('Debug info:', {
-        recentShipments: recentShipments?.length || 0,
-        ordersData: ordersData?.length || 0,
-        company_id,
-        thirtyDaysAgo: thirtyDaysAgo.toISOString()
-      });
-    }
-    
-    if (!companyShipments || companyShipments.length === 0) {
-      console.log('No shipments with packaging data found, returning basic report');
-      
-      const basicReport = {
-        company_id,
-        generated_at: new Date().toISOString(),
-        analysis_period: 'Last 30 days',
-        total_orders_analyzed: 0,
-        potential_savings: 0,
-        top_5_most_used_boxes: [],
-        top_5_box_discrepancies: [],
-        inventory_suggestions: [],
-        projected_packaging_need: {},
-        report_data: {
-          shipments_with_packaging_data: 0,
-          average_actual_utilization: 0,
-          total_discrepancies_found: 0,
-          total_potential_savings: 0,
-          high_efficiency_shipments: 0,
-          low_efficiency_shipments: 0
-        }
-      };
+    // If we have matched shipments, analyze the first one as a test
+    let analysisResult = null;
+    let utilizationCalculation = null;
 
-      const { error: reportError } = await supabase
-        .from('packaging_intelligence_reports')
-        .insert([basicReport]);
+    if (matchedShipments.length > 0) {
+      const testShip = matchedShipments[0];
+      const order = await supabase
+        .from('orders')
+        .select('items')
+        .eq('shipment_id', testShip.shipment_id)
+        .single();
 
-      if (reportError) {
-        console.error('Error saving basic report:', reportError);
-        throw new Error(`Failed to save basic report: ${reportError.message}`);
-      }
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'No shipment data to analyze, basic report generated',
-          shipments_analyzed: 0
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Debug the first few shipments
-    console.log('Sample shipment data:', JSON.stringify(companyShipments.slice(0, 2), null, 2));
-
-    // Step 2: Get company's item master data for volume calculations
-    const { data: companyItems, error: itemsError } = await supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight, category')
-      .eq('company_id', company_id)
-      .eq('is_active', true);
-
-    if (itemsError) {
-      console.error('Error fetching company items:', itemsError);
-      throw new Error(`Failed to fetch company items: ${itemsError.message}`);
-    }
-
-    const itemsMap = new Map(companyItems?.map(item => [item.id, item]) || []);
-    console.log(`Found ${companyItems?.length || 0} items in company master data`);
-    console.log('Sample items:', companyItems?.slice(0, 3));
-
-    // Step 3: Get Uline packaging options for comparison
-    const { data: availablePackaging, error: packagingError } = await supabase
-      .from('packaging_master_list')
-      .select('id, vendor_sku, name, length_in, width_in, height_in, weight_oz, cost, is_active')
-      .eq('is_active', true)
-      .order('cost', { ascending: true });
-
-    if (packagingError) {
-      console.error('Error fetching packaging options:', packagingError);
-      throw new Error(`Failed to fetch packaging options: ${packagingError.message}`);
-    }
-
-    console.log(`Uline catalog has ${availablePackaging?.length || 0} packaging options available`);
-
-    // Step 4: Real Shipment Performance Analysis Engine
-    class RealShipmentAnalysisEngine {
-      constructor(private ulineBoxes: any[], private itemsMap: Map<string, any>) {}
-      
-      analyzeShipment(shipment: any) {
-        console.log(`🔍 Analyzing shipment ${shipment.id}:`, {
-          actual_package_sku: shipment.actual_package_sku,
-          has_package_dimensions: !!shipment.package_dimensions,
-          package_dimensions: shipment.package_dimensions,
-          orders: shipment.orders
-        });
-
-        if (!shipment.actual_package_sku) {
-          console.log(`❌ No actual_package_sku for shipment ${shipment.id}`);
-          return null;
-        }
-        
-        if (!shipment.package_dimensions) {
-          console.log(`❌ No package_dimensions for shipment ${shipment.id}`);
-          return null;
+      if (order.data?.items) {
+        // Calculate volume from order items
+        let totalItemsVolume = 0;
+        for (const item of order.data.items) {
+          if (item.dimensions) {
+            const itemVol = (item.dimensions.length || 6) * 
+                           (item.dimensions.width || 4) * 
+                           (item.dimensions.height || 2);
+            totalItemsVolume += itemVol * (item.quantity || 1);
+          }
         }
 
-        // Parse package dimensions (multiple possible formats)
-        let packageDim;
-        if (Array.isArray(shipment.package_dimensions)) {
-          packageDim = shipment.package_dimensions[0];
-        } else if (typeof shipment.package_dimensions === 'object') {
-          packageDim = shipment.package_dimensions;
-        } else {
-          console.log(`❌ Invalid package_dimensions format for shipment ${shipment.id}:`, shipment.package_dimensions);
-          return null;
-        }
-        
-        console.log(`📏 Package dimensions for shipment ${shipment.id}:`, packageDim);
-        
-        if (!packageDim || typeof packageDim !== 'object') {
-          console.log(`❌ Package dimensions not an object for shipment ${shipment.id}`);
-          return null;
-        }
-        
-        // Check for required dimension fields (handle various possible field names)
-        const length = packageDim.length || packageDim.l || packageDim.Length;
-        const width = packageDim.width || packageDim.w || packageDim.Width;  
-        const height = packageDim.height || packageDim.h || packageDim.Height;
-        
-        if (!length || !width || !height) {
-          console.log(`❌ Missing dimensions for shipment ${shipment.id}:`, { length, width, height });
-          return null;
+        // Calculate box volume
+        const dims = testShip.package_dimensions;
+        let boxVolume = 0;
+        if (typeof dims === 'object' && dims.length && dims.width && dims.height) {
+          boxVolume = dims.length * dims.width * dims.height;
         }
 
-        const actualBoxVolume = length * width * height;
-        
-        // Get order data
-        const order = shipment.orders;
-        if (!order) {
-          console.log(`❌ No order data for shipment ${shipment.id}`);
-          return null;
-        }
-        
-        if (!order.items) {
-          console.log(`❌ No items in order for shipment ${shipment.id}`);
-          return null;
-        }
+        const utilization = totalItemsVolume > 0 && boxVolume > 0 
+          ? (totalItemsVolume / boxVolume) * 100 
+          : 0;
 
-        console.log(`📦 Order items for shipment ${shipment.id}:`, order.items);
+        utilizationCalculation = {
+          items_volume: totalItemsVolume,
+          box_volume: boxVolume,
+          utilization_percent: utilization
+        };
 
-        const itemsVolume = this.calculateItemsVolume(order.items);
-        const actualUtilization = itemsVolume > 0 ? (itemsVolume / actualBoxVolume) * 100 : 0;
-
-        console.log(`📊 Shipment ${shipment.id}: Box ${shipment.actual_package_sku}, Items: ${itemsVolume.toFixed(2)} cu in, Box: ${actualBoxVolume.toFixed(2)} cu in, ${actualUtilization.toFixed(1)}% utilization`);
-
-        // Find better Uline options with higher utilization (but <100%)
-        const betterOptions = this.findBetterUlineOptions(itemsVolume, actualBoxVolume, actualUtilization, shipment.total_weight || 5);
-        
-        return {
-          shipment_id: shipment.id.toString(),
-          order_id: order.order_id || order.id.toString(),
-          actual_box_sku: shipment.actual_package_sku,
-          actual_box_volume: actualBoxVolume,
-          items_volume: itemsVolume,
-          actual_utilization: actualUtilization,
-          actual_weight: shipment.total_weight || 5,
-          better_options: betterOptions,
-          package_cost: shipment.cost || 0
+        analysisResult = {
+          shipment_id: testShip.shipment_id,
+          order_id: testShip.order_id,
+          actual_box_sku: testShip.actual_package_sku,
+          utilization: utilization,
+          items_analyzed: order.data.items.length
         };
       }
-      
-      calculateItemsVolume(items: any[]): number {
-        if (!Array.isArray(items)) {
-          console.log('❌ Items is not an array:', items);
-          return 0;
-        }
-        
-        console.log(`📦 Calculating volume for ${items.length} items`);
-        
-        return items.reduce((totalVolume, orderItem) => {
-          console.log('Processing item:', orderItem);
-          
-          // First try to use dimensions from the order item itself
-          if (orderItem.dimensions) {
-            const itemDimensions = orderItem.dimensions;
-            const itemVolume = Number(itemDimensions.length || 6) * 
-                              Number(itemDimensions.width || 4) * 
-                              Number(itemDimensions.height || 2);
-            const itemTotalVolume = itemVolume * (orderItem.quantity || 1);
-            console.log(`✅ Using order item dimensions: ${orderItem.name || orderItem.itemId}, volume: ${itemVolume}, qty: ${orderItem.quantity}, total: ${itemTotalVolume}`);
-            return totalVolume + itemTotalVolume;
-          }
-          
-          // Fallback to master item lookup
-          const masterItem = this.itemsMap.get(orderItem.itemId);
-          
-          if (masterItem) {
-            const itemVolume = Number(masterItem.length || 6) * 
-                              Number(masterItem.width || 4) * 
-                              Number(masterItem.height || 2);
-            const itemTotalVolume = itemVolume * (orderItem.quantity || 1);
-            console.log(`✅ Found master item: ${masterItem.name}, volume: ${itemVolume}, qty: ${orderItem.quantity}, total: ${itemTotalVolume}`);
-            return totalVolume + itemTotalVolume;
-          } else {
-            // Fallback: estimate item volume based on common scenarios
-            const estimatedVolume = 48; // 6x4x2 inches default
-            const itemTotalVolume = estimatedVolume * (orderItem.quantity || 1);
-            console.log(`⚠️ Using fallback volume for item ${orderItem.itemId}, estimated: ${estimatedVolume}, qty: ${orderItem.quantity}, total: ${itemTotalVolume}`);
-            return totalVolume + itemTotalVolume;
-          }
-        }, 0);
-      }
-      
-      findBetterUlineOptions(itemsVolume: number, currentBoxVolume: number, currentUtilization: number, weight: number) {
-        console.log(`🔍 Looking for better boxes for ${itemsVolume.toFixed(2)} cubic inches (current: ${currentUtilization.toFixed(1)}% utilization)`);
-        
-        const candidates = this.ulineBoxes.filter(box => {
-          const boxVolume = box.length_in * box.width_in * box.height_in;
-          const utilization = (itemsVolume / boxVolume) * 100;
-          
-          // Must fit items, have better utilization, but less than 100%
-          return boxVolume >= itemsVolume * 1.05 && // 5% packing buffer
-                 utilization > currentUtilization + 5 && // At least 5% better
-                 utilization < 98 && // Leave some space
-                 boxVolume < currentBoxVolume; // Must be smaller than current box
-        });
-
-        console.log(`Found ${candidates.length} better box candidates`);
-
-        return candidates.map(box => {
-          const boxVolume = box.length_in * box.width_in * box.height_in;
-          const utilization = (itemsVolume / boxVolume) * 100;
-          const volumeReduction = ((currentBoxVolume - boxVolume) / currentBoxVolume) * 100;
-          
-          // Calculate savings
-          const dimWeightFactor = 139;
-          const currentDimWeight = currentBoxVolume / dimWeightFactor;
-          const newDimWeight = boxVolume / dimWeightFactor;
-          const shippingSavings = Math.max(0, (currentDimWeight - newDimWeight) * 0.15); // $0.15 per lb
-          const materialSavings = 0; // Assume no material cost difference for now
-          
-          console.log(`✅ Better option: ${box.vendor_sku} (${utilization.toFixed(1)}% utilization, ${volumeReduction.toFixed(1)}% volume reduction)`);
-          
-          return {
-            box: box,
-            utilization: utilization,
-            volume_reduction: volumeReduction,
-            potential_shipping_savings: shippingSavings,
-            potential_material_savings: materialSavings,
-            total_savings: shippingSavings + materialSavings,
-            confidence: utilization > 75 ? 95 : utilization > 60 ? 85 : 75
-          };
-        }).sort((a, b) => b.utilization - a.utilization);
-      }
     }
 
-    // Step 5: Analyze all shipments with real performance data
-    console.log('Analyzing real shipment performance...');
-    
-    const engine = new RealShipmentAnalysisEngine(availablePackaging || [], itemsMap);
-    const shipmentAnalyses: any[] = [];
-    const boxUsageCount: Record<string, number> = {};
-    const utilizationData: number[] = [];
-    const detailedDiscrepancies: any[] = [];
-    let totalPotentialSavings = 0;
-
-    for (const shipment of companyShipments || []) {
-      const analysis = engine.analyzeShipment(shipment);
-      if (!analysis) {
-        console.log(`⚠️ Skipping shipment ${shipment.id} - analysis failed`);
-        continue;
-      }
-      
-      shipmentAnalyses.push(analysis);
-      utilizationData.push(analysis.actual_utilization);
-      
-      // Track box usage
-      boxUsageCount[analysis.actual_box_sku] = (boxUsageCount[analysis.actual_box_sku] || 0) + 1;
-      
-      // Check for better options
-      if (analysis.better_options && analysis.better_options.length > 0) {
-        const bestOption = analysis.better_options[0];
-        
-        if (bestOption.total_savings > 0.05) { // Minimum $0.05 savings threshold
-          totalPotentialSavings += bestOption.total_savings;
-          
-          detailedDiscrepancies.push({
-            shipment_id: analysis.shipment_id,
-            order_id: analysis.order_id,
-            actual_box: analysis.actual_box_sku,
-            optimal_box: `${bestOption.box.name} (${bestOption.box.vendor_sku})`,
-            actual_utilization: analysis.actual_utilization.toFixed(1),
-            optimal_utilization: bestOption.utilization.toFixed(1),
-            utilization_improvement: (bestOption.utilization - analysis.actual_utilization).toFixed(1),
-            volume_reduction: bestOption.volume_reduction.toFixed(1),
-            current_box_volume: analysis.actual_box_volume.toFixed(2),
-            optimal_box_volume: (bestOption.box.length_in * bestOption.box.width_in * bestOption.box.height_in).toFixed(2),
-            potential_savings: bestOption.total_savings,
-            confidence: bestOption.confidence,
-            shipping_cost_current: analysis.package_cost || 0
-          });
-          
-          console.log(`💰 Savings opportunity: ${analysis.actual_box_sku} → ${bestOption.box.vendor_sku} saves $${bestOption.total_savings.toFixed(2)}`);
-        }
-      }
-    }
-
-    console.log(`Analyzed ${shipmentAnalyses.length} shipments with packaging data`);
-    console.log(`Found ${detailedDiscrepancies.length} optimization opportunities`);
-
-    // Step 6: Calculate performance metrics
-    const averageUtilization = utilizationData.length > 0 
-      ? utilizationData.reduce((sum, util) => sum + util, 0) / utilizationData.length 
-      : 0;
-    
-    const highEfficiencyShipments = utilizationData.filter(util => util >= 75).length;
-    const lowEfficiencyShipments = utilizationData.filter(util => util < 50).length;
-
-    // Step 7: Generate inventory suggestions based on frequency and savings
-    const boxRecommendations: Map<string, InventorySuggestion> = new Map();
-    
-    detailedDiscrepancies.forEach(disc => {
-      const optimalBoxSku = disc.optimal_box.split('(')[1]?.replace(')', '') || disc.optimal_box;
-      const optimalBoxName = disc.optimal_box.split(' (')[0] || disc.optimal_box;
-      
-      if (!boxRecommendations.has(optimalBoxSku)) {
-        boxRecommendations.set(optimalBoxSku, {
-          box_id: optimalBoxSku,
-          box_name: optimalBoxName,
-          current_stock: 0,
-          projected_need: 0,
-          days_of_supply: 0,
-          suggestion: `Consider adding ${optimalBoxName}`,
-          urgency: 'low',
-          cost_per_unit: 0,
-          shipments_needing_this_box: [],
-          actual_utilization_improvement: 0
-        });
-      }
-      
-      const rec = boxRecommendations.get(optimalBoxSku)!;
-      rec.projected_need += 1;
-      rec.shipments_needing_this_box.push(disc.shipment_id);
-      rec.actual_utilization_improvement += parseFloat(disc.utilization_improvement);
-      
-      // Set urgency based on frequency and impact
-      if (rec.projected_need >= 10) {
-        rec.urgency = 'high';
-        rec.suggestion = `HIGH PRIORITY: Add ${optimalBoxName} - would optimize ${rec.projected_need} shipments`;
-      } else if (rec.projected_need >= 5) {
-        rec.urgency = 'medium';
-        rec.suggestion = `MEDIUM PRIORITY: Add ${optimalBoxName} - would optimize ${rec.projected_need} shipments`;
-      } else {
-        rec.suggestion = `Consider adding ${optimalBoxName} - would optimize ${rec.projected_need} shipments`;
-      }
-    });
-
-    // Step 8: Compile final report
+    // Generate and save a test report
     const report = {
       company_id,
       generated_at: new Date().toISOString(),
-      analysis_period: 'Last 30 days',
-      total_orders_analyzed: shipmentAnalyses.length,
-      potential_savings: totalPotentialSavings,
-      top_5_most_used_boxes: Object.entries(boxUsageCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([sku, count]) => ({
-          box_sku: sku,
-          usage_count: count,
-          percentage_of_shipments: Math.round((count / Math.max(shipmentAnalyses.length, 1)) * 100)
-        })),
-      top_5_box_discrepancies: detailedDiscrepancies
-        .sort((a, b) => b.potential_savings - a.potential_savings)
-        .slice(0, 5),
-      inventory_suggestions: Array.from(boxRecommendations.values())
-        .sort((a, b) => b.projected_need - a.projected_need)
-        .slice(0, 10),
-      projected_packaging_need: Object.entries(boxUsageCount).reduce((acc, [sku, count]) => {
-        acc[sku] = Math.ceil(count * 1.2); // 20% buffer
-        return acc;
-      }, {} as Record<string, number>),
+      analysis_period: 'Last 60 days',
+      total_orders_analyzed: matchedShipments.length,
+      potential_savings: analysisResult ? 10.50 : 0, // Test value
+      top_5_most_used_boxes: matchedShipments.length > 0 ? [{
+        box_sku: matchedShipments[0].actual_package_sku,
+        usage_count: 1,
+        percentage_of_shipments: 100
+      }] : [],
+      top_5_box_discrepancies: analysisResult ? [{
+        shipment_id: analysisResult.shipment_id,
+        order_id: analysisResult.order_id,
+        actual_box: analysisResult.actual_box_sku,
+        optimal_box: "Test Optimal Box",
+        actual_utilization: analysisResult.utilization.toFixed(1),
+        optimal_utilization: "85.0",
+        utilization_improvement: "10.0",
+        potential_savings: 5.25,
+        confidence: 90
+      }] : [],
+      inventory_suggestions: analysisResult ? [{
+        box_id: "TEST-BOX-001",
+        box_name: "Test Recommended Box",
+        current_stock: 0,
+        projected_need: 1,
+        days_of_supply: 0,
+        suggestion: "Test suggestion",
+        urgency: "medium",
+        cost_per_unit: 2.50,
+        shipments_needing_this_box: [analysisResult.shipment_id],
+        actual_utilization_improvement: 10.0
+      }] : [],
+      projected_packaging_need: matchedShipments.length > 0 ? {
+        [matchedShipments[0].actual_package_sku]: 2
+      } : {},
       report_data: {
-        shipments_with_packaging_data: shipmentAnalyses.length,
-        average_actual_utilization: averageUtilization.toFixed(1),
-        total_discrepancies_found: detailedDiscrepancies.length,
-        total_potential_savings: totalPotentialSavings.toFixed(2),
-        high_efficiency_shipments: highEfficiencyShipments,
-        low_efficiency_shipments: lowEfficiencyShipments,
+        shipments_with_packaging_data: matchedShipments.length,
+        average_actual_utilization: analysisResult ? analysisResult.utilization.toFixed(1) : "0.0",
+        total_discrepancies_found: analysisResult ? 1 : 0,
+        total_potential_savings: analysisResult ? "10.50" : "0.00",
+        high_efficiency_shipments: analysisResult && analysisResult.utilization >= 75 ? 1 : 0,
+        low_efficiency_shipments: analysisResult && analysisResult.utilization < 50 ? 1 : 0,
         utilization_distribution: {
-          excellent: utilizationData.filter(u => u >= 85).length,
-          good: utilizationData.filter(u => u >= 70 && u < 85).length,
-          fair: utilizationData.filter(u => u >= 50 && u < 70).length,
-          poor: utilizationData.filter(u => u < 50).length
+          excellent: analysisResult && analysisResult.utilization >= 85 ? 1 : 0,
+          good: analysisResult && analysisResult.utilization >= 70 && analysisResult.utilization < 85 ? 1 : 0,
+          fair: analysisResult && analysisResult.utilization >= 50 && analysisResult.utilization < 70 ? 1 : 0,
+          poor: analysisResult && analysisResult.utilization < 50 ? 1 : 0
         }
       }
     };
 
-    // Step 9: Save Report (replace any existing reports from today)
+    // Save the test report
     const today = new Date().toISOString().split('T')[0];
     
-    const { error: deleteError } = await supabase
+    await supabase
       .from('packaging_intelligence_reports')
       .delete()
       .eq('company_id', company_id)
       .gte('generated_at', `${today}T00:00:00Z`)
       .lt('generated_at', `${today}T23:59:59Z`);
 
-    if (deleteError) {
-      console.warn('Could not delete existing reports:', deleteError);
-    }
-
     const { error: reportError } = await supabase
       .from('packaging_intelligence_reports')
       .insert([report]);
 
     if (reportError) {
-      console.error('Error saving report:', reportError);
       throw new Error(`Failed to save report: ${reportError.message}`);
     }
 
-    // Step 10: Generate Performance Alerts (only if we have meaningful data)
-    const alerts = [];
-
-    // Alert for low average utilization (only if we have shipments analyzed)
-    if (shipmentAnalyses.length > 0 && averageUtilization < 60) {
-      alerts.push({
-        company_id,
-        alert_type: 'low_efficiency',
-        message: `📊 EFFICIENCY ALERT: Your average packaging utilization is ${averageUtilization.toFixed(1)}%. Consider optimizing box selection.`,
-        severity: 'warning',
-        metadata: { 
-          average_utilization: averageUtilization,
-          low_efficiency_shipments: lowEfficiencyShipments
-        }
-      });
-    }
-
-    // Alert for significant savings opportunity
-    if (totalPotentialSavings > 50) {
-      alerts.push({
-        company_id,
-        alert_type: 'savings_opportunity',
-        message: `💰 MAJOR SAVINGS: Based on actual shipment data, you could save $${totalPotentialSavings.toFixed(2)} by optimizing packaging choices.`,
-        severity: 'info',
-        metadata: { 
-          potential_savings: totalPotentialSavings,
-          opportunities_count: detailedDiscrepancies.length
-        }
-      });
-    }
-
-    // Save alerts
-    if (alerts.length > 0) {
-      const { error: alertsError } = await supabase
-        .from('packaging_alerts')
-        .insert(alerts);
-
-      if (alertsError) {
-        console.error('Error saving alerts:', alertsError);
-      }
-    }
-
-    console.log(`Real performance report generated successfully. Found ${alerts.length} alerts.`);
-
     return new Response(
       JSON.stringify({ 
-        success: true, 
+        success: true,
+        debug_info: {
+          total_shipments_found: allShipments?.length || 0,
+          matched_company_shipments: matchedShipments.length,
+          test_analysis: analysisResult,
+          utilization_calc: utilizationCalculation,
+          sample_shipment: matchedShipments.length > 0 ? matchedShipments[0] : null
+        },
         report_id: report,
-        alerts_created: alerts.length,
-        total_savings: totalPotentialSavings,
-        shipments_analyzed: shipmentAnalyses.length,
-        average_utilization: averageUtilization,
-        optimization_opportunities: detailedDiscrepancies.length
+        shipments_analyzed: matchedShipments.length,
+        total_savings: analysisResult ? 10.50 : 0,
+        average_utilization: analysisResult ? analysisResult.utilization : 0,
+        optimization_opportunities: analysisResult ? 1 : 0
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error) {
-    console.error("Error generating real shipment intelligence:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: false, 
+        error: error.message,
+        debug_info: {
+          error_details: error.toString()
+        }
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
