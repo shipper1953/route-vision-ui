@@ -1,6 +1,34 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
+// Simple 3D bin packing logic for better utilization calculation
+function calculateBoxFit(items: any[], boxLength: number, boxWidth: number, boxHeight: number): { fits: boolean, utilization: number, itemsVolume: number, boxVolume: number } {
+  let totalItemVolume = 0;
+  
+  // Calculate total volume of all items
+  for (const item of items) {
+    if (item.dimensions) {
+      const itemVol = (item.dimensions.length || 6) * 
+                     (item.dimensions.width || 4) * 
+                     (item.dimensions.height || 2);
+      totalItemVolume += itemVol * (item.quantity || 1);
+    }
+  }
+  
+  const boxVolume = boxLength * boxWidth * boxHeight;
+  const utilization = totalItemVolume > 0 && boxVolume > 0 ? (totalItemVolume / boxVolume) * 100 : 0;
+  
+  // Basic fit check - items volume should not exceed box volume
+  const fits = totalItemVolume <= boxVolume && utilization <= 100;
+  
+  return {
+    fits,
+    utilization,
+    itemsVolume: totalItemVolume,
+    boxVolume
+  };
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -98,9 +126,9 @@ serve(async (req) => {
       .from('packaging_master_list')
       .select('id, name, length_in, width_in, height_in, cost, vendor_sku, type')
       .eq('is_active', true)
-      .eq('type', 'Box')
+      .eq('type', 'box')
       .order('cost', { ascending: true })
-      .limit(50);
+      .limit(100);
 
     const allAvailableBoxes = [
       ...(availableBoxes || []).map(box => ({
@@ -122,112 +150,119 @@ serve(async (req) => {
 
     console.log(`📦 Found ${availableBoxes?.length || 0} company boxes and ${ulineBoxes?.length || 0} Uline boxes`);
 
-    // Analyze ALL matched shipments
+    // Analyze ALL matched shipments for Uline optimization opportunities
     let allAnalysisResults = [];
     let totalUtilization = 0;
     let utilizationCount = 0;
 
-    for (const shipment of matchedShipments) {
-      if (shipment.order_items && shipment.order_items.length > 0) {
-        // Calculate volume from order items
-        let totalItemsVolume = 0;
-        for (const item of shipment.order_items) {
-          if (item.dimensions) {
-            const itemVol = (item.dimensions.length || 6) * 
-                           (item.dimensions.width || 4) * 
-                           (item.dimensions.height || 2);
-            totalItemsVolume += itemVol * (item.quantity || 1);
-          }
-        }
+    console.log('🔬 Starting detailed analysis of', matchedShipments.length, 'matched shipments');
 
-        // Parse package dimensions
-        let dims;
+    for (const shipment of matchedShipments) {
+      console.log(`🧪 Analyzing shipment: ${shipment.shipment_id}, SKU: "${shipment.actual_package_sku}", items: ${shipment.order_items?.length || 0}`);
+      
+      if (shipment.order_items && shipment.order_items.length > 0) {
+        // Parse actual package dimensions that were used
+        let actualDims;
         try {
           if (typeof shipment.package_dimensions === 'string') {
-            dims = JSON.parse(shipment.package_dimensions);
+            actualDims = JSON.parse(shipment.package_dimensions);
           } else {
-            dims = shipment.package_dimensions;
+            actualDims = shipment.package_dimensions;
           }
         } catch (e) {
-          dims = null;
-        }
-        
-        let boxVolume = 0;
-        if (dims && typeof dims === 'object' && dims.length && dims.width && dims.height) {
-          boxVolume = parseFloat(dims.length) * parseFloat(dims.width) * parseFloat(dims.height);
+          console.log('❌ Failed to parse package dimensions for shipment', shipment.shipment_id);
+          actualDims = null;
         }
 
-        const utilization = totalItemsVolume > 0 && boxVolume > 0 
-          ? (totalItemsVolume / boxVolume) * 100 
-          : 0;
+        if (!actualDims || !actualDims.length || !actualDims.width || !actualDims.height) {
+          console.log('⚠️ Skipping shipment due to invalid dimensions');
+          continue;
+        }
 
-        if (utilization > 0) {
-          totalUtilization += utilization;
+        // Calculate actual utilization using the box that was actually used
+        const actualBoxFit = calculateBoxFit(
+          shipment.order_items,
+          parseFloat(actualDims.length),
+          parseFloat(actualDims.width), 
+          parseFloat(actualDims.height)
+        );
+
+        console.log(`📊 Actual utilization: ${actualBoxFit.utilization.toFixed(1)}% (${actualBoxFit.itemsVolume}/${actualBoxFit.boxVolume})`);
+
+        if (actualBoxFit.utilization > 0) {
+          totalUtilization += actualBoxFit.utilization;
           utilizationCount++;
         }
 
-        // Find optimal box from all available boxes
-        let optimalBox = null;
-        let bestUtilization = 0;
+        // Now find Uline boxes that would provide HIGHER utilization but still under 100%
+        let bestUlineAlternative = null;
+        let bestUlineUtilization = actualBoxFit.utilization; // Must beat the actual utilization
+
+        // Focus specifically on Uline boxes for alternatives
+        const ulineAlternatives = allAvailableBoxes.filter(box => box.source === 'uline');
+        console.log(`🔍 Checking ${ulineAlternatives.length} Uline alternatives against actual utilization of ${actualBoxFit.utilization.toFixed(1)}%`);
         
-        for (const box of allAvailableBoxes) {
-          const candidateVolume = box.length * box.width * box.height;
-          const candidateUtilization = totalItemsVolume > 0 && candidateVolume > 0 
-            ? (totalItemsVolume / candidateVolume) * 100 
-            : 0;
+        for (const ulineBox of ulineAlternatives) {
+          const ulineBoxFit = calculateBoxFit(
+            shipment.order_items,
+            ulineBox.length,
+            ulineBox.width,
+            ulineBox.height
+          );
           
-          // Look for boxes with 70-90% utilization (ideal range)
-          if (candidateUtilization >= 70 && candidateUtilization <= 90 && 
-              candidateUtilization > bestUtilization && 
-              candidateVolume >= totalItemsVolume) {
-            bestUtilization = candidateUtilization;
-            optimalBox = box;
-          }
-        }
-        
-        // If no box in ideal range, find the smallest box that fits
-        if (!optimalBox) {
-          for (const box of allAvailableBoxes) {
-            const candidateVolume = box.length * box.width * box.height;
-            if (candidateVolume >= totalItemsVolume) {
-              const candidateUtilization = totalItemsVolume > 0 && candidateVolume > 0 
-                ? (totalItemsVolume / candidateVolume) * 100 
-                : 0;
-              if (candidateUtilization > bestUtilization) {
-                bestUtilization = candidateUtilization;
-                optimalBox = box;
-              }
-            }
+          // We want Uline boxes that:
+          // 1. Items actually fit (utilization <= 95% for safety)
+          // 2. Provide HIGHER utilization than what was actually used
+          // 3. Are not overpacked (< 95% utilization for safety)
+          if (ulineBoxFit.fits && 
+              ulineBoxFit.utilization > actualBoxFit.utilization && 
+              ulineBoxFit.utilization <= 95 &&
+              ulineBoxFit.utilization > bestUlineUtilization) {
+            bestUlineUtilization = ulineBoxFit.utilization;
+            bestUlineAlternative = {
+              ...ulineBox,
+              fit_analysis: ulineBoxFit
+            };
           }
         }
 
-        if (utilization > 0 || optimalBox) {
-          allAnalysisResults.push({
-            shipment_id: shipment.shipment_id,
-            order_id: shipment.order_id,
-            actual_box_sku: shipment.actual_package_sku,
-            utilization: utilization,
-            items_analyzed: shipment.order_items.length,
-            optimal_box: optimalBox,
-            optimal_utilization: bestUtilization,
-            items_volume: totalItemsVolume,
-            box_volume: boxVolume
-          });
+        if (bestUlineAlternative) {
+          console.log(`✨ Found Uline optimization: ${bestUlineAlternative.name} (${bestUlineAlternative.vendor_sku}) - ${bestUlineUtilization.toFixed(1)}% vs ${actualBoxFit.utilization.toFixed(1)}%`);
         }
+
+        // Store analysis results
+        allAnalysisResults.push({
+          shipment_id: shipment.shipment_id,
+          order_id: shipment.order_id,
+          actual_box_sku: shipment.actual_package_sku,
+          actual_utilization: actualBoxFit.utilization,
+          actual_box_dimensions: actualDims,
+          items_analyzed: shipment.order_items.length,
+          items_volume: actualBoxFit.itemsVolume,
+          actual_box_volume: actualBoxFit.boxVolume,
+          uline_alternative: bestUlineAlternative,
+          uline_utilization: bestUlineUtilization,
+          has_optimization_opportunity: !!bestUlineAlternative
+        });
       }
     }
 
     const averageUtilization = utilizationCount > 0 ? totalUtilization / utilizationCount : 0;
     console.log(`📊 Analyzed ${allAnalysisResults.length} shipments with average utilization: ${averageUtilization.toFixed(1)}%`);
 
-    // Calculate most used boxes from all shipments
+    // Calculate most used boxes from all matched shipments
     const boxUsage = {};
-    matchedShipments.forEach(shipment => {
+    console.log('📦 Calculating box usage from', matchedShipments.length, 'shipments');
+    
+    matchedShipments.forEach((shipment, index) => {
       const sku = shipment.actual_package_sku;
+      console.log(`📦 Shipment ${index + 1}: SKU="${sku}"`);
       if (sku) {
         boxUsage[sku] = (boxUsage[sku] || 0) + 1;
       }
     });
+    
+    console.log('📊 Final box usage counts:', boxUsage);
 
     const mostUsedBoxes = Object.entries(boxUsage)
       .map(([sku, count]) => ({
@@ -238,58 +273,62 @@ serve(async (req) => {
       .sort((a, b) => b.usage_count - a.usage_count)
       .slice(0, 5);
 
-    // Get top discrepancies (biggest optimization opportunities)
-    const topDiscrepancies = allAnalysisResults
-      .filter(result => result.optimal_box && result.optimal_utilization > result.utilization)
-      .sort((a, b) => (b.optimal_utilization - b.utilization) - (a.optimal_utilization - a.utilization))
-      .slice(0, 5)
+    console.log('📊 Most used boxes:', mostUsedBoxes);
+
+    // Get top Uline optimization opportunities
+    const ulineOptimizations = allAnalysisResults
+      .filter(result => result.has_optimization_opportunity && result.uline_alternative)
+      .sort((a, b) => (b.uline_utilization - b.actual_utilization) - (a.uline_utilization - a.actual_utilization))
+      .slice(0, 10)
       .map(result => ({
         shipment_id: result.shipment_id,
         order_id: result.order_id,
         actual_box: result.actual_box_sku,
-        optimal_box: `${result.optimal_box.name} ${result.optimal_box.source === 'uline' ? '(Uline: ' + result.optimal_box.vendor_sku + ')' : '(Company)'}`,
-        actual_utilization: result.utilization.toFixed(1),
-        optimal_utilization: result.optimal_utilization.toFixed(1),
-        utilization_improvement: (result.optimal_utilization - result.utilization).toFixed(1),
-        potential_savings: parseFloat(((result.optimal_utilization - result.utilization) * 0.05).toFixed(2)),
-        confidence: result.optimal_box.source === 'uline' ? 75 : 85
+        actual_utilization: result.actual_utilization.toFixed(1),
+        recommended_uline_box: `${result.uline_alternative.name} (${result.uline_alternative.vendor_sku})`,
+        recommended_utilization: result.uline_utilization.toFixed(1),
+        utilization_improvement: (result.uline_utilization - result.actual_utilization).toFixed(1),
+        potential_cost_savings: parseFloat(((result.uline_utilization - result.actual_utilization) * 0.05).toFixed(2)),
+        confidence: 85,
+        uline_box_cost: result.uline_alternative.cost,
+        optimization_type: 'Uline Alternative'
       }));
 
-    // Get inventory suggestions from top optimal boxes
-    const optimalBoxCounts = {};
-    allAnalysisResults.forEach(result => {
-      if (result.optimal_box) {
-        const key = result.optimal_box.source === 'uline' ? result.optimal_box.vendor_sku : result.optimal_box.name;
-        if (!optimalBoxCounts[key]) {
-          optimalBoxCounts[key] = {
-            box: result.optimal_box,
-            count: 0,
-            shipments: []
-          };
-        }
-        optimalBoxCounts[key].count++;
-        optimalBoxCounts[key].shipments.push(result.shipment_id);
+    console.log(`✨ Found ${ulineOptimizations.length} Uline optimization opportunities`);
+
+    // Get inventory suggestions based on Uline alternatives that were recommended
+    const ulineRecommendationCounts = {};
+    ulineOptimizations.forEach(opt => {
+      const key = opt.recommended_uline_box;
+      if (!ulineRecommendationCounts[key]) {
+        ulineRecommendationCounts[key] = {
+          box_name: key,
+          count: 0,
+          total_improvement: 0,
+          shipments: []
+        };
       }
+      ulineRecommendationCounts[key].count++;
+      ulineRecommendationCounts[key].total_improvement += parseFloat(opt.utilization_improvement);
+      ulineRecommendationCounts[key].shipments.push(opt.shipment_id);
     });
 
-    const inventorySuggestions = Object.values(optimalBoxCounts)
+    const inventorySuggestions = Object.values(ulineRecommendationCounts)
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
       .map(item => ({
-        box_id: item.box.source === 'uline' ? item.box.vendor_sku : item.box.id,
-        box_name: `${item.box.name} ${item.box.source === 'uline' ? '(Uline)' : '(Company)'}`,
-        current_stock: item.box.in_stock || 0,
-        projected_need: Math.ceil(item.count * 2),
-        days_of_supply: item.box.in_stock ? Math.floor(item.box.in_stock / (item.count / 30)) : 0,
-        suggestion: `${item.count} shipments could benefit from this box. ${item.box.source === 'uline' ? 'Consider adding to inventory.' : 'Ensure adequate stock.'}`,
-        urgency: (item.box.in_stock || 0) < item.count ? "high" : (item.box.in_stock || 0) < item.count * 2 ? "medium" : "low",
-        cost_per_unit: item.box.cost || 0,
-        shipments_needing_this_box: item.shipments.slice(0, 5),
-        actual_utilization_improvement: item.count
+        box_name: item.box_name,
+        shipments_that_could_benefit: item.count,
+        average_utilization_improvement: (item.total_improvement / item.count).toFixed(1),
+        projected_monthly_need: Math.ceil(item.count * 2),
+        suggestion: `${item.count} recent shipments could benefit from this Uline box`,
+        urgency: item.count >= 3 ? "high" : item.count >= 2 ? "medium" : "low",
+        total_potential_improvement: item.total_improvement.toFixed(1),
+        affected_shipments: item.shipments.slice(0, 5)
       }));
 
-    // Generate and save the report
-    const totalPotentialSavings = topDiscrepancies.reduce((sum, disc) => sum + disc.potential_savings, 0);
+    // Generate and save the report  
+    const totalPotentialSavings = ulineOptimizations.reduce((sum, opt) => sum + opt.potential_cost_savings, 0);
     
     const report = {
       company_id,
@@ -298,7 +337,7 @@ serve(async (req) => {
       total_orders_analyzed: matchedShipments.length,
       potential_savings: parseFloat(totalPotentialSavings.toFixed(2)),
       top_5_most_used_boxes: mostUsedBoxes,
-      top_5_box_discrepancies: topDiscrepancies,
+      top_5_box_discrepancies: ulineOptimizations,
       inventory_suggestions: inventorySuggestions,
       projected_packaging_need: mostUsedBoxes.reduce((acc, box) => {
         acc[box.box_sku] = Math.ceil(box.usage_count * 2);
@@ -307,15 +346,16 @@ serve(async (req) => {
       report_data: {
         shipments_with_packaging_data: matchedShipments.length,
         average_actual_utilization: averageUtilization.toFixed(1),
-        total_discrepancies_found: topDiscrepancies.length,
+        uline_optimization_opportunities: ulineOptimizations.length,
         total_potential_savings: totalPotentialSavings.toFixed(2),
-        high_efficiency_shipments: allAnalysisResults.filter(r => r.utilization >= 75).length,
-        low_efficiency_shipments: allAnalysisResults.filter(r => r.utilization < 50).length,
+        high_efficiency_shipments: allAnalysisResults.filter(r => r.actual_utilization >= 75).length,
+        low_efficiency_shipments: allAnalysisResults.filter(r => r.actual_utilization < 50).length,
+        shipments_with_uline_alternatives: allAnalysisResults.filter(r => r.has_optimization_opportunity).length,
         utilization_distribution: {
-          excellent: allAnalysisResults.filter(r => r.utilization >= 85).length,
-          good: allAnalysisResults.filter(r => r.utilization >= 70 && r.utilization < 85).length,
-          fair: allAnalysisResults.filter(r => r.utilization >= 50 && r.utilization < 70).length,
-          poor: allAnalysisResults.filter(r => r.utilization < 50).length
+          excellent: allAnalysisResults.filter(r => r.actual_utilization >= 85).length,
+          good: allAnalysisResults.filter(r => r.actual_utilization >= 70 && r.actual_utilization < 85).length,
+          fair: allAnalysisResults.filter(r => r.actual_utilization >= 50 && r.actual_utilization < 70).length,
+          poor: allAnalysisResults.filter(r => r.actual_utilization < 50).length
         }
       }
     };
