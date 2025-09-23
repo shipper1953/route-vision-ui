@@ -86,6 +86,16 @@ serve(async (req) => {
 
     console.log(`✅ Matched ${matchedShipments.length} shipments with orders`);
 
+    // Get company's available boxes for recommendations
+    const { data: availableBoxes, error: boxesError } = await supabase
+      .from('boxes')
+      .select('id, name, length, width, height, max_weight, cost, in_stock')
+      .eq('company_id', company_id)
+      .eq('is_active', true)
+      .order('cost', { ascending: true });
+
+    console.log(`📦 Found ${availableBoxes?.length || 0} available boxes for optimization`);
+
     // Analyze the first matched shipment if available
     let analysisResult = null;
     let utilizationCalculation = null;
@@ -113,17 +123,24 @@ serve(async (req) => {
         // Parse package dimensions (they might be stored as JSON string)
         let dims;
         try {
-          dims = typeof testShip.package_dimensions === 'string' 
-            ? JSON.parse(testShip.package_dimensions) 
-            : testShip.package_dimensions;
+          if (typeof testShip.package_dimensions === 'string') {
+            dims = JSON.parse(testShip.package_dimensions);
+            console.log('✅ Parsed dimensions from string:', dims);
+          } else {
+            dims = testShip.package_dimensions;
+            console.log('✅ Using object dimensions:', dims);
+          }
         } catch (e) {
           console.log('⚠️ Could not parse package dimensions:', testShip.package_dimensions);
-          dims = testShip.package_dimensions;
+          dims = null;
         }
         
         let boxVolume = 0;
-        if (dims && dims.length && dims.width && dims.height) {
-          boxVolume = dims.length * dims.width * dims.height;
+        if (dims && typeof dims === 'object' && dims.length && dims.width && dims.height) {
+          boxVolume = parseFloat(dims.length) * parseFloat(dims.width) * parseFloat(dims.height);
+          console.log('📦 Box volume calculated:', boxVolume, 'from dimensions:', dims);
+        } else {
+          console.log('❌ Invalid dimensions format:', dims);
         }
 
         const utilization = totalItemsVolume > 0 && boxVolume > 0 
@@ -136,10 +153,49 @@ serve(async (req) => {
           utilization: utilization.toFixed(1) + '%'
         });
 
+        // Find optimal box from available boxes
+        let optimalBox = null;
+        let bestUtilization = 0;
+        
+        if (availableBoxes && availableBoxes.length > 0) {
+          for (const box of availableBoxes) {
+            const candidateVolume = box.length * box.width * box.height;
+            const candidateUtilization = totalItemsVolume > 0 && candidateVolume > 0 
+              ? (totalItemsVolume / candidateVolume) * 100 
+              : 0;
+            
+            // Look for boxes with 70-90% utilization (ideal range)
+            if (candidateUtilization >= 70 && candidateUtilization <= 90 && 
+                candidateUtilization > bestUtilization && 
+                candidateVolume >= totalItemsVolume) {
+              bestUtilization = candidateUtilization;
+              optimalBox = box;
+            }
+          }
+          
+          // If no box in ideal range, find the smallest box that fits
+          if (!optimalBox) {
+            for (const box of availableBoxes) {
+              const candidateVolume = box.length * box.width * box.height;
+              if (candidateVolume >= totalItemsVolume) {
+                const candidateUtilization = totalItemsVolume > 0 && candidateVolume > 0 
+                  ? (totalItemsVolume / candidateVolume) * 100 
+                  : 0;
+                if (candidateUtilization > bestUtilization) {
+                  bestUtilization = candidateUtilization;
+                  optimalBox = box;
+                }
+              }
+            }
+          }
+        }
+
         utilizationCalculation = {
           items_volume: totalItemsVolume,
           box_volume: boxVolume,
-          utilization_percent: utilization
+          utilization_percent: utilization,
+          optimal_box_volume: optimalBox ? (optimalBox.length * optimalBox.width * optimalBox.height) : null,
+          optimal_utilization: bestUtilization
         };
 
         analysisResult = {
@@ -147,7 +203,9 @@ serve(async (req) => {
           order_id: testShip.order_id,
           actual_box_sku: testShip.actual_package_sku,
           utilization: utilization,
-          items_analyzed: testShip.order_items.length
+          items_analyzed: testShip.order_items.length,
+          optimal_box: optimalBox,
+          optimal_utilization: bestUtilization
         };
       }
     }
@@ -168,24 +226,24 @@ serve(async (req) => {
         shipment_id: analysisResult.shipment_id,
         order_id: analysisResult.order_id,
         actual_box: analysisResult.actual_box_sku,
-        optimal_box: "Optimized Box Recommendation",
+        optimal_box: analysisResult.optimal_box ? analysisResult.optimal_box.name : "No optimal box found",
         actual_utilization: analysisResult.utilization.toFixed(1),
-        optimal_utilization: "85.0",
-        utilization_improvement: Math.max(0, 85 - analysisResult.utilization).toFixed(1),
-        potential_savings: parseFloat((Math.max(0, 85 - analysisResult.utilization) * 0.05).toFixed(2)),
-        confidence: 85
+        optimal_utilization: analysisResult.optimal_utilization ? analysisResult.optimal_utilization.toFixed(1) : "N/A",
+        utilization_improvement: analysisResult.optimal_utilization ? Math.max(0, analysisResult.optimal_utilization - analysisResult.utilization).toFixed(1) : "0.0",
+        potential_savings: analysisResult.optimal_box ? parseFloat((Math.max(0, analysisResult.optimal_utilization - analysisResult.utilization) * 0.05).toFixed(2)) : 0,
+        confidence: analysisResult.optimal_box ? 85 : 50
       }] : [],
-      inventory_suggestions: analysisResult ? [{
-        box_id: "OPT-BOX-001",
-        box_name: "Recommended Optimal Box",
-        current_stock: 0,
+      inventory_suggestions: analysisResult && analysisResult.optimal_box ? [{
+        box_id: analysisResult.optimal_box.id,
+        box_name: analysisResult.optimal_box.name,
+        current_stock: analysisResult.optimal_box.in_stock,
         projected_need: Math.ceil(matchedShipments.length / 30),
-        days_of_supply: 0,
-        suggestion: `Based on ${matchedShipments.length} recent shipments, consider optimizing box selection`,
-        urgency: analysisResult.utilization < 50 ? "high" : "medium",
-        cost_per_unit: 3.25,
+        days_of_supply: Math.floor(analysisResult.optimal_box.in_stock / (matchedShipments.length / 30)),
+        suggestion: `Switch to ${analysisResult.optimal_box.name} for better utilization (${analysisResult.optimal_utilization.toFixed(1)}% vs current ${analysisResult.utilization.toFixed(1)}%)`,
+        urgency: analysisResult.optimal_box.in_stock < 10 ? "high" : analysisResult.optimal_box.in_stock < 30 ? "medium" : "low",
+        cost_per_unit: analysisResult.optimal_box.cost,
         shipments_needing_this_box: [analysisResult.shipment_id],
-        actual_utilization_improvement: Math.max(0, 85 - analysisResult.utilization)
+        actual_utilization_improvement: Math.max(0, analysisResult.optimal_utilization - analysisResult.utilization)
       }] : [],
       projected_packaging_need: matchedShipments.length > 0 ? {
         [matchedShipments[0].actual_package_sku]: Math.ceil(matchedShipments.length / 30)
