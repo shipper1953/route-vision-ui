@@ -52,6 +52,7 @@ serve(async (req) => {
     
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    console.log(`Looking for shipments after: ${thirtyDaysAgo.toISOString()}`);
 
     // Step 1: Get actual shipments with real packaging data
     const { data: recentShipments, error: shipmentsError } = await supabase
@@ -75,6 +76,15 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(200);
 
+    console.log(`Found ${recentShipments?.length || 0} total shipments with packaging data`);
+    if (recentShipments?.length) {
+      console.log('Sample shipment dates:', recentShipments.slice(0, 3).map(s => ({
+        id: s.id,
+        created: s.created_at,
+        sku: s.actual_package_sku
+      })));
+    }
+
     if (shipmentsError) {
       console.error('Error fetching shipments:', shipmentsError);
       throw new Error(`Failed to fetch shipments: ${shipmentsError.message}`);
@@ -94,6 +104,8 @@ serve(async (req) => {
         .in('shipment_id', shipmentIds);
 
       ordersData = ordersResult.data; // Assign for debugging
+      
+      console.log(`Found ${ordersData?.length || 0} orders for company ${company_id} with shipment IDs:`, shipmentIds);
       
       if (ordersResult.error) {
         console.error('Error fetching orders:', ordersResult.error);
