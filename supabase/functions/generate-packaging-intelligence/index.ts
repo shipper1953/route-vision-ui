@@ -283,6 +283,18 @@ serve(async (req) => {
         return items.reduce((totalVolume, orderItem) => {
           console.log('Processing item:', orderItem);
           
+          // First try to use dimensions from the order item itself
+          if (orderItem.dimensions) {
+            const itemDimensions = orderItem.dimensions;
+            const itemVolume = Number(itemDimensions.length || 6) * 
+                              Number(itemDimensions.width || 4) * 
+                              Number(itemDimensions.height || 2);
+            const itemTotalVolume = itemVolume * (orderItem.quantity || 1);
+            console.log(`✅ Using order item dimensions: ${orderItem.name || orderItem.itemId}, volume: ${itemVolume}, qty: ${orderItem.quantity}, total: ${itemTotalVolume}`);
+            return totalVolume + itemTotalVolume;
+          }
+          
+          // Fallback to master item lookup
           const masterItem = this.itemsMap.get(orderItem.itemId);
           
           if (masterItem) {
