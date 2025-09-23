@@ -131,6 +131,9 @@ serve(async (req) => {
       );
     }
 
+    // Debug the first few shipments
+    console.log('Sample shipment data:', JSON.stringify(recentShipments.slice(0, 2), null, 2));
+
     // Step 2: Get company's item master data for volume calculations
     const { data: companyItems, error: itemsError } = await supabase
       .from('items')
@@ -145,6 +148,7 @@ serve(async (req) => {
 
     const itemsMap = new Map(companyItems?.map(item => [item.id, item]) || []);
     console.log(`Found ${companyItems?.length || 0} items in company master data`);
+    console.log('Sample items:', companyItems?.slice(0, 3));
 
     // Step 3: Get Uline packaging options for comparison
     const { data: availablePackaging, error: packagingError } = await supabase
@@ -165,29 +169,71 @@ serve(async (req) => {
       constructor(private ulineBoxes: any[], private itemsMap: Map<string, any>) {}
       
       analyzeShipment(shipment: any) {
-        if (!shipment.actual_package_sku || !shipment.package_dimensions) {
+        console.log(`🔍 Analyzing shipment ${shipment.id}:`, {
+          actual_package_sku: shipment.actual_package_sku,
+          has_package_dimensions: !!shipment.package_dimensions,
+          package_dimensions: shipment.package_dimensions,
+          orders: shipment.orders
+        });
+
+        if (!shipment.actual_package_sku) {
+          console.log(`❌ No actual_package_sku for shipment ${shipment.id}`);
+          return null;
+        }
+        
+        if (!shipment.package_dimensions) {
+          console.log(`❌ No package_dimensions for shipment ${shipment.id}`);
           return null;
         }
 
-        // Parse package dimensions (assuming format like [{"length": 12, "width": 10, "height": 8}])
-        const packageDim = Array.isArray(shipment.package_dimensions) 
-          ? shipment.package_dimensions[0] 
-          : shipment.package_dimensions;
+        // Parse package dimensions (multiple possible formats)
+        let packageDim;
+        if (Array.isArray(shipment.package_dimensions)) {
+          packageDim = shipment.package_dimensions[0];
+        } else if (typeof shipment.package_dimensions === 'object') {
+          packageDim = shipment.package_dimensions;
+        } else {
+          console.log(`❌ Invalid package_dimensions format for shipment ${shipment.id}:`, shipment.package_dimensions);
+          return null;
+        }
         
-        if (!packageDim || !packageDim.length || !packageDim.width || !packageDim.height) {
+        console.log(`📏 Package dimensions for shipment ${shipment.id}:`, packageDim);
+        
+        if (!packageDim || typeof packageDim !== 'object') {
+          console.log(`❌ Package dimensions not an object for shipment ${shipment.id}`);
+          return null;
+        }
+        
+        // Check for required dimension fields (handle various possible field names)
+        const length = packageDim.length || packageDim.l || packageDim.Length;
+        const width = packageDim.width || packageDim.w || packageDim.Width;  
+        const height = packageDim.height || packageDim.h || packageDim.Height;
+        
+        if (!length || !width || !height) {
+          console.log(`❌ Missing dimensions for shipment ${shipment.id}:`, { length, width, height });
           return null;
         }
 
-        const actualBoxVolume = packageDim.length * packageDim.width * packageDim.height;
+        const actualBoxVolume = length * width * height;
         
-        // Calculate items volume from order
+        // Get order data
         const order = shipment.orders;
-        if (!order || !order.items) return null;
+        if (!order) {
+          console.log(`❌ No order data for shipment ${shipment.id}`);
+          return null;
+        }
+        
+        if (!order.items) {
+          console.log(`❌ No items in order for shipment ${shipment.id}`);
+          return null;
+        }
+
+        console.log(`📦 Order items for shipment ${shipment.id}:`, order.items);
 
         const itemsVolume = this.calculateItemsVolume(order.items);
         const actualUtilization = itemsVolume > 0 ? (itemsVolume / actualBoxVolume) * 100 : 0;
 
-        console.log(`📦 Shipment ${shipment.id}: Box ${shipment.actual_package_sku}, ${actualUtilization.toFixed(1)}% utilization`);
+        console.log(`📊 Shipment ${shipment.id}: Box ${shipment.actual_package_sku}, Items: ${itemsVolume.toFixed(2)} cu in, Box: ${actualBoxVolume.toFixed(2)} cu in, ${actualUtilization.toFixed(1)}% utilization`);
 
         // Find better Uline options with higher utilization (but <100%)
         const betterOptions = this.findBetterUlineOptions(itemsVolume, actualBoxVolume, actualUtilization, shipment.total_weight || 5);
@@ -206,20 +252,31 @@ serve(async (req) => {
       }
       
       calculateItemsVolume(items: any[]): number {
-        if (!Array.isArray(items)) return 0;
+        if (!Array.isArray(items)) {
+          console.log('❌ Items is not an array:', items);
+          return 0;
+        }
+        
+        console.log(`📦 Calculating volume for ${items.length} items`);
         
         return items.reduce((totalVolume, orderItem) => {
+          console.log('Processing item:', orderItem);
+          
           const masterItem = this.itemsMap.get(orderItem.itemId);
           
           if (masterItem) {
             const itemVolume = Number(masterItem.length || 6) * 
                               Number(masterItem.width || 4) * 
                               Number(masterItem.height || 2);
-            return totalVolume + (itemVolume * (orderItem.quantity || 1));
+            const itemTotalVolume = itemVolume * (orderItem.quantity || 1);
+            console.log(`✅ Found master item: ${masterItem.name}, volume: ${itemVolume}, qty: ${orderItem.quantity}, total: ${itemTotalVolume}`);
+            return totalVolume + itemTotalVolume;
           } else {
             // Fallback: estimate item volume based on common scenarios
             const estimatedVolume = 48; // 6x4x2 inches default
-            return totalVolume + (estimatedVolume * (orderItem.quantity || 1));
+            const itemTotalVolume = estimatedVolume * (orderItem.quantity || 1);
+            console.log(`⚠️ Using fallback volume for item ${orderItem.itemId}, estimated: ${estimatedVolume}, qty: ${orderItem.quantity}, total: ${itemTotalVolume}`);
+            return totalVolume + itemTotalVolume;
           }
         }, 0);
       }
@@ -237,6 +294,8 @@ serve(async (req) => {
                  utilization < 98 && // Leave some space
                  boxVolume < currentBoxVolume; // Must be smaller than current box
         });
+
+        console.log(`Found ${candidates.length} better box candidates`);
 
         return candidates.map(box => {
           const boxVolume = box.length_in * box.width_in * box.height_in;
@@ -277,7 +336,10 @@ serve(async (req) => {
 
     for (const shipment of recentShipments || []) {
       const analysis = engine.analyzeShipment(shipment);
-      if (!analysis) continue;
+      if (!analysis) {
+        console.log(`⚠️ Skipping shipment ${shipment.id} - analysis failed`);
+        continue;
+      }
       
       shipmentAnalyses.push(analysis);
       utilizationData.push(analysis.actual_utilization);
@@ -427,11 +489,11 @@ serve(async (req) => {
       throw new Error(`Failed to save report: ${reportError.message}`);
     }
 
-    // Step 10: Generate Performance Alerts
+    // Step 10: Generate Performance Alerts (only if we have meaningful data)
     const alerts = [];
 
-    // Alert for low average utilization
-    if (averageUtilization < 60) {
+    // Alert for low average utilization (only if we have shipments analyzed)
+    if (shipmentAnalyses.length > 0 && averageUtilization < 60) {
       alerts.push({
         company_id,
         alert_type: 'low_efficiency',
