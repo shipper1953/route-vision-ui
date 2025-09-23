@@ -395,7 +395,7 @@ serve(async (req) => {
         shipments_analyzed: matchedShipments.length,
         total_savings: totalPotentialSavings,
         average_utilization: averageUtilization,
-        optimization_opportunities: topDiscrepancies.length
+        optimization_opportunities: ulineOptimizations.length
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
