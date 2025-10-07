@@ -5,77 +5,125 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Package, RefreshCw } from "lucide-react";
+import { Package, RefreshCw, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { DateRangeSelector, type DateRangePreset } from "./DateRangeSelector";
 
 interface BoxUsageData {
   boxSku: string;
+  boxName: string;
+  length: number;
+  width: number;
+  height: number;
+  max_weight: number;
+  cost: number;
   usage_count: number;
   percentage_of_shipments: number;
+  first_used: string;
+  last_used: string;
 }
 
 export const HistoricalBoxUsageSimplified = () => {
   const { userProfile } = useAuth();
   const [boxUsageData, setBoxUsageData] = useState<BoxUsageData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalShipments, setTotalShipments] = useState(0);
+  const [shipmentsWithoutBox, setShipmentsWithoutBox] = useState(0);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    to: new Date()
+  });
+  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>("month");
 
-  const fetchBoxUsage = async () => {
+  const fetchBoxUsage = async (from: Date, to: Date) => {
     if (!userProfile?.company_id) {
-      console.log('No user profile or company_id found:', { 
-        userProfile, 
-        company_id: userProfile?.company_id 
-      });
       setBoxUsageData([]);
       setLoading(false);
       return;
     }
 
-    console.log('Fetching box usage for company:', userProfile.company_id);
-
     try {
       setLoading(true);
 
-      // Get shipments with actual box data
+      // Get all shipments in date range for total count
+      const { data: allShipments, error: totalError } = await supabase
+        .from('shipments')
+        .select('id, actual_package_sku')
+        .eq('company_id', userProfile.company_id)
+        .gte('created_at', from.toISOString())
+        .lte('created_at', to.toISOString());
+
+      if (totalError) throw totalError;
+
+      const totalCount = allShipments?.length || 0;
+      const withoutBoxCount = allShipments?.filter(s => !s.actual_package_sku).length || 0;
+      
+      setTotalShipments(totalCount);
+      setShipmentsWithoutBox(withoutBoxCount);
+
+      // Get shipments with box data and join with boxes table
       const { data: shipmentsWithBoxes, error: shipmentError } = await supabase
         .from('shipments')
-        .select('actual_package_sku')
+        .select(`
+          actual_package_sku,
+          created_at
+        `)
         .eq('company_id', userProfile.company_id)
+        .gte('created_at', from.toISOString())
+        .lte('created_at', to.toISOString())
         .not('actual_package_sku', 'is', null);
 
-      if (shipmentError) {
-        console.error('Error fetching shipments:', shipmentError);
-        throw shipmentError;
-      }
+      if (shipmentError) throw shipmentError;
 
-      console.log('Shipments with box data:', shipmentsWithBoxes?.length || 0);
-
-      // Get total shipments for percentage calculation
-      const { data: totalShipmentsData } = await supabase
-        .from('shipments')
-        .select('id', { count: 'exact' })
-        .eq('company_id', userProfile.company_id);
-
-      const totalShipments = totalShipmentsData?.length || 0;
-
-      // Aggregate box usage
-      const boxUsage = new Map<string, number>();
+      // Aggregate box usage with dates
+      const boxUsageMap = new Map<string, { count: number; dates: Date[] }>();
 
       shipmentsWithBoxes?.forEach(shipment => {
         if (shipment.actual_package_sku) {
-          boxUsage.set(shipment.actual_package_sku, (boxUsage.get(shipment.actual_package_sku) || 0) + 1);
+          const existing = boxUsageMap.get(shipment.actual_package_sku);
+          if (existing) {
+            existing.count++;
+            existing.dates.push(new Date(shipment.created_at));
+          } else {
+            boxUsageMap.set(shipment.actual_package_sku, {
+              count: 1,
+              dates: [new Date(shipment.created_at)]
+            });
+          }
         }
       });
 
-      // Convert to array and calculate percentages
-      const usageData: BoxUsageData[] = Array.from(boxUsage.entries())
-        .map(([boxSku, count]) => ({
-          boxSku,
-          usage_count: count,
-          percentage_of_shipments: totalShipments > 0 ? Math.round((count / totalShipments) * 100) : 0
-        }))
-        .sort((a, b) => b.usage_count - a.usage_count)
-        .slice(0, 10); // Show top 10
+      // Get box details from boxes table
+      const boxSkus = Array.from(boxUsageMap.keys());
+      const { data: boxes, error: boxError } = await supabase
+        .from('boxes')
+        .select('sku, name, length, width, height, max_weight, cost')
+        .eq('company_id', userProfile.company_id)
+        .in('sku', boxSkus);
 
-      console.log('Box usage data:', usageData);
+      if (boxError) throw boxError;
+
+      // Combine data
+      const usageData: BoxUsageData[] = Array.from(boxUsageMap.entries())
+        .map(([sku, usage]) => {
+          const boxInfo = boxes?.find(b => b.sku === sku);
+          const sortedDates = usage.dates.sort((a, b) => a.getTime() - b.getTime());
+          
+          return {
+            boxSku: sku,
+            boxName: boxInfo?.name || sku,
+            length: boxInfo?.length || 0,
+            width: boxInfo?.width || 0,
+            height: boxInfo?.height || 0,
+            max_weight: boxInfo?.max_weight || 0,
+            cost: boxInfo?.cost || 0,
+            usage_count: usage.count,
+            percentage_of_shipments: totalCount > 0 ? Math.round((usage.count / totalCount) * 100) : 0,
+            first_used: sortedDates[0].toISOString(),
+            last_used: sortedDates[sortedDates.length - 1].toISOString()
+          };
+        })
+        .sort((a, b) => b.usage_count - a.usage_count);
       
       setBoxUsageData(usageData);
     } catch (error) {
@@ -86,8 +134,16 @@ export const HistoricalBoxUsageSimplified = () => {
     }
   };
 
+  const handleDateRangeChange = (range: { from: Date; to: Date }, preset: DateRangePreset) => {
+    setDateRange(range);
+    setSelectedPreset(preset);
+    fetchBoxUsage(range.from, range.to);
+  };
+
   useEffect(() => {
-    fetchBoxUsage();
+    if (userProfile?.company_id) {
+      fetchBoxUsage(dateRange.from, dateRange.to);
+    }
   }, [userProfile?.company_id]);
 
   if (loading) {
@@ -106,72 +162,121 @@ export const HistoricalBoxUsageSimplified = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
-            Box Usage History
-          </CardTitle>
-          <CardDescription>
-            {boxUsageData.length === 0 
-              ? "No box usage data available from shipments."
-              : `Showing ${boxUsageData.length} different box types from shipments`
-            }
-          </CardDescription>
+          <div className="flex flex-col gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                Box Usage History
+              </CardTitle>
+              <CardDescription>
+                Historical analysis of box usage across shipments
+              </CardDescription>
+            </div>
+            <DateRangeSelector onRangeChange={handleDateRangeChange} />
+          </div>
         </CardHeader>
         <CardContent>
+          {shipmentsWithoutBox > 0 && (
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {shipmentsWithoutBox} of {totalShipments} shipments in this period don't have box data assigned.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {boxUsageData.length === 0 ? (
             <div className="text-center py-8">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Box Usage Data Found</h3>
               <p className="text-muted-foreground mb-4">
-                Create shipments with selected boxes to see usage statistics.
+                {totalShipments === 0 
+                  ? "No shipments found in the selected date range."
+                  : "Create shipments with selected boxes to see usage statistics."}
               </p>
-              <Button onClick={fetchBoxUsage} variant="outline">
+              <Button onClick={() => fetchBoxUsage(dateRange.from, dateRange.to)} variant="outline">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh Data
               </Button>
             </div>
           ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/20 rounded-lg">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{boxUsageData.length}</div>
-                <div className="text-sm text-muted-foreground">Different Boxes</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {boxUsageData.reduce((sum, item) => sum + item.usage_count, 0)}
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/20 rounded-lg">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">{boxUsageData.length}</div>
+                  <div className="text-sm text-muted-foreground">Different Boxes</div>
                 </div>
-                <div className="text-sm text-muted-foreground">Total Shipments</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {boxUsageData[0]?.boxSku || 'N/A'}
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{totalShipments}</div>
+                  <div className="text-sm text-muted-foreground">Total Shipments</div>
                 </div>
-                <div className="text-sm text-muted-foreground">Most Common</div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {boxUsageData.reduce((sum, item) => sum + item.usage_count, 0)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">With Box Data</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {boxUsageData[0]?.boxName || 'N/A'}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Most Common</div>
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-3">
-              <h4 className="font-semibold">Most Used Box Types</h4>
-              {boxUsageData.map((box, index) => (
-                <div key={box.boxSku} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline">#{index + 1}</Badge>
-                    <div>
-                      <div className="font-medium">{box.boxSku}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {box.percentage_of_shipments}% of shipments
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-green-600">{box.usage_count}</div>
-                    <div className="text-xs text-muted-foreground">shipments</div>
+              <div className="space-y-3">
+                <h4 className="font-semibold text-lg">Box Usage Details</h4>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium">#</th>
+                          <th className="text-left p-3 font-medium">Box Name</th>
+                          <th className="text-left p-3 font-medium">SKU</th>
+                          <th className="text-left p-3 font-medium">Dimensions (L×W×H)</th>
+                          <th className="text-left p-3 font-medium">Max Weight</th>
+                          <th className="text-left p-3 font-medium">Cost</th>
+                          <th className="text-left p-3 font-medium">Usage</th>
+                          <th className="text-left p-3 font-medium">% of Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {boxUsageData.map((box, index) => (
+                          <tr key={box.boxSku} className="border-t hover:bg-muted/20">
+                            <td className="p-3">
+                              <Badge variant="outline">#{index + 1}</Badge>
+                            </td>
+                            <td className="p-3 font-medium">{box.boxName}</td>
+                            <td className="p-3 text-muted-foreground">{box.boxSku}</td>
+                            <td className="p-3 text-sm">
+                              {box.length}×{box.width}×{box.height} in
+                            </td>
+                            <td className="p-3 text-sm">{box.max_weight} lbs</td>
+                            <td className="p-3 text-sm">${box.cost.toFixed(2)}</td>
+                            <td className="p-3">
+                              <div className="font-semibold text-green-600">{box.usage_count}</div>
+                              <div className="text-xs text-muted-foreground">shipments</div>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-muted rounded-full h-2">
+                                  <div 
+                                    className="bg-primary h-2 rounded-full"
+                                    style={{ width: `${box.percentage_of_shipments}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-medium">{box.percentage_of_shipments}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
           )}
         </CardContent>
       </Card>
