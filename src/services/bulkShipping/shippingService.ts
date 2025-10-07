@@ -44,10 +44,21 @@ export class BulkShippingService {
 
         // Purchase label with error handling
         try {
+          // Prepare box data from the recommended box
+          const selectedBoxData = order.recommendedBox ? {
+            selectedBoxId: order.recommendedBox.id,
+            selectedBoxSku: (order.recommendedBox as any).sku || order.recommendedBox.name,
+            selectedBoxName: order.recommendedBox.name
+          } : undefined;
+
+          console.log(`Purchasing label for order ${order.id} with box:`, selectedBoxData);
+
           const labelResponse = await this.labelService.purchaseLabel(
             shipmentId,
             selectedRate.id,
-            order.id
+            order.id,
+            undefined, // provider - let it default
+            selectedBoxData
           );
 
           console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
