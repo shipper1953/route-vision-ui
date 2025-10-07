@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { NavItem } from "./sidebar/NavItem";
+import { OrdersNavItem } from "./sidebar/OrdersNavItem";
 import { UserProfile } from "./sidebar/UserProfile";
 import { CreateMenu } from "./sidebar/CreateMenu";
 import { LogoutButton } from "./sidebar/LogoutButton";
@@ -63,7 +64,7 @@ export const TmsSidebar = () => {
       <ScrollArea className="flex-1 px-2 py-4">
         <div className="space-y-2">
           <NavItem icon={Home} label="Dashboard" to="/" isCollapsed={isCollapsed} />
-          <NavItem icon={ShoppingCart} label="Orders" to="/orders" isCollapsed={isCollapsed} />
+          <OrdersNavItem />
           <NavItem icon={Truck} label="Shipments" to="/shipments" isCollapsed={isCollapsed} />
           <NavItem icon={Database} label="Item Master" to="/item-master" isCollapsed={isCollapsed} />
           <PackagingInventoryNavItem />

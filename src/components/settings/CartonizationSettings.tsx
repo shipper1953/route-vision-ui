@@ -1,20 +1,14 @@
 
 import { useState } from "react";
-import { useCartonization } from "@/hooks/useCartonization";
 import { useBoxOrderStats } from "@/hooks/useBoxOrderStats";
-import { useBulkShipping } from "@/hooks/useBulkShipping";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { TrendingUp, ChevronDown, ChevronRight, Ship } from "lucide-react";
+import { TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BulkShipOrdersTable } from "@/components/cartonization/BulkShipOrdersTable";
 
 export const CartonizationSettings = () => {
   const { boxStats, loading } = useBoxOrderStats();
-  const { boxShippingGroups, loading: bulkShippingLoading, handleFetchRates, handleBulkShip } = useBulkShipping();
   const [expandedBoxId, setExpandedBoxId] = useState<string | null>(null);
-  const [showBulkShipping, setShowBulkShipping] = useState(false);
 
   const toggleExpanded = (boxId: string) => {
     setExpandedBoxId(expandedBoxId === boxId ? null : boxId);
@@ -22,85 +16,8 @@ export const CartonizationSettings = () => {
 
   return (
     <div className="space-y-6">
-      {/* Toggle between Box Demand Ranking and Bulk Shipping */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant={!showBulkShipping ? "default" : "outline"}
-          onClick={() => setShowBulkShipping(false)}
-          className="gap-2"
-        >
-          <TrendingUp className="h-4 w-4" />
-          Box Demand Ranking
-        </Button>
-        <Button
-          variant={showBulkShipping ? "default" : "outline"}
-          onClick={() => setShowBulkShipping(true)}
-          className="gap-2"
-        >
-          <Ship className="h-4 w-4" />
-          Bulk Ship by Box Size
-        </Button>
-      </div>
-
-      {showBulkShipping ? (
-        /* Bulk Shipping View */
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Ship className="h-5 w-5 text-tms-blue" />
-                Bulk Ship Orders by Box Size
-              </CardTitle>
-              <CardDescription>
-                Select and ship multiple orders that use the same recommended box size and shipping service.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          {bulkShippingLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <Card key={i}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <Skeleton className="h-6 w-48" />
-                      <Skeleton className="h-8 w-32" />
-                    </div>
-                    <Skeleton className="h-32 w-full" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {boxShippingGroups.length === 0 ? (
-                <Card>
-                  <CardContent className="text-center py-8">
-                    <Ship className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No Orders Ready for Bulk Shipping</h3>
-                    <p className="text-muted-foreground">
-                      There are currently no orders that can be grouped by box size for bulk shipping.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                boxShippingGroups.map((group) => (
-                  <BulkShipOrdersTable
-                    key={group.box.id}
-                    boxName={group.box.name}
-                    boxDimensions={`${group.box.length}" × ${group.box.width}" × ${group.box.height}"`}
-                    orders={group.orders}
-                    onFetchRates={handleFetchRates}
-                    onBulkShip={handleBulkShip}
-                  />
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Box Demand Ranking View */
-        <Card>
+      {/* Box Demand Ranking */}
+      <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-green-600" />
@@ -202,7 +119,6 @@ export const CartonizationSettings = () => {
             )}
           </CardContent>
         </Card>
-      )}
     </div>
   );
 };

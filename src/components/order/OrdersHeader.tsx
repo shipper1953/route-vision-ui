@@ -1,5 +1,5 @@
 
-import { FileDown, ShoppingBag } from "lucide-react";
+import { FileDown, ShoppingBag, Ship } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -16,6 +16,10 @@ export const OrdersHeader = () => {
         <Button className="bg-tms-blue hover:bg-tms-blue-400" onClick={() => navigate('/orders/create')}>
           <ShoppingBag className="mr-2 h-4 w-4" />
           Create Order
+        </Button>
+        <Button variant="outline" onClick={() => navigate('/orders/bulk-ship')}>
+          <Ship className="mr-2 h-4 w-4" />
+          Bulk Ship
         </Button>
         <Button variant="outline" onClick={() => {}}>
           <FileDown className="mr-2 h-4 w-4" />

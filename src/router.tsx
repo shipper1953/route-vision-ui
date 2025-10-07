@@ -9,6 +9,7 @@ import Orders from "@/pages/Orders";
 import CreateOrder from "@/pages/CreateOrder";
 import EditOrder from "@/pages/EditOrder";
 import OrderDetails from "@/pages/OrderDetails";
+import BulkShipOrders from "@/pages/BulkShipOrders";
 import Shipments from "@/pages/Shipments";
 import CreateShipment from "@/pages/CreateShipment";
 import ItemMaster from "@/pages/ItemMaster";
@@ -49,6 +50,10 @@ const router = createBrowserRouter([
   {
     path: "/orders/:id/edit",
     element: <EditOrder />,
+  },
+  {
+    path: "/orders/bulk-ship",
+    element: <BulkShipOrders />,
   },
   {
     path: "/shipments",
