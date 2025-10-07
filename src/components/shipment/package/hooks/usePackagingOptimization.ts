@@ -63,8 +63,19 @@ export const usePackagingOptimization = (orderItems: any[]) => {
     form.setValue("width", box.width);
     form.setValue("height", box.height);
     
+    // CRITICAL FIX: Set selected box form fields so they're sent to backend
+    form.setValue("selectedBoxId", box.id);
+    form.setValue("selectedBoxSku", (box as any).sku || box.name);
+    form.setValue("selectedBoxName", box.name);
+    
     // Update selected box state
     setSelectedBox(box);
+    
+    console.log('Selected box for shipment:', {
+      id: box.id,
+      sku: (box as any).sku || box.name,
+      name: box.name
+    });
     
     toast.success(`Selected ${box.name} for optimal packaging`);
   };
