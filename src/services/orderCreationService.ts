@@ -159,6 +159,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
           const engine = new CartonizationEngine(boxes.map(box => ({
             id: box.id,
             name: box.name,
+            sku: box.sku,
             length: Number(box.length),
             width: Number(box.width),
             height: Number(box.height),

@@ -13,6 +13,7 @@ export interface Item {
 export interface Box {
   id: string;
   name: string;
+  sku?: string;
   length: number;
   width: number;
   height: number;

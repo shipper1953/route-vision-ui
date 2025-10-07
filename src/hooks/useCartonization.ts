@@ -52,6 +52,7 @@ export const useCartonization = () => {
           const transformedBoxes: Box[] = data.map(box => ({
             id: box.id,
             name: box.name,
+            sku: box.sku,
             length: Number(box.length),
             width: Number(box.width),
             height: Number(box.height),

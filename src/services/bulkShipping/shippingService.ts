@@ -47,7 +47,7 @@ export class BulkShippingService {
           // Prepare box data from the recommended box
           const selectedBoxData = order.recommendedBox ? {
             selectedBoxId: order.recommendedBox.id,
-            selectedBoxSku: (order.recommendedBox as any).sku || order.recommendedBox.name,
+            selectedBoxSku: order.recommendedBox.sku || order.recommendedBox.name,
             selectedBoxName: order.recommendedBox.name
           } : undefined;
 

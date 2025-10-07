@@ -133,6 +133,7 @@ export const useUpdateOrder = (orderId: string) => {
                 const engine = new CartonizationEngine(boxes.map(box => ({
                   id: box.id,
                   name: box.name,
+                  sku: box.sku,
                   length: box.length,
                   width: box.width,
                   height: box.height,
