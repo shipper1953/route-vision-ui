@@ -30,8 +30,89 @@ function createSuccessResponse(data: any): Response {
   })
 }
 
+function sanitizePhoneNumber(phone: string | undefined): string {
+  if (!phone) return '5555555555';
+  
+  // Remove all non-numeric characters
+  const cleaned = phone.replace(/\D/g, '');
+  
+  // If less than 10 digits, pad with 5s
+  if (cleaned.length < 10) {
+    return cleaned.padEnd(10, '5');
+  }
+  
+  return cleaned;
+}
+
+async function ensureValidPhoneNumbers(shipmentId: string, apiKey: string): Promise<void> {
+  console.log('📞 Ensuring shipment has valid phone numbers...');
+  
+  // Fetch shipment details
+  const shipmentResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+    },
+  });
+  
+  if (!shipmentResponse.ok) {
+    console.error('❌ Failed to fetch shipment details');
+    return;
+  }
+  
+  const shipment = await shipmentResponse.json();
+  const needsUpdate: any = {};
+  
+  // Check and fix from_address phone
+  const fromPhone = shipment.from_address?.phone;
+  const sanitizedFromPhone = sanitizePhoneNumber(fromPhone);
+  if (fromPhone !== sanitizedFromPhone) {
+    needsUpdate.from_address = {
+      ...shipment.from_address,
+      phone: sanitizedFromPhone
+    };
+    console.log(`📞 Fixing from_address phone: ${fromPhone} -> ${sanitizedFromPhone}`);
+  }
+  
+  // Check and fix to_address phone
+  const toPhone = shipment.to_address?.phone;
+  const sanitizedToPhone = sanitizePhoneNumber(toPhone);
+  if (toPhone !== sanitizedToPhone) {
+    needsUpdate.to_address = {
+      ...shipment.to_address,
+      phone: sanitizedToPhone
+    };
+    console.log(`📞 Fixing to_address phone: ${toPhone} -> ${sanitizedToPhone}`);
+  }
+  
+  // Update shipment if needed
+  if (Object.keys(needsUpdate).length > 0) {
+    console.log('📝 Updating shipment with valid phone numbers...');
+    const updateResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(needsUpdate),
+    });
+    
+    if (updateResponse.ok) {
+      console.log('✅ Phone numbers updated successfully');
+    } else {
+      const errorText = await updateResponse.text();
+      console.error('❌ Failed to update phone numbers:', errorText);
+    }
+  } else {
+    console.log('✅ Phone numbers are already valid');
+  }
+}
+
 async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey: string) {
   console.log('🚚 Purchasing label for shipment:', shipmentId, 'with rate:', rateId)
+  
+  // Ensure phone numbers are valid before purchasing
+  await ensureValidPhoneNumbers(shipmentId, apiKey);
   
   const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
     method: 'POST',
