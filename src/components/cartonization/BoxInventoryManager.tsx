@@ -40,6 +40,8 @@ export const BoxInventoryManager = () => {
     max_weight: 50,
     cost: 0,
     in_stock: 0,
+    min_stock: 10,
+    max_stock: 100,
     box_type: 'box' as 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom',
     sku: '',
     description: ''
@@ -81,6 +83,8 @@ export const BoxInventoryManager = () => {
         max_weight: 50,
         cost: 0,
         in_stock: 0,
+        min_stock: 10,
+        max_stock: 100,
         box_type: 'box',
         sku: '',
         description: ''
@@ -98,6 +102,8 @@ export const BoxInventoryManager = () => {
         max_weight: 50,
         cost: masterItem.cost,
         in_stock: 0,
+        min_stock: 10,
+        max_stock: 100,
         box_type: masterItem.type as any,
         sku: masterItem.vendor_sku,
         description: `${masterItem.vendor} ${masterItem.name}`
@@ -128,6 +134,8 @@ export const BoxInventoryManager = () => {
           max_weight: newBox.max_weight || 50,
           cost: newBox.cost || 0,
           in_stock: newBox.in_stock || 0,
+          min_stock: newBox.min_stock || 10,
+          max_stock: newBox.max_stock || 100,
           box_type: newBox.box_type,
           sku: newBox.sku || null,
           description: newBox.description || null
@@ -165,6 +173,8 @@ export const BoxInventoryManager = () => {
           max_weight: editingBox.maxWeight,
           cost: editingBox.cost,
           in_stock: editingBox.inStock,
+          min_stock: editingBox.minStock,
+          max_stock: editingBox.maxStock,
           box_type: editingBox.type,
           sku: editingBox.sku || null,
           description: editingBox.description || null
@@ -225,6 +235,8 @@ export const BoxInventoryManager = () => {
       max_weight: 50,
       cost: 0,
       in_stock: 0,
+      min_stock: 10,
+      max_stock: 100,
       box_type: 'box',
       sku: '',
       description: ''
@@ -309,6 +321,26 @@ export const BoxInventoryManager = () => {
                     type="number"
                     value={newBox.in_stock}
                     onChange={(e) => setNewBox({ ...newBox, in_stock: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="minStock">Min Stock</Label>
+                  <Input
+                    id="minStock"
+                    type="number"
+                    value={newBox.min_stock}
+                    onChange={(e) => setNewBox({ ...newBox, min_stock: parseInt(e.target.value) || 0 })}
+                    placeholder="Low inventory alert level"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="maxStock">Max Stock</Label>
+                  <Input
+                    id="maxStock"
+                    type="number"
+                    value={newBox.max_stock}
+                    onChange={(e) => setNewBox({ ...newBox, max_stock: parseInt(e.target.value) || 0 })}
+                    placeholder="Reorder suggestion level"
                   />
                 </div>
                 <div>
@@ -464,6 +496,26 @@ export const BoxInventoryManager = () => {
                     type="number"
                     value={editingBox.inStock}
                     onChange={(e) => setEditingBox({ ...editingBox, inStock: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editMinStock">Min Stock</Label>
+                  <Input
+                    id="editMinStock"
+                    type="number"
+                    value={editingBox.minStock}
+                    onChange={(e) => setEditingBox({ ...editingBox, minStock: parseInt(e.target.value) || 0 })}
+                    placeholder="Low inventory alert"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editMaxStock">Max Stock</Label>
+                  <Input
+                    id="editMaxStock"
+                    type="number"
+                    value={editingBox.maxStock}
+                    onChange={(e) => setEditingBox({ ...editingBox, maxStock: parseInt(e.target.value) || 0 })}
+                    placeholder="Reorder level"
                   />
                 </div>
                 <div>

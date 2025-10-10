@@ -53,7 +53,9 @@ export type Database = {
           in_stock: number
           is_active: boolean
           length: number
+          max_stock: number
           max_weight: number
+          min_stock: number
           name: string
           sku: string | null
           updated_at: string
@@ -70,7 +72,9 @@ export type Database = {
           in_stock?: number
           is_active?: boolean
           length: number
+          max_stock?: number
           max_weight: number
+          min_stock?: number
           name: string
           sku?: string | null
           updated_at?: string
@@ -87,7 +91,9 @@ export type Database = {
           in_stock?: number
           is_active?: boolean
           length?: number
+          max_stock?: number
           max_weight?: number
+          min_stock?: number
           name?: string
           sku?: string | null
           updated_at?: string
