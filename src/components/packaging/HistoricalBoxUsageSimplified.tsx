@@ -15,7 +15,6 @@ interface BoxUsageData {
   length: number;
   width: number;
   height: number;
-  max_weight: number;
   cost: number;
   usage_count: number;
   percentage_of_shipments: number;
@@ -97,11 +96,14 @@ export const HistoricalBoxUsageSimplified = () => {
       const boxSkus = Array.from(boxUsageMap.keys());
       const { data: boxes, error: boxError } = await supabase
         .from('boxes')
-        .select('sku, name, length, width, height, max_weight, cost')
+        .select('sku, name, length, width, height, cost')
         .eq('company_id', userProfile.company_id)
         .in('sku', boxSkus);
 
       if (boxError) throw boxError;
+      
+      console.log('Box SKUs from shipments:', boxSkus);
+      console.log('Boxes found in database:', boxes);
 
       // Combine data
       const usageData: BoxUsageData[] = Array.from(boxUsageMap.entries())
@@ -109,14 +111,17 @@ export const HistoricalBoxUsageSimplified = () => {
           const boxInfo = boxes?.find(b => b.sku === sku);
           const sortedDates = usage.dates.sort((a, b) => a.getTime() - b.getTime());
           
+          if (!boxInfo) {
+            console.warn(`Box info not found for SKU: ${sku}`);
+          }
+          
           return {
             boxSku: sku,
             boxName: boxInfo?.name || sku,
-            length: boxInfo?.length || 0,
-            width: boxInfo?.width || 0,
-            height: boxInfo?.height || 0,
-            max_weight: boxInfo?.max_weight || 0,
-            cost: boxInfo?.cost || 0,
+            length: Number(boxInfo?.length) || 0,
+            width: Number(boxInfo?.width) || 0,
+            height: Number(boxInfo?.height) || 0,
+            cost: Number(boxInfo?.cost) || 0,
             usage_count: usage.count,
             percentage_of_shipments: totalCount > 0 ? Math.round((usage.count / totalCount) * 100) : 0,
             first_used: sortedDates[0].toISOString(),
@@ -235,7 +240,6 @@ export const HistoricalBoxUsageSimplified = () => {
                           <th className="text-left p-3 font-medium">Box Name</th>
                           <th className="text-left p-3 font-medium">SKU</th>
                           <th className="text-left p-3 font-medium">Dimensions (L×W×H)</th>
-                          <th className="text-left p-3 font-medium">Max Weight</th>
                           <th className="text-left p-3 font-medium">Cost</th>
                           <th className="text-left p-3 font-medium">Usage</th>
                           <th className="text-left p-3 font-medium">% of Total</th>
@@ -250,10 +254,13 @@ export const HistoricalBoxUsageSimplified = () => {
                             <td className="p-3 font-medium">{box.boxName}</td>
                             <td className="p-3 text-muted-foreground">{box.boxSku}</td>
                             <td className="p-3 text-sm">
-                              {box.length}×{box.width}×{box.height} in
+                              {box.length > 0 && box.width > 0 && box.height > 0 
+                                ? `${box.length}×${box.width}×${box.height} in`
+                                : 'N/A'}
                             </td>
-                            <td className="p-3 text-sm">{box.max_weight} lbs</td>
-                            <td className="p-3 text-sm">${box.cost.toFixed(2)}</td>
+                            <td className="p-3 text-sm">
+                              {box.cost > 0 ? `$${box.cost.toFixed(2)}` : 'N/A'}
+                            </td>
                             <td className="p-3">
                               <div className="font-semibold text-green-600">{box.usage_count}</div>
                               <div className="text-xs text-muted-foreground">shipments</div>
