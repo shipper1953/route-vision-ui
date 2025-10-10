@@ -172,7 +172,7 @@ export const HistoricalBoxUsageSimplified = () => {
                 Historical analysis of box usage across shipments
               </CardDescription>
             </div>
-            <DateRangeSelector onRangeChange={handleDateRangeChange} />
+            <DateRangeSelector selectedPreset={selectedPreset} onRangeChange={handleDateRangeChange} />
           </div>
         </CardHeader>
         <CardContent>

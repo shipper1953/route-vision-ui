@@ -14,11 +14,11 @@ interface DateRange {
 }
 
 interface DateRangeSelectorProps {
+  selectedPreset: DateRangePreset;
   onRangeChange: (range: DateRange, preset: DateRangePreset) => void;
 }
 
-export const DateRangeSelector = ({ onRangeChange }: DateRangeSelectorProps) => {
-  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>("month");
+export const DateRangeSelector = ({ selectedPreset, onRangeChange }: DateRangeSelectorProps) => {
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [isCustomOpen, setIsCustomOpen] = useState(false);
 
@@ -56,14 +56,12 @@ export const DateRangeSelector = ({ onRangeChange }: DateRangeSelectorProps) => 
   };
 
   const handlePresetClick = (preset: DateRangePreset) => {
-    setSelectedPreset(preset);
     const range = getPresetRange(preset);
     onRangeChange(range, preset);
   };
 
   const handleCustomRangeSelect = () => {
     if (customRange.from && customRange.to) {
-      setSelectedPreset("custom");
       onRangeChange(
         { from: customRange.from, to: customRange.to },
         "custom"
