@@ -59,6 +59,8 @@ export const useCartonization = () => {
             maxWeight: Number(box.max_weight),
             cost: Number(box.cost),
             inStock: box.in_stock,
+            minStock: box.min_stock,
+            maxStock: box.max_stock,
             type: box.box_type
           }));
 

@@ -166,6 +166,8 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
             maxWeight: Number(box.max_weight),
             cost: Number(box.cost),
             inStock: box.in_stock,
+            minStock: box.min_stock,
+            maxStock: box.max_stock,
             type: box.box_type as 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom'
           })));
 

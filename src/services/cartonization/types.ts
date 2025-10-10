@@ -20,6 +20,8 @@ export interface Box {
   maxWeight: number;
   cost: number;
   inStock: number;
+  minStock: number;
+  maxStock: number;
   type: 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom';
   materialCost?: number;
 }

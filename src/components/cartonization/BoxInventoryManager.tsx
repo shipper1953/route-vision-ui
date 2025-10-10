@@ -459,6 +459,7 @@ export const BoxInventoryManager = () => {
                   <p>Dimensions: {box.length}" × {box.width}" × {box.height}"</p>
                   <p>Max Weight: {box.maxWeight} lbs</p>
                   <p>Cost: ${box.cost.toFixed(2)}</p>
+                  <p>Min Stock: {box.minStock} | Max Stock: {box.maxStock}</p>
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="secondary">

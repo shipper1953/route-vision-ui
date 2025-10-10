@@ -140,6 +140,8 @@ export const useUpdateOrder = (orderId: string) => {
                   maxWeight: box.max_weight,
                   cost: box.cost,
                   inStock: box.in_stock,
+                  minStock: box.min_stock,
+                  maxStock: box.max_stock,
                   type: box.box_type
                 })));
 
