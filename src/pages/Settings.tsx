@@ -12,7 +12,7 @@ import { useCartonization } from "@/hooks/useCartonization";
 
 const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'box-demand';
+  const activeTab = searchParams.get('tab') || 'box-recommendations';
   const { boxes, setBoxes, parameters, updateParameters } = useCartonization();
 
   const handleTabChange = (value: string) => {
@@ -33,10 +33,7 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto gap-1 p-1">
-            <TabsTrigger value="box-demand" className="text-xs sm:text-sm whitespace-nowrap px-2 py-2">
-              Box Demand
-            </TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto gap-1 p-1">
             <TabsTrigger value="historical-usage" className="text-xs sm:text-sm whitespace-nowrap px-2 py-2">
               Historical
             </TabsTrigger>
@@ -53,10 +50,6 @@ const Settings = () => {
               Testing
             </TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="box-demand" className="space-y-4">
-            <CartonizationSettings />
-          </TabsContent>
           
           <TabsContent value="historical-usage" className="space-y-4">
             <HistoricalBoxUsageSimplified />
