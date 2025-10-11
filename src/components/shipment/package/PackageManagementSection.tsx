@@ -84,10 +84,6 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
     if (util >= 60) return 'bg-yellow-500';
     return 'bg-green-500';
   };
-  
-  const showLowUtilizationWarning = (util: number) => util < 30;
-  const showLowConfidenceWarning = (conf: number) => conf < 70;
-  const showOversizedWarning = (boxVol: number, itemsVol: number) => boxVol > itemsVol * 3;
 
   return (
     <Card className="w-full border-2 hover:border-primary/50 transition-colors">
@@ -103,24 +99,6 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
                 <Badge className={`${getConfidenceColor(confidence)} border`}>
                   {confidence}% confidence
                 </Badge>
-                {showLowUtilizationWarning(utilization) && (
-                  <Badge variant="destructive" className="text-xs">
-                    ⚠️ Low utilization - oversized box
-                  </Badge>
-                )}
-                {showLowConfidenceWarning(confidence) && (
-                  <Badge variant="destructive" className="text-xs">
-                    ⚠️ Uncertain fit
-                  </Badge>
-                )}
-                {showOversizedWarning(
-                  box.length * box.width * box.height,
-                  assignedItems.reduce((sum, item) => sum + (item.length * item.width * item.height * item.quantity), 0)
-                ) && (
-                  <Badge variant="outline" className="text-xs border-yellow-500 text-yellow-700">
-                    ⚠️ Box may be too large
-                  </Badge>
-                )}
               </CardTitle>
               <p className="text-sm text-muted-foreground">{assignedItems.length} items</p>
             </div>
