@@ -12,7 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useCompanyInfo } from "@/hooks/useCompanyInfo";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User, Building2, Key, Mail } from "lucide-react";
+import { User, Building2, Key, Mail, Printer } from "lucide-react";
+import { PrintNodeSettings } from "@/components/settings/PrintNodeSettings";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -160,6 +161,7 @@ const ProfileSettings = () => {
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="company">Company Info</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="printer">Printer</TabsTrigger>
           </TabsList>
           
           <TabsContent value="profile">
@@ -344,6 +346,10 @@ const ProfileSettings = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+          
+          <TabsContent value="printer">
+            <PrintNodeSettings />
           </TabsContent>
         </Tabs>
       </div>
