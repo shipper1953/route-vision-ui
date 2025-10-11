@@ -24,9 +24,9 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
     // Label size: 812 x 406 dots
     // Barcode centered and filling ~70% of label
     return `^XA
-^FO100,50^BY5^BCN,200,Y,N,N
+^FO50,40^BY5^BCN,200,Y,N,N
 ^FD${item.sku}^FS
-^FO100,280^A0N,40,40^FD${item.name}^FS
+^FO0,270^FB812,1,0,C,0^A0N,40,40^FD${item.name}^FS
 ^XZ`;
   };
 
