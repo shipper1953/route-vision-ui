@@ -60,6 +60,7 @@ export const CartonizationTestingEnvironment = () => {
 
   const [testResults, setTestResults] = useState<TestResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [historicalResults, setHistoricalResults] = useState<any[]>([]);
 
   // Fetch open orders and available items
   useEffect(() => {
@@ -96,29 +97,6 @@ export const CartonizationTestingEnvironment = () => {
 
     fetchData();
   }, [userProfile?.company_id]);
-  
-  const [historicalData] = useState([
-    {
-      id: 1,
-      orderId: 'ORD-2024-001',
-      timestamp: '2024-01-20 14:30',
-      rules: 'Standard + Amazon FBA',
-      recommendation: '12x10x8 Box + Bubble Wrap',
-      actualPackaging: '12x10x8 Box + Bubble Wrap',
-      accuracy: 100,
-      cost: '$2.45'
-    },
-    {
-      id: 2,
-      orderId: 'ORD-2024-002',
-      timestamp: '2024-01-20 14:25',
-      rules: 'Standard + Dimensional Weight',
-      recommendation: '14x12x6 Box + Air Pillows',
-      actualPackaging: '16x14x8 Box + Bubble Wrap',
-      accuracy: 75,
-      cost: '$3.20'
-    }
-  ]);
 
   const runTest = async () => {
     setIsRunning(true);
@@ -151,10 +129,10 @@ export const CartonizationTestingEnvironment = () => {
         return;
       }
 
-      setTestResults({
+      const newTestResult = {
         recommendation: {
           packageType: result.recommendedBox.name,
-          materials: ['Bubble Wrap', 'Packing Paper'], // Would come from box configuration
+          materials: ['Bubble Wrap', 'Packing Paper'],
           estimatedCost: `$${result.recommendedBox.cost.toFixed(2)}`,
           dimensionalWeight: `${result.dimensionalWeight.toFixed(1)} lbs`,
           confidence: result.confidence
@@ -165,7 +143,23 @@ export const CartonizationTestingEnvironment = () => {
           rulesEvaluated: result.rulesApplied.length,
           alternativesConsidered: result.alternatives.length
         }
-      });
+      };
+      
+      setTestResults(newTestResult);
+
+      // Add to historical results
+      const historicalEntry = {
+        id: Date.now(),
+        orderId: testScenario.orderId,
+        timestamp: new Date().toLocaleString(),
+        rules: result.rulesApplied.join(', '),
+        recommendation: result.recommendedBox.name,
+        actualPackaging: '-',
+        accuracy: result.confidence,
+        cost: `$${result.recommendedBox.cost.toFixed(2)}`
+      };
+      
+      setHistoricalResults(prev => [historicalEntry, ...prev]);
 
       toast.success('Test completed successfully');
     } catch (error) {
@@ -254,10 +248,6 @@ export const CartonizationTestingEnvironment = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Rule Testing Environment</h3>
-        <Button variant="outline" size="sm">
-          <History className="h-4 w-4 mr-2" />
-          Load Template
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -511,7 +501,14 @@ export const CartonizationTestingEnvironment = () => {
                 </tr>
               </thead>
               <tbody>
-                {historicalData.map((test) => (
+                {historicalResults.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      No test results yet. Run a test to see results here.
+                    </td>
+                  </tr>
+                ) : (
+                  historicalResults.map((test) => (
                   <tr key={test.id} className="border-b">
                     <td className="py-3">{test.orderId}</td>
                     <td className="py-3 text-muted-foreground">{test.timestamp}</td>
@@ -525,7 +522,8 @@ export const CartonizationTestingEnvironment = () => {
                     </td>
                     <td className="py-3">{test.cost}</td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
