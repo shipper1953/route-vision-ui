@@ -98,81 +98,123 @@ serve(async (req) => {
       length: parseFloat((qboidData.l / 25.4).toFixed(2)), // mm to inches
       width: parseFloat((qboidData.w / 25.4).toFixed(2)),   // mm to inches  
       height: parseFloat((qboidData.h / 25.4).toFixed(2)),  // mm to inches
-      weight: parseFloat((qboidData.weight / 453.592).toFixed(2)), // grams to pounds (not ounces)
-      orderId: qboidData.barcode || null
+      weight: parseFloat((qboidData.weight / 453.592).toFixed(2)) // grams to pounds
     }
 
     console.log('Converted dimensions:', dimensions)
 
-    // If we have an order barcode, update the order with dimensions
+    // If we have a barcode, look up the item and update its dimensions
     if (qboidData.barcode) {
-      console.log('Updating order with Qboid dimensions:', qboidData.barcode)
+      console.log('Looking up item with SKU:', qboidData.barcode)
       
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({ 
-          qboid_dimensions: dimensions 
+      const { data: item, error: lookupError } = await supabase
+        .from('items')
+        .select('*')
+        .eq('sku', qboidData.barcode)
+        .single()
+      
+      if (lookupError || !item) {
+        console.error('Item not found for SKU:', qboidData.barcode)
+        
+        // Store pending dimensions in qboid_events
+        await supabase
+          .from('qboid_events')
+          .insert({
+            event_type: 'item_sku_not_found',
+            data: {
+              dimensions,
+              sku: qboidData.barcode,
+              timestamp: qboidData.timestamp || new Date().toISOString(),
+              device: qboidData.device || 'unknown'
+            }
+          })
+        
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'SKU not found in catalog',
+          sku: qboidData.barcode,
+          data: { dimensions }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404
         })
-        .eq('order_id', qboidData.barcode)
-
-      if (orderError) {
-        console.error('Error updating order:', orderError)
-      } else {
-        console.log('Order updated successfully with Qboid dimensions')
       }
-    }
-
-    console.log('Saving dimensions to database:', dimensions)
-
-    // Save to shipments table (this will be used for shipment creation)
-    const { error: shipmentError } = await supabase
-      .from('shipments')
-      .insert({
-        carrier: 'qboid-measurement',
-        service: 'measurement',
-        status: 'measured',
-        cost: 0,
-        package_dimensions: dimensions,
-        package_weights: { weight: dimensions.weight, weight_unit: 'lbs' },
-        order_id: qboidData.barcode || null,
-        user_id: null // Service role can insert without user context
+      
+      // Update item dimensions
+      const { error: updateError } = await supabase
+        .from('items')
+        .update({
+          length: dimensions.length,
+          width: dimensions.width,
+          height: dimensions.height,
+          weight: dimensions.weight,
+          dimensions_updated_at: new Date().toISOString()
+        })
+        .eq('id', item.id)
+      
+      if (updateError) {
+        console.error('Error updating item:', updateError)
+        return new Response(JSON.stringify({ 
+          error: 'Failed to update item dimensions' 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        })
+      }
+      
+      console.log(`Item ${item.sku} dimensions updated successfully`)
+      
+      // Publish realtime event for item update
+      await supabase
+        .from('qboid_events')
+        .insert({
+          event_type: 'item_dimensions_updated',
+          data: {
+            item_id: item.id,
+            sku: qboidData.barcode,
+            name: item.name,
+            dimensions,
+            timestamp: qboidData.timestamp || new Date().toISOString(),
+            device: qboidData.device || 'unknown'
+          }
+        })
+      
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Item dimensions updated successfully',
+        data: {
+          item_id: item.id,
+          sku: item.sku,
+          name: item.name,
+          dimensions,
+          timestamp: qboidData.timestamp || new Date().toISOString()
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
       })
-
-    if (shipmentError) {
-      console.error('Error saving dimensions to database:', shipmentError)
-    }
-
-    console.log('Publishing realtime event for dimensions:', dimensions)
-
-    // Publish realtime event to qboid_events table
-    const eventData = {
-      dimensions,
-      orderId: qboidData.barcode || null,
-      timestamp: new Date().toISOString(),
-      device: qboidData.device || 'unknown'
-    }
-
-    const { error: eventError } = await supabase
-      .from('qboid_events')
-      .insert({
-        event_type: 'dimensions_received',
-        data: eventData
-      })
-
-    if (eventError) {
-      console.error('Error publishing realtime event:', eventError)
     } else {
-      console.log('Realtime event published successfully')
+      // No barcode, store pending dimensions
+      await supabase
+        .from('qboid_events')
+        .insert({
+          event_type: 'dimensions_pending',
+          data: {
+            dimensions,
+            timestamp: qboidData.timestamp || new Date().toISOString(),
+            device: qboidData.device || 'unknown'
+          }
+        })
+      
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Dimensions captured. Please scan barcode to link to item.',
+        data: { dimensions }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      })
     }
-
-    // Return success response
-    return new Response(JSON.stringify({ 
-      status: 'success', 
-      dimensions,
-      orderId: qboidData.barcode 
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
 
   } catch (error) {
     console.error('Error processing qboid data:', error)
