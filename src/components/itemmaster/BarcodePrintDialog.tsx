@@ -57,19 +57,29 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
               size: 2in 1in;
               margin: 0;
             }
+            html, body {
+              width: 2in;
+              height: 1in;
+              margin: 0;
+              padding: 0;
+            }
             body * {
               visibility: hidden;
+              display: none;
             }
             .print-content,
             .print-content * {
               visibility: visible;
+              display: block;
             }
             .print-content {
-              position: absolute;
+              position: fixed;
               left: 0;
               top: 0;
               margin: 0;
               padding: 0;
+              width: 2in;
+              height: auto;
             }
             .barcode-label {
               width: 2in !important;
@@ -79,13 +89,18 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
               margin: 0 !important;
               padding: 0.05in !important;
               border: none !important;
+              background: white !important;
               display: flex !important;
               flex-direction: column !important;
               align-items: center !important;
               justify-content: center !important;
+              box-sizing: border-box !important;
             }
             .barcode-label:last-child {
               page-break-after: auto !important;
+            }
+            canvas {
+              display: block !important;
             }
           }
         `}} />
