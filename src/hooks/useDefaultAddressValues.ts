@@ -37,7 +37,7 @@ export const useDefaultAddressValues = () => {
         if (warehouseId) {
           const { data: warehouse, error } = await supabase
             .from('warehouses')
-            .select('name, address')
+            .select('name, address, phone, email')
             .eq('id', warehouseId)
             .maybeSingle();
 
@@ -47,7 +47,9 @@ export const useDefaultAddressValues = () => {
             console.log("Loaded warehouse address:", warehouse);
             setWarehouseAddress({
               name: warehouse.name,
-              address: warehouse.address
+              address: warehouse.address,
+              phone: warehouse.phone,
+              email: warehouse.email
             });
           }
         }
@@ -85,8 +87,8 @@ export const useDefaultAddressValues = () => {
       fromState: addr.state || "",
       fromZip: addr.zip || "",
       fromCountry: addr.country || "US",
-      fromPhone: addr.phone || "",
-      fromEmail: addr.email || "",
+      fromPhone: warehouseAddress.phone || "",
+      fromEmail: warehouseAddress.email || "",
     };
   };
 
