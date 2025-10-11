@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -197,9 +198,21 @@ export const PackagingIntelligenceDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-primary">📦 Packaging Intelligence Center</h2>
-        <p className="text-muted-foreground">Real shipment performance analysis and cost optimization insights</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-primary">📦 Packaging Intelligence Center</h2>
+          <p className="text-muted-foreground">Real shipment performance analysis and cost optimization insights</p>
+        </div>
+        <Button
+          onClick={generateReport}
+          disabled={loading || !userProfile?.company_id}
+          variant="outline"
+          size="sm"
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh Report
+        </Button>
       </div>
 
       {/* Low Inventory Alerts */}
