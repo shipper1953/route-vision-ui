@@ -47,34 +47,44 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
         </DialogHeader>
 
         {/* PrintNode Printer Selection */}
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 bg-slate-50 p-4 rounded-lg border">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Direct Print to Label Printer</label>
-            <div className="flex gap-2">
-              <Select
-                value={selectedPrinter?.toString()}
-                onValueChange={(value) => setSelectedPrinter(Number(value))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select printer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {printers.map((printer) => (
-                    <SelectItem key={printer.id} value={printer.id.toString()}>
-                      {printer.name} {printer.default ? '(Default)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button 
-                onClick={handlePrintNode} 
-                disabled={!selectedPrinter || loading}
-                size="sm"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Send to Printer
-              </Button>
-            </div>
+            <label className="text-sm font-medium flex items-center gap-2">
+              <Printer className="h-4 w-4" />
+              Direct Print to Label Printer (PrintNode)
+            </label>
+            {printers.length === 0 && !loading ? (
+              <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+                No printers found. Configure printers in Settings → Printer tab.
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Select
+                  value={selectedPrinter?.toString()}
+                  onValueChange={(value) => setSelectedPrinter(Number(value))}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loading ? "Loading printers..." : "Select printer"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {printers.map((printer) => (
+                      <SelectItem key={printer.id} value={printer.id.toString()}>
+                        {printer.name} {printer.default ? '(Default)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button 
+                  onClick={handlePrintNode} 
+                  disabled={!selectedPrinter || loading}
+                  size="sm"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  Send to Printer
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

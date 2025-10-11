@@ -146,33 +146,43 @@ export const ShippingLabelDialog = ({
               )}
               
               {/* PrintNode Direct Print */}
-              <div className="w-full space-y-2 bg-slate-50 p-3 rounded-lg">
-                <label className="text-sm font-medium">Direct Print to Label Printer</label>
-                <div className="flex gap-2">
-                  <Select
-                    value={selectedPrinter?.toString()}
-                    onValueChange={(value) => setSelectedPrinter(Number(value))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select printer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {printers.map((printer) => (
-                        <SelectItem key={printer.id} value={printer.id.toString()}>
-                          {printer.name} {printer.default ? '(Default)' : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    onClick={handlePrintNode}
-                    disabled={!selectedPrinter || printLoading}
-                    size="sm"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    Send to Printer
-                  </Button>
-                </div>
+              <div className="w-full space-y-2 bg-slate-50 p-3 rounded-lg border">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Printer className="h-4 w-4" />
+                  Direct Print to Label Printer (PrintNode)
+                </label>
+                {printers.length === 0 && !printLoading ? (
+                  <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+                    No printers found. Configure printers in Settings → Printer tab.
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Select
+                      value={selectedPrinter?.toString()}
+                      onValueChange={(value) => setSelectedPrinter(Number(value))}
+                      disabled={printLoading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={printLoading ? "Loading printers..." : "Select printer"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {printers.map((printer) => (
+                          <SelectItem key={printer.id} value={printer.id.toString()}>
+                            {printer.name} {printer.default ? '(Default)' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      onClick={handlePrintNode}
+                      disabled={!selectedPrinter || printLoading}
+                      size="sm"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Send to Printer
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
