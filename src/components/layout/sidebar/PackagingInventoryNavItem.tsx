@@ -10,7 +10,7 @@ export const PackagingInventoryNavItem = () => {
     <NavItem
       icon={Box}
       label="Tornado Pack"
-      to="/settings?tab=box-recommendations"
+      to="/packaging?tab=box-recommendations"
       isCollapsed={isCollapsed}
     />
   );

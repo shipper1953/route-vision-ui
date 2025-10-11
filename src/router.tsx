@@ -76,11 +76,11 @@ const router = createBrowserRouter([
     element: <CreateUser />,
   },
   {
-    path: "/settings",
+    path: "/packaging",
     element: <Settings />,
   },
   {
-    path: "/profile",
+    path: "/settings",
     element: <ProfileSettings />,
   },
   {
