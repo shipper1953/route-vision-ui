@@ -11,7 +11,7 @@ import { ShippingRatesCardFooter } from "./ShippingRatesCardFooter";
 import { useFormContext } from "react-hook-form";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Company, CompanyAddress } from "@/types/auth";
 import { applyMarkupToRates, MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";

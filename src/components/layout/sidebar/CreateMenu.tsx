@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { Package, Plus, Truck, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,

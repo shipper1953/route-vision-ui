@@ -1,5 +1,5 @@
 
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { DashboardCharts } from "@/components/dashboard/DashboardCharts";
 import { ShipmentCard } from "@/components/dashboard/ShipmentCard";

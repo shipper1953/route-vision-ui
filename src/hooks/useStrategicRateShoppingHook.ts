@@ -5,7 +5,7 @@ import {
   EnhancedRateResponse,
   EnhancedQuote 
 } from "@/services/strategicRateShoppingService";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 export const useStrategicRateShopping = () => {

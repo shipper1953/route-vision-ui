@@ -3,7 +3,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { Warehouse } from "@/types/auth";
 
 export const WarehouseSelectionSection = () => {

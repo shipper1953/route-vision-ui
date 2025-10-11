@@ -23,7 +23,7 @@ import {
   BarChart3,
   Shield
 } from "lucide-react";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 
 export const TmsSidebar = () => {
   const { isCollapsed, toggleSidebar, sidebarRef } = useSidebar();

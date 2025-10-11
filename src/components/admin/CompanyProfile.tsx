@@ -1,5 +1,5 @@
 
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { CompanyInformationCard } from "./profile/CompanyInformationCard";
 import { CompanyAddressCard } from "./profile/CompanyAddressCard";
 import { MarkupSettingsCard } from "./profile/MarkupSettingsCard";

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Package, Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { useCartonization } from "@/hooks/useCartonization";
 import { toast } from "sonner";
 

@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 
 interface User {
   id: string;

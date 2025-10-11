@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { OrderFormValues } from "@/types/order";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { useItemMaster } from "@/hooks/useItemMaster";
 
 export const useUpdateOrder = (orderId: string) => {

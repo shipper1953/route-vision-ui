@@ -1,6 +1,6 @@
 
 import { TmsLayout } from "@/components/layout/TmsLayout";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { 
   Card, 

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { UsersHeader } from "@/components/users/UsersHeader";
 import { UsersSearch } from "@/components/users/UsersSearch";

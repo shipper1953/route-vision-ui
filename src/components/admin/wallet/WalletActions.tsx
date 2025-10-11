@@ -5,7 +5,7 @@ import { Plus, CreditCard, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 
 interface WalletActionsProps {
   balance: number;

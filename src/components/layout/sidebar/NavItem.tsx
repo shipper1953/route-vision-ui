@@ -2,7 +2,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { useState, useRef } from "react";
 
 interface NavItemProps {

@@ -1,5 +1,5 @@
 
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 
 interface UserProfileProps {
   isCollapsed: boolean;

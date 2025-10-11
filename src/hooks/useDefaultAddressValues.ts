@@ -1,5 +1,5 @@
 
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 

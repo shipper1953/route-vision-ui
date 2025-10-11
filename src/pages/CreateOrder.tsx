@@ -12,7 +12,7 @@ import { WarehouseSelectionSection } from "@/components/order/WarehouseSelection
 import { OrderFormActions } from "@/components/order/OrderFormActions";
 import { orderFormSchema, OrderFormValues } from "@/types/order";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
 import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
 import { useEffect } from "react";

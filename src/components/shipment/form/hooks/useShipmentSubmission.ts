@@ -6,7 +6,7 @@ import { RateShoppingService, CombinedRateResponse } from "@/services/rateShoppi
 import { validatePackageDimensions } from "../helpers/formValidation";
 import { buildShipmentData } from "../helpers/shipmentDataBuilder";
 import { findRecommendedRateByDate, findMostEconomicalRate } from "../helpers/rateSelectionHelpers";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { recommendRate } from "@/services/shipping/rateSelection";
 import { logEvent } from "@/services/shipping/analytics";

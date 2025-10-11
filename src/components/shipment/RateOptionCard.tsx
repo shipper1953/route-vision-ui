@@ -5,7 +5,7 @@ import { SmartRate, Rate } from "@/services/easypost";
 import { CombinedRate } from "@/services/rateShoppingService";
 import { MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 
 interface RateOptionCardProps {
   rate: SmartRate | Rate | MarkedUpRate | MarkedUpSmartRate | CombinedRate;

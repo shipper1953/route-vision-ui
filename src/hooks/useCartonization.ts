@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { Box, Item, CartonizationParameters } from "@/services/cartonization/cartonizationEngine";
 
 // Default parameters - can be customized per user/company

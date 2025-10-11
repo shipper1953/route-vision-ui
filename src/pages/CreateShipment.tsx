@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { ShippingLabelDialog } from "@/components/shipment/ShippingLabelDialog";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Package } from "lucide-react";

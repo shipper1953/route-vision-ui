@@ -1,5 +1,5 @@
 
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";

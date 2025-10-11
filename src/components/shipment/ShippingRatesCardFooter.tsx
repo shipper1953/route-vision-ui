@@ -8,7 +8,7 @@ import { useFormContext } from "react-hook-form";
 import { ShipmentForm } from "@/types/shipment";
 import { toast } from "sonner";
 import { linkShipmentToOrder } from "@/services/orderService";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { LabelService } from "@/services/easypost/labelService";
 import { BulkShippingLabelDialog } from "@/components/cartonization/BulkShippingLabelDialog";

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { OrderFormValues } from "@/types/order";
 import { createOrder } from "@/services/orderCreationService";
-import { useAuth } from "@/context";
+import { useAuth } from "@/hooks/useAuth";
 import { useItemMaster } from "@/hooks/useItemMaster";
 
 export const useCreateOrder = () => {
