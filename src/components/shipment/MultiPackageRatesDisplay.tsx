@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Package, Truck, DollarSign, Check } from 'lucide-react';
+import { Package, Truck, DollarSign, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { SmartRate, Rate } from '@/services/easypost';
 import { RateShoppingService } from '@/services/rateShoppingService';
 import { LabelService } from '@/services/easypost/labelService';
@@ -37,6 +37,7 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
   const [packageRates, setPackageRates] = useState<PackageRate[]>([]);
   const [loading, setLoading] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+  const [expandedPackages, setExpandedPackages] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (packages.length > 0 && toAddress && fromAddress) {
@@ -143,6 +144,18 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
     }
   };
 
+  const togglePackageExpanded = (packageIndex: number) => {
+    setExpandedPackages(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(packageIndex)) {
+        newSet.delete(packageIndex);
+      } else {
+        newSet.add(packageIndex);
+      }
+      return newSet;
+    });
+  };
+
   if (loading && packageRates.length === 0) {
     return (
       <Card>
@@ -224,7 +237,7 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
               ) : (
                 <div className="space-y-3">
                   <div className="grid gap-2">
-                    {packageRate.rates.slice(0, 4).map((rate, rateIndex) => (
+                    {(expandedPackages.has(index) ? packageRate.rates : packageRate.rates.slice(0, 5)).map((rate, rateIndex) => (
                       <div
                         key={rateIndex}
                         className={`p-3 border rounded-lg cursor-pointer transition-all ${
@@ -263,6 +276,27 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
                       </div>
                     ))}
                   </div>
+
+                  {packageRate.rates.length > 5 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => togglePackageExpanded(index)}
+                      className="w-full gap-2"
+                    >
+                      {expandedPackages.has(index) ? (
+                        <>
+                          <ChevronUp className="h-4 w-4" />
+                          Show Less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4" />
+                          View All {packageRate.rates.length} Rates
+                        </>
+                      )}
+                    </Button>
+                  )}
                   
                   {packageRate.selectedRate && (
                     <div className="pt-3 border-t">

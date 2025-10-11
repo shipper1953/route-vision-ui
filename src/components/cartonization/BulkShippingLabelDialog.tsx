@@ -1,9 +1,12 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Printer, Download } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { usePrintNode } from "@/hooks/usePrintNode";
+import { toast } from "sonner";
 
 interface BulkShippingLabelDialogProps {
   isOpen: boolean;
@@ -24,6 +27,7 @@ export const BulkShippingLabelDialog = ({
 }: BulkShippingLabelDialogProps) => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [iframeErrors, setIframeErrors] = useState<Record<string, boolean>>({});
+  const { printers, selectedPrinter, setSelectedPrinter, printPDF, loading: printersLoading } = usePrintNode();
 
   const getProxyUrl = (originalUrl: string) => {
     // Use environment variable to construct the Supabase URL to avoid Chrome blocking issues
@@ -45,6 +49,44 @@ export const BulkShippingLabelDialog = ({
     }
     
     setIsPrinting(false);
+  };
+
+  const handlePrintNodeAll = async () => {
+    if (!selectedPrinter) {
+      toast.error("Please select a printer first");
+      return;
+    }
+
+    setIsPrinting(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const label of shipmentLabels) {
+      if (label.labelUrl) {
+        try {
+          const success = await printPDF(label.labelUrl, `Label - Order ${label.orderId}`);
+          if (success) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+          // Small delay between prints
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error(`Failed to print label for order ${label.orderId}:`, error);
+          errorCount++;
+        }
+      }
+    }
+
+    setIsPrinting(false);
+    
+    if (successCount > 0) {
+      toast.success(`Successfully printed ${successCount} label(s)`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Failed to print ${errorCount} label(s)`);
+    }
   };
 
   const handleDownloadAll = async () => {
@@ -85,16 +127,49 @@ export const BulkShippingLabelDialog = ({
         </DialogHeader>
         
         <div className="space-y-4">
+          {/* PrintNode Printer Selection */}
+          {printers.length > 0 && (
+            <div className="p-4 bg-muted/20 rounded-lg space-y-2">
+              <label className="text-sm font-medium">Direct Print to Label Printer</label>
+              <Select
+                value={selectedPrinter?.toString() || ""}
+                onValueChange={(value) => setSelectedPrinter(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a printer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {printers.map((printer) => (
+                    <SelectItem key={printer.id} value={printer.id.toString()}>
+                      {printer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Action buttons */}
           <div className="flex gap-2 p-4 bg-muted/20 rounded-lg">
-            <Button
-              onClick={handlePrintAll}
-              disabled={isPrinting}
-              className="flex-1 gap-2"
-            >
-              <Printer className="h-4 w-4" />
-              {isPrinting ? "Printing..." : "Print All Labels"}
-            </Button>
+            {selectedPrinter ? (
+              <Button
+                onClick={handlePrintNodeAll}
+                disabled={isPrinting}
+                className="flex-1 gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                {isPrinting ? "Printing..." : "Print All to Printer"}
+              </Button>
+            ) : (
+              <Button
+                onClick={handlePrintAll}
+                disabled={isPrinting}
+                className="flex-1 gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                {isPrinting ? "Printing..." : "Browser Print All"}
+              </Button>
+            )}
             <Button
               onClick={handleDownloadAll}
               variant="outline"
