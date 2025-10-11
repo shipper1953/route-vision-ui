@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import { 
   TrendingUp, 
   DollarSign, 
@@ -45,6 +46,31 @@ export const PackagingIntelligenceDashboard = () => {
   const [lowStockBoxes, setLowStockBoxes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const generateReport = async () => {
+    if (!userProfile?.company_id) return;
+    
+    setLoading(true);
+    toast.info('Generating new packaging intelligence report...');
+    
+    try {
+      const { error } = await supabase.functions.invoke('generate-packaging-intelligence', {
+        body: { company_id: userProfile.company_id }
+      });
+
+      if (error) throw error;
+      
+      // Refetch the report after generation
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait a second for DB to update
+      await fetchLatestReport();
+      toast.success('Report generated successfully');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast.error('Failed to generate report');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchLatestReport = async () => {
     if (!userProfile?.company_id) {
       console.log('PackagingIntelligenceDashboard: No user profile or company_id found:', { 
@@ -59,7 +85,7 @@ export const PackagingIntelligenceDashboard = () => {
     try {
       const { data, error } = await supabase
         .from('packaging_intelligence_reports')
-        .select('id, generated_at, total_orders_analyzed, potential_savings, top_5_most_used_boxes, top_5_box_discrepancies, inventory_suggestions, projected_packaging_need')
+        .select('id, generated_at, total_orders_analyzed, potential_savings, top_5_most_used_boxes, top_5_box_discrepancies, inventory_suggestions, projected_packaging_need, report_data')
         .eq('company_id', userProfile.company_id)
         .order('generated_at', { ascending: false })
         .limit(1)
@@ -72,8 +98,30 @@ export const PackagingIntelligenceDashboard = () => {
         return;
       }
 
-      setReport(data ?? null);
-      console.log('PackagingIntelligenceDashboard: Report set:', data);
+      if (data) {
+        // Check if the report has the new structure
+        const discrepancies = data.top_5_box_discrepancies as any;
+        const hasNewStructure = discrepancies && 
+          Array.isArray(discrepancies) &&
+          discrepancies.length > 0 &&
+          discrepancies[0].master_box_sku !== undefined;
+
+        // If old structure detected, regenerate the report
+        if (discrepancies && 
+            Array.isArray(discrepancies) &&
+            discrepancies.length > 0 && 
+            !hasNewStructure) {
+          console.log('Old report structure detected, regenerating...');
+          toast.info('Updating report to new format...');
+          await generateReport();
+          return;
+        }
+
+        setReport(data as PackagingReport);
+        console.log('PackagingIntelligenceDashboard: Report set:', data);
+      } else {
+        setReport(null);
+      }
     } catch (error) {
       console.error('Error fetching report:', error);
     }
