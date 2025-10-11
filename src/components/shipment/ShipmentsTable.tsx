@@ -30,6 +30,8 @@ export interface Shipment {
   status: string;
   weight: string;
   labelUrl?: string;
+  orderId?: number | string;  // Order database ID
+  orderNumber?: string;  // Order display number (order_id field)
 }
 
 interface ShipmentsTableProps {
@@ -74,8 +76,8 @@ export const ShipmentsTable = ({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Shipment</TableHead>
             <TableHead>Tracking</TableHead>
+            <TableHead>Order #</TableHead>
             <TableHead>Carrier</TableHead>
             <TableHead>Service</TableHead>
             <TableHead>Weight</TableHead>
@@ -93,7 +95,6 @@ export const ShipmentsTable = ({
               key={shipment.id} 
               className={highlightedShipment === shipment.id ? "bg-blue-50" : ""}
             >
-              <TableCell className="font-medium">{shipment.id}</TableCell>
               <TableCell>
                 {shipment.tracking !== 'Pending' ? (
                   <a 
@@ -107,6 +108,18 @@ export const ShipmentsTable = ({
                   </a>
                 ) : (
                   <span className="text-muted-foreground">Pending</span>
+                )}
+              </TableCell>
+              <TableCell className="font-medium">
+                {shipment.orderNumber ? (
+                  <a 
+                    href={`/orders/${shipment.orderId}`}
+                    className="text-tms-blue hover:underline"
+                  >
+                    {shipment.orderNumber}
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
                 )}
               </TableCell>
               <TableCell>

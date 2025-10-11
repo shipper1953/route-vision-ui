@@ -63,7 +63,9 @@ export const convertOrderToShipment = (order: OrderData): Shipment => {
     actualDelivery: order.shipment!.actualDeliveryDate || null,
     status: order.status,
     weight: order.parcelInfo ? `${order.parcelInfo.weight} oz` : "Unknown",
-    labelUrl: order.shipment!.labelUrl
+    labelUrl: order.shipment!.labelUrl,
+    orderId: order.id,
+    orderNumber: order.id  // Using id as orderNumber since there's no separate orderID field
   };
 };
 
@@ -168,6 +170,8 @@ export const createShipmentFromLabel = (labelData: any): Shipment => {
     actualDelivery: null,
     status: 'purchased',
     weight: `${labelData.parcel?.weight || '0'} ${labelData.parcel?.weight_unit || 'oz'}`,
-    labelUrl: labelData.postage_label?.label_url
+    labelUrl: labelData.postage_label?.label_url,
+    orderId: labelData.order_id,
+    orderNumber: labelData.order_number
   };
 };

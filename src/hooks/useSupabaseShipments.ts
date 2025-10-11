@@ -31,6 +31,7 @@ export const useSupabaseShipments = () => {
           .select(`
             *,
             orders!left (
+              id,
               order_id,
               customer_name,
               shipping_address,
@@ -112,7 +113,9 @@ export const useSupabaseShipments = () => {
               new Date(s.actual_delivery_date).toLocaleDateString() : null,
             status: s.status || 'created',
             weight,
-            labelUrl: s.label_url
+            labelUrl: s.label_url,
+            orderId: orderData?.id,
+            orderNumber: orderData?.order_id
           };
         });
         
