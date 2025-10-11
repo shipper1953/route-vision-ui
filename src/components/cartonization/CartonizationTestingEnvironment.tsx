@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,8 @@ import { Plus, X, Play, Loader2, CheckCircle, History } from "lucide-react";
 import { CartonizationEngine, Item } from "@/services/cartonization/cartonizationEngine";
 import { useCartonization } from "@/hooks/useCartonization";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TestScenario {
   orderId: string;
@@ -42,13 +44,15 @@ interface TestResult {
 
 export const CartonizationTestingEnvironment = () => {
   const { boxes, parameters } = useCartonization();
+  const { userProfile } = useAuth();
+  
+  const [orders, setOrders] = useState<any[]>([]);
+  const [availableItems, setAvailableItems] = useState<any[]>([]);
+  const [selectedOrderMode, setSelectedOrderMode] = useState<string>('custom');
   
   const [testScenario, setTestScenario] = useState<TestScenario>({
-    orderId: 'ORD-2024-001',
-    items: [
-      { sku: 'WIDGET-001', quantity: 2, dimensions: '10x8x3', weight: '0.5' },
-      { sku: 'GADGET-002', quantity: 1, dimensions: '15x12x5', weight: '1.2' }
-    ],
+    orderId: 'custom',
+    items: [],
     destination: 'US-CA-90210',
     carrier: 'fedex',
     serviceLevel: 'ground'
@@ -56,6 +60,42 @@ export const CartonizationTestingEnvironment = () => {
 
   const [testResults, setTestResults] = useState<TestResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+
+  // Fetch open orders and available items
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!userProfile?.company_id) return;
+
+      try {
+        // Fetch ready to ship orders
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select('id, order_id, customer_name, items, shipping_address')
+          .eq('company_id', userProfile.company_id)
+          .eq('status', 'ready_to_ship')
+          .order('created_at', { ascending: false });
+
+        if (ordersError) throw ordersError;
+        setOrders(ordersData || []);
+
+        // Fetch available items
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('items')
+          .select('*')
+          .eq('company_id', userProfile.company_id)
+          .eq('is_active', true)
+          .order('name');
+
+        if (itemsError) throw itemsError;
+        setAvailableItems(itemsData || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load orders and items');
+      }
+    };
+
+    fetchData();
+  }, [userProfile?.company_id]);
   
   const [historicalData] = useState([
     {
@@ -159,6 +199,46 @@ export const CartonizationTestingEnvironment = () => {
     }));
   };
 
+  const handleOrderSelection = (orderId: string) => {
+    setSelectedOrderMode(orderId);
+    
+    if (orderId === 'custom') {
+      // Reset to custom mode
+      setTestScenario(prev => ({
+        ...prev,
+        orderId: 'custom',
+        items: []
+      }));
+    } else {
+      // Load order items
+      const selectedOrder = orders.find(o => o.id.toString() === orderId);
+      if (selectedOrder && selectedOrder.items) {
+        const orderItems = Array.isArray(selectedOrder.items) ? selectedOrder.items : [];
+        const formattedItems = orderItems.map((item: any) => ({
+          sku: item.name || item.sku || 'Unknown',
+          quantity: item.quantity || 1,
+          dimensions: `${item.length || 0}x${item.width || 0}x${item.height || 0}`,
+          weight: (item.weight || 0).toString()
+        }));
+
+        setTestScenario(prev => ({
+          ...prev,
+          orderId: selectedOrder.order_id || orderId,
+          items: formattedItems
+        }));
+      }
+    }
+  };
+
+  const handleItemSelect = (index: number, itemId: string) => {
+    const selectedItem = availableItems.find(i => i.id === itemId);
+    if (selectedItem) {
+      updateItem(index, 'sku', selectedItem.name);
+      updateItem(index, 'dimensions', `${selectedItem.length}x${selectedItem.width}x${selectedItem.height}`);
+      updateItem(index, 'weight', selectedItem.weight.toString());
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -177,62 +257,93 @@ export const CartonizationTestingEnvironment = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="orderId">Order ID</Label>
-              <Input
-                id="orderId"
-                value={testScenario.orderId}
-                onChange={(e) => setTestScenario(prev => ({ ...prev, orderId: e.target.value }))}
-              />
+              <Label htmlFor="orderId">Order Selection</Label>
+              <Select value={selectedOrderMode} onValueChange={handleOrderSelection}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an order or custom" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Custom (Add Items Manually)</SelectItem>
+                  {orders.map(order => (
+                    <SelectItem key={order.id} value={order.id.toString()}>
+                      {order.order_id} - {order.customer_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <Label>Items</Label>
               <div className="space-y-3">
                 {testScenario.items.map((item, index) => (
-                  <div key={index} className="flex items-center space-x-2 p-3 bg-muted/50 rounded">
-                    <Input
-                      placeholder="SKU"
-                      value={item.sku}
-                      onChange={(e) => updateItem(index, 'sku', e.target.value)}
-                      className="flex-1"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Qty"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                      className="w-16"
-                    />
-                    <Input
-                      placeholder="L×W×H"
-                      value={item.dimensions}
-                      onChange={(e) => updateItem(index, 'dimensions', e.target.value)}
-                      className="w-24"
-                    />
-                    <Input
-                      placeholder="Weight"
-                      value={item.weight}
-                      onChange={(e) => updateItem(index, 'weight', e.target.value)}
-                      className="w-20"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeItem(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                  <div key={index} className="space-y-2 p-3 bg-muted/50 rounded">
+                    {selectedOrderMode === 'custom' && (
+                      <Select onValueChange={(value) => handleItemSelect(index, value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an item" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableItems.map(availItem => (
+                            <SelectItem key={availItem.id} value={availItem.id}>
+                              {availItem.name} ({availItem.sku})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        placeholder="SKU"
+                        value={item.sku}
+                        onChange={(e) => updateItem(index, 'sku', e.target.value)}
+                        className="flex-1"
+                        disabled={selectedOrderMode !== 'custom'}
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Qty"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                        className="w-16"
+                      />
+                      <Input
+                        placeholder="L×W×H"
+                        value={item.dimensions}
+                        onChange={(e) => updateItem(index, 'dimensions', e.target.value)}
+                        className="w-24"
+                        disabled={selectedOrderMode !== 'custom'}
+                      />
+                      <Input
+                        placeholder="Weight"
+                        value={item.weight}
+                        onChange={(e) => updateItem(index, 'weight', e.target.value)}
+                        className="w-20"
+                        disabled={selectedOrderMode !== 'custom'}
+                      />
+                      {selectedOrderMode === 'custom' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeItem(index)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
-                <Button
-                  variant="outline"
-                  onClick={addItem}
-                  className="w-full border-dashed"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
-                </Button>
+                {selectedOrderMode === 'custom' && (
+                  <Button
+                    variant="outline"
+                    onClick={addItem}
+                    className="w-full border-dashed"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                )}
               </div>
             </div>
 
