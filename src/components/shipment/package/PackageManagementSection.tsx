@@ -75,7 +75,7 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
 
   const getConfidenceColor = (conf: number) => {
     if (conf >= 80) return 'bg-green-100 text-green-800 border-green-200';
-    if (conf >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    if (conf >= 70) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
@@ -84,6 +84,10 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
     if (util >= 60) return 'bg-yellow-500';
     return 'bg-green-500';
   };
+  
+  const showLowUtilizationWarning = (util: number) => util < 30;
+  const showLowConfidenceWarning = (conf: number) => conf < 70;
+  const showOversizedWarning = (boxVol: number, itemsVol: number) => boxVol > itemsVol * 3;
 
   return (
     <Card className="w-full border-2 hover:border-primary/50 transition-colors">
@@ -94,11 +98,29 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
               <Package className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
                 Package {packageIndex + 1}
                 <Badge className={`${getConfidenceColor(confidence)} border`}>
                   {confidence}% confidence
                 </Badge>
+                {showLowUtilizationWarning(utilization) && (
+                  <Badge variant="destructive" className="text-xs">
+                    ⚠️ Low utilization - oversized box
+                  </Badge>
+                )}
+                {showLowConfidenceWarning(confidence) && (
+                  <Badge variant="destructive" className="text-xs">
+                    ⚠️ Uncertain fit
+                  </Badge>
+                )}
+                {showOversizedWarning(
+                  box.length * box.width * box.height,
+                  assignedItems.reduce((sum, item) => sum + (item.length * item.width * item.height * item.quantity), 0)
+                ) && (
+                  <Badge variant="outline" className="text-xs border-yellow-500 text-yellow-700">
+                    ⚠️ Box may be too large
+                  </Badge>
+                )}
               </CardTitle>
               <p className="text-sm text-muted-foreground">{assignedItems.length} items</p>
             </div>

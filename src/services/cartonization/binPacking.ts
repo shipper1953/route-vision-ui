@@ -2,6 +2,33 @@ import { Item, Box, PackedItem, Space, PackingResult } from './types';
 
 export class BinPackingAlgorithm {
   static enhanced3DBinPacking(items: Item[], box: Box): PackingResult {
+    // Geometric feasibility pre-checks
+    console.log(`🔍 Pre-checking geometric feasibility for ${items.length} unique items in ${box.name}`);
+    
+    for (const item of items) {
+      // Check 1: Can the item fit in ANY orientation?
+      const itemDims = [item.length, item.width, item.height].sort((a, b) => b - a);
+      const boxDims = [box.length, box.width, box.height].sort((a, b) => b - a);
+      
+      const canFitAnyOrientation = itemDims.every((dim, i) => dim <= boxDims[i]);
+      if (!canFitAnyOrientation) {
+        console.log(`❌ GEOMETRIC FAIL: Item "${item.name}" (${item.length}×${item.width}×${item.height}) cannot fit in box (${box.length}×${box.width}×${box.height}) in ANY orientation`);
+        return {
+          success: false,
+          packedItems: [],
+          usedVolume: 0,
+          packingEfficiency: 0
+        };
+      }
+      
+      // Check 2: Longest dimension check (with realistic margin)
+      const longestItemDim = Math.max(item.length, item.width, item.height);
+      const longestBoxDim = Math.max(box.length, box.width, box.height);
+      if (longestItemDim > longestBoxDim * 0.95) {
+        console.log(`⚠️ WARNING: Item "${item.name}" longest dimension (${longestItemDim}") is ${((longestItemDim/longestBoxDim)*100).toFixed(1)}% of box longest dimension (${longestBoxDim}")`);
+      }
+    }
+    
     // Expand items by quantity
     const expandedItems: Item[] = [];
     items.forEach(item => {
@@ -9,6 +36,30 @@ export class BinPackingAlgorithm {
         expandedItems.push({ ...item, quantity: 1 });
       }
     });
+    
+    // Check 3: Volume reality check with practical packing factor
+    const totalItemVolume = expandedItems.reduce((sum, item) => 
+      sum + (item.length * item.width * item.height), 0
+    );
+    const boxVolumeCalc = box.length * box.width * box.height;
+    const theoreticalUtilization = (totalItemVolume / boxVolumeCalc) * 100;
+    
+    // Account for practical packing efficiency (~70-85% for real-world scenarios)
+    const practicalPackingFactor = 0.75; // 75% is realistic for non-uniform items
+    const expectedUtilization = theoreticalUtilization / practicalPackingFactor;
+    
+    console.log(`📊 Volume Analysis: Total items=${totalItemVolume.toFixed(0)} in³, Box=${boxVolumeCalc.toFixed(0)} in³`);
+    console.log(`📊 Theoretical utilization=${theoreticalUtilization.toFixed(1)}%, Expected with packing factor=${expectedUtilization.toFixed(1)}%`);
+    
+    if (expectedUtilization > 100) {
+      console.log(`❌ VOLUME FAIL: Expected utilization ${expectedUtilization.toFixed(1)}% exceeds box capacity even with optimal packing`);
+      return {
+        success: false,
+        packedItems: [],
+        usedVolume: 0,
+        packingEfficiency: 0
+      };
+    }
 
     // Sort items by volume (largest first) for better packing
     const sortedItems = expandedItems.sort((a, b) => 
@@ -130,10 +181,10 @@ export class BinPackingAlgorithm {
     const usedVolume = packedItems.reduce((sum, packed) => 
       sum + (packed.length * packed.width * packed.height), 0
     );
-    const boxVolume = box.length * box.width * box.height;
-    const packingEfficiency = usedVolume / boxVolume;
+    const boxVolumeFinal = box.length * box.width * box.height;
+    const packingEfficiency = usedVolume / boxVolumeFinal;
     
-    console.log(`✅ Successfully packed all ${packedItems.length} items. Used volume: ${usedVolume}/${boxVolume} (${(packingEfficiency * 100).toFixed(1)}%)`);
+    console.log(`✅ Successfully packed all ${packedItems.length} items. Used volume: ${usedVolume}/${boxVolumeFinal} (${(packingEfficiency * 100).toFixed(1)}%)`);
     
     return {
       success: true,

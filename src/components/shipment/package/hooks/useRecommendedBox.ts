@@ -45,7 +45,7 @@ export const useRecommendedBox = (orderItems: any[]) => {
           let requiresMultiPackage = false;
           
           // If single package fails or has low confidence, try multi-package
-          if (!result || result.confidence < 60) {
+          if (!result || result.confidence < 75) {
             console.log('Single-package solution insufficient, trying multi-package...');
             multiPackage = engine.calculateMultiPackageCartonization(items, 'balanced');
             

@@ -75,8 +75,16 @@ export class CartonizationEngine {
       sum + (item.length * item.width * item.height * item.quantity), 0
     );
 
-    console.log(`🔍 Starting cartonization analysis for ${items.length} items:`);
-    console.log(`📊 Total weight: ${totalWeight} lbs, Total volume: ${totalVolume} cubic inches`);
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`🔍 CARTONIZATION ANALYSIS START`);
+    console.log(`${'='.repeat(80)}`);
+    console.log(`📦 Items to pack: ${items.length} unique items`);
+    items.forEach(item => {
+      console.log(`   - ${item.name}: ${item.length}×${item.width}×${item.height} (${item.quantity}x) = ${(item.length * item.width * item.height * item.quantity).toFixed(0)} in³`);
+    });
+    console.log(`📊 Total weight: ${totalWeight.toFixed(2)} lbs`);
+    console.log(`📊 Total volume: ${totalVolume.toFixed(0)} cubic inches`);
+    console.log(`${'='.repeat(80)}\n`);
 
     // Filter boxes that can handle the weight
     const suitableBoxes = this.boxes.filter(box => {
@@ -280,8 +288,14 @@ export class CartonizationEngine {
 
   // Modified sorting method that prioritizes highest utilization under 100%
   private sortBoxesByOptimization(analyses: any[]): any[] {
-    // Filter out boxes with 100% or higher utilization
-    const viableBoxes = analyses.filter(analysis => analysis.utilization < 100);
+    // Filter out boxes with 100% or higher utilization AND unrealistically low utilization
+    const viableBoxes = analyses.filter(analysis => {
+      const isRealistic = analysis.utilization >= 30 && analysis.utilization < 100;
+      if (!isRealistic) {
+        console.log(`⚠️ Filtering out ${analysis.box.name}: utilization ${analysis.utilization.toFixed(1)}% is ${analysis.utilization < 30 ? 'too low (oversized box)' : 'too high'}`);
+      }
+      return isRealistic;
+    });
     
     return viableBoxes.sort((a, b) => {
       // PRIMARY: Highest utilization under 100% (descending order)
