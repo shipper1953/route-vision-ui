@@ -136,6 +136,28 @@ export const ShippingLabelDialog = ({
                 </div>
               )}
               
+              {/* Action Buttons - Prominent placement */}
+              <div className="w-full space-y-2">
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleDownload}
+                    className="flex items-center gap-2 flex-1"
+                    disabled={loading}
+                  >
+                    <FileText className="h-4 w-4" />
+                    {loading ? "Downloading..." : "Download Label"}
+                  </Button>
+                  <Button 
+                    onClick={handlePrint}
+                    variant="outline"
+                    className="flex items-center gap-2 flex-1"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Print Label
+                  </Button>
+                </div>
+              </div>
+              
               <div className="bg-slate-50 p-4 rounded-lg w-full">
                 <div className="space-y-3">
                   <div className="text-sm text-gray-600 text-center">
@@ -174,7 +196,7 @@ export const ShippingLabelDialog = ({
                   </div>
                   
                   <div className="text-xs text-gray-500 text-center">
-                    If the preview doesn't load, try the buttons below
+                    If the preview doesn't load, try opening in a new tab
                   </div>
                   
                   <Button 
@@ -183,35 +205,13 @@ export const ShippingLabelDialog = ({
                       console.log('Opening label in new tab:', proxyUrl);
                       window.open(proxyUrl, '_blank');
                     }}
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     className="w-full"
                   >
                     Open Label in New Tab
                   </Button>
                 </div>
-              </div>
-              
-              <div className="flex gap-2 mt-2 w-full">
-                <Button 
-                  onClick={handlePrint}
-                  variant="outline"
-                  className="flex items-center gap-2 flex-1"
-                  size="sm"
-                >
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-                <Button 
-                  onClick={handleDownload}
-                  variant="outline"
-                  className="flex items-center gap-2 flex-1"
-                  disabled={loading}
-                  size="sm"
-                >
-                  <FileText className="h-4 w-4" />
-                  Download
-                </Button>
               </div>
               
               <Separator className="my-4" />
