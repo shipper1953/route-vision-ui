@@ -36,8 +36,8 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
     const barcodeStartX = Math.round(labelCenterX - (barcodeWidth / 2));
     
     // Vertical positioning
-    const barcodeY = 80; // Upper portion of label
-    const nameY = 330; // Near bottom of label
+    const barcodeY = 110; // Upper-middle portion of label
+    const nameY = 300; // Lower-middle portion of label
     
     return `^XA
 ^FO${barcodeStartX},${barcodeY}^BY${moduleWidth}^BCN,${barcodeHeight},Y,N,N
