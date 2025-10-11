@@ -36,7 +36,7 @@ export const ShippingLabelDialog = ({
   
   const getProxyUrl = (originalUrl: string) => {
     // Use environment variable to construct the Supabase URL to avoid Chrome blocking issues  
-    const supabaseUrl = import.meta.env.REACT_APP_SUPABASE_URL || 'https://gidrlosmhpvdcogrkidj.supabase.co';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://gidrlosmhpvdcogrkidj.supabase.co';
     return `${supabaseUrl}/functions/v1/label-proxy?url=${encodeURIComponent(originalUrl)}`;
   };
 
