@@ -8,6 +8,7 @@ export interface OrderForShipping {
   shippingAddress: any;
   recommendedBox: Box;
   recommendedService?: string;
+  requiredDeliveryDate?: string;
 }
 
 export interface BoxShippingGroup {
@@ -31,6 +32,7 @@ export interface OrderWithRates extends OrderForShipping {
     service: string;
     rate: string;
     delivery_days?: number;
+    delivery_date?: string;
     shipment_id?: string;
   }>;
   selectedRateId?: string;

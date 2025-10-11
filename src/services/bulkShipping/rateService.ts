@@ -61,21 +61,82 @@ export class RateService {
         const shipmentResponse = await this.shipmentService.createShipment(shipmentData);
         console.log(`Rates fetched for order ${order.id}:`, shipmentResponse.id);
 
-        // Process standard rates only
+        // Process standard rates and smart rates if available
         const rates = shipmentResponse.rates || [];
-        const processedRates = rates.map(rate => ({
-          id: rate.id,
-          carrier: rate.carrier || 'Unknown',
-          service: rate.service || 'Standard',
-          rate: rate.rate || '0.00',
-          delivery_days: rate.delivery_days,
-          shipment_id: shipmentResponse.id // Store the shipment ID with each rate
-        }));
+        const smartRates = shipmentResponse.smartRates || [];
+        
+        // Combine both rate types
+        const allRates = [
+          ...rates.map(rate => ({
+            id: rate.id,
+            carrier: rate.carrier || 'Unknown',
+            service: rate.service || 'Standard',
+            rate: rate.rate || '0.00',
+            delivery_days: rate.delivery_days,
+            delivery_date: rate.delivery_date,
+            shipment_id: shipmentResponse.id
+          })),
+          ...smartRates.map(rate => ({
+            id: rate.id,
+            carrier: rate.carrier || 'Unknown',
+            service: rate.service || 'Standard',
+            rate: rate.rate || '0.00',
+            delivery_days: rate.delivery_days,
+            delivery_date: rate.delivery_date,
+            shipment_id: shipmentResponse.id
+          }))
+        ];
+
+        // Auto-select rate that meets required delivery date if specified
+        let selectedRateId: string | undefined;
+        if (order.requiredDeliveryDate && allRates.length > 0) {
+          const requiredDate = new Date(order.requiredDeliveryDate);
+          
+          // Filter rates that meet the delivery date requirement
+          const viableRates = allRates.filter(rate => {
+            if (rate.delivery_date) {
+              return new Date(rate.delivery_date) <= requiredDate;
+            } else if (rate.delivery_days !== undefined) {
+              const estimatedDelivery = new Date();
+              estimatedDelivery.setDate(estimatedDelivery.getDate() + rate.delivery_days);
+              return estimatedDelivery <= requiredDate;
+            }
+            return false;
+          });
+
+          if (viableRates.length > 0) {
+            // Select the cheapest rate that meets the deadline
+            const cheapestViable = viableRates.sort((a, b) => 
+              parseFloat(a.rate) - parseFloat(b.rate)
+            )[0];
+            selectedRateId = cheapestViable.id;
+            console.log(`✅ Auto-selected rate for order ${order.id}: ${cheapestViable.carrier} ${cheapestViable.service} ($${cheapestViable.rate}) - meets delivery by ${order.requiredDeliveryDate}`);
+          } else {
+            // If no rates meet the deadline, select the fastest available
+            const fastest = allRates.sort((a, b) => {
+              const aDays = a.delivery_days ?? 999;
+              const bDays = b.delivery_days ?? 999;
+              return aDays - bDays;
+            })[0];
+            selectedRateId = fastest.id;
+            console.warn(`⚠️ No rates meet delivery deadline for order ${order.id}. Selected fastest: ${fastest.carrier} ${fastest.service}`);
+          }
+        } else if (allRates.length > 0) {
+          // No required delivery date - select cheapest rate
+          const cheapest = allRates.sort((a, b) => 
+            parseFloat(a.rate) - parseFloat(b.rate)
+          )[0];
+          selectedRateId = cheapest.id;
+          console.log(`Auto-selected cheapest rate for order ${order.id}: ${cheapest.carrier} ${cheapest.service} ($${cheapest.rate})`);
+        }
 
         ordersWithRates.push({
           ...order,
-          rates: processedRates
+          rates: allRates,
+          selectedRateId
         });
+
+        console.log(`Rates fetched for order ${order.id}:`, shipmentResponse.id);
 
         // Add delay between requests to prevent rate limiting
         if (i < orders.length - 1) {

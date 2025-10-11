@@ -77,7 +77,8 @@ export class OrderProcessor {
               value: orderValue,
               shippingAddress: order.shippingAddress,
               recommendedBox: result.recommendedBox,
-              recommendedService
+              recommendedService,
+              requiredDeliveryDate: order.requiredDeliveryDate
             };
 
             boxGroups.get(boxId)!.orders.push(orderForShipping);
