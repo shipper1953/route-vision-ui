@@ -54,54 +54,13 @@ const PaymentForm = ({ amount, companyId, onSuccess, onCancel }: PaymentFormProp
         return;
       }
 
-      // Phase 1: Create SetupIntent and confirm to attach PM to customer
-      const { data: setupData, error: setupErr } = await supabase.functions.invoke('create-payment-intent', {
-        body: {
-          action: 'setup',
-          companyId,
-        }
-      });
-
-      if (setupErr) {
-        throw setupErr;
-      }
-      if (!setupData?.clientSecret) {
-        throw new Error('No client secret returned for setup intent');
-      }
-
-      const setupResult = await stripe.confirmSetup({
-        clientSecret: setupData.clientSecret,
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/company-admin`,
-        },
-        redirect: 'if_required',
-      });
-
-      if (setupResult.error) {
-        console.error('[ImprovedPayment] Setup confirmation error:', setupResult.error);
-        toast({
-          title: 'Card Setup Failed',
-          description: setupResult.error.message,
-          variant: 'destructive',
-        });
-        setPaymentStep('collecting');
-        setLoading(false);
-        return;
-      }
-
-      const pmId = setupResult.setupIntent?.payment_method as string | undefined;
-      if (!pmId) {
-        throw new Error('No payment method returned from setup intent');
-      }
-
-      // Phase 2: Create PaymentIntent (not confirmed server-side)
+      // Create PaymentIntent and confirm payment in one flow
+      console.log('[ImprovedPayment] Creating payment intent for amount:', amount);
       const { data: piData, error: piErr } = await supabase.functions.invoke('create-payment-intent', {
         body: {
           action: 'topup',
           amount: Math.round(amount * 100),
           companyId,
-          paymentMethodId: pmId,
         }
       });
 
@@ -112,8 +71,10 @@ const PaymentForm = ({ amount, companyId, onSuccess, onCancel }: PaymentFormProp
         throw new Error('No client secret returned for payment intent');
       }
 
-      // Confirm payment client-side to handle SCA if needed
+      console.log('[ImprovedPayment] Confirming payment...');
+      // Confirm payment using Elements (which is in payment mode)
       const { error: confirmError } = await stripe.confirmPayment({
+        elements,
         clientSecret: piData.clientSecret,
         confirmParams: {
           return_url: `${window.location.origin}/company-admin`,
@@ -128,14 +89,17 @@ const PaymentForm = ({ amount, companyId, onSuccess, onCancel }: PaymentFormProp
           description: confirmError.message,
           variant: 'destructive',
         });
-      } else {
-        console.log('[ImprovedPayment] Payment successful');
-        toast({
-          title: 'Payment Successful',
-          description: `$${amount.toFixed(2)} added to wallet.`,
-        });
-        onSuccess();
+        setPaymentStep('collecting');
+        setLoading(false);
+        return;
       }
+
+      console.log('[ImprovedPayment] Payment successful');
+      toast({
+        title: 'Payment Successful',
+        description: `$${amount.toFixed(2)} added to wallet.`,
+      });
+      onSuccess();
     } catch (err) {
       console.error('[ImprovedPayment] Unexpected error:', err);
       toast({
@@ -325,7 +289,6 @@ export const ImprovedStripePayment = ({
     mode: 'payment' as const,
     amount: Math.round(amount * 100),
     currency: 'usd',
-    paymentMethodCreation: 'manual' as const,
     appearance: {
       theme: 'stripe' as const,
     },
