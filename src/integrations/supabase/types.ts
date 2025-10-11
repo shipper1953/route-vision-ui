@@ -198,6 +198,7 @@ export type Database = {
           category: string
           company_id: string
           created_at: string
+          dimensions_updated_at: string | null
           height: number
           id: string
           is_active: boolean
@@ -212,6 +213,7 @@ export type Database = {
           category: string
           company_id: string
           created_at?: string
+          dimensions_updated_at?: string | null
           height: number
           id?: string
           is_active?: boolean
@@ -226,6 +228,7 @@ export type Database = {
           category?: string
           company_id?: string
           created_at?: string
+          dimensions_updated_at?: string | null
           height?: number
           id?: string
           is_active?: boolean

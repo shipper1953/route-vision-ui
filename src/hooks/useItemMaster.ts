@@ -17,6 +17,34 @@ export const useItemMaster = () => {
     }
   }, [userProfile]);
 
+  // Subscribe to Qboid realtime updates
+  useEffect(() => {
+    if (!userProfile) return;
+
+    const channel = supabase
+      .channel('qboid-item-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'qboid_events'
+        },
+        (payload: any) => {
+          const eventData = payload.new;
+          if (eventData.event_type === 'item_dimensions_updated') {
+            // Refresh items list when an item is updated via Qboid
+            fetchItems();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userProfile]);
+
   const fetchItems = async () => {
     setLoading(true);
     try {
@@ -37,7 +65,8 @@ export const useItemMaster = () => {
         height: Number(item.height),
         weight: Number(item.weight),
         category: item.category,
-        isActive: item.is_active
+        isActive: item.is_active,
+        dimensionsUpdatedAt: item.dimensions_updated_at
       }));
       
       setItems(mappedItems);
@@ -85,7 +114,8 @@ export const useItemMaster = () => {
         height: Number(data.height),
         weight: Number(data.weight),
         category: data.category,
-        isActive: data.is_active
+        isActive: data.is_active,
+        dimensionsUpdatedAt: data.dimensions_updated_at
       };
 
       setItems(prev => [...prev, newItem]);

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Plus, Package, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ItemMasterTable } from "@/components/itemmaster/ItemMasterTable";
 import { CreateItemDialog } from "@/components/itemmaster/CreateItemDialog";
+import { QboidItemConnection } from "@/components/itemmaster/QboidItemConnection";
 import { useItemMaster } from "@/hooks/useItemMaster";
 
 const ItemMaster = () => {
@@ -34,6 +35,8 @@ const ItemMaster = () => {
           Add Item
         </Button>
       </div>
+
+      <QboidItemConnection />
 
       <Card>
         <CardHeader>

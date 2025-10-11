@@ -9,4 +9,5 @@ export interface Item {
   weight: number;
   category: string;
   isActive: boolean;
+  dimensionsUpdatedAt?: string;
 }

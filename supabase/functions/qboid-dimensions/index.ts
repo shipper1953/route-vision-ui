@@ -4,28 +4,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const corsHeaders = {
   'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*', // In production, set this to your specific domain
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qboid-token',
 }
 
 interface QboidData {
-  timestamp: string;       // Format: "YYYY/MM/DD HH:MM:SS"
-  l: number;               // Length in mm
-  w: number;               // Width in mm
-  h: number;               // Height in mm
-  weight?: number;         // Weight in grams
-  barcode?: string;        // Optional barcode
-  shape?: string;          // Shape description
-  device: string;          // Device ID
-  note?: string;           // Optional note
-  attributes?: {           // Optional attributes
-    [key: string]: string; 
-  };
-  image?: string;          // Optional base64 encoded image
-  imagecolor?: string;     // Optional base64 encoded color image
-  imageseg?: string;       // Optional base64 encoded segmented image
-  orderId?: string;        // Custom field: order ID reference
+  timestamp: string;
+  l: number;
+  w: number;
+  h: number;
+  weight?: number;
+  barcode?: string;
+  device: string;
+  note?: string;
 }
 
 console.log('Qboid dimensions API endpoint loaded');
@@ -99,79 +91,124 @@ serve(async (req) => {
       // Set up Supabase client
       const supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
 
-      // Convert mm to inches for compatibility with our system
+      // Convert mm to inches
       const dimensions = {
-        length: parseFloat((qboidData.l / 25.4).toFixed(2)),  // mm to inches
-        width: parseFloat((qboidData.w / 25.4).toFixed(2)),   // mm to inches
-        height: parseFloat((qboidData.h / 25.4).toFixed(2)),  // mm to inches
-        weight: qboidData.weight ? parseFloat((qboidData.weight / 28.35).toFixed(2)) : 0  // g to oz, default to 0
+        length: parseFloat((qboidData.l / 25.4).toFixed(2)),
+        width: parseFloat((qboidData.w / 25.4).toFixed(2)),
+        height: parseFloat((qboidData.h / 25.4).toFixed(2)),
+        weight: qboidData.weight ? parseFloat((qboidData.weight / 453.592).toFixed(2)) : 0
       };
       
-      // If weight is not provided, use a default
-      if (!dimensions.weight) {
-        dimensions.weight = parseFloat((dimensions.length * dimensions.width * dimensions.height * 0.02).toFixed(2));
-        console.log(`Weight not provided, estimated as ${dimensions.weight}oz`);
-      }
+      // If barcode provided, try to update item
+      if (qboidData.barcode) {
+        const { data: item, error: lookupError } = await supabaseClient
+          .from('items')
+          .select('*')
+          .eq('sku', qboidData.barcode)
+          .single();
         
-      // Store in database for future reference
-      try {
-        const { error: saveError } = await supabaseClient
-          .from('shipments')
-          .insert({
-            dimensions: dimensions,
-            weight: dimensions.weight,
-            created_at: new Date().toISOString(),
-            status: 'dimensions_captured',
-            order_id: qboidData.orderId ? parseInt(qboidData.orderId.replace(/\D/g, '')) : null,
-            barcode: qboidData.barcode || null,
-            easypost_id: null
+        if (lookupError || !item) {
+          console.error('Item not found for SKU:', qboidData.barcode);
+          
+          // Store pending dimensions in qboid_events
+          await supabaseClient
+            .from('qboid_events')
+            .insert({
+              event_type: 'item_sku_not_found',
+              data: {
+                dimensions: dimensions,
+                sku: qboidData.barcode,
+                timestamp: qboidData.timestamp || new Date().toISOString()
+              }
+            });
+          
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'SKU not found in catalog',
+            sku: qboidData.barcode,
+            data: { dimensions }
+          }), {
+            headers: corsHeaders,
+            status: 404,
           });
-        
-        if (saveError) {
-          console.error('Error saving dimensions to database:', saveError);
-        } else {
-          console.log('Dimensions saved successfully');
         }
-      } catch (err) {
-        console.error('Failed to save dimensions:', err);
-        // Don't fail the request if we can't save to the database
-      }
-      
-      // Try to push data to any connected clients via Supabase realtime
-      try {
+        
+        // Update item dimensions
+        const { error: updateError } = await supabaseClient
+          .from('items')
+          .update({
+            length: dimensions.length,
+            width: dimensions.width,
+            height: dimensions.height,
+            weight: dimensions.weight,
+            dimensions_updated_at: new Date().toISOString()
+          })
+          .eq('id', item.id);
+        
+        if (updateError) {
+          console.error('Error updating item:', updateError);
+          return new Response(JSON.stringify({ 
+            error: 'Failed to update item dimensions' 
+          }), {
+            headers: corsHeaders,
+            status: 500,
+          });
+        }
+        
+        // Publish realtime event
         await supabaseClient
           .from('qboid_events')
           .insert({
-            event_type: 'dimensions_received',
+            event_type: 'item_dimensions_updated',
             data: {
+              item_id: item.id,
+              sku: qboidData.barcode,
+              name: item.name,
               dimensions: dimensions,
-              timestamp: qboidData.timestamp || new Date().toISOString(),
-              barcode: qboidData.barcode || null,
-              orderId: qboidData.orderId || null
+              timestamp: qboidData.timestamp || new Date().toISOString()
             }
           });
-      } catch (err) {
-        console.error('Failed to publish realtime event:', err);
-        // Continue anyway
+        
+        console.log(`Item ${item.sku} dimensions updated successfully`);
+        
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Item dimensions updated successfully',
+          data: {
+            item_id: item.id,
+            sku: item.sku,
+            name: item.name,
+            dimensions: dimensions,
+            timestamp: qboidData.timestamp || new Date().toISOString()
+          }
+        }), {
+          headers: corsHeaders,
+          status: 200,
+        });
+      } else {
+        // No barcode, store pending dimensions
+        await supabaseClient
+          .from('qboid_events')
+          .insert({
+            event_type: 'dimensions_pending',
+            data: {
+              dimensions: dimensions,
+              timestamp: qboidData.timestamp || new Date().toISOString()
+            }
+          });
+        
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Dimensions captured. Please scan barcode to link to item.',
+          data: { dimensions }
+        }), {
+          headers: corsHeaders,
+          status: 200,
+        });
       }
-      
-      // Return success response with the processed data
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'Package dimensions received successfully',
-        data: {
-          dimensions: dimensions,
-          timestamp: qboidData.timestamp || new Date().toISOString(),
-          barcode: qboidData.barcode || null,
-          orderId: qboidData.orderId || null,
-        }
-      }), {
-        headers: corsHeaders,
-        status: 200,
-      });
     }
     
     // If we get here, the request was invalid

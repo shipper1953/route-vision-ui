@@ -1,12 +1,14 @@
-
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Package } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Edit, Trash2, Package, Printer } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { EditItemDialog } from "./EditItemDialog";
+import { BarcodePrintDialog } from "./BarcodePrintDialog";
 import { Item } from "@/types/itemMaster";
+import { formatDistanceToNow } from "date-fns";
 
 interface ItemMasterTableProps {
   items: Item[];
@@ -17,6 +19,9 @@ interface ItemMasterTableProps {
 
 export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMasterTableProps) => {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printItems, setPrintItems] = useState<Item[]>([]);
 
   if (loading) {
     return (
@@ -40,21 +45,74 @@ export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMast
   };
 
   const getWeightColor = (weight: number) => {
-    if (weight > 50) return "bg-red-100 text-red-800";
-    if (weight > 20) return "bg-yellow-100 text-yellow-800";
-    return "bg-green-100 text-green-800";
+    if (weight > 50) return "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-100";
+    if (weight > 20) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-100";
+    return "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-100";
   };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedItems(new Set(items.map(item => item.id)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleSelectItem = (itemId: string, checked: boolean) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(itemId);
+    } else {
+      newSelected.delete(itemId);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handlePrintSelected = () => {
+    const itemsToPrint = items.filter(item => selectedItems.has(item.id));
+    setPrintItems(itemsToPrint);
+    setPrintDialogOpen(true);
+  };
+
+  const handlePrintSingle = (item: Item) => {
+    setPrintItems([item]);
+    setPrintDialogOpen(true);
+  };
+
+  const allSelected = items.length > 0 && selectedItems.size === items.length;
+  const someSelected = selectedItems.size > 0 && selectedItems.size < items.length;
 
   return (
     <>
+      {selectedItems.size > 0 && (
+        <div className="mb-4 p-3 bg-primary/10 rounded-lg flex items-center justify-between">
+          <span className="text-sm font-medium">
+            {selectedItems.size} item{selectedItems.size > 1 ? 's' : ''} selected
+          </span>
+          <Button onClick={handlePrintSelected} size="sm">
+            <Printer className="h-4 w-4 mr-2" />
+            Print Barcodes
+          </Button>
+        </div>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-12">
+              <Checkbox
+                checked={allSelected}
+                onCheckedChange={handleSelectAll}
+                aria-label="Select all"
+                className={someSelected ? "data-[state=checked]:bg-primary/50" : ""}
+              />
+            </TableHead>
             <TableHead>SKU</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Dimensions (L×W×H)</TableHead>
             <TableHead>Weight</TableHead>
             <TableHead>Category</TableHead>
+            <TableHead>Dims Updated</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -62,6 +120,13 @@ export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMast
         <TableBody>
           {items.map((item) => (
             <TableRow key={item.id}>
+              <TableCell>
+                <Checkbox
+                  checked={selectedItems.has(item.id)}
+                  onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                  aria-label={`Select ${item.name}`}
+                />
+              </TableCell>
               <TableCell className="font-mono">{item.sku}</TableCell>
               <TableCell className="font-semibold">{item.name}</TableCell>
               <TableCell>{formatDimensions(item)}</TableCell>
@@ -74,12 +139,29 @@ export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMast
                 <Badge variant="outline">{item.category}</Badge>
               </TableCell>
               <TableCell>
+                {item.dimensionsUpdatedAt ? (
+                  <span className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(item.dimensionsUpdatedAt), { addSuffix: true })}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Never</span>
+                )}
+              </TableCell>
+              <TableCell>
                 <Badge variant={item.isActive ? "default" : "secondary"}>
                   {item.isActive ? "Active" : "Inactive"}
                 </Badge>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handlePrintSingle(item)}
+                    title="Print barcode"
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -106,6 +188,15 @@ export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMast
         isOpen={!!editingItem}
         onClose={() => setEditingItem(null)}
         onUpdate={onUpdate}
+      />
+
+      <BarcodePrintDialog
+        items={printItems}
+        isOpen={printDialogOpen}
+        onClose={() => {
+          setPrintDialogOpen(false);
+          setPrintItems([]);
+        }}
       />
     </>
   );
