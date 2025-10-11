@@ -20,13 +20,29 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
   };
 
   const generateZPL = (item: Item): string => {
-    // Generate ZPL code for barcode label (4" x 2" at 203 DPI)
-    // Label size: 812 x 406 dots (center point: 406, 203)
-    // Barcode and name centered both horizontally and vertically as a group
+    // Label specifications (4" x 2" at 203 DPI)
+    const labelWidth = 812;
+    const labelCenterX = labelWidth / 2; // 406
+    
+    // Barcode specifications
+    const moduleWidth = 4; // ^BY4
+    const barcodeHeight = 90;
+    const skuLength = item.sku.length;
+    
+    // Calculate barcode width for Code 128: (11 * characters + 35) * module_width
+    const barcodeWidth = (11 * skuLength + 35) * moduleWidth;
+    
+    // Calculate starting X position to center the barcode
+    const barcodeStartX = Math.round(labelCenterX - (barcodeWidth / 2));
+    
+    // Vertical positioning
+    const barcodeY = 80; // Upper portion of label
+    const nameY = 330; // Near bottom of label
+    
     return `^XA
-^FO250,120^BY4^BCN,90,Y,N,N
+^FO${barcodeStartX},${barcodeY}^BY${moduleWidth}^BCN,${barcodeHeight},Y,N,N
 ^FD${item.sku}^FS
-^FO0,250^FB812,1,0,C,0^A0N,40,40^FD${item.name}^FS
+^FO0,${nameY}^FB${labelWidth},1,0,C,0^A0N,40,40^FD${item.name}^FS
 ^XZ`;
   };
 
