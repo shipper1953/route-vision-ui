@@ -10,6 +10,8 @@ export interface PrintNodePrinter {
   state: string;
 }
 
+const STORAGE_KEY = 'printnode_selected_printer_id';
+
 export const usePrintNode = () => {
   const [printers, setPrinters] = useState<PrintNodePrinter[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<number | null>(null);
@@ -17,6 +19,11 @@ export const usePrintNode = () => {
 
   useEffect(() => {
     loadPrinters();
+    // Load saved printer from localStorage
+    const savedPrinterId = localStorage.getItem(STORAGE_KEY);
+    if (savedPrinterId) {
+      setSelectedPrinter(parseInt(savedPrinterId));
+    }
   }, []);
 
   const loadPrinters = async () => {
@@ -31,10 +38,18 @@ export const usePrintNode = () => {
 
       if (data?.printers) {
         setPrinters(data.printers);
-        // Auto-select default printer
-        const defaultPrinter = data.printers.find((p: PrintNodePrinter) => p.default);
-        if (defaultPrinter) {
-          setSelectedPrinter(defaultPrinter.id);
+        // Auto-select saved printer or default printer
+        const savedPrinterId = localStorage.getItem(STORAGE_KEY);
+        if (savedPrinterId) {
+          const savedPrinter = data.printers.find((p: PrintNodePrinter) => p.id === parseInt(savedPrinterId));
+          if (savedPrinter) {
+            setSelectedPrinter(savedPrinter.id);
+          }
+        } else {
+          const defaultPrinter = data.printers.find((p: PrintNodePrinter) => p.default);
+          if (defaultPrinter) {
+            setSelectedPrinter(defaultPrinter.id);
+          }
         }
       }
     } catch (error) {
@@ -124,10 +139,16 @@ export const usePrintNode = () => {
     });
   };
 
+  const saveSelectedPrinter = (printerId: number) => {
+    setSelectedPrinter(printerId);
+    localStorage.setItem(STORAGE_KEY, printerId.toString());
+    toast.success('Default printer updated');
+  };
+
   return {
     printers,
     selectedPrinter,
-    setSelectedPrinter,
+    setSelectedPrinter: saveSelectedPrinter,
     loading,
     loadPrinters,
     printPDF,

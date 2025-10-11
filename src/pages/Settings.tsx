@@ -8,6 +8,7 @@ import { CartonizationTestingEnvironment } from "@/components/cartonization/Cart
 import { PackagingAlgorithm } from "@/components/cartonization/PackagingAlgorithm";
 import { BoxRecommendations } from "@/components/cartonization/BoxRecommendations";
 import { HistoricalBoxUsageSimplified } from "@/components/packaging/HistoricalBoxUsageSimplified";
+import { PrintNodeSettings } from "@/components/settings/PrintNodeSettings";
 import { useCartonization } from "@/hooks/useCartonization";
 
 const Settings = () => {
@@ -33,7 +34,7 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto gap-1 p-1">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto gap-1 p-1">
             <TabsTrigger value="historical-usage" className="text-xs sm:text-sm whitespace-nowrap px-2 py-2">
               Historical
             </TabsTrigger>
@@ -48,6 +49,9 @@ const Settings = () => {
             </TabsTrigger>
             <TabsTrigger value="testing" className="text-xs sm:text-sm whitespace-nowrap px-2 py-2">
               Testing
+            </TabsTrigger>
+            <TabsTrigger value="printer" className="text-xs sm:text-sm whitespace-nowrap px-2 py-2">
+              Printer
             </TabsTrigger>
           </TabsList>
           
@@ -75,6 +79,10 @@ const Settings = () => {
           
           <TabsContent value="testing" className="space-y-4">
             <CartonizationTestingEnvironment />
+          </TabsContent>
+          
+          <TabsContent value="printer" className="space-y-4">
+            <PrintNodeSettings />
           </TabsContent>
         </Tabs>
       </div>
