@@ -34,7 +34,8 @@ serve(async (req) => {
       'easypost-files.s3-us-west-2.amazonaws.com',
       'shippo-delivery-east.s3.amazonaws.com',
       'shippo-delivery-west.s3.amazonaws.com',
-      'goshippo-production.s3.amazonaws.com'
+      'goshippo-production.s3.amazonaws.com',
+      'deliver.goshippo.com'
     ];
 
     const urlObj = new URL(labelUrl);
