@@ -21,10 +21,10 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
 
   const generateZPL = (item: Item): string => {
     // Generate ZPL code for barcode label (4" x 2" at 203 DPI)
-    // Label size: 812 x 406 dots
-    // Barcode centered and filling ~70% of label, name at bottom
+    // Label size: 812 x 406 dots (center point: 406, 203)
+    // Both barcode and name centered horizontally, name near bottom
     return `^XA
-^FO150,40^BY5^BCN,200,Y,N,N
+^FO180,40^BY5^BCN,200,Y,N,N
 ^FD${item.sku}^FS
 ^FO0,330^FB812,1,0,C,0^A0N,40,40^FD${item.name}^FS
 ^XZ`;
