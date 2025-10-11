@@ -33,7 +33,49 @@ export const QboidItemConnection = () => {
     updatedItems: [] 
   });
 
+  // Load recent events on mount
   useEffect(() => {
+    const loadRecentEvents = async () => {
+      console.log('Loading recent Qboid events...');
+      const { data, error } = await supabase
+        .from('qboid_events')
+        .select('*')
+        .eq('event_type', 'item_dimensions_updated')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error('Error loading recent events:', error);
+        return;
+      }
+
+      console.log('Recent events loaded:', data);
+
+      if (data && data.length > 0) {
+        const recentItems: UpdatedItem[] = data.map(event => {
+          const eventData = event.data as any;
+          return {
+            sku: eventData.sku,
+            name: eventData.name || eventData.sku,
+            dimensions: eventData.dimensions,
+            timestamp: eventData.timestamp || event.created_at,
+            item_id: eventData.item_id
+          };
+        });
+
+        setStatus(prev => ({
+          ...prev,
+          connected: true,
+          updatedItems: recentItems
+        }));
+      }
+    };
+
+    loadRecentEvents();
+  }, []);
+
+  useEffect(() => {
+    console.log('Setting up Qboid realtime subscription...');
     const channel = supabase
       .channel('qboid-item-updates')
       .on(
@@ -44,10 +86,11 @@ export const QboidItemConnection = () => {
           table: 'qboid_events'
         },
         (payload: any) => {
-          console.log('Qboid event received:', payload);
+          console.log('Qboid realtime event received:', payload);
           const eventData = payload.new;
 
           if (eventData.event_type === 'dimensions_pending') {
+            console.log('Dimensions pending event:', eventData.data);
             setStatus(prev => ({
               ...prev,
               connected: true,
@@ -56,6 +99,7 @@ export const QboidItemConnection = () => {
             }));
             toast.info('Dimensions captured! Scan barcode to link to item.');
           } else if (eventData.event_type === 'item_dimensions_updated') {
+            console.log('Item updated event:', eventData.data);
             const newItem: UpdatedItem = {
               sku: eventData.data.sku,
               name: eventData.data.name || eventData.data.sku,
