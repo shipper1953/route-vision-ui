@@ -1,8 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarcodeGenerator } from './BarcodeGenerator';
 import { Item } from '@/types/itemMaster';
-import { Printer } from 'lucide-react';
+import { Printer, Send } from 'lucide-react';
+import { usePrintNode } from '@/hooks/usePrintNode';
 
 interface BarcodePrintDialogProps {
   items: Item[];
@@ -11,22 +13,81 @@ interface BarcodePrintDialogProps {
 }
 
 export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialogProps) => {
+  const { printers, selectedPrinter, setSelectedPrinter, loading, printZPL } = usePrintNode();
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const generateZPL = (item: Item): string => {
+    // Generate ZPL code for barcode label (2" x 1")
+    return `^XA
+^FO50,30^BY2^BCN,60,Y,N,N
+^FD${item.sku}^FS
+^FO50,100^A0N,20,20^FD${item.name}^FS
+^XZ`;
+  };
+
+  const handlePrintNode = async () => {
+    if (!selectedPrinter) {
+      return;
+    }
+
+    for (const item of items) {
+      const zplCode = generateZPL(item);
+      await printZPL(zplCode, `Barcode: ${item.sku}`);
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Print Barcodes ({items.length})</span>
-            <Button onClick={handlePrint} size="sm">
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-          </DialogTitle>
+          <DialogTitle>Print Barcodes ({items.length})</DialogTitle>
         </DialogHeader>
+
+        {/* PrintNode Printer Selection */}
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Direct Print to Label Printer</label>
+            <div className="flex gap-2">
+              <Select
+                value={selectedPrinter?.toString()}
+                onValueChange={(value) => setSelectedPrinter(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select printer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {printers.map((printer) => (
+                    <SelectItem key={printer.id} value={printer.id.toString()}>
+                      {printer.name} {printer.default ? '(Default)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button 
+                onClick={handlePrintNode} 
+                disabled={!selectedPrinter || loading}
+                size="sm"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send to Printer
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex-1 border-t" />
+            <span className="text-xs text-muted-foreground">OR</span>
+            <div className="flex-1 border-t" />
+          </div>
+
+          <Button onClick={handlePrint} variant="outline" className="w-full">
+            <Printer className="h-4 w-4 mr-2" />
+            Print via Browser
+          </Button>
+        </div>
 
         <div className="print-content">
           <div className="space-y-4">

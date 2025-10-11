@@ -1,11 +1,13 @@
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { FileText, Printer, PackageCheck } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Printer, PackageCheck, Send } from "lucide-react";
 import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { usePrintNode } from "@/hooks/usePrintNode";
 
 interface OrderDetails {
   carrier: string;
@@ -33,6 +35,7 @@ export const ShippingLabelDialog = ({
   const [loading, setLoading] = useState(false);
   const [iframeError, setIframeError] = useState(false);
   const navigate = useNavigate();
+  const { printers, selectedPrinter, setSelectedPrinter, loading: printLoading, printPDF } = usePrintNode();
   
   const getProxyUrl = (originalUrl: string) => {
     // Use environment variable to construct the Supabase URL to avoid Chrome blocking issues  
@@ -87,6 +90,12 @@ export const ShippingLabelDialog = ({
     onClose();
   };
 
+  const handlePrintNode = async () => {
+    if (!labelUrl) return;
+    const proxyUrl = getProxyUrl(labelUrl);
+    await printPDF(proxyUrl, `Shipping Label ${shipmentId}`);
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent className="sm:max-w-md w-full overflow-y-auto">
@@ -136,16 +145,53 @@ export const ShippingLabelDialog = ({
                 </div>
               )}
               
-              {/* Action Buttons - Prominent placement */}
+              {/* PrintNode Direct Print */}
+              <div className="w-full space-y-2 bg-slate-50 p-3 rounded-lg">
+                <label className="text-sm font-medium">Direct Print to Label Printer</label>
+                <div className="flex gap-2">
+                  <Select
+                    value={selectedPrinter?.toString()}
+                    onValueChange={(value) => setSelectedPrinter(Number(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select printer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {printers.map((printer) => (
+                        <SelectItem key={printer.id} value={printer.id.toString()}>
+                          {printer.name} {printer.default ? '(Default)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    onClick={handlePrintNode}
+                    disabled={!selectedPrinter || printLoading}
+                    size="sm"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Send to Printer
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex-1 border-t" />
+                <span className="text-xs text-muted-foreground">OR</span>
+                <div className="flex-1 border-t" />
+              </div>
+
+              {/* Action Buttons */}
               <div className="w-full space-y-2">
                 <div className="flex gap-2">
                   <Button 
                     onClick={handleDownload}
+                    variant="outline"
                     className="flex items-center gap-2 flex-1"
                     disabled={loading}
                   >
                     <FileText className="h-4 w-4" />
-                    {loading ? "Downloading..." : "Download Label"}
+                    {loading ? "Downloading..." : "Download"}
                   </Button>
                   <Button 
                     onClick={handlePrint}
@@ -153,7 +199,7 @@ export const ShippingLabelDialog = ({
                     className="flex items-center gap-2 flex-1"
                   >
                     <Printer className="h-4 w-4" />
-                    Print Label
+                    Browser Print
                   </Button>
                 </div>
               </div>
