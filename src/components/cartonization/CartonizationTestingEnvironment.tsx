@@ -214,12 +214,23 @@ export const CartonizationTestingEnvironment = () => {
       const selectedOrder = orders.find(o => o.id.toString() === orderId);
       if (selectedOrder && selectedOrder.items) {
         const orderItems = Array.isArray(selectedOrder.items) ? selectedOrder.items : [];
-        const formattedItems = orderItems.map((item: any) => ({
-          sku: item.name || item.sku || 'Unknown',
-          quantity: item.quantity || 1,
-          dimensions: `${item.length || 0}x${item.width || 0}x${item.height || 0}`,
-          weight: (item.weight || 0).toString()
-        }));
+        const formattedItems = orderItems.map((item: any) => {
+          // Look up item from available items to get dimensions
+          const masterItem = availableItems.find(
+            ai => ai.sku === item.sku || ai.name === item.name || ai.sku === item.name
+          );
+          
+          return {
+            sku: item.name || item.sku || 'Unknown',
+            quantity: item.quantity || 1,
+            dimensions: masterItem 
+              ? `${masterItem.length}x${masterItem.width}x${masterItem.height}`
+              : `${item.length || 0}x${item.width || 0}x${item.height || 0}`,
+            weight: masterItem 
+              ? masterItem.weight.toString() 
+              : (item.weight || 0).toString()
+          };
+        });
 
         setTestScenario(prev => ({
           ...prev,
