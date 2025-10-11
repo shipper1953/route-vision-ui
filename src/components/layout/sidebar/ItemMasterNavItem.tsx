@@ -2,14 +2,14 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useState, useRef } from "react";
-import { ShoppingCart, ChevronRight } from "lucide-react";
+import { Database, ChevronRight } from "lucide-react";
 
-export const OrdersNavItem = () => {
+export const ItemMasterNavItem = () => {
   const location = useLocation();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const [isHovered, setIsHovered] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
-  const isActive = location.pathname.startsWith('/orders');
+  const isActive = location.pathname.startsWith('/item-master');
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -26,9 +26,8 @@ export const OrdersNavItem = () => {
   };
 
   const submenuItems = [
-    { label: "Single Orders", path: "/orders" },
-    { label: "Bulk Ship", path: "/orders/bulk-ship" },
-    { label: "Create Order", path: "/orders/create" }
+    { label: "Create Item", path: "/item-master/create" },
+    { label: "Items", path: "/item-master" }
   ];
 
   return (
@@ -39,7 +38,6 @@ export const OrdersNavItem = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       {isCollapsed ? (
-        // Collapsed state - show icon with tooltip submenu
         <>
           <div
             className={cn(
@@ -49,7 +47,7 @@ export const OrdersNavItem = () => {
                 : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
             )}
           >
-            <ShoppingCart size={20} />
+            <Database size={20} />
           </div>
 
           {isHovered && (
@@ -79,7 +77,6 @@ export const OrdersNavItem = () => {
           )}
         </>
       ) : (
-        // Expanded state - show with submenu on hover
         <>
           <div
             className={cn(
@@ -89,8 +86,8 @@ export const OrdersNavItem = () => {
                 : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
             )}
           >
-            <ShoppingCart size={20} />
-            <span className="flex-1">Orders</span>
+            <Database size={20} />
+            <span className="flex-1">Item Master</span>
             <ChevronRight size={16} className="text-sidebar-foreground/60" />
           </div>
 

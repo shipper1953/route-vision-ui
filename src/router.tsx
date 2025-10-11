@@ -63,10 +63,14 @@ const router = createBrowserRouter([
     path: "/shipments/create",
     element: <CreateShipment />,
   },
-  {
-    path: "/item-master",
-    element: <ItemMaster />,
-  },
+    {
+      path: "/item-master",
+      element: <ItemMaster />,
+    },
+    {
+      path: "/item-master/create",
+      element: <ItemMaster />,
+    },
   {
     path: "/users",
     element: <Users />,

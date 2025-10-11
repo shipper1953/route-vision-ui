@@ -29,8 +29,8 @@ export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false,
   const handleClick = (e: React.MouseEvent) => {
     // Prevent event from bubbling up to the sidebar container
     e.stopPropagation();
-    // Don't expand sidebar when clicking on nav items while collapsed
-    // Only the empty blue area should expand it
+    // Auto-collapse sidebar on selection
+    setIsCollapsed(true);
   };
 
   // Calculate tooltip position

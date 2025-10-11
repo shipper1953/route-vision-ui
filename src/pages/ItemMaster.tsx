@@ -1,5 +1,6 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,23 @@ const ItemMaster = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { items, loading, createItem, updateItem, deleteItem } = useItemMaster();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Auto-open create dialog if route is /item-master/create
+  useEffect(() => {
+    if (location.pathname === '/item-master/create') {
+      setShowCreateDialog(true);
+    }
+  }, [location.pathname]);
+
+  const handleCloseDialog = () => {
+    setShowCreateDialog(false);
+    // Navigate back to /item-master when closing dialog
+    if (location.pathname === '/item-master/create') {
+      navigate('/item-master');
+    }
+  };
 
   const filteredItems = items.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -73,7 +91,7 @@ const ItemMaster = () => {
 
       <CreateItemDialog
         isOpen={showCreateDialog}
-        onClose={() => setShowCreateDialog(false)}
+        onClose={handleCloseDialog}
         onCreateItem={createItem}
       />
     </TmsLayout>

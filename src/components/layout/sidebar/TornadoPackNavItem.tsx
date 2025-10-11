@@ -2,14 +2,14 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useState, useRef } from "react";
-import { ShoppingCart, ChevronRight } from "lucide-react";
+import { Box, ChevronRight } from "lucide-react";
 
-export const OrdersNavItem = () => {
+export const TornadoPackNavItem = () => {
   const location = useLocation();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const [isHovered, setIsHovered] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
-  const isActive = location.pathname.startsWith('/orders');
+  const isActive = location.pathname.startsWith('/packaging');
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -26,9 +26,12 @@ export const OrdersNavItem = () => {
   };
 
   const submenuItems = [
-    { label: "Single Orders", path: "/orders" },
-    { label: "Bulk Ship", path: "/orders/bulk-ship" },
-    { label: "Create Order", path: "/orders/create" }
+    { label: "Historical", path: "/packaging?tab=historical-usage" },
+    { label: "Inventory", path: "/packaging?tab=box-inventory" },
+    { label: "Recommendations", path: "/packaging?tab=box-recommendations" },
+    { label: "Rules", path: "/packaging?tab=packaging-rules" },
+    { label: "Testing", path: "/packaging?tab=testing" },
+    { label: "Printer", path: "/packaging?tab=printer" }
   ];
 
   return (
@@ -39,7 +42,6 @@ export const OrdersNavItem = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       {isCollapsed ? (
-        // Collapsed state - show icon with tooltip submenu
         <>
           <div
             className={cn(
@@ -49,12 +51,12 @@ export const OrdersNavItem = () => {
                 : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
             )}
           >
-            <ShoppingCart size={20} />
+            <Box size={20} />
           </div>
 
           {isHovered && (
             <div
-              className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[160px]"
+              className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[180px]"
               style={getTooltipPosition()}
             >
               <div className="py-1">
@@ -79,7 +81,6 @@ export const OrdersNavItem = () => {
           )}
         </>
       ) : (
-        // Expanded state - show with submenu on hover
         <>
           <div
             className={cn(
@@ -89,14 +90,14 @@ export const OrdersNavItem = () => {
                 : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
             )}
           >
-            <ShoppingCart size={20} />
-            <span className="flex-1">Orders</span>
+            <Box size={20} />
+            <span className="flex-1">Tornado Pack</span>
             <ChevronRight size={16} className="text-sidebar-foreground/60" />
           </div>
 
           {isHovered && (
             <div
-              className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[160px]"
+              className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[180px]"
               style={getTooltipPosition()}
             >
               <div className="py-1">
