@@ -79,7 +79,8 @@ export const useShipment = (initialOrderId?: string | null) => {
         shipmentId,
         error: error?.message || String(error),
       });
-      toast.error('Failed to purchase label');
+      const errorMessage = error?.message || 'Failed to purchase label';
+      toast.error(errorMessage);
       throw error;
     }
   };
