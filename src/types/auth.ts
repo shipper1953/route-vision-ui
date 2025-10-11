@@ -52,6 +52,8 @@ export interface Warehouse {
   id: string;
   company_id: string;
   name: string;
+  phone?: string;
+  email?: string;
   address: any;
   is_default: boolean;
   created_at: string;

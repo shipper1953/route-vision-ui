@@ -1145,27 +1145,33 @@ export type Database = {
           address: Json
           company_id: string
           created_at: string
+          email: string | null
           id: string
           is_default: boolean | null
           name: string
+          phone: string | null
           updated_at: string
         }
         Insert: {
           address: Json
           company_id: string
           created_at?: string
+          email?: string | null
           id?: string
           is_default?: boolean | null
           name: string
+          phone?: string | null
           updated_at?: string
         }
         Update: {
           address?: Json
           company_id?: string
           created_at?: string
+          email?: string | null
           id?: string
           is_default?: boolean | null
           name?: string
+          phone?: string | null
           updated_at?: string
         }
         Relationships: [

@@ -24,6 +24,8 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
   const [newWarehouse, setNewWarehouse] = useState({
     name: '',
+    phone: '',
+    email: '',
     address: {
       street1: '',
       street2: '',
@@ -75,6 +77,8 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
       setWarehouses([data, ...warehouses]);
       setNewWarehouse({
         name: '',
+        phone: '',
+        email: '',
         address: {
           street1: '',
           street2: '',
@@ -135,6 +139,8 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
         .from('warehouses')
         .update({
           name: editingWarehouse.name,
+          phone: editingWarehouse.phone,
+          email: editingWarehouse.email,
           address: editingWarehouse.address,
         })
         .eq('id', editingWarehouse.id);
@@ -188,6 +194,28 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                     onChange={(e) => setNewWarehouse({ ...newWarehouse, name: e.target.value })}
                     placeholder="Enter warehouse name"
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="warehouse-phone">Phone</Label>
+                    <Input
+                      id="warehouse-phone"
+                      value={newWarehouse.phone}
+                      onChange={(e) => setNewWarehouse({ ...newWarehouse, phone: e.target.value })}
+                      placeholder="555-123-4567"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="warehouse-email">Email</Label>
+                    <Input
+                      id="warehouse-email"
+                      type="email"
+                      value={newWarehouse.email}
+                      onChange={(e) => setNewWarehouse({ ...newWarehouse, email: e.target.value })}
+                      placeholder="warehouse@company.com"
+                    />
+                  </div>
                 </div>
                 
                 <div className="space-y-4">
@@ -280,6 +308,34 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                   placeholder="Enter warehouse name"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-warehouse-phone">Phone</Label>
+                  <Input
+                    id="edit-warehouse-phone"
+                    value={editingWarehouse.phone || ''}
+                    onChange={(e) => setEditingWarehouse({ 
+                      ...editingWarehouse, 
+                      phone: e.target.value 
+                    })}
+                    placeholder="555-123-4567"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-warehouse-email">Email</Label>
+                  <Input
+                    id="edit-warehouse-email"
+                    type="email"
+                    value={editingWarehouse.email || ''}
+                    onChange={(e) => setEditingWarehouse({ 
+                      ...editingWarehouse, 
+                      email: e.target.value 
+                    })}
+                    placeholder="warehouse@company.com"
+                  />
+                </div>
+              </div>
               
               <div className="space-y-4">
                 <h4 className="font-medium">Address</h4>
@@ -369,6 +425,7 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Contact</TableHead>
                 <TableHead>Address</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
@@ -378,6 +435,12 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
               {warehouses.map((warehouse) => (
                 <TableRow key={warehouse.id}>
                   <TableCell className="font-medium">{warehouse.name}</TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      {warehouse.phone && <div>{warehouse.phone}</div>}
+                      {warehouse.email && <div className="text-muted-foreground">{warehouse.email}</div>}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="text-sm">
                       {warehouse.address.street1}
