@@ -29,7 +29,7 @@ export const usePrintNode = () => {
   const loadPrinters = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('printnode-print');
+      const { data, error } = await supabase.functions.invoke('printnode-print?action=list-printers');
 
       if (error) throw error;
 
