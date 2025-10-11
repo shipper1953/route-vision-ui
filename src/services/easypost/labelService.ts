@@ -34,6 +34,7 @@ export class LabelService {
     service?: string;
     to: any;
     from: any;
+    selectedRates?: Array<{ shipmentId: string; rateId: string; provider: string }>;
   }): Promise<any> {
     try {
       if (!this.useEdgeFunctions) {
@@ -172,10 +173,43 @@ export class LabelService {
     service?: string;
     to: any;
     from: any;
+    selectedRates?: Array<{ shipmentId: string; rateId: string; provider: string }>;
   }): Promise<{ results: any[]; errors: any[] }> {
-    const { packages, orderId, provider, carrier, service, to, from } = params;
+    const { packages, orderId, selectedRates } = params;
     const results: any[] = [];
     const errors: any[] = [];
+
+    // If we have pre-selected rates with shipment and rate IDs, use them directly
+    if (selectedRates && selectedRates.length === packages.length) {
+      console.log('Using pre-selected rates for multi-package purchase:', selectedRates);
+      
+      for (let i = 0; i < selectedRates.length; i++) {
+        const { shipmentId, rateId, provider } = selectedRates[i];
+        
+        try {
+          console.log(`Purchasing label ${i + 1}/${selectedRates.length}:`, { shipmentId, rateId, provider });
+          
+          const result = await this.purchaseLabelViaEdgeFunction(
+            shipmentId,
+            rateId,
+            orderId,
+            provider,
+            undefined
+          );
+          
+          results.push({ purchase: result, index: i });
+        } catch (error) {
+          console.error(`Failed to purchase label for package ${i + 1}:`, error);
+          errors.push({ error: error instanceof Error ? error.message : 'Unknown error', index: i });
+        }
+      }
+      
+      return { results, errors };
+    }
+
+    // Fallback to original logic if no pre-selected rates
+    console.log('No pre-selected rates provided, fetching rates for each package...');
+    const { provider, carrier, service, to, from } = params;
     const rateService = new RateShoppingService();
 
     for (let i = 0; i < packages.length; i++) {

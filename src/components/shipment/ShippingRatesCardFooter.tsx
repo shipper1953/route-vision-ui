@@ -138,62 +138,60 @@ export const ShippingRatesCardFooter = ({
     
     try {
       const labelService = new LabelService('');
-      const purchasePromises = packageRates.map(async (pkgRate, index) => {
+      
+      // Build array of selected rates with their shipment and rate IDs
+      const selectedRates = packageRates.map((pkgRate) => {
         if (!pkgRate.selectedRate) return null;
         
-        const provider = (pkgRate.selectedRate as any)?.provider || 'easypost';
-        const carrier = pkgRate.selectedRate.carrier;
-        const service = pkgRate.selectedRate.service;
+        const selectedRate = pkgRate.selectedRate;
+        const provider = (selectedRate as any)?.provider || 'easypost';
         
-        // Get addresses from the existing shipment response
-        const epTo = (shipmentResponse as any)?.easypost_shipment?.to_address;
-        const epFrom = (shipmentResponse as any)?.easypost_shipment?.from_address;
-        
-        const toAddress = epTo || {};
-        const fromAddress = epFrom || {};
-        
-        try {
-          const result = await labelService.purchaseMultipleLabels({
-            packages: [pkgRate.dimensions],
-            orderId,
-            provider,
-            carrier,
-            service,
-            to: toAddress,
-            from: fromAddress,
-          });
-          
-          return result;
-        } catch (error) {
-          console.error(`Failed to purchase label for package ${index + 1}:`, error);
-          return { error: error instanceof Error ? error.message : 'Unknown error' };
+        // Get the correct shipment ID based on provider
+        let shipmentId: string;
+        if (provider === 'shippo') {
+          shipmentId = (selectedRate as any)?.shipment_id || (shipmentResponse as any)?.shippo_shipment?.object_id;
+        } else {
+          shipmentId = (selectedRate as any)?.shipment_id || (shipmentResponse as any)?.easypost_shipment?.id;
         }
+        
+        return {
+          shipmentId,
+          rateId: selectedRate.id,
+          provider
+        };
+      }).filter(Boolean) as Array<{ shipmentId: string; rateId: string; provider: string }>;
+      
+      console.log('Purchasing multi-package labels with selected rates:', selectedRates);
+      
+      // Get addresses from the existing shipment response
+      const epTo = (shipmentResponse as any)?.easypost_shipment?.to_address;
+      const epFrom = (shipmentResponse as any)?.easypost_shipment?.from_address;
+      
+      const result = await labelService.purchaseMultipleLabels({
+        packages: packageRates.map(pkgRate => pkgRate.dimensions),
+        orderId,
+        to: epTo || {},
+        from: epFrom || {},
+        selectedRates
       });
 
-      const results = await Promise.allSettled(purchasePromises);
-      const successfulPurchases = results
-        .filter((r, i) => r.status === 'fulfilled' && r.value && !r.value.error)
-        .map((r: any) => r.value);
-
-      // Process successful purchases into label format
+      // Process results into label format
       const labels: any[] = [];
-      successfulPurchases.forEach((result) => {
-        if (result?.results) {
-          result.results.forEach((r: any) => {
-            const p = r.purchase || r;
-            const labelUrl = p?.postage_label?.label_url || p?.label_url;
-            if (labelUrl) {
-              labels.push({
-                orderId: orderId || `Package-${labels.length + 1}`,
-                labelUrl,
-                trackingNumber: p?.tracking_code || p?.tracking_number || 'N/A',
-                carrier: p?.selected_rate?.carrier || p?.rate?.carrier || p?.carrier || 'Unknown',
-                service: p?.selected_rate?.service || p?.rate?.service || p?.service || 'Unknown',
-              });
-            }
-          });
-        }
-      });
+      if (result?.results) {
+        result.results.forEach((r: any) => {
+          const p = r.purchase || r;
+          const labelUrl = p?.postage_label?.label_url || p?.label_url;
+          if (labelUrl) {
+            labels.push({
+              orderId: orderId || `Package-${labels.length + 1}`,
+              labelUrl,
+              trackingNumber: p?.tracking_code || p?.tracking_number || 'N/A',
+              carrier: p?.selected_rate?.carrier || p?.rate?.carrier || p?.carrier || 'Unknown',
+              service: p?.selected_rate?.service || p?.rate?.service || p?.service || 'Unknown',
+            });
+          }
+        });
+      }
 
       if (labels.length > 0) {
         // Update order status if needed

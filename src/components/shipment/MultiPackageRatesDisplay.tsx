@@ -78,7 +78,14 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
         console.log(`Getting rates for package ${i + 1}:`, shipmentData);
         
         const response = await rateService.getRatesFromAllProviders(shipmentData);
-        const allRates = [...(response.rates || []), ...(response.smartRates || [])];
+        
+        // Add shipment IDs to each rate for later use
+        const allRates = [...(response.rates || []), ...(response.smartRates || [])].map(rate => ({
+          ...rate,
+          shipment_id: rate.provider === 'shippo' 
+            ? response.shippo_shipment?.object_id 
+            : response.easypost_shipment?.id
+        }));
         
         // Auto-select the cheapest rate
         const cheapestRate = allRates.reduce((prev, current) => 
