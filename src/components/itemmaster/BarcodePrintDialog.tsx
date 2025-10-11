@@ -29,21 +29,23 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
         </DialogHeader>
 
         <div className="print-content">
-          <div className="grid grid-cols-2 gap-4">
-            {items.map((item) => (
+          <div className="space-y-4">
+            {items.map((item, index) => (
               <div
                 key={item.id}
-                className="border rounded-lg p-4 bg-white barcode-label"
+                className="border rounded-lg p-2 bg-white barcode-label"
                 style={{
                   width: '2in',
                   height: '1in',
-                  pageBreakInside: 'avoid'
+                  pageBreakAfter: 'always',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
-                <div className="flex flex-col items-center justify-center h-full">
-                  <BarcodeGenerator value={item.sku} displayValue={true} height={30} width={1.5} />
-                  <p className="text-xs mt-1 truncate w-full text-center">{item.name}</p>
-                </div>
+                <BarcodeGenerator value={item.sku} displayValue={true} height={35} width={1.8} />
+                <p className="text-[8px] mt-0.5 truncate w-full text-center font-medium">{item.name}</p>
               </div>
             ))}
           </div>
@@ -51,6 +53,10 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
 
         <style dangerouslySetInnerHTML={{__html: `
           @media print {
+            @page {
+              size: 2in 1in;
+              margin: 0;
+            }
             body * {
               visibility: hidden;
             }
@@ -62,14 +68,24 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
               position: absolute;
               left: 0;
               top: 0;
-              width: 100%;
+              margin: 0;
+              padding: 0;
             }
             .barcode-label {
               width: 2in !important;
               height: 1in !important;
-              page-break-inside: avoid;
-              border: 1px solid #ddd;
-              padding: 0.1in;
+              page-break-after: always !important;
+              page-break-inside: avoid !important;
+              margin: 0 !important;
+              padding: 0.05in !important;
+              border: none !important;
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: center !important;
+              justify-content: center !important;
+            }
+            .barcode-label:last-child {
+              page-break-after: auto !important;
             }
           }
         `}} />
