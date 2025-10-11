@@ -10,7 +10,7 @@ import {
 } from "@/utils/shipmentDataUtils";
 import { sampleShipments } from "@/types/shipmentTypes";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 export const usePaginatedShipments = () => {
   const [allShipments, setAllShipments] = useState<Shipment[]>([]);
