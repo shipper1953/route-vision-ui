@@ -12,18 +12,26 @@ interface QboidDimensions {
   weight: number;
 }
 
+interface UpdatedItem {
+  sku: string;
+  name: string;
+  dimensions: QboidDimensions;
+  timestamp: string;
+  item_id: string;
+}
+
 interface QboidStatus {
   connected: boolean;
   lastScan?: string;
   pendingDimensions?: QboidDimensions;
-  lastUpdatedItem?: {
-    sku: string;
-    name: string;
-  };
+  updatedItems: UpdatedItem[];
 }
 
 export const QboidItemConnection = () => {
-  const [status, setStatus] = useState<QboidStatus>({ connected: false });
+  const [status, setStatus] = useState<QboidStatus>({ 
+    connected: false, 
+    updatedItems: [] 
+  });
 
   useEffect(() => {
     const channel = supabase
@@ -40,27 +48,35 @@ export const QboidItemConnection = () => {
           const eventData = payload.new;
 
           if (eventData.event_type === 'dimensions_pending') {
-            setStatus({
+            setStatus(prev => ({
+              ...prev,
               connected: true,
               lastScan: new Date().toLocaleString(),
               pendingDimensions: eventData.data.dimensions
-            });
+            }));
             toast.info('Dimensions captured! Scan barcode to link to item.');
           } else if (eventData.event_type === 'item_dimensions_updated') {
-            setStatus({
+            const newItem: UpdatedItem = {
+              sku: eventData.data.sku,
+              name: eventData.data.name || eventData.data.sku,
+              dimensions: eventData.data.dimensions,
+              timestamp: eventData.data.timestamp || new Date().toISOString(),
+              item_id: eventData.data.item_id
+            };
+            
+            setStatus(prev => ({
               connected: true,
               lastScan: new Date().toLocaleString(),
-              lastUpdatedItem: {
-                sku: eventData.data.sku,
-                name: eventData.data.name || eventData.data.sku
-              }
-            });
+              pendingDimensions: undefined,
+              updatedItems: [newItem, ...prev.updatedItems].slice(0, 20) // Keep last 20
+            }));
             toast.success(`Item ${eventData.data.sku} dimensions updated!`);
           } else if (eventData.event_type === 'item_sku_not_found') {
-            setStatus({
+            setStatus(prev => ({
+              ...prev,
               connected: true,
               lastScan: new Date().toLocaleString()
-            });
+            }));
             toast.error(`SKU ${eventData.data.sku} not found in catalog`);
           }
         }
@@ -106,14 +122,36 @@ export const QboidItemConnection = () => {
             </div>
           )}
 
-          {status.lastUpdatedItem && (
-            <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950 rounded-md">
-              <Package className="h-4 w-4 text-green-600 mt-0.5" />
-              <div className="flex-1 text-sm">
-                <p className="font-medium text-green-900 dark:text-green-100">
-                  {status.lastUpdatedItem.name}
-                </p>
-                <p className="text-green-700 dark:text-green-300">SKU: {status.lastUpdatedItem.sku}</p>
+          {status.updatedItems.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Package className="h-4 w-4" />
+                <span>Recently Updated Items</span>
+              </div>
+              <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2">
+                {status.updatedItems.map((item, index) => (
+                  <div 
+                    key={`${item.item_id}-${item.timestamp}-${index}`}
+                    className="p-3 bg-green-50 dark:bg-green-950 rounded-md border border-green-200 dark:border-green-800"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-green-900 dark:text-green-100">
+                          {item.sku}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(item.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-green-800 dark:text-green-200 truncate">
+                        {item.name}
+                      </p>
+                      <p className="text-xs text-green-700 dark:text-green-300">
+                        {item.dimensions.length}" × {item.dimensions.width}" × {item.dimensions.height}" | {item.dimensions.weight} lbs
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
