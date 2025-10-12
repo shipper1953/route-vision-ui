@@ -17,6 +17,16 @@ const CompanyAdminPanel = () => {
   const { isAuthenticated, isCompanyAdmin, userProfile, loading } = useAuth();
   const navigate = useNavigate();
   const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [activeTab, setActiveTab] = useState("profile");
+
+  // Handle tab from URL parameter
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, []);
 
   useEffect(() => {
     if (!loading && (!isAuthenticated || !isCompanyAdmin)) {
@@ -148,7 +158,7 @@ const CompanyAdminPanel = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="profile">Company Profile</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>

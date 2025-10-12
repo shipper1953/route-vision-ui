@@ -9,6 +9,7 @@ import { OrdersNavItem } from "./sidebar/OrdersNavItem";
 import { ShipmentsNavItem } from "./sidebar/ShipmentsNavItem";
 import { ItemMasterNavItem } from "./sidebar/ItemMasterNavItem";
 import { TornadoPackNavItem } from "./sidebar/TornadoPackNavItem";
+import { CompanyAdminNavItem } from "./sidebar/CompanyAdminNavItem";
 import { UserProfile } from "./sidebar/UserProfile";
 import { CreateMenu } from "./sidebar/CreateMenu";
 import { LogoutButton } from "./sidebar/LogoutButton";
@@ -78,7 +79,7 @@ export const TmsSidebar = () => {
                 {!isCollapsed && <h3 className="text-xs font-semibold text-sidebar-primary uppercase tracking-wider">Admin</h3>}
               </div>
               <NavItem icon={Users} label="Users" to="/users" isCollapsed={isCollapsed} />
-              {isAdmin && <NavItem icon={Shield} label="Company Admin" to="/company-admin" isCollapsed={isCollapsed} />}
+              {isAdmin && <CompanyAdminNavItem />}
               {isSuperAdmin && <NavItem icon={BarChart3} label="Super Admin" to="/super-admin" isCollapsed={isCollapsed} />}
             </>
           )}
