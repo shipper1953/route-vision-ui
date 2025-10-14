@@ -33,47 +33,67 @@ export async function fetchOrders(): Promise<OrderData[]> {
     console.log(`Found ${orders.length} orders in Supabase`);
 
     const numericOrderIds = orders.map(order => order.id);
-    const directShipmentIds = orders
-      .map(order => order.shipment_id)
-      .filter((id): id is number => typeof id === 'number' && !Number.isNaN(id));
-
-    const orderShipmentResult = await (
-      numericOrderIds.length
-        ? supabase
-            .from('order_shipments')
-            .select('order_id, shipment_id')
-            .in('order_id', numericOrderIds)
-        : Promise.resolve({ data: [] as OrderShipmentRow[], error: null })
+    const directShipmentIdSet = new Set(
+      orders
+        .map(order => order.shipment_id)
+        .filter((id): id is number => typeof id === 'number' && !Number.isNaN(id))
     );
 
-    const orderShipmentLinks = orderShipmentResult.data ?? [];
+    const orderShipmentPromise = numericOrderIds.length
+      ? supabase
+          .from('order_shipments')
+          .select('order_id, shipment_id')
+          .in('order_id', numericOrderIds)
+      : Promise.resolve({ data: [] as OrderShipmentRow[], error: null });
+
+    const directShipmentsPromise = directShipmentIdSet.size
+      ? supabase
+          .from('shipments')
+          .select('*')
+          .in('id', Array.from(directShipmentIdSet))
+      : Promise.resolve({ data: [] as ShipmentRow[], error: null });
+
+    const [orderShipmentResult, directShipmentsResult] = await Promise.all([
+      orderShipmentPromise,
+      directShipmentsPromise
+    ]);
+
     if (orderShipmentResult.error) {
       console.error('Error fetching order shipment links:', orderShipmentResult.error);
     }
 
-    const shipmentIds = new Set<number>(directShipmentIds);
+    if (directShipmentsResult.error) {
+      console.error('Error fetching direct shipments:', directShipmentsResult.error);
+    }
+
+    const orderShipmentLinks = orderShipmentResult.data ?? [];
+    const shipmentsById = new Map<number, ShipmentRow>();
+
+    (directShipmentsResult.data ?? []).forEach(shipment => {
+      shipmentsById.set(shipment.id, shipment);
+    });
+
+    const missingShipmentIds = new Set<number>();
     for (const link of orderShipmentLinks) {
-      if (link.shipment_id) {
-        shipmentIds.add(link.shipment_id);
+      if (link.shipment_id && !shipmentsById.has(link.shipment_id)) {
+        missingShipmentIds.add(link.shipment_id);
       }
     }
 
-    const shipmentsResult = shipmentIds.size
-      ? await supabase
-          .from('shipments')
-          .select('*')
-          .in('id', Array.from(shipmentIds))
-      : { data: [] as ShipmentRow[], error: null };
+    if (missingShipmentIds.size) {
+      const additionalShipmentsResult = await supabase
+        .from('shipments')
+        .select('*')
+        .in('id', Array.from(missingShipmentIds));
 
-    if (shipmentsResult.error) {
-      console.error('Error fetching shipments:', shipmentsResult.error);
+      if (additionalShipmentsResult.error) {
+        console.error('Error fetching linked shipments:', additionalShipmentsResult.error);
+      }
+
+      (additionalShipmentsResult.data ?? []).forEach(shipment => {
+        shipmentsById.set(shipment.id, shipment);
+      });
     }
-
-    const shipments = shipmentsResult.data ?? [];
-    const shipmentsById = new Map<number, ShipmentRow>();
-    shipments.forEach(shipment => {
-      shipmentsById.set(shipment.id, shipment);
-    });
 
     const linkedShipmentByOrderId = new Map<number, ShipmentRow>();
     orderShipmentLinks.forEach(link => {
