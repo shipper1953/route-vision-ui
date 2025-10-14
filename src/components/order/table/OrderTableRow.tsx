@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Eye, Package, Truck, Box, ExternalLink, Copy } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -288,39 +289,71 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
         )}
       </TableCell>
       <TableCell>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(`/orders/${order.id}`)}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(`/orders/${order.id}/edit`)}
-          >
-            <Package className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopyOrder}
-            title="Copy Order"
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-          {order.status !== 'shipped' && order.status !== 'delivered' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(`/shipments/create?orderId=${order.id}`)}
-            >
-              <Truck className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        <TooltipProvider>
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/orders/${order.id}`)}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>View order details</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/orders/${order.id}/edit`)}
+                >
+                  <Package className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Edit order</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopyOrder}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Copy order to create new</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {order.status !== 'shipped' && order.status !== 'delivered' && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/shipments/create?orderId=${order.id}`)}
+                  >
+                    <Truck className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Create shipment for this order</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </TooltipProvider>
       </TableCell>
     </TableRow>
   );

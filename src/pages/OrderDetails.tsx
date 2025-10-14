@@ -10,6 +10,7 @@ import { CustomerInfoCard } from "@/components/order/CustomerInfoCard";
 import { OrderInfoCard } from "@/components/order/OrderInfoCard";
 import { ShippingAddressCard } from "@/components/order/ShippingAddressCard";
 import { ShipmentInfoCard } from "@/components/order/ShipmentInfoCard";
+import { OrderShipmentsDetailCard } from "@/components/order/OrderShipmentsDetailCard";
 import { OrderNotFoundCard } from "@/components/order/OrderNotFoundCard";
 
 const OrderDetails = () => {
@@ -73,7 +74,11 @@ const OrderDetails = () => {
           <CustomerInfoCard order={order} />
           <OrderInfoCard order={order} />
           <ShippingAddressCard order={order} />
-          <ShipmentInfoCard order={order} />
+          {(order.status === 'shipped' || order.status === 'delivered') ? (
+            <OrderShipmentsDetailCard order={order} />
+          ) : (
+            <ShipmentInfoCard order={order} />
+          )}
         </div>
       </div>
     </TmsLayout>
