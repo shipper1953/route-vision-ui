@@ -47,31 +47,68 @@ export const useSupabaseShipments = () => {
           return;
         }
 
-        // Get order data for these shipments using the old linking method
-        // (orders.shipment_id = shipments.id)
+        // Get order data for these shipments using BOTH linking methods
         const shipmentIds = supabaseShipments.map(s => s.id);
         
-        const { data: linkedOrders } = await supabase
-          .from('orders')
-          .select('id, order_id, customer_name, shipping_address, qboid_dimensions, shipment_id')
-          .in('shipment_id', shipmentIds);
+        // Query both old-style (orders.shipment_id) and new-style (order_shipments) linkages
+        const [oldStyleOrders, newStyleLinks] = await Promise.all([
+          // Old single-package orders (orders.shipment_id)
+          supabase
+            .from('orders')
+            .select('id, order_id, customer_name, shipping_address, qboid_dimensions, shipment_id')
+            .in('shipment_id', shipmentIds),
+          
+          // New multi-package orders (order_shipments table)
+          supabase
+            .from('order_shipments')
+            .select(`
+              shipment_id,
+              package_index,
+              package_info,
+              orders!inner (
+                id,
+                order_id,
+                customer_name,
+                shipping_address,
+                qboid_dimensions
+              )
+            `)
+            .in('shipment_id', shipmentIds)
+        ]);
         
-        // Create a map of shipment_id -> order data
+        // Create a map of shipment_id -> order data (with package info for multi-package)
         const shipmentToOrderMap = new Map();
         
-        linkedOrders?.forEach(order => {
+        // Add old-style orders
+        oldStyleOrders.data?.forEach(order => {
           if (order.shipment_id) {
             shipmentToOrderMap.set(order.shipment_id, {
               id: order.id,
               order_id: order.order_id,
               customer_name: order.customer_name,
               shipping_address: order.shipping_address,
-              qboid_dimensions: order.qboid_dimensions
+              qboid_dimensions: order.qboid_dimensions,
+              packageIndex: null,
+              packageInfo: null
             });
           }
         });
         
-        console.log(`Found order data for ${shipmentToOrderMap.size} of ${supabaseShipments.length} shipments`);
+        // Add/overwrite with new-style multi-package orders (more detailed info)
+        newStyleLinks.data?.forEach(link => {
+          const order = (link as any).orders;
+          shipmentToOrderMap.set(link.shipment_id, {
+            id: order.id,
+            order_id: order.order_id,
+            customer_name: order.customer_name,
+            shipping_address: order.shipping_address,
+            qboid_dimensions: order.qboid_dimensions,
+            packageIndex: link.package_index,
+            packageInfo: link.package_info
+          });
+        });
+        
+        console.log(`Found order data for ${shipmentToOrderMap.size} of ${supabaseShipments.length} shipments (${oldStyleOrders.data?.length || 0} old-style, ${newStyleLinks.data?.length || 0} new-style)`);
         
         // Transform Supabase data to match our interface
         const formattedShipments: Shipment[] = supabaseShipments.map(s => {
