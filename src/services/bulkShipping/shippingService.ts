@@ -58,12 +58,18 @@ export class BulkShippingService {
             rate: selectedRate.rate 
           });
 
+          // Extract both original and marked-up costs
+          const originalCost = parseFloat((selectedRate as any).original_rate || selectedRate.rate);
+          const markedUpCost = parseFloat(selectedRate.rate);
+
           const labelResponse = await this.labelService.purchaseLabel(
             shipmentId,
             selectedRate.id,
             order.id,
             undefined, // provider - let it default
-            selectedBoxData
+            selectedBoxData,
+            originalCost,
+            markedUpCost
           );
 
           console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);

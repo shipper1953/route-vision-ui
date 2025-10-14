@@ -95,18 +95,21 @@ export const SuperAdminShipmentsReport = () => {
           companyName = 'No Company';
         }
         
-        // Calculate original cost based on markup (reverse calculation)
-        let originalCost = shipment.cost;
+        // Use stored original_cost if available, otherwise fall back to cost for legacy data
+        let originalCost = shipment.original_cost ?? shipment.cost;
+        let revenue = shipment.cost;
         let profit = 0;
 
-        if (companyData?.markup_type && companyData?.markup_value) {
+        // For legacy shipments without original_cost, calculate it from markup
+        if (shipment.original_cost === null && companyData?.markup_type && companyData?.markup_value) {
           if (companyData.markup_type === 'percentage') {
             originalCost = shipment.cost / (1 + (companyData.markup_value / 100));
           } else if (companyData.markup_type === 'fixed') {
             originalCost = shipment.cost - companyData.markup_value;
           }
-          profit = shipment.cost - originalCost;
         }
+        
+        profit = revenue - originalCost;
 
         return {
           id: String(shipment.id),
@@ -115,7 +118,7 @@ export const SuperAdminShipmentsReport = () => {
           carrier: shipment.carrier,
           service: shipment.service,
           status: shipment.status,
-          cost: shipment.cost,
+          cost: revenue,
           original_cost: originalCost,
           profit: profit,
           created_at: shipment.created_at,
@@ -286,7 +289,7 @@ export const SuperAdminShipmentsReport = () => {
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead className="text-right">Base Cost</TableHead>
-                  <TableHead className="text-right">Charged</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
                   <TableHead className="text-right">Profit</TableHead>
                 </TableRow>
               </TableHeader>

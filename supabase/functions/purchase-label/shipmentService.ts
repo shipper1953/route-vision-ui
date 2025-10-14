@@ -6,7 +6,9 @@ export async function saveShipmentToDatabase(
   orderId: string | null,
   userId: string,
   provider: string = 'easypost',
-  selectedBox?: any
+  selectedBox?: any,
+  originalCost?: number | null,
+  markedUpCost?: number | null
 ) {
   console.log("Saving shipment to database with user_id:", userId);
   
@@ -76,7 +78,19 @@ export async function saveShipmentToDatabase(
   // Map response data based on provider
   let shipmentData;
   
+  // Determine the costs to store
+  // Priority: 1) Passed in explicitly, 2) From API response
+  let finalOriginalCost = originalCost;
+  let finalMarkedUpCost = markedUpCost;
+  
   if (provider === 'shippo') {
+    const apiCost = parseFloat(purchaseResponse.rate?.amount || purchaseResponse.amount || '0');
+    if (finalOriginalCost === null || finalOriginalCost === undefined) {
+      finalOriginalCost = apiCost;
+    }
+    if (finalMarkedUpCost === null || finalMarkedUpCost === undefined) {
+      finalMarkedUpCost = apiCost;
+    }
     // Shippo response structure - the rate info comes from a nested rate object
     shipmentData = {
       easypost_id: purchaseResponse.object_id, // Store Shippo transaction ID in easypost_id field
@@ -86,7 +100,8 @@ export async function saveShipmentToDatabase(
       status: 'purchased',
       label_url: purchaseResponse.label_url,
       tracking_url: purchaseResponse.tracking_url_provider,
-      cost: parseFloat(purchaseResponse.rate?.amount || purchaseResponse.amount || '0'),
+      original_cost: finalOriginalCost,
+      cost: finalMarkedUpCost,
       weight: purchaseResponse.parcel?.weight?.toString(),
       package_dimensions: JSON.stringify({
         length: purchaseResponse.parcel?.length,
@@ -111,6 +126,14 @@ export async function saveShipmentToDatabase(
       actual_package_master_id: selectedBox?.selectedBoxId || selectedBox?.boxId || null
     };
   } else {
+    const apiCost = parseFloat(purchaseResponse.selected_rate?.rate || '0');
+    if (finalOriginalCost === null || finalOriginalCost === undefined) {
+      finalOriginalCost = apiCost;
+    }
+    if (finalMarkedUpCost === null || finalMarkedUpCost === undefined) {
+      finalMarkedUpCost = apiCost;
+    }
+    
     // EasyPost response structure (default)
     shipmentData = {
       easypost_id: purchaseResponse.id,
@@ -120,7 +143,8 @@ export async function saveShipmentToDatabase(
       status: 'purchased',
       label_url: purchaseResponse.postage_label?.label_url,
       tracking_url: purchaseResponse.tracker?.public_url,
-      cost: parseFloat(purchaseResponse.selected_rate?.rate || '0'),
+      original_cost: finalOriginalCost,
+      cost: finalMarkedUpCost,
       weight: purchaseResponse.parcel?.weight?.toString(),
       package_dimensions: JSON.stringify({
         length: purchaseResponse.parcel?.length,

@@ -16,13 +16,15 @@ export class LabelService {
     rateId: string,
     orderId?: string | null,
     provider?: string,
-    selectedBoxData?: any
+    selectedBoxData?: any,
+    originalCost?: number | null,
+    markedUpCost?: number | null
   ): Promise<any> {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} using ${provider || 'easypost'}`);
       
       if (this.useEdgeFunctions) {
-        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData);
+        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData, originalCost, markedUpCost);
       }
       
       return this.purchaseLabelDirectly(shipmentId, rateId);
@@ -139,7 +141,9 @@ export class LabelService {
     rateId: string,
     orderId?: string | null,
     provider?: string,
-    selectedBoxData?: any
+    selectedBoxData?: any,
+    originalCost?: number | null,
+    markedUpCost?: number | null
   ): Promise<any> {
     const requestBody: any = { shipmentId, rateId };
     
@@ -159,6 +163,16 @@ export class LabelService {
     if (selectedBoxData) {
       requestBody.selectedBox = selectedBoxData;
       console.log('Including selected box data in edge function request:', selectedBoxData);
+    }
+
+    // Include cost data if provided
+    if (originalCost !== null && originalCost !== undefined) {
+      requestBody.originalCost = originalCost;
+      console.log('Including original cost in edge function request:', originalCost);
+    }
+    if (markedUpCost !== null && markedUpCost !== undefined) {
+      requestBody.markedUpCost = markedUpCost;
+      console.log('Including marked-up cost in edge function request:', markedUpCost);
     }
 
     console.log('Calling purchase-label edge function with:', requestBody);

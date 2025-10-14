@@ -115,8 +115,8 @@ const CompanyAdminPanel = () => {
     enabled: !!userProfile?.company_id && isCompanyAdmin,
   });
 
-  // Fetch company shipments
-  const { data: companyShipments = [] } = useQuery({
+  // Fetch company shipments - cost column already contains marked-up rate
+  const { data: companyShipments = [], isLoading: shipmentsLoading } = useQuery({
     queryKey: ['company-shipments', userProfile?.company_id],
     queryFn: async () => {
       if (!userProfile?.company_id) return [];
@@ -132,39 +132,6 @@ const CompanyAdminPanel = () => {
     },
     enabled: !!userProfile?.company_id && isCompanyAdmin,
   });
-
-  // Apply markup to shipment costs for display
-  const shipmentsWithMarkup = useMemo(() => {
-    if (!company || !companyShipments.length) return companyShipments;
-    
-    return companyShipments.map(shipment => {
-      if (!shipment.cost || !company.markup_value || company.markup_value <= 0) {
-        return shipment;
-      }
-      
-      const originalCost = parseFloat(shipment.cost.toString());
-      let markedUpCost = originalCost;
-      
-      if (company.markup_type === 'percentage') {
-        markedUpCost = originalCost * (1 + company.markup_value / 100);
-      } else if (company.markup_type === 'fixed') {
-        markedUpCost = originalCost + company.markup_value;
-      }
-      
-      return {
-        ...shipment,
-        displayCost: markedUpCost as number | undefined
-      };
-    });
-  }, [companyShipments, company]);
-
-  // Calculate marked-up rate for a shipment
-  const getDisplayRate = (shipment: any) => {
-    if ('displayCost' in shipment && shipment.displayCost) {
-      return Number(shipment.displayCost).toFixed(2);
-    }
-    return shipment.cost ? Number(shipment.cost).toFixed(2) : 'N/A';
-  };
 
   // Show loading while checking authentication or confirming payment
   if (loading || confirmingPayment) {
@@ -265,12 +232,12 @@ const CompanyAdminPanel = () => {
               <CardHeader>
                 <CardTitle>Company Shipments</CardTitle>
                 <CardDescription>
-                  All shipments created by your company ({shipmentsWithMarkup.length} total)
+                  All shipments created by your company ({companyShipments.length} total)
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {shipmentsWithMarkup.length === 0 ? (
+                  {companyShipments.length === 0 ? (
                     <p className="text-muted-foreground">No shipments found for your company.</p>
                   ) : (
                     <div className="overflow-x-auto">
@@ -281,13 +248,19 @@ const CompanyAdminPanel = () => {
                             <th className="border border-gray-200 px-4 py-2 text-left">Carrier</th>
                             <th className="border border-gray-200 px-4 py-2 text-left">Service</th>
                             <th className="border border-gray-200 px-4 py-2 text-left">Status</th>
-                            <th className="border border-gray-200 px-4 py-2 text-left">Rate</th>
+                            <th className="border border-gray-200 px-4 py-2 text-left">Shipping Rate</th>
                             <th className="border border-gray-200 px-4 py-2 text-left">Tracking</th>
                             <th className="border border-gray-200 px-4 py-2 text-left">Date</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {shipmentsWithMarkup.map((shipment) => (
+                          {shipmentsLoading ? (
+                            <tr>
+                              <td colSpan={7} className="border border-gray-200 px-4 py-8 text-center">
+                                Loading shipments...
+                              </td>
+                            </tr>
+                          ) : companyShipments.map((shipment) => (
                             <tr key={shipment.id}>
                               <td className="border border-gray-200 px-4 py-2">{shipment.id}</td>
                               <td className="border border-gray-200 px-4 py-2">{shipment.carrier}</td>
@@ -298,7 +271,7 @@ const CompanyAdminPanel = () => {
                                 </span>
                               </td>
                               <td className="border border-gray-200 px-4 py-2">
-                                ${getDisplayRate(shipment)}
+                                {shipment.cost ? `$${parseFloat(shipment.cost.toString()).toFixed(2)}` : 'N/A'}
                               </td>
                               <td className="border border-gray-200 px-4 py-2">{shipment.tracking_number || 'N/A'}</td>
                               <td className="border border-gray-200 px-4 py-2">

@@ -1,5 +1,7 @@
 import { ShipmentService } from "@/services/easypost/shipmentService";
 import { OrderForShipping, OrderWithRates } from "@/types/bulkShipping";
+import { applyMarkupToRates } from "@/utils/rateMarkupUtils";
+import { supabase } from "@/integrations/supabase/client";
 
 export class RateService {
   private shipmentService: ShipmentService;
@@ -10,6 +12,27 @@ export class RateService {
 
   async fetchRatesForOrders(orders: OrderForShipping[]): Promise<OrderWithRates[]> {
     console.log('Fetching rates for orders:', orders.map(o => o.id));
+    
+    // Get company info for markup
+    const { data: { user } } = await supabase.auth.getUser();
+    let company = null;
+    
+    if (user) {
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+        
+      if (userProfile?.company_id) {
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', userProfile.company_id)
+          .single();
+        company = companyData;
+      }
+    }
     
     const ordersWithRates: OrderWithRates[] = [];
 
@@ -65,22 +88,30 @@ export class RateService {
         const rates = shipmentResponse.rates || [];
         const smartRates = shipmentResponse.smartRates || [];
         
+        // Apply company markup to all rates
+        const markedUpRates = applyMarkupToRates(rates, company);
+        const markedUpSmartRates = applyMarkupToRates(smartRates, company);
+        
         // Combine both rate types
         const allRates = [
-          ...rates.map(rate => ({
+          ...markedUpRates.map(rate => ({
             id: rate.id,
             carrier: rate.carrier || 'Unknown',
             service: rate.service || 'Standard',
             rate: rate.rate || '0.00',
+            original_rate: rate.original_rate || rate.rate || '0.00',
+            markup_applied: rate.markup_applied || 0,
             delivery_days: rate.delivery_days,
             delivery_date: rate.delivery_date,
             shipment_id: shipmentResponse.id
           })),
-          ...smartRates.map(rate => ({
+          ...markedUpSmartRates.map(rate => ({
             id: rate.id,
             carrier: rate.carrier || 'Unknown',
             service: rate.service || 'Standard',
             rate: rate.rate || '0.00',
+            original_rate: rate.original_rate || rate.rate || '0.00',
+            markup_applied: rate.markup_applied || 0,
             delivery_days: rate.delivery_days,
             delivery_date: rate.delivery_date,
             shipment_id: shipmentResponse.id
