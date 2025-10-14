@@ -34,9 +34,10 @@ const CreateShipment = () => {
   const [selectedBoxData, setSelectedBoxData] = useState<any>(null);
   const [requiredDeliveryDate, setRequiredDeliveryDate] = useState<string | null>(null);
   const [shipmentAddresses, setShipmentAddresses] = useState<{ from: any; to: any } | null>(null);
+  const [multiParcels, setMultiParcels] = useState<any[]>([]);
   
-  // Detect if this is a multi-package shipment (check if we have multiple boxes selected)
-  const isMultiPackage = selectedBoxData?.selectedBoxes && selectedBoxData.selectedBoxes.length > 1;
+  // Detect if this is a multi-package shipment (check if we have multiple parcels)
+  const isMultiPackage = multiParcels && multiParcels.length > 1;
 
   // Log user context for debugging
   useEffect(() => {
@@ -138,10 +139,38 @@ const CreateShipment = () => {
 
       {!shipmentResponse ? (
         <ShipmentForm onShipmentCreated={(response, selectedRate, boxData) => {
+          console.log('Shipment created with boxData:', boxData);
+          
           if (boxData) {
             setSelectedBoxData(boxData);
           }
-          // Extract required delivery date and addresses from form
+          
+          // Extract multi-package data from localStorage (set by PackageManagementSection)
+          const storedMultiParcels = localStorage.getItem('multiParcels');
+          const storedSelectedBoxes = localStorage.getItem('selectedBoxes');
+          
+          if (storedMultiParcels && storedSelectedBoxes) {
+            try {
+              const parcels = JSON.parse(storedMultiParcels);
+              const boxes = JSON.parse(storedSelectedBoxes);
+              
+              console.log('Multi-package data found:', { parcels, boxes });
+              
+              // Combine parcel dimensions with box info
+              const combinedPackages = parcels.map((parcel: any, idx: number) => ({
+                ...parcel,
+                boxId: boxes[idx]?.boxId,
+                boxSku: boxes[idx]?.boxSku,
+                boxName: boxes[idx]?.boxName,
+              }));
+              
+              setMultiParcels(combinedPackages);
+            } catch (e) {
+              console.error('Error parsing multi-package data:', e);
+            }
+          }
+          
+          // Extract required delivery date from form
           const formElement = document.querySelector('input[name="requiredDeliveryDate"]') as HTMLInputElement;
           if (formElement?.value) {
             setRequiredDeliveryDate(formElement.value);
@@ -166,15 +195,7 @@ const CreateShipment = () => {
         <div className="space-y-8">
           {isMultiPackage && shipmentAddresses ? (
             <MultiPackageRatesDisplay
-              packages={selectedBoxData.selectedBoxes.map((box: any) => ({
-                length: box.length || 0,
-                width: box.width || 0,
-                height: box.height || 0,
-                weight: box.weight || 0,
-                boxId: box.boxId,
-                boxSku: box.boxSku,
-                boxName: box.boxName,
-              }))}
+              packages={multiParcels}
               fromAddress={shipmentAddresses.from}
               toAddress={shipmentAddresses.to}
               requiredDeliveryDate={requiredDeliveryDate}
