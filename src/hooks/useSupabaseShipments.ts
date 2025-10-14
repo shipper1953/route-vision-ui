@@ -32,7 +32,7 @@ export const useSupabaseShipments = () => {
           .select(`
             *,
             order_shipments!left (
-              orders!inner (
+              orders!left (
                 id,
                 order_id,
                 customer_name,
