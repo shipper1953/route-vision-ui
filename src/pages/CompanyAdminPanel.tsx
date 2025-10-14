@@ -1,7 +1,7 @@
 
 import { useAuth } from "@/hooks/useAuth";
 import { TmsLayout } from "@/components/layout/TmsLayout";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { CompanyProfile } from "@/components/admin/CompanyProfile";
 import { WarehouseManagement } from "@/components/admin/WarehouseManagement";
@@ -12,12 +12,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useCompanyInfo } from "@/hooks/useCompanyInfo";
 
 const CompanyAdminPanel = () => {
   const { isAuthenticated, isCompanyAdmin, userProfile, loading } = useAuth();
   const navigate = useNavigate();
   const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+  const { company } = useCompanyInfo(userProfile?.company_id);
 
   // Handle tab from URL parameter
   useEffect(() => {
@@ -131,6 +133,39 @@ const CompanyAdminPanel = () => {
     enabled: !!userProfile?.company_id && isCompanyAdmin,
   });
 
+  // Apply markup to shipment costs for display
+  const shipmentsWithMarkup = useMemo(() => {
+    if (!company || !companyShipments.length) return companyShipments;
+    
+    return companyShipments.map(shipment => {
+      if (!shipment.cost || !company.markup_value || company.markup_value <= 0) {
+        return shipment;
+      }
+      
+      const originalCost = parseFloat(shipment.cost.toString());
+      let markedUpCost = originalCost;
+      
+      if (company.markup_type === 'percentage') {
+        markedUpCost = originalCost * (1 + company.markup_value / 100);
+      } else if (company.markup_type === 'fixed') {
+        markedUpCost = originalCost + company.markup_value;
+      }
+      
+      return {
+        ...shipment,
+        displayCost: markedUpCost as number | undefined
+      };
+    });
+  }, [companyShipments, company]);
+
+  // Calculate marked-up rate for a shipment
+  const getDisplayRate = (shipment: any) => {
+    if ('displayCost' in shipment && shipment.displayCost) {
+      return Number(shipment.displayCost).toFixed(2);
+    }
+    return shipment.cost ? Number(shipment.cost).toFixed(2) : 'N/A';
+  };
+
   // Show loading while checking authentication or confirming payment
   if (loading || confirmingPayment) {
     return (
@@ -230,12 +265,12 @@ const CompanyAdminPanel = () => {
               <CardHeader>
                 <CardTitle>Company Shipments</CardTitle>
                 <CardDescription>
-                  All shipments created by your company ({companyShipments.length} total)
+                  All shipments created by your company ({shipmentsWithMarkup.length} total)
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {companyShipments.length === 0 ? (
+                  {shipmentsWithMarkup.length === 0 ? (
                     <p className="text-muted-foreground">No shipments found for your company.</p>
                   ) : (
                     <div className="overflow-x-auto">
@@ -246,13 +281,13 @@ const CompanyAdminPanel = () => {
                             <th className="border border-gray-200 px-4 py-2 text-left">Carrier</th>
                             <th className="border border-gray-200 px-4 py-2 text-left">Service</th>
                             <th className="border border-gray-200 px-4 py-2 text-left">Status</th>
-                            <th className="border border-gray-200 px-4 py-2 text-left">Cost</th>
+                            <th className="border border-gray-200 px-4 py-2 text-left">Rate</th>
                             <th className="border border-gray-200 px-4 py-2 text-left">Tracking</th>
                             <th className="border border-gray-200 px-4 py-2 text-left">Date</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {companyShipments.map((shipment) => (
+                          {shipmentsWithMarkup.map((shipment) => (
                             <tr key={shipment.id}>
                               <td className="border border-gray-200 px-4 py-2">{shipment.id}</td>
                               <td className="border border-gray-200 px-4 py-2">{shipment.carrier}</td>
@@ -263,7 +298,7 @@ const CompanyAdminPanel = () => {
                                 </span>
                               </td>
                               <td className="border border-gray-200 px-4 py-2">
-                                ${shipment.cost ? Number(shipment.cost).toFixed(2) : 'N/A'}
+                                ${getDisplayRate(shipment)}
                               </td>
                               <td className="border border-gray-200 px-4 py-2">{shipment.tracking_number || 'N/A'}</td>
                               <td className="border border-gray-200 px-4 py-2">
