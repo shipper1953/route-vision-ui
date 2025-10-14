@@ -12,7 +12,7 @@ const DEFAULT_PARAMETERS: CartonizationParameters = {
   packingEfficiency: 85,
   allowPartialFill: true,
   optimizeForCost: false,
-  optimizeForSpace: true // Prioritize smallest boxes
+  optimizeForSpace: false // Prioritize utilization over size
 };
 
 export const useCartonization = () => {

@@ -19,7 +19,7 @@ export class CartonizationEngine {
       packingEfficiency: 85,
       allowPartialFill: true,
       optimizeForCost: false,
-      optimizeForSpace: true, // Prioritize smallest boxes
+      optimizeForSpace: false, // Prioritize utilization over size
       ...parameters
     };
   }
@@ -134,7 +134,7 @@ export class CartonizationEngine {
       
       const dimensionalWeight = CartonizationUtils.calculateDimensionalWeight(box, this.parameters.dimensionalWeightFactor);
       
-      // Calculate confidence with bonus for smaller boxes
+      // Calculate confidence based on utilization and packing efficiency only
       let confidence = !itemsFit ? 0 : 
         CartonizationUtils.calculateConfidence(
           actualUtilization, 
@@ -143,14 +143,8 @@ export class CartonizationEngine {
           packingResult.packingEfficiency
         );
       
-      // Size bonus: smaller boxes get higher confidence when they fit
       if (itemsFit) {
-        const sizeRank = sortedBoxes.indexOf(box);
-        const sizeBonusMax = 15;
-        const sizeBonus = Math.max(0, sizeBonusMax - (sizeRank * 3));
-        confidence += sizeBonus;
-        confidence = Math.min(confidence, 100);
-        console.log(`📈 ${box.name} confidence: ${confidence}% (size bonus: +${sizeBonus})`);
+        console.log(`📈 ${box.name} confidence: ${confidence.toFixed(1)}%, utilization: ${actualUtilization.toFixed(1)}%`);
       }
       
       return {
@@ -180,10 +174,8 @@ export class CartonizationEngine {
     
     if (this.parameters.optimizeForCost) {
       rulesApplied.push('Cost Optimization Rule');
-    } else if (this.parameters.optimizeForSpace) {
-      rulesApplied.push('Highest Utilization Under 100% Rule');
     } else {
-      rulesApplied.push('Balanced Optimization Rule');
+      rulesApplied.push('Highest Utilization Rule (up to 99%)');
     }
 
     // Apply fill rate threshold rule - use as preference weight, not hard filter
@@ -267,7 +259,7 @@ export class CartonizationEngine {
     rulesApplied.push('Enhanced 3D Bin Packing Algorithm');
     rulesApplied.push('Multi-Orientation Item Fitting');
     rulesApplied.push('Dimensional Weight Calculation');
-    rulesApplied.push('Smallest Box Priority Logic');
+    rulesApplied.push('Size as Tiebreaker Only');
 
     console.log(`✅ Final recommendation: ${recommendedAnalysis.box.name} with ${recommendedAnalysis.confidence}% confidence`);
 
@@ -286,33 +278,28 @@ export class CartonizationEngine {
     };
   }
 
-  // Modified sorting method that prioritizes highest utilization under 100%
+  // Sorting method that prioritizes highest utilization up to 99%
   private sortBoxesByOptimization(analyses: any[]): any[] {
-    // Filter out boxes with 100% or higher utilization AND unrealistically low utilization
+    // Filter out boxes with utilization >= 99% or unrealistically low utilization
     const viableBoxes = analyses.filter(analysis => {
-      const isRealistic = analysis.utilization >= 30 && analysis.utilization < 100;
+      const isRealistic = analysis.utilization >= 30 && analysis.utilization < 99;
       if (!isRealistic) {
-        console.log(`⚠️ Filtering out ${analysis.box.name}: utilization ${analysis.utilization.toFixed(1)}% is ${analysis.utilization < 30 ? 'too low (oversized box)' : 'too high'}`);
+        console.log(`⚠️ Filtering out ${analysis.box.name}: utilization ${analysis.utilization.toFixed(1)}% is ${analysis.utilization < 30 ? 'too low (oversized)' : 'too high (exceeds 99% threshold)'}`);
       }
       return isRealistic;
     });
     
     return viableBoxes.sort((a, b) => {
-      // PRIMARY: Highest utilization under 100% (descending order)
+      // PRIMARY: Highest utilization up to 99% (descending order)
       const utilizationDiff = b.utilization - a.utilization;
-      if (Math.abs(utilizationDiff) > 2) { // 2% difference threshold
+      if (Math.abs(utilizationDiff) > 1) { // 1% difference threshold
         return utilizationDiff; // Higher utilization first
       }
 
-      // SECONDARY: Confidence (higher is better) for similar utilization
-      if (Math.abs(a.confidence - b.confidence) > 5) {
-        return b.confidence - a.confidence;
-      }
-
-      // TERTIARY: Size preference - prefer smaller boxes as tiebreaker
+      // SECONDARY: For boxes within 1% utilization, prefer smaller box
       const volumeA = a.box.length * a.box.width * a.box.height;
       const volumeB = b.box.length * b.box.width * b.box.height;
-      return volumeA - volumeB; // Smaller volume first
+      return volumeA - volumeB; // Smaller volume as tiebreaker only
     });
   }
 
