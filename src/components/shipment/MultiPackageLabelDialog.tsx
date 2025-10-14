@@ -99,6 +99,12 @@ export const MultiPackageLabelDialog = ({
     }
   };
 
+  const getFileExtension = (url: string) => {
+    // Extract extension from URL (e.g., .pdf or .png)
+    const match = url.match(/\.(pdf|png|jpg|jpeg)(\?|$)/i);
+    return match ? match[1].toLowerCase() : 'pdf';
+  };
+
   const handleDownloadAll = async () => {
     for (const pkg of packageLabels) {
       const labelUrl = getLabelUrl(pkg.label);
@@ -112,14 +118,19 @@ export const MultiPackageLabelDialog = ({
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `package-${pkg.packageIndex + 1}-label.pdf`;
+            const extension = getFileExtension(labelUrl);
+            link.download = `package-${pkg.packageIndex + 1}-label.${extension}`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
+            toast.success(`Downloaded package ${pkg.packageIndex + 1}`);
+          } else {
+            toast.error(`Failed to download package ${pkg.packageIndex + 1}`);
           }
         } catch (error) {
           console.error(`Failed to download package ${pkg.packageIndex + 1}:`, error);
+          toast.error(`Error downloading package ${pkg.packageIndex + 1}`);
         }
         
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -235,14 +246,19 @@ export const MultiPackageLabelDialog = ({
                                 const url = window.URL.createObjectURL(blob);
                                 const link = document.createElement('a');
                                 link.href = url;
-                                link.download = `package-${pkg.packageIndex + 1}-label.pdf`;
+                                const extension = getFileExtension(labelUrl);
+                                link.download = `package-${pkg.packageIndex + 1}-label.${extension}`;
                                 document.body.appendChild(link);
                                 link.click();
                                 document.body.removeChild(link);
                                 window.URL.revokeObjectURL(url);
+                                toast.success(`Downloaded package ${pkg.packageIndex + 1}`);
+                              } else {
+                                toast.error(`Download failed for package ${pkg.packageIndex + 1}`);
                               }
                             } catch (error) {
                               console.error('Download failed:', error);
+                              toast.error('Download failed');
                             }
                           }
                         }}
