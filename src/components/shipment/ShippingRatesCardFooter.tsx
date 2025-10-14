@@ -156,17 +156,17 @@ export const ShippingRatesCardFooter = ({
             // Extract box IDs from each package
             const potentialBoxIds = cartonData.packages.map((pkg: any) => pkg.box_id || cartonData.recommended_box_id);
             
-            // Validate that box IDs actually exist in the boxes table
+            // Validate that box IDs actually exist in the packaging_master_list table
             if (potentialBoxIds.some(id => id)) {
               const validBoxIds = potentialBoxIds.filter(id => id);
               if (validBoxIds.length > 0) {
                 const { data: validBoxes } = await supabase
-                  .from('boxes')
+                  .from('packaging_master_list')
                   .select('id')
                   .in('id', validBoxIds);
                 
                 const validBoxIdSet = new Set(validBoxes?.map(b => b.id) || []);
-                console.log('✅ Valid box IDs from database:', Array.from(validBoxIdSet));
+                console.log('✅ Valid box IDs from packaging_master_list:', Array.from(validBoxIdSet));
                 
                 // Only use box IDs that actually exist
                 packageBoxIds = potentialBoxIds.map(id => validBoxIdSet.has(id) ? id : null);
@@ -175,9 +175,9 @@ export const ShippingRatesCardFooter = ({
             
             console.log('📦 Final package box IDs:', packageBoxIds);
           } else if (cartonData?.recommended_box_id) {
-            // Validate the recommended box exists
+            // Validate the recommended box exists in packaging_master_list
             const { data: validBox } = await supabase
-              .from('boxes')
+              .from('packaging_master_list')
               .select('id')
               .eq('id', cartonData.recommended_box_id)
               .single();
@@ -186,7 +186,7 @@ export const ShippingRatesCardFooter = ({
               packageBoxIds = packageRates.map(() => cartonData.recommended_box_id);
               console.log('📦 Using validated recommended box for all packages:', cartonData.recommended_box_id);
             } else {
-              console.warn('❌ Recommended box ID does not exist:', cartonData.recommended_box_id);
+              console.warn('❌ Recommended box ID does not exist in packaging_master_list:', cartonData.recommended_box_id);
             }
           }
         } catch (error) {
