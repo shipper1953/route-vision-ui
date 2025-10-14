@@ -39,6 +39,7 @@ const CreateShipment = () => {
   const [multiParcels, setMultiParcels] = useState<any[]>([]);
   const [multiPackageLabels, setMultiPackageLabels] = useState<any[]>([]);
   const [showMultiPackageDialog, setShowMultiPackageDialog] = useState(false);
+  const [isPurchasingLabels, setIsPurchasingLabels] = useState(false);
   
   // Detect if this is a multi-package shipment (check if we have multiple parcels)
   const isMultiPackage = multiParcels && multiParcels.length > 1;
@@ -216,9 +217,19 @@ const CreateShipment = () => {
               onPurchaseAll={async (packageRates) => {
                 console.log('Purchasing all labels for packages:', packageRates);
                 
+                // Prevent multiple simultaneous purchases
+                if (isPurchasingLabels) {
+                  toast.warning('Label purchase already in progress');
+                  return;
+                }
+                
+                setIsPurchasingLabels(true);
+                const purchasedLabels = [];
+                let hasErrors = false;
+                
                 try {
                   const labelService = new LabelService('');
-                  const purchasedLabels = [];
+                  toast.info(`Purchasing labels for ${packageRates.length} packages...`);
                   
                   for (let i = 0; i < packageRates.length; i++) {
                     const pkgRate = packageRates[i];
@@ -226,6 +237,7 @@ const CreateShipment = () => {
                     
                     if (!rate) {
                       toast.error(`Package ${i + 1} has no selected rate`);
+                      hasErrors = true;
                       continue;
                     }
                     
@@ -236,48 +248,68 @@ const CreateShipment = () => {
                       rate: rate.rate
                     });
                     
-                    // Get shipment ID from rate's stored data
-                    const shipmentId = rate.shipment_id || rate._shipment_data?.easypost_shipment?.id || rate._shipment_data?.shippo_shipment?.object_id;
-                    
-                    if (!shipmentId) {
-                      toast.error(`Package ${i + 1}: No shipment ID found`);
-                      continue;
+                    try {
+                      // Get shipment ID from rate's stored data
+                      const shipmentId = rate.shipment_id || rate._shipment_data?.easypost_shipment?.id || rate._shipment_data?.shippo_shipment?.object_id;
+                      
+                      if (!shipmentId) {
+                        toast.error(`Package ${i + 1}: No shipment ID found`);
+                        hasErrors = true;
+                        continue;
+                      }
+                      
+                      // Prepare box data for this package
+                      const boxData = {
+                        selectedBoxId: pkgRate.packageDimensions.boxId,
+                        selectedBoxSku: pkgRate.packageDimensions.boxSku,
+                        selectedBoxName: pkgRate.packageDimensions.boxName,
+                      };
+                      
+                      const result = await labelService.purchaseLabel(
+                        shipmentId,
+                        rate.id,
+                        orderId,
+                        rate.provider,
+                        boxData
+                      );
+                      
+                      purchasedLabels.push({
+                        packageIndex: i,
+                        label: result,
+                        rate: rate
+                      });
+                      
+                      console.log(`✅ Package ${i + 1} label purchased successfully`);
+                      toast.success(`Package ${i + 1} of ${packageRates.length} label purchased`);
+                      
+                    } catch (error) {
+                      console.error(`Error purchasing label for package ${i + 1}:`, error);
+                      toast.error(`Failed to purchase label for package ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                      hasErrors = true;
                     }
-                    
-                    // Prepare box data for this package
-                    const boxData = {
-                      selectedBoxId: pkgRate.packageDimensions.boxId,
-                      selectedBoxSku: pkgRate.packageDimensions.boxSku,
-                      selectedBoxName: pkgRate.packageDimensions.boxName,
-                    };
-                    
-                    const result = await labelService.purchaseLabel(
-                      shipmentId,
-                      rate.id,
-                      orderId,
-                      rate.provider,
-                      boxData
-                    );
-                    
-                    purchasedLabels.push({
-                      packageIndex: i,
-                      label: result,
-                      rate: rate
-                    });
-                    
-                    toast.success(`Package ${i + 1} label purchased successfully`);
                   }
                   
-                  console.log('All labels purchased:', purchasedLabels);
-                  toast.success(`Successfully purchased ${purchasedLabels.length} labels!`);
+                  console.log('Purchase complete. Total labels purchased:', purchasedLabels.length);
                   
-                  // Store all labels and show multi-package dialog
-                  setMultiPackageLabels(purchasedLabels);
-                  setShowMultiPackageDialog(true);
+                  // Only show dialog if we have at least one successful label
+                  if (purchasedLabels.length > 0) {
+                    console.log('Opening multi-package dialog with labels:', purchasedLabels);
+                    toast.success(`Successfully purchased ${purchasedLabels.length} of ${packageRates.length} labels!`);
+                    
+                    // Use a small delay to ensure state is set properly
+                    setTimeout(() => {
+                      setMultiPackageLabels(purchasedLabels);
+                      setShowMultiPackageDialog(true);
+                    }, 100);
+                  } else {
+                    toast.error('No labels were purchased successfully');
+                  }
                   
                 } catch (error) {
                   console.error('Multi-package purchase error:', error);
                   toast.error(error instanceof Error ? error.message : 'Failed to purchase labels');
+                } finally {
+                  setIsPurchasingLabels(false);
                 }
               }}
             />
