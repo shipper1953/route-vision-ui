@@ -385,7 +385,15 @@ export type Database = {
           package_info?: Json | null
           shipment_id?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "order_shipments_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       orders: {
         Row: {
