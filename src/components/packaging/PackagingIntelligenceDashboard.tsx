@@ -148,6 +148,13 @@ export const PackagingIntelligenceDashboard = () => {
         box.in_stock <= (box.min_stock + 20)
       );
 
+      // Sort by most critical (lowest current/min ratio) to least critical
+      lowStock.sort((a, b) => {
+        const ratioA = a.in_stock / Math.max(a.min_stock, 1);
+        const ratioB = b.in_stock / Math.max(b.min_stock, 1);
+        return ratioA - ratioB;
+      });
+
       setLowStockBoxes(lowStock);
     } catch (error) {
       console.error('Error fetching low stock boxes:', error);
