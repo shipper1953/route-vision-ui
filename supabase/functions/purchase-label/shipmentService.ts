@@ -1,8 +1,18 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-export async function saveShipmentToDatabase(purchaseResponse: any, orderId: string | null, userId: string, provider: string = 'easypost', selectedBox?: any) {
+export async function saveShipmentToDatabase(
+  purchaseResponse: any,
+  orderId: string | null,
+  userId: string,
+  provider: string = 'easypost',
+  selectedBox?: any,
+  expectedCost?: number
+) {
   console.log("Saving shipment to database with user_id:", userId);
+  if (expectedCost !== undefined) {
+    console.log("Using expected cost instead of API response cost:", expectedCost);
+  }
   
   const supabaseService = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -80,7 +90,7 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
       status: 'purchased',
       label_url: purchaseResponse.label_url,
       tracking_url: purchaseResponse.tracking_url_provider,
-      cost: parseFloat(purchaseResponse.rate?.amount || purchaseResponse.amount || '0'),
+      cost: expectedCost !== undefined ? expectedCost : parseFloat(purchaseResponse.rate?.amount || purchaseResponse.amount || '0'),
       weight: purchaseResponse.parcel?.weight?.toString(),
       package_dimensions: JSON.stringify({
         length: purchaseResponse.parcel?.length,
@@ -114,7 +124,7 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
       status: 'purchased',
       label_url: purchaseResponse.postage_label?.label_url,
       tracking_url: purchaseResponse.tracker?.public_url,
-      cost: parseFloat(purchaseResponse.selected_rate?.rate || '0'),
+      cost: expectedCost !== undefined ? expectedCost : parseFloat(purchaseResponse.selected_rate?.rate || '0'),
       weight: purchaseResponse.parcel?.weight?.toString(),
       package_dimensions: JSON.stringify({
         length: purchaseResponse.parcel?.length,

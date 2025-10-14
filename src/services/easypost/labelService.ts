@@ -11,12 +11,20 @@ export class LabelService {
     this.useEdgeFunctions = !apiKey;
   }
 
-  async purchaseLabel(shipmentId: string, rateId: string, orderId?: string | null, provider?: string, selectedBoxData?: any): Promise<any> {
+  async purchaseLabel(
+    shipmentId: string,
+    rateId: string,
+    orderId?: string | null,
+    provider?: string,
+    selectedBoxData?: any,
+    expectedCost?: number
+  ): Promise<any> {
     try {
-      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} using ${provider || 'easypost'}`);
+      console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} using ${provider || 'easypost'}`, 
+        expectedCost ? `Expected cost: $${expectedCost}` : '');
       
       if (this.useEdgeFunctions) {
-        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData);
+        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData, expectedCost);
       }
       
       return this.purchaseLabelDirectly(shipmentId, rateId);
@@ -128,7 +136,14 @@ export class LabelService {
      return { total, perParcel };
    }
  
-   private async purchaseLabelViaEdgeFunction(shipmentId: string, rateId: string, orderId?: string | null, provider?: string, selectedBoxData?: any): Promise<any> {
+  private async purchaseLabelViaEdgeFunction(
+    shipmentId: string,
+    rateId: string,
+    orderId?: string | null,
+    provider?: string,
+    selectedBoxData?: any,
+    expectedCost?: number
+  ): Promise<any> {
     const requestBody: any = { shipmentId, rateId };
     
     // Include orderId if provided
@@ -147,6 +162,12 @@ export class LabelService {
     if (selectedBoxData) {
       requestBody.selectedBox = selectedBoxData;
       console.log('Including selected box data in edge function request:', selectedBoxData);
+    }
+
+    // Include expected cost if provided (the cost shown to the user with markup)
+    if (expectedCost !== undefined) {
+      requestBody.expectedCost = expectedCost;
+      console.log('Including expected cost in edge function request:', expectedCost);
     }
 
     console.log('Calling purchase-label edge function with:', requestBody);

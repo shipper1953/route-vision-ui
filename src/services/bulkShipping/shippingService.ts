@@ -52,13 +52,19 @@ export class BulkShippingService {
           } : undefined;
 
           console.log(`Purchasing label for order ${order.id} with box:`, selectedBoxData);
+          console.log(`Selected rate for order ${order.id}:`, { 
+            carrier: selectedRate.carrier, 
+            service: selectedRate.service, 
+            rate: selectedRate.rate 
+          });
 
           const labelResponse = await this.labelService.purchaseLabel(
             shipmentId,
             selectedRate.id,
             order.id,
             undefined, // provider - let it default
-            selectedBoxData
+            selectedBoxData,
+            parseFloat(selectedRate.rate) // Pass the expected cost
           );
 
           console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
@@ -68,7 +74,7 @@ export class BulkShippingService {
             success: true,
             trackingNumber: labelResponse.tracking_code,
             labelUrl: labelResponse.postage_label?.label_url,
-            cost: parseFloat(selectedRate.rate)
+            cost: parseFloat(selectedRate.rate) // Use the rate the user saw
           });
         } catch (labelError: any) {
           // Handle rate limiting on label purchase
