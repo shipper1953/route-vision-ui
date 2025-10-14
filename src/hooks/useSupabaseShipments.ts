@@ -44,7 +44,11 @@ export const useSupabaseShipments = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
-        console.log("Supabase shipments query result:", { data: supabaseShipments, error: shipmentsError });
+        console.log("Supabase shipments query result:", { 
+          count: supabaseShipments?.length, 
+          error: shipmentsError,
+          sampleData: supabaseShipments?.[0]
+        });
         
         if (shipmentsError) {
           throw new Error(`Supabase error: ${shipmentsError.message}`);
@@ -59,8 +63,13 @@ export const useSupabaseShipments = () => {
         // Transform Supabase data to match our interface
         const formattedShipments: Shipment[] = supabaseShipments.map(s => {
           // Extract order data from order_shipments join
+          console.log("Processing shipment:", {
+            shipmentId: s.id,
+            orderShipmentsRaw: s.order_shipments
+          });
           const orderShipment = Array.isArray(s.order_shipments) ? s.order_shipments[0] : s.order_shipments;
           const orderData = orderShipment?.orders;
+          console.log("Extracted order data:", { orderData });
           
           // Get weight information
           let weight = 'Unknown';
