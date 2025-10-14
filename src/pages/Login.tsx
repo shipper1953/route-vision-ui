@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ShipTornadoLogo } from '@/components/logo/ShipTornadoLogo';
 import { toast } from 'sonner';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Info, ArrowRight } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -52,7 +52,8 @@ const Login = () => {
           <h1 className="text-4xl font-bold text-white">Ship Tornado</h1>
         </div>
         <div className="text-white max-w-md">
-          <p className="text-xl opacity-90">Welcome back! Sign in to continue</p>
+          <h2 className="text-2xl font-semibold mb-3">Welcome to Ship Tornado Demo</h2>
+          <p className="text-lg opacity-90">Sign in to your account or create a free demo account to explore our full shipping management platform with no limitations.</p>
         </div>
       </div>
 
@@ -68,6 +69,19 @@ const Login = () => {
           <div className="mb-6">
             <h2 className="text-2xl font-bold">Sign In</h2>
             <p className="text-muted-foreground">Enter your credentials to access your account</p>
+          </div>
+
+          {/* Demo Environment Banner */}
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-blue-900 mb-1">🎯 Demo Environment</h3>
+                <p className="text-sm text-blue-800">
+                  Create a free account to explore all Ship Tornado features with full access. No credit card required.
+                </p>
+              </div>
+            </div>
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -124,14 +138,27 @@ const Login = () => {
               {(isLoading || loading) ? "Signing in..." : "Sign in"}
             </Button>
             
-            <div className="flex flex-col space-y-2 items-center text-sm text-center">
-              <div className="flex space-x-1">
-                <span className="text-muted-foreground">New to Ship Tornado?</span>
-                <Link to="/signup" className="text-tms-navy font-medium hover:underline">
-                  Create an account
-                </Link>
+            {/* Prominent Signup CTA */}
+            <div className="mt-6 p-6 border-2 border-blue-200 rounded-lg bg-gradient-to-br from-blue-50 to-white text-center">
+              <p className="text-sm text-muted-foreground mb-3">Don't have an account?</p>
+              <Link to="/signup">
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  size="lg"
+                  className="w-full border-2 border-tms-navy text-tms-navy hover:bg-tms-navy hover:text-white font-semibold group"
+                >
+                  Create Free Demo Account
+                  <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+              <div className="mt-3 space-y-1">
+                <p className="text-xs text-muted-foreground">✓ Instant access • ✓ All features unlocked • ✓ No credit card needed</p>
               </div>
-              <a href="#" className="text-tms-navy font-medium hover:underline">
+            </div>
+            
+            <div className="text-center mt-4">
+              <a href="#" className="text-sm text-tms-navy font-medium hover:underline">
                 Forgot your password?
               </a>
             </div>
