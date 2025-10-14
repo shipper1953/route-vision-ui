@@ -258,7 +258,12 @@ const CreateShipment = () => {
                     
                     try {
                       // Get shipment ID from rate's stored data
-                      const shipmentId = rate.shipment_id || rate._shipment_data?.easypost_shipment?.id || rate._shipment_data?.shippo_shipment?.object_id;
+                      // For Shippo: check original_rate.shipment
+                      // For EasyPost: check _shipment_data
+                      const shipmentId = rate.shipment_id 
+                        || rate.original_rate?.shipment 
+                        || rate._shipment_data?.easypost_shipment?.id 
+                        || rate._shipment_data?.shippo_shipment?.object_id;
                       
                       if (!shipmentId) {
                         const errorMsg = `Package ${i + 1}: No shipment ID found in rate data`;
