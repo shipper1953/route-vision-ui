@@ -897,7 +897,7 @@ export type Database = {
             foreignKeyName: "shipments_actual_package_master_id_fkey"
             columns: ["actual_package_master_id"]
             isOneToOne: false
-            referencedRelation: "packaging_master_list"
+            referencedRelation: "boxes"
             referencedColumns: ["id"]
           },
         ]

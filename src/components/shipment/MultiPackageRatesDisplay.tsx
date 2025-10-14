@@ -181,6 +181,7 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
     })));
     
     setPurchasing(true);
+    setLoading(true); // Hide "Loading..." text during purchase
     try {
       await onPurchaseAll(packageRates);
     } catch (error) {
@@ -188,6 +189,7 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
       toast.error(error instanceof Error ? error.message : 'Failed to purchase labels');
     } finally {
       setPurchasing(false);
+      setLoading(false);
     }
   };
 
