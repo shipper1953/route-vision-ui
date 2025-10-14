@@ -62,13 +62,23 @@ export async function fetchOrdersPaginated(
     
     console.log(`Found ${data.length} orders on page ${page}, total: ${count}`);
     
-    // Batch fetch qboid data for all orders in current page
-    const orderIds = data.map(order => `ORD-${order.order_id || order.id}`);
-    const { data: qboidData } = await supabase
+    // Batch fetch qboid data for all orders in current page - OPTIMIZED with limit
+    const orderIdLinks = data.map(order => `ORD-${order.order_id || order.id}`);
+    
+    // Fetch recent qboid events with a reasonable limit instead of entire table
+    const { data: allQboidData } = await supabase
       .from('qboid_events')
       .select('*')
       .eq('event_type', 'dimensions_received')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(100); // Cap at recent 100 instead of fetching all
+    
+    // Filter to only events matching current page's orders
+    const qboidData = allQboidData?.filter(event => {
+      const eventData = event.data as any;
+      const orderId = eventData?.orderId || eventData?.barcode;
+      return orderId && orderIdLinks.includes(orderId);
+    });
     
     // Create a map of qboid data by order ID for quick lookup
     const qboidMap = new Map();
