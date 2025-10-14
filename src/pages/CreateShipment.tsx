@@ -6,6 +6,7 @@ import { MultiPackageRatesDisplay } from "@/components/shipment/MultiPackageRate
 import { useShipment } from "@/hooks/useShipment";
 import { useState, useEffect } from "react";
 import { ShippingLabelDialog } from "@/components/shipment/ShippingLabelDialog";
+import { MultiPackageLabelDialog } from "@/components/shipment/MultiPackageLabelDialog";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,7 +38,7 @@ const CreateShipment = () => {
   const [shipmentAddresses, setShipmentAddresses] = useState<{ from: any; to: any } | null>(null);
   const [multiParcels, setMultiParcels] = useState<any[]>([]);
   const [multiPackageLabels, setMultiPackageLabels] = useState<any[]>([]);
-  const [currentLabelIndex, setCurrentLabelIndex] = useState(0);
+  const [showMultiPackageDialog, setShowMultiPackageDialog] = useState(false);
   
   // Detect if this is a multi-package shipment (check if we have multiple parcels)
   const isMultiPackage = multiParcels && multiParcels.length > 1;
@@ -112,19 +113,21 @@ const CreateShipment = () => {
 
   // Handle dialog close and navigate to orders page
   const handleDialogClose = () => {
-    // If we're showing multi-package labels, show next label or navigate
-    if (multiPackageLabels.length > 0 && currentLabelIndex < multiPackageLabels.length - 1) {
-      setCurrentLabelIndex(currentLabelIndex + 1);
-      setLabelData(multiPackageLabels[currentLabelIndex + 1].label);
+    setShowLabelDialog(false);
+    if (orderId) {
+      navigate(`/orders?highlight=${orderId}`);
     } else {
-      setShowLabelDialog(false);
-      setMultiPackageLabels([]);
-      setCurrentLabelIndex(0);
-      if (orderId) {
-        navigate(`/orders?highlight=${orderId}`);
-      } else {
-        navigate('/orders');
-      }
+      navigate('/orders');
+    }
+  };
+
+  const handleMultiPackageDialogClose = () => {
+    setShowMultiPackageDialog(false);
+    setMultiPackageLabels([]);
+    if (orderId) {
+      navigate(`/orders?highlight=${orderId}`);
+    } else {
+      navigate('/orders');
     }
   };
 
@@ -268,11 +271,9 @@ const CreateShipment = () => {
                   console.log('All labels purchased:', purchasedLabels);
                   toast.success(`Successfully purchased ${purchasedLabels.length} labels!`);
                   
-                  // Store all labels and show first one
+                  // Store all labels and show multi-package dialog
                   setMultiPackageLabels(purchasedLabels);
-                  setCurrentLabelIndex(0);
-                  setLabelData(purchasedLabels[0].label);
-                  setShowLabelDialog(true);
+                  setShowMultiPackageDialog(true);
                   
                 } catch (error) {
                   console.error('Multi-package purchase error:', error);
@@ -321,7 +322,13 @@ const CreateShipment = () => {
               trackingUrl: labelData.tracker?.public_url || labelData.tracking_url_provider || '',
               createdAt: new Date().toLocaleString()
             } : undefined}
-            title={multiPackageLabels.length > 0 ? `Package ${currentLabelIndex + 1} of ${multiPackageLabels.length}` : undefined}
+          />
+
+          {/* Multi-Package Label Dialog */}
+          <MultiPackageLabelDialog
+            isOpen={showMultiPackageDialog}
+            onClose={handleMultiPackageDialogClose}
+            packageLabels={multiPackageLabels}
           />
         </div>
       )}
