@@ -26,16 +26,19 @@ export const useSupabaseShipments = () => {
         }
 
         // Get all shipments for the current user with their related order data
+        // Use order_shipments join table to link shipments to orders
         const { data: supabaseShipments, error: shipmentsError } = await supabase
           .from('shipments')
           .select(`
             *,
-            orders!left (
-              id,
-              order_id,
-              customer_name,
-              shipping_address,
-              qboid_dimensions
+            order_shipments!left (
+              orders!inner (
+                id,
+                order_id,
+                customer_name,
+                shipping_address,
+                qboid_dimensions
+              )
             )
           `)
           .eq('user_id', user.id)
@@ -55,7 +58,9 @@ export const useSupabaseShipments = () => {
         
         // Transform Supabase data to match our interface
         const formattedShipments: Shipment[] = supabaseShipments.map(s => {
-          const orderData = Array.isArray(s.orders) ? s.orders[0] : s.orders;
+          // Extract order data from order_shipments join
+          const orderShipment = Array.isArray(s.order_shipments) ? s.order_shipments[0] : s.order_shipments;
+          const orderData = orderShipment?.orders;
           
           // Get weight information
           let weight = 'Unknown';
