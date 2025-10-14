@@ -164,14 +164,26 @@ export const ShippingRatesCardFooter = ({
       
       // Build array of selected rates with their shipment, rate IDs, and box info
       const selectedRates = packageRates.map((pkgRate, index) => {
-        if (!pkgRate.selectedRate) return null;
+        if (!pkgRate.selectedRate) {
+          console.error(`Package ${index + 1}: No rate selected`);
+          return null;
+        }
         
         const selectedRate = pkgRate.selectedRate;
         const provider = (selectedRate as any)?.provider || 'easypost';
         
         // Get the correct shipment ID based on provider from the rate's stored data
-        let shipmentId: string;
+        let shipmentId: string | undefined;
         const storedShipmentData = (selectedRate as any)?._shipment_data;
+        
+        console.log(`Package ${index + 1} debug:`, {
+          provider,
+          rate_shipment_id: (selectedRate as any)?.shipment_id,
+          stored_shippo_id: storedShipmentData?.shippo_shipment?.object_id,
+          stored_easypost_id: storedShipmentData?.easypost_shipment?.id,
+          response_shippo_id: (shipmentResponse as any)?.shippo_shipment?.object_id,
+          response_easypost_id: (shipmentResponse as any)?.easypost_shipment?.id
+        });
         
         if (provider === 'shippo') {
           shipmentId = (selectedRate as any)?.shipment_id || 
@@ -184,11 +196,11 @@ export const ShippingRatesCardFooter = ({
         }
         
         if (!shipmentId) {
-          console.error(`Missing shipment ID for package ${index + 1}, provider: ${provider}`);
+          console.error(`❌ Package ${index + 1}: Missing shipment ID for ${provider}. Selected rate:`, selectedRate);
           return null;
         }
         
-        console.log(`Package ${index + 1}: shipmentId=${shipmentId}, rateId=${selectedRate.id}, provider=${provider}, carrier=${selectedRate.carrier}, service=${selectedRate.service}`);
+        console.log(`✅ Package ${index + 1}: shipmentId=${shipmentId}, rateId=${selectedRate.id}, provider=${provider}, carrier=${selectedRate.carrier}, service=${selectedRate.service}`);
         
         return {
           shipmentId,
@@ -198,7 +210,16 @@ export const ShippingRatesCardFooter = ({
         };
       }).filter(Boolean) as Array<{ shipmentId: string; rateId: string; provider: string; boxId: string | null }>;
       
-      console.log('Purchasing multi-package labels with selected rates:', selectedRates);
+      // Validate we have shipment IDs for all packages
+      if (selectedRates.length === 0) {
+        throw new Error('No packages have valid shipment IDs');
+      }
+      
+      if (selectedRates.length !== packageRates.length) {
+        throw new Error(`Only ${selectedRates.length} of ${packageRates.length} packages have valid shipment IDs. Cannot proceed with purchase.`);
+      }
+      
+      console.log('✅ All packages validated. Purchasing multi-package labels with selected rates:', selectedRates);
       
       // Get addresses from the existing shipment response
       const epTo = (shipmentResponse as any)?.easypost_shipment?.to_address;

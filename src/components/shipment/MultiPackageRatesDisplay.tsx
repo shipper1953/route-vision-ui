@@ -147,12 +147,23 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
   const handlePurchaseAll = async () => {
     if (!canPurchaseAll()) return;
     
+    console.log('🚀 Starting multi-package purchase. Package rates:', packageRates.map((pkg, i) => ({
+      packageIndex: i + 1,
+      hasSelectedRate: !!pkg.selectedRate,
+      rateId: pkg.selectedRate?.id,
+      carrier: pkg.selectedRate?.carrier,
+      service: pkg.selectedRate?.service,
+      provider: (pkg.selectedRate as any)?.provider,
+      hasShipmentId: !!(pkg.selectedRate as any)?.shipment_id,
+      hasShipmentData: !!(pkg.selectedRate as any)?._shipment_data
+    })));
+    
     setPurchasing(true);
     try {
       await onPurchaseAll(packageRates);
     } catch (error) {
       console.error('Purchase failed:', error);
-      toast.error('Failed to purchase labels');
+      toast.error(error instanceof Error ? error.message : 'Failed to purchase labels');
     } finally {
       setPurchasing(false);
     }
