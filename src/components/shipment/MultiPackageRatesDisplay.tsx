@@ -79,12 +79,16 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
         
         const response = await rateService.getRatesFromAllProviders(shipmentData);
         
-        // Add shipment IDs to each rate for later use
+        // Add shipment IDs and full shipment data to each rate for later use
         const allRates = [...(response.rates || []), ...(response.smartRates || [])].map(rate => ({
           ...rate,
           shipment_id: rate.provider === 'shippo' 
             ? response.shippo_shipment?.object_id 
-            : response.easypost_shipment?.id
+            : response.easypost_shipment?.id,
+          _shipment_data: {
+            shippo_shipment: response.shippo_shipment,
+            easypost_shipment: response.easypost_shipment
+          }
         }));
         
         // Auto-select the cheapest rate
@@ -118,13 +122,16 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
   };
 
   const handleRateSelection = (packageIndex: number, rate: SmartRate | Rate) => {
-    const updatedRates = packageRates.map(pkg => 
-      pkg.packageIndex === packageIndex 
-        ? { ...pkg, selectedRate: rate }
-        : pkg
-    );
-    setPackageRates(updatedRates);
-    onRatesCalculated(updatedRates);
+    setPackageRates(prev => {
+      const updatedRates = prev.map(pkg => 
+        pkg.packageIndex === packageIndex 
+          ? { ...pkg, selectedRate: rate }
+          : pkg
+      );
+      // Call onRatesCalculated in next tick to avoid state update conflicts
+      setTimeout(() => onRatesCalculated(updatedRates), 0);
+      return updatedRates;
+    });
   };
 
   const calculateTotalCost = () => {

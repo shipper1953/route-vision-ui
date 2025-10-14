@@ -169,13 +169,26 @@ export const ShippingRatesCardFooter = ({
         const selectedRate = pkgRate.selectedRate;
         const provider = (selectedRate as any)?.provider || 'easypost';
         
-        // Get the correct shipment ID based on provider
+        // Get the correct shipment ID based on provider from the rate's stored data
         let shipmentId: string;
+        const storedShipmentData = (selectedRate as any)?._shipment_data;
+        
         if (provider === 'shippo') {
-          shipmentId = (selectedRate as any)?.shipment_id || (shipmentResponse as any)?.shippo_shipment?.object_id;
+          shipmentId = (selectedRate as any)?.shipment_id || 
+                       storedShipmentData?.shippo_shipment?.object_id || 
+                       (shipmentResponse as any)?.shippo_shipment?.object_id;
         } else {
-          shipmentId = (selectedRate as any)?.shipment_id || (shipmentResponse as any)?.easypost_shipment?.id;
+          shipmentId = (selectedRate as any)?.shipment_id || 
+                       storedShipmentData?.easypost_shipment?.id ||
+                       (shipmentResponse as any)?.easypost_shipment?.id;
         }
+        
+        if (!shipmentId) {
+          console.error(`Missing shipment ID for package ${index + 1}, provider: ${provider}`);
+          return null;
+        }
+        
+        console.log(`Package ${index + 1}: shipmentId=${shipmentId}, rateId=${selectedRate.id}, provider=${provider}, carrier=${selectedRate.carrier}, service=${selectedRate.service}`);
         
         return {
           shipmentId,
