@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Package } from "lucide-react";
+import { LabelService } from "@/services/easypost/labelService";
 
 const CreateShipment = () => {
   const [searchParams] = useSearchParams();
@@ -199,10 +200,76 @@ const CreateShipment = () => {
               fromAddress={shipmentAddresses.from}
               toAddress={shipmentAddresses.to}
               requiredDeliveryDate={requiredDeliveryDate}
-              onPurchaseAll={async (selectedRates) => {
-                console.log('Purchasing all labels with rates:', selectedRates);
-                // TODO: Implement multi-package purchase logic
-                toast.info('Multi-package purchase coming soon!');
+              onPurchaseAll={async (packageRates) => {
+                console.log('Purchasing all labels for packages:', packageRates);
+                
+                try {
+                  const labelService = new (await import('@/services/easypost/labelService')).LabelService('');
+                  const purchasedLabels = [];
+                  
+                  for (let i = 0; i < packageRates.length; i++) {
+                    const pkgRate = packageRates[i];
+                    const rate = pkgRate.selectedRate;
+                    
+                    if (!rate) {
+                      toast.error(`Package ${i + 1} has no selected rate`);
+                      continue;
+                    }
+                    
+                    console.log(`Purchasing label for package ${i + 1}:`, {
+                      provider: rate.provider,
+                      carrier: rate.carrier,
+                      service: rate.service,
+                      rate: rate.rate
+                    });
+                    
+                    // Get shipment ID from rate's stored data
+                    const shipmentId = rate.shipment_id || rate._shipment_data?.easypost_shipment?.id || rate._shipment_data?.shippo_shipment?.object_id;
+                    
+                    if (!shipmentId) {
+                      toast.error(`Package ${i + 1}: No shipment ID found`);
+                      continue;
+                    }
+                    
+                    // Prepare box data for this package
+                    const boxData = {
+                      selectedBoxId: pkgRate.packageDimensions.boxId,
+                      selectedBoxSku: pkgRate.packageDimensions.boxSku,
+                      selectedBoxName: pkgRate.packageDimensions.boxName,
+                    };
+                    
+                    const result = await labelService.purchaseLabel(
+                      shipmentId,
+                      rate.id,
+                      orderId,
+                      rate.provider,
+                      boxData
+                    );
+                    
+                    purchasedLabels.push({
+                      packageIndex: i,
+                      label: result,
+                      rate: rate
+                    });
+                    
+                    toast.success(`Package ${i + 1} label purchased successfully`);
+                  }
+                  
+                  console.log('All labels purchased:', purchasedLabels);
+                  
+                  // Navigate to orders page with highlight
+                  if (orderId) {
+                    navigate(`/orders?highlight=${orderId}`);
+                  } else {
+                    navigate('/orders');
+                  }
+                  
+                  toast.success(`Successfully purchased ${purchasedLabels.length} labels!`);
+                  
+                } catch (error) {
+                  console.error('Multi-package purchase error:', error);
+                  toast.error(error instanceof Error ? error.message : 'Failed to purchase labels');
+                }
               }}
             />
           ) : (

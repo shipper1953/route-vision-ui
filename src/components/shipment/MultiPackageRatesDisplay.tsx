@@ -38,7 +38,7 @@ interface MultiPackageRatesDisplayProps {
   toAddress: any;
   requiredDeliveryDate?: string | null;
   onRatesCalculated?: (totalCost: number, allRates: any[]) => void;
-  onPurchaseAll?: (selectedRates: any[]) => Promise<void>;
+  onPurchaseAll?: (packageRates: PackageRate[]) => Promise<void>;
 }
 
 export const MultiPackageRatesDisplay = ({
@@ -288,8 +288,7 @@ export const MultiPackageRatesDisplay = ({
     
     setPurchasing(true);
     try {
-      const selectedRates = packageRates.map(pkg => pkg.selectedRate).filter(Boolean);
-      await onPurchaseAll(selectedRates);
+      await onPurchaseAll(packageRates);
     } catch (error) {
       console.error('Purchase failed:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to purchase labels');
