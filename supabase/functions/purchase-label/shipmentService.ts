@@ -102,7 +102,7 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
       // Add selected box information
       actual_package_sku: selectedBox?.selectedBoxSku || selectedBox?.selectedBoxName || null,
       // Set actual_package_master_id to trigger inventory decrement
-      actual_package_master_id: selectedBox?.boxId || null
+      actual_package_master_id: selectedBox?.selectedBoxId || selectedBox?.boxId || null
     };
   } else {
     // EasyPost response structure (default)
@@ -134,7 +134,7 @@ export async function saveShipmentToDatabase(purchaseResponse: any, orderId: str
       // Add selected box information
       actual_package_sku: selectedBox?.selectedBoxSku || selectedBox?.selectedBoxName || null,
       // Set actual_package_master_id to trigger inventory decrement
-      actual_package_master_id: selectedBox?.boxId || null
+      actual_package_master_id: selectedBox?.selectedBoxId || selectedBox?.boxId || null
     };
   }
 
