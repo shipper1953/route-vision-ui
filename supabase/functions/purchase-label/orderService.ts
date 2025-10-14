@@ -22,7 +22,7 @@ export async function linkShipmentToOrder(
     console.log(`📝 Strategy 1: Searching for order with numeric id: ${orderId}`);
     const { data: orderById, error: searchError1 } = await supabaseClient
       .from('orders')
-      .select('id, order_id, customer_name, status')
+      .select('id, order_id, customer_name, status, shipment_id')
       .eq('id', parseInt(orderId, 10))
       .maybeSingle();
     
@@ -39,7 +39,7 @@ export async function linkShipmentToOrder(
     console.log(`📝 Strategy 2: Searching for order with exact order_id: "${orderId}"`);
     const { data: orderByOrderId, error: searchError2 } = await supabaseClient
       .from('orders')
-      .select('id, order_id, customer_name, status')
+      .select('id, order_id, customer_name, status, shipment_id')
       .eq('order_id', orderId)
       .maybeSingle();
     
@@ -56,7 +56,7 @@ export async function linkShipmentToOrder(
     console.log(`📝 Strategy 3: Searching for order with case-insensitive order_id: "${orderId}"`);
     const { data: orderByCaseInsensitive, error: searchError3 } = await supabaseClient
       .from('orders')
-      .select('id, order_id, customer_name, status')
+      .select('id, order_id, customer_name, status, shipment_id')
       .ilike('order_id', orderId)
       .maybeSingle();
     
@@ -68,56 +68,65 @@ export async function linkShipmentToOrder(
     }
   }
   
-  // If we found an order, try to update it
+  // If we found an order, process it
   if (foundOrder) {
-    // Check if order is already shipped
-    if (foundOrder.status === 'shipped') {
-      console.log(`⚠️ Order ${foundOrder.order_id} is already shipped, skipping update`);
-      return true; // Return success since order is already in correct state
-    }
+    console.log(`🔄 Processing order ${foundOrder.id} (order_id: ${foundOrder.order_id}) with shipment ${finalShipmentId}`);
     
-    console.log(`🔄 Attempting to update order ${foundOrder.id} (order_id: ${foundOrder.order_id}) with shipment ${finalShipmentId}`);
-    
-    const { data: updatedOrder, error: updateError } = await supabaseClient
-      .from('orders')
-      .update({ 
-        shipment_id: finalShipmentId,
-        status: 'shipped'
-      })
-      .eq('id', foundOrder.id)
-      .select('id, order_id, status, shipment_id');
-    
-    if (!updateError && updatedOrder && updatedOrder.length > 0) {
-      console.log(`✅ Successfully updated order ${orderId} to shipment ${finalShipmentId}:`, updatedOrder[0]);
-      orderUpdateSuccess = true;
-      
-      // CRITICAL: Also create order_shipments record for multi-package support
-      console.log(`🔗 Creating order_shipments link record...`);
-      const { error: linkError } = await supabaseClient
-        .from('order_shipments')
-        .insert({
-          order_id: foundOrder.id,
+    // Only update orders.shipment_id if it's not already set (first package)
+    if (!foundOrder.shipment_id) {
+      console.log(`📝 Setting initial shipment_id on order`);
+      const { error: updateError } = await supabaseClient
+        .from('orders')
+        .update({ 
           shipment_id: finalShipmentId,
-          package_index: packageMetadata?.packageIndex || 0,
-          package_info: packageMetadata ? {
-            boxName: packageMetadata.boxData.name,
-            boxDimensions: {
-              length: packageMetadata.boxData.length,
-              width: packageMetadata.boxData.width,
-              height: packageMetadata.boxData.height
-            },
-            items: packageMetadata.items,
-            weight: packageMetadata.weight
-          } : null
-        });
+          status: 'shipped'
+        })
+        .eq('id', foundOrder.id);
       
-      if (linkError) {
-        console.error(`❌ Failed to create order_shipments record:`, linkError);
+      if (updateError) {
+        console.error(`❌ Failed to update order:`, updateError);
       } else {
-        console.log(`✅ Created order_shipments link record`);
+        console.log(`✅ Set shipment_id ${finalShipmentId} on order`);
+        orderUpdateSuccess = true;
       }
     } else {
-      console.error(`❌ Failed to update order ${foundOrder.id}:`, updateError);
+      console.log(`ℹ️ Order already has shipment_id ${foundOrder.shipment_id}, keeping it`);
+      
+      // Just update status if needed
+      if (foundOrder.status !== 'shipped') {
+        await supabaseClient
+          .from('orders')
+          .update({ status: 'shipped' })
+          .eq('id', foundOrder.id);
+      }
+      orderUpdateSuccess = true;
+    }
+    
+    // ALWAYS create order_shipments record (even for subsequent packages)
+    console.log(`🔗 Creating order_shipments link record for package ${packageMetadata?.packageIndex || 0}...`);
+    const { error: linkError } = await supabaseClient
+      .from('order_shipments')
+      .insert({
+        order_id: foundOrder.id,
+        shipment_id: finalShipmentId,
+        package_index: packageMetadata?.packageIndex || 0,
+        package_info: packageMetadata ? {
+          boxName: packageMetadata.boxData.name,
+          boxDimensions: {
+            length: packageMetadata.boxData.length,
+            width: packageMetadata.boxData.width,
+            height: packageMetadata.boxData.height
+          },
+          items: packageMetadata.items,
+          weight: packageMetadata.weight
+        } : null
+      });
+    
+    if (linkError) {
+      console.error(`❌ Failed to create order_shipments record:`, linkError);
+      orderUpdateSuccess = false;
+    } else {
+      console.log(`✅ Created order_shipments link record`);
     }
   } else {
     console.error(`❌ Order ${orderId} not found in database using any strategy`);
