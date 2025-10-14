@@ -98,7 +98,7 @@ export const HistoricalBoxUsageSimplified = () => {
         .from('boxes')
         .select('sku, name, length, width, height, cost')
         .eq('company_id', userProfile.company_id)
-        .in('sku', boxSkus);
+        .in('name', boxSkus);
 
       if (boxError) throw boxError;
       
@@ -108,7 +108,7 @@ export const HistoricalBoxUsageSimplified = () => {
       // Combine data
       const usageData: BoxUsageData[] = Array.from(boxUsageMap.entries())
         .map(([sku, usage]) => {
-          const boxInfo = boxes?.find(b => b.sku === sku);
+          const boxInfo = boxes?.find(b => b.name === sku);
           const sortedDates = usage.dates.sort((a, b) => a.getTime() - b.getTime());
           
           if (!boxInfo) {
