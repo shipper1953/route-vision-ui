@@ -399,7 +399,7 @@ export const ShippingRatesCardFooter = ({
             className={purchasing ? "bg-transparent hover:bg-transparent border-transparent" : "bg-tms-blue hover:bg-tms-blue-400 gap-1"}
           >
             {purchasing ? (
-              <LoadingSpinner size={100} className="[&>span]:hidden [&>div]:bg-transparent tornado-360-spin" />
+              <LoadingSpinner size={100} className="[&>span]:opacity-0 [&>div]:bg-transparent tornado-360-spin" />
             ) : (
               <>
                 {multiParcelsCount > 1 ? `Buy ${multiParcelsCount} Labels` : 'Buy Shipping Label'}
