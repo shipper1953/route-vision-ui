@@ -76,8 +76,24 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
       .select('id, order_id, status, shipment_id');
     
     if (!updateError && updatedOrder && updatedOrder.length > 0) {
-      console.log(`✅ Successfully linked order ${orderId} to shipment ${finalShipmentId}:`, updatedOrder[0]);
+      console.log(`✅ Successfully updated order ${orderId} to shipment ${finalShipmentId}:`, updatedOrder[0]);
       orderUpdateSuccess = true;
+      
+      // CRITICAL: Also create order_shipments record for multi-package support
+      console.log(`🔗 Creating order_shipments link record...`);
+      const { error: linkError } = await supabaseClient
+        .from('order_shipments')
+        .insert({
+          order_id: foundOrder.id,
+          shipment_id: finalShipmentId,
+          package_index: 0 // TODO: Get actual package index for multi-package shipments
+        });
+      
+      if (linkError) {
+        console.error(`❌ Failed to create order_shipments record:`, linkError);
+      } else {
+        console.log(`✅ Created order_shipments link record`);
+      }
     } else {
       console.error(`❌ Failed to update order ${foundOrder.id}:`, updateError);
     }

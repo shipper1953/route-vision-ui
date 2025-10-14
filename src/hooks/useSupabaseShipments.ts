@@ -25,29 +25,16 @@ export const useSupabaseShipments = () => {
           return;
         }
 
-        // Get all shipments for the current user with their related order data
-        // Use order_shipments join table to link shipments to orders
+        // Get all shipments for the current user
         const { data: supabaseShipments, error: shipmentsError } = await supabase
           .from('shipments')
-          .select(`
-            *,
-            order_shipments!left (
-              orders!left (
-                id,
-                order_id,
-                customer_name,
-                shipping_address,
-                qboid_dimensions
-              )
-            )
-          `)
+          .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
         console.log("Supabase shipments query result:", { 
           count: supabaseShipments?.length, 
-          error: shipmentsError,
-          sampleData: supabaseShipments?.[0]
+          error: shipmentsError
         });
         
         if (shipmentsError) {
@@ -59,17 +46,36 @@ export const useSupabaseShipments = () => {
           setShipments([]);
           return;
         }
+
+        // Get order data for these shipments using the old linking method
+        // (orders.shipment_id = shipments.id)
+        const shipmentIds = supabaseShipments.map(s => s.id);
+        
+        const { data: linkedOrders } = await supabase
+          .from('orders')
+          .select('id, order_id, customer_name, shipping_address, qboid_dimensions, shipment_id')
+          .in('shipment_id', shipmentIds);
+        
+        // Create a map of shipment_id -> order data
+        const shipmentToOrderMap = new Map();
+        
+        linkedOrders?.forEach(order => {
+          if (order.shipment_id) {
+            shipmentToOrderMap.set(order.shipment_id, {
+              id: order.id,
+              order_id: order.order_id,
+              customer_name: order.customer_name,
+              shipping_address: order.shipping_address,
+              qboid_dimensions: order.qboid_dimensions
+            });
+          }
+        });
+        
+        console.log(`Found order data for ${shipmentToOrderMap.size} of ${supabaseShipments.length} shipments`);
         
         // Transform Supabase data to match our interface
         const formattedShipments: Shipment[] = supabaseShipments.map(s => {
-          // Extract order data from order_shipments join
-          console.log("Processing shipment:", {
-            shipmentId: s.id,
-            orderShipmentsRaw: s.order_shipments
-          });
-          const orderShipment = Array.isArray(s.order_shipments) ? s.order_shipments[0] : s.order_shipments;
-          const orderData = orderShipment?.orders;
-          console.log("Extracted order data:", { orderData });
+          const orderData = shipmentToOrderMap.get(s.id);
           
           // Get weight information
           let weight = 'Unknown';
