@@ -63,8 +63,7 @@ export class BulkShippingService {
             selectedRate.id,
             order.id,
             undefined, // provider - let it default
-            selectedBoxData,
-            parseFloat(selectedRate.rate) // Pass the expected cost
+            selectedBoxData
           );
 
           console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
