@@ -69,8 +69,33 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
     throw new Error("No warehouse available for this user or company. Please contact your administrator to set up a warehouse.");
   }
 
-  // Generate a unique order ID
-  const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+  // Generate a unique order ID with retry logic
+  let orderId: string;
+  let attempts = 0;
+  const maxAttempts = 10;
+  
+  while (attempts < maxAttempts) {
+    orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+    
+    // Check if this ID already exists
+    const { data: existingOrder } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    
+    if (!existingOrder) {
+      // ID is unique, we can use it
+      break;
+    }
+    
+    attempts++;
+    console.log(`Order ID ${orderId} already exists, trying again... (attempt ${attempts}/${maxAttempts})`);
+  }
+  
+  if (attempts >= maxAttempts) {
+    throw new Error("Failed to generate unique order ID after multiple attempts");
+  }
 
   // Prepare items data - include both legacy format and detailed items
   const itemsData = orderData.orderItems && orderData.orderItems.length > 0 
