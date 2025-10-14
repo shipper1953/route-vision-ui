@@ -42,7 +42,15 @@ export class LabelService {
     service?: string;
     to: any;
     from: any;
-    selectedRates?: Array<{ shipmentId: string; rateId: string; provider: string; boxId?: string | null }>;
+    selectedRates?: Array<{ 
+      shipmentId: string; 
+      rateId: string; 
+      provider: string; 
+      boxId?: string | null;
+      boxData?: { name: string; length: number; width: number; height: number };
+      items?: Array<any>;
+      packageIndex?: number;
+    }>;
   }): Promise<any> {
     try {
       if (!this.useEdgeFunctions) {
@@ -143,7 +151,13 @@ export class LabelService {
     provider?: string,
     selectedBoxData?: any,
     originalCost?: number | null,
-    markedUpCost?: number | null
+    markedUpCost?: number | null,
+    packageMetadata?: {
+      packageIndex: number;
+      items: Array<any>;
+      boxData: { name: string; length: number; width: number; height: number };
+      weight: number;
+    }
   ): Promise<any> {
     const requestBody: any = { shipmentId, rateId };
     
@@ -175,6 +189,12 @@ export class LabelService {
       console.log('Including marked-up cost in edge function request:', markedUpCost);
     }
 
+    // Include package metadata if provided
+    if (packageMetadata) {
+      requestBody.packageMetadata = packageMetadata;
+      console.log('Including package metadata in edge function request:', packageMetadata);
+    }
+
     console.log('Calling purchase-label edge function with:', requestBody);
 
     // Always use Supabase functions client to avoid URL/env issues
@@ -199,7 +219,15 @@ export class LabelService {
     service?: string;
     to: any;
     from: any;
-    selectedRates?: Array<{ shipmentId: string; rateId: string; provider: string; boxId?: string | null }>;
+    selectedRates?: Array<{ 
+      shipmentId: string; 
+      rateId: string; 
+      provider: string; 
+      boxId?: string | null;
+      boxData?: { name: string; length: number; width: number; height: number };
+      items?: Array<any>;
+      packageIndex?: number;
+    }>;
   }): Promise<{ results: any[]; errors: any[] }> {
     const { packages, orderId, selectedRates } = params;
     const results: any[] = [];
@@ -210,20 +238,31 @@ export class LabelService {
       console.log('Using pre-selected rates for multi-package purchase:', selectedRates);
       
       for (let i = 0; i < selectedRates.length; i++) {
-        const { shipmentId, rateId, provider, boxId } = selectedRates[i];
+        const { shipmentId, rateId, provider, boxId, boxData, items, packageIndex } = selectedRates[i];
         
         try {
-          console.log(`Purchasing label ${i + 1}/${selectedRates.length}:`, { shipmentId, rateId, provider, boxId });
+          console.log(`Purchasing label ${i + 1}/${selectedRates.length}:`, { shipmentId, rateId, provider, boxId, packageIndex });
           
           // Build selected box data if we have a box ID
           const selectedBoxData = boxId ? { boxId } : undefined;
+          
+          // Build package metadata if we have items and box data
+          const packageMetadata = items && boxData ? {
+            packageIndex: packageIndex !== undefined ? packageIndex : i,
+            items,
+            boxData,
+            weight: packages[i].weight
+          } : undefined;
           
           const result = await this.purchaseLabelViaEdgeFunction(
             shipmentId,
             rateId,
             orderId,
             provider,
-            selectedBoxData
+            selectedBoxData,
+            undefined, // originalCost
+            undefined, // markedUpCost
+            packageMetadata
           );
           
           results.push({ purchase: result, index: i });

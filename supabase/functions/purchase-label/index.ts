@@ -287,7 +287,8 @@ serve(async (req) => {
       provider, 
       selectedBox,
       originalCost = null,
-      markedUpCost = null
+      markedUpCost = null,
+      packageMetadata = null
     } = requestBody
     
     console.log('🔍 Extracted parameters:', { shipmentId, rateId, orderId, provider })
@@ -410,7 +411,7 @@ serve(async (req) => {
     if (orderId && finalShipmentId) {
       try {
         console.log('🔗 Linking order to shipment...')
-        const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId)
+        const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId, packageMetadata)
         if (linkSuccess) {
           console.log('✅ Order successfully linked to shipment')
           // Fire Slack notification for "order shipped"

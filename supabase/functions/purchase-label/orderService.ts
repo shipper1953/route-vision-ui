@@ -1,6 +1,18 @@
-
-export async function linkShipmentToOrder(supabaseClient: any, orderId: string, finalShipmentId: number) {
+export async function linkShipmentToOrder(
+  supabaseClient: any, 
+  orderId: string, 
+  finalShipmentId: number,
+  packageMetadata?: {
+    packageIndex: number;
+    items: Array<any>;
+    boxData: { name: string; length: number; width: number; height: number };
+    weight: number;
+  }
+) {
   console.log(`🔗 Linking order ${orderId} to shipment ${finalShipmentId}`);
+  if (packageMetadata) {
+    console.log(`📦 Package metadata:`, packageMetadata);
+  }
   
   let orderUpdateSuccess = false;
   let foundOrder = null;
@@ -86,7 +98,17 @@ export async function linkShipmentToOrder(supabaseClient: any, orderId: string, 
         .insert({
           order_id: foundOrder.id,
           shipment_id: finalShipmentId,
-          package_index: 0 // TODO: Get actual package index for multi-package shipments
+          package_index: packageMetadata?.packageIndex || 0,
+          package_info: packageMetadata ? {
+            boxName: packageMetadata.boxData.name,
+            boxDimensions: {
+              length: packageMetadata.boxData.length,
+              width: packageMetadata.boxData.width,
+              height: packageMetadata.boxData.height
+            },
+            items: packageMetadata.items,
+            weight: packageMetadata.weight
+          } : null
         });
       
       if (linkError) {

@@ -139,8 +139,9 @@ export const ShippingRatesCardFooter = ({
     try {
       const labelService = new LabelService('');
       
-      // Fetch order cartonization data to get box IDs
+      // Fetch order cartonization data to get box IDs and items
       let packageBoxIds: (string | null)[] = [];
+      let cartonizationData: any = null;
       
       if (orderId) {
         try {
@@ -149,6 +150,8 @@ export const ShippingRatesCardFooter = ({
             .select('packages, recommended_box_id')
             .eq('order_id', typeof orderId === 'string' ? parseInt(orderId, 10) : orderId)
             .single();
+          
+          cartonizationData = cartonData;
           
           console.log('📦 Cartonization data:', cartonData);
           
@@ -205,7 +208,7 @@ export const ShippingRatesCardFooter = ({
         console.log('⚠️ No valid box IDs found, using null for all packages');
       }
       
-      // Build array of selected rates with their shipment, rate IDs, and box info
+      // Build array of selected rates with their shipment, rate IDs, box info, and items
       const selectedRates = packageRates.map((pkgRate, index) => {
         if (!pkgRate.selectedRate) {
           console.error(`Package ${index + 1}: No rate selected`);
@@ -214,6 +217,30 @@ export const ShippingRatesCardFooter = ({
         
         const selectedRate = pkgRate.selectedRate;
         const provider = (selectedRate as any)?.provider || 'easypost';
+        
+        // Get items and box data for this package from cartonization
+        let packageItems: any[] = [];
+        let boxData: { name: string; length: number; width: number; height: number } | null = null;
+        
+        if (cartonizationData?.packages?.[index]) {
+          const pkg = cartonizationData.packages[index];
+          packageItems = pkg.items || [];
+          
+          if (pkg.box || pkg.boxName) {
+            boxData = {
+              name: pkg.boxName || pkg.box?.name || 'Unknown',
+              length: pkg.box?.length || pkgRate.dimensions.length,
+              width: pkg.box?.width || pkgRate.dimensions.width,
+              height: pkg.box?.height || pkgRate.dimensions.height
+            };
+          }
+        }
+        
+        console.log(`📦 Package ${index + 1} items and box:`, { 
+          itemCount: packageItems.length, 
+          boxName: boxData?.name,
+          items: packageItems 
+        });
         
         // Get the correct shipment ID based on provider from the rate's stored data
         let shipmentId: string | undefined;
@@ -249,9 +276,20 @@ export const ShippingRatesCardFooter = ({
           shipmentId,
           rateId: selectedRate.id,
           provider,
-          boxId: packageBoxIds[index] || null
+          boxId: packageBoxIds[index] || null,
+          boxData: boxData || undefined,
+          items: packageItems.length > 0 ? packageItems : undefined,
+          packageIndex: index
         };
-      }).filter(Boolean) as Array<{ shipmentId: string; rateId: string; provider: string; boxId: string | null }>;
+      }).filter(Boolean) as Array<{ 
+        shipmentId: string; 
+        rateId: string; 
+        provider: string; 
+        boxId: string | null;
+        boxData?: { name: string; length: number; width: number; height: number };
+        items?: Array<any>;
+        packageIndex: number;
+      }>;
       
       // Validate we have shipment IDs for all packages
       if (selectedRates.length === 0) {
