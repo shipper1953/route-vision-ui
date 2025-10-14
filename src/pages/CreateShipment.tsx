@@ -215,37 +215,45 @@ const CreateShipment = () => {
               toAddress={shipmentAddresses.to}
               requiredDeliveryDate={requiredDeliveryDate}
               onPurchaseAll={async (packageRates) => {
-                console.log('Purchasing all labels for packages:', packageRates);
+                console.log('🚀 Starting multi-package purchase for', packageRates.length, 'packages');
+                console.log('Package rates data:', JSON.stringify(packageRates, null, 2));
                 
                 // Prevent multiple simultaneous purchases
                 if (isPurchasingLabels) {
+                  console.warn('⚠️ Purchase already in progress, blocking duplicate request');
                   toast.warning('Label purchase already in progress');
                   return;
                 }
                 
                 setIsPurchasingLabels(true);
                 const purchasedLabels = [];
-                let hasErrors = false;
+                const errors = [];
                 
                 try {
                   const labelService = new LabelService('');
-                  toast.info(`Purchasing labels for ${packageRates.length} packages...`);
+                  toast.info(`Starting purchase of ${packageRates.length} package labels...`);
                   
+                  // Process each package individually with detailed logging
                   for (let i = 0; i < packageRates.length; i++) {
+                    console.log(`\n📦 Processing package ${i + 1} of ${packageRates.length}`);
                     const pkgRate = packageRates[i];
                     const rate = pkgRate.selectedRate;
                     
+                    // Validation checks
                     if (!rate) {
-                      toast.error(`Package ${i + 1} has no selected rate`);
-                      hasErrors = true;
+                      const errorMsg = `Package ${i + 1}: No rate selected`;
+                      console.error(`❌ ${errorMsg}`);
+                      errors.push(errorMsg);
+                      toast.error(errorMsg);
                       continue;
                     }
                     
-                    console.log(`Purchasing label for package ${i + 1}:`, {
+                    console.log(`Package ${i + 1} rate details:`, {
                       provider: rate.provider,
                       carrier: rate.carrier,
                       service: rate.service,
-                      rate: rate.rate
+                      rate: rate.rate,
+                      id: rate.id
                     });
                     
                     try {
@@ -253,10 +261,15 @@ const CreateShipment = () => {
                       const shipmentId = rate.shipment_id || rate._shipment_data?.easypost_shipment?.id || rate._shipment_data?.shippo_shipment?.object_id;
                       
                       if (!shipmentId) {
-                        toast.error(`Package ${i + 1}: No shipment ID found`);
-                        hasErrors = true;
+                        const errorMsg = `Package ${i + 1}: No shipment ID found in rate data`;
+                        console.error(`❌ ${errorMsg}`);
+                        console.log('Rate object:', rate);
+                        errors.push(errorMsg);
+                        toast.error(errorMsg);
                         continue;
                       }
+                      
+                      console.log(`Package ${i + 1} shipment ID:`, shipmentId);
                       
                       // Prepare box data for this package
                       const boxData = {
@@ -264,6 +277,9 @@ const CreateShipment = () => {
                         selectedBoxSku: pkgRate.packageDimensions.boxSku,
                         selectedBoxName: pkgRate.packageDimensions.boxName,
                       };
+                      
+                      console.log(`Package ${i + 1} box data:`, boxData);
+                      console.log(`🔄 Calling labelService.purchaseLabel for package ${i + 1}...`);
                       
                       const result = await labelService.purchaseLabel(
                         shipmentId,
@@ -273,28 +289,49 @@ const CreateShipment = () => {
                         boxData
                       );
                       
+                      console.log(`✅ Package ${i + 1} label purchased successfully:`, {
+                        tracking: result.tracking_code || result.tracking_number,
+                        labelUrl: result.postage_label?.label_url || result.label_url
+                      });
+                      
                       purchasedLabels.push({
                         packageIndex: i,
                         label: result,
                         rate: rate
                       });
                       
-                      console.log(`✅ Package ${i + 1} label purchased successfully`);
                       toast.success(`Package ${i + 1} of ${packageRates.length} label purchased`);
                       
+                      // Add small delay between purchases to avoid rate limits
+                      if (i < packageRates.length - 1) {
+                        console.log(`⏳ Waiting 500ms before next purchase...`);
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                      }
+                      
                     } catch (error) {
-                      console.error(`Error purchasing label for package ${i + 1}:`, error);
-                      toast.error(`Failed to purchase label for package ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                      hasErrors = true;
+                      const errorMsg = `Package ${i + 1} purchase failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                      console.error(`❌ ${errorMsg}`);
+                      console.error('Full error:', error);
+                      errors.push(errorMsg);
+                      toast.error(`Failed: Package ${i + 1}`);
+                      // Continue to next package even if this one fails
                     }
                   }
                   
-                  console.log('Purchase complete. Total labels purchased:', purchasedLabels.length);
+                  console.log('\n📊 Purchase summary:');
+                  console.log(`   Success: ${purchasedLabels.length}`);
+                  console.log(`   Errors: ${errors.length}`);
+                  console.log(`   Total: ${packageRates.length}`);
                   
-                  // Only show dialog if we have at least one successful label
+                  // Show results
                   if (purchasedLabels.length > 0) {
-                    console.log('Opening multi-package dialog with labels:', purchasedLabels);
-                    toast.success(`Successfully purchased ${purchasedLabels.length} of ${packageRates.length} labels!`);
+                    console.log('✅ Opening multi-package dialog with', purchasedLabels.length, 'labels');
+                    
+                    if (errors.length > 0) {
+                      toast.warning(`Purchased ${purchasedLabels.length} of ${packageRates.length} labels. ${errors.length} failed.`);
+                    } else {
+                      toast.success(`Successfully purchased all ${purchasedLabels.length} labels!`);
+                    }
                     
                     // Use a small delay to ensure state is set properly
                     setTimeout(() => {
@@ -302,14 +339,16 @@ const CreateShipment = () => {
                       setShowMultiPackageDialog(true);
                     }, 100);
                   } else {
-                    toast.error('No labels were purchased successfully');
+                    console.error('❌ No labels were purchased successfully');
+                    toast.error('Failed to purchase any labels. Check console for details.');
                   }
                   
                 } catch (error) {
-                  console.error('Multi-package purchase error:', error);
+                  console.error('💥 Fatal error in multi-package purchase:', error);
                   toast.error(error instanceof Error ? error.message : 'Failed to purchase labels');
                 } finally {
                   setIsPurchasingLabels(false);
+                  console.log('🏁 Multi-package purchase process complete\n');
                 }
               }}
             />
