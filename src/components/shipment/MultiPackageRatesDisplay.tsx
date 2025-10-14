@@ -38,14 +38,19 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
   const [loading, setLoading] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [expandedPackages, setExpandedPackages] = useState<Set<number>>(new Set());
+  const [hasCalculated, setHasCalculated] = useState(false);
 
   useEffect(() => {
-    if (packages.length > 0 && toAddress && fromAddress) {
+    if (packages.length > 0 && toAddress && fromAddress && !hasCalculated) {
+      console.log('🔄 Initial rate calculation triggered');
       calculateRatesForAllPackages();
+    } else if (hasCalculated) {
+      console.log('⏸️ Rate calculation skipped - already calculated');
     }
-  }, [packages, toAddress, fromAddress]);
+  }, [packages, toAddress, fromAddress, hasCalculated]);
 
   const calculateRatesForAllPackages = async () => {
+    console.log('🚀 Starting rate calculation for', packages.length, 'packages');
     setLoading(true);
     const rateService = new RateShoppingService();
     
@@ -75,7 +80,7 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
           }
         };
 
-        console.log(`Getting rates for package ${i + 1}:`, shipmentData);
+        console.log(`📦 Package ${i + 1}: Getting rates...`);
         
         const response = await rateService.getRatesFromAllProviders(shipmentData);
         
@@ -91,10 +96,16 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
           }
         }));
         
-        // Auto-select the cheapest rate
-        const cheapestRate = allRates.reduce((prev, current) => 
-          parseFloat(current.rate) < parseFloat(prev.rate) ? current : prev
-        );
+        console.log(`📦 Package ${i + 1}: Found ${allRates.length} rates`);
+        
+        // Auto-select the cheapest rate ONLY on initial load
+        const cheapestRate = allRates.length > 0 
+          ? allRates.reduce((prev, current) => 
+              parseFloat(current.rate) < parseFloat(prev.rate) ? current : prev
+            )
+          : undefined;
+
+        console.log(`📦 Package ${i + 1}: Auto-selected cheapest rate:`, cheapestRate?.carrier, cheapestRate?.service, `$${cheapestRate?.rate}`);
 
         updatedPackageRates[i] = {
           ...updatedPackageRates[i],
@@ -107,7 +118,7 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
         setPackageRates([...updatedPackageRates]);
         
       } catch (error) {
-        console.error(`Error getting rates for package ${i + 1}:`, error);
+        console.error(`❌ Package ${i + 1}: Error getting rates:`, error);
         updatedPackageRates[i] = {
           ...updatedPackageRates[i],
           error: error instanceof Error ? error.message : 'Failed to get rates',
@@ -118,18 +129,29 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
     }
     
     setLoading(false);
+    setHasCalculated(true);
+    console.log('✅ Rate calculation complete for all packages');
     onRatesCalculated(updatedPackageRates);
   };
 
   const handleRateSelection = (packageIndex: number, rate: SmartRate | Rate) => {
+    console.log(`👆 User selected rate for package ${packageIndex + 1}:`, rate.carrier, rate.service, `$${rate.rate}`);
+    
     setPackageRates(prev => {
       const updatedRates = prev.map(pkg => 
         pkg.packageIndex === packageIndex 
           ? { ...pkg, selectedRate: rate }
           : pkg
       );
+      
+      console.log('✅ Updated package rates with user selection');
+      
       // Call onRatesCalculated in next tick to avoid state update conflicts
-      setTimeout(() => onRatesCalculated(updatedRates), 0);
+      setTimeout(() => {
+        console.log('📤 Notifying parent of rate change');
+        onRatesCalculated(updatedRates);
+      }, 0);
+      
       return updatedRates;
     });
   };
