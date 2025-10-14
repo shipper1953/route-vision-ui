@@ -36,6 +36,8 @@ const CreateShipment = () => {
   const [requiredDeliveryDate, setRequiredDeliveryDate] = useState<string | null>(null);
   const [shipmentAddresses, setShipmentAddresses] = useState<{ from: any; to: any } | null>(null);
   const [multiParcels, setMultiParcels] = useState<any[]>([]);
+  const [multiPackageLabels, setMultiPackageLabels] = useState<any[]>([]);
+  const [currentLabelIndex, setCurrentLabelIndex] = useState(0);
   
   // Detect if this is a multi-package shipment (check if we have multiple parcels)
   const isMultiPackage = multiParcels && multiParcels.length > 1;
@@ -110,11 +112,19 @@ const CreateShipment = () => {
 
   // Handle dialog close and navigate to orders page
   const handleDialogClose = () => {
-    setShowLabelDialog(false);
-    if (orderId) {
-      navigate(`/orders?highlight=${orderId}`);
+    // If we're showing multi-package labels, show next label or navigate
+    if (multiPackageLabels.length > 0 && currentLabelIndex < multiPackageLabels.length - 1) {
+      setCurrentLabelIndex(currentLabelIndex + 1);
+      setLabelData(multiPackageLabels[currentLabelIndex + 1].label);
     } else {
-      navigate('/orders');
+      setShowLabelDialog(false);
+      setMultiPackageLabels([]);
+      setCurrentLabelIndex(0);
+      if (orderId) {
+        navigate(`/orders?highlight=${orderId}`);
+      } else {
+        navigate('/orders');
+      }
     }
   };
 
@@ -204,7 +214,7 @@ const CreateShipment = () => {
                 console.log('Purchasing all labels for packages:', packageRates);
                 
                 try {
-                  const labelService = new (await import('@/services/easypost/labelService')).LabelService('');
+                  const labelService = new LabelService('');
                   const purchasedLabels = [];
                   
                   for (let i = 0; i < packageRates.length; i++) {
@@ -256,15 +266,13 @@ const CreateShipment = () => {
                   }
                   
                   console.log('All labels purchased:', purchasedLabels);
-                  
-                  // Navigate to orders page with highlight
-                  if (orderId) {
-                    navigate(`/orders?highlight=${orderId}`);
-                  } else {
-                    navigate('/orders');
-                  }
-                  
                   toast.success(`Successfully purchased ${purchasedLabels.length} labels!`);
+                  
+                  // Store all labels and show first one
+                  setMultiPackageLabels(purchasedLabels);
+                  setCurrentLabelIndex(0);
+                  setLabelData(purchasedLabels[0].label);
+                  setShowLabelDialog(true);
                   
                 } catch (error) {
                   console.error('Multi-package purchase error:', error);
@@ -313,6 +321,7 @@ const CreateShipment = () => {
               trackingUrl: labelData.tracker?.public_url || labelData.tracking_url_provider || '',
               createdAt: new Date().toLocaleString()
             } : undefined}
+            title={multiPackageLabels.length > 0 ? `Package ${currentLabelIndex + 1} of ${multiPackageLabels.length}` : undefined}
           />
         </div>
       )}

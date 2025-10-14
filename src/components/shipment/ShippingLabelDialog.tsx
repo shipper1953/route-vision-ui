@@ -23,6 +23,7 @@ interface ShippingLabelDialogProps {
   labelUrl: string | undefined;
   shipmentId: string;
   orderDetails?: OrderDetails;
+  title?: string;
 }
 
 export const ShippingLabelDialog = ({
@@ -30,7 +31,8 @@ export const ShippingLabelDialog = ({
   onClose,
   labelUrl,
   shipmentId,
-  orderDetails
+  orderDetails,
+  title
 }: ShippingLabelDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [iframeError, setIframeError] = useState(false);
@@ -103,7 +105,7 @@ export const ShippingLabelDialog = ({
           <SheetTitle>
             <div className="flex items-center gap-2 text-green-500">
               <PackageCheck className="w-5 h-5" />
-              <span>Label Purchased</span>
+              <span>{title || 'Label Purchased'}</span>
             </div>
           </SheetTitle>
         </SheetHeader>
