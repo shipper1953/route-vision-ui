@@ -150,16 +150,54 @@ export const ShippingRatesCardFooter = ({
             .eq('order_id', typeof orderId === 'string' ? parseInt(orderId, 10) : orderId)
             .single();
           
+          console.log('📦 Cartonization data:', cartonData);
+          
           if (cartonData?.packages && Array.isArray(cartonData.packages)) {
             // Extract box IDs from each package
-            packageBoxIds = cartonData.packages.map((pkg: any) => pkg.box_id || cartonData.recommended_box_id);
+            const potentialBoxIds = cartonData.packages.map((pkg: any) => pkg.box_id || cartonData.recommended_box_id);
+            
+            // Validate that box IDs actually exist in the boxes table
+            if (potentialBoxIds.some(id => id)) {
+              const validBoxIds = potentialBoxIds.filter(id => id);
+              if (validBoxIds.length > 0) {
+                const { data: validBoxes } = await supabase
+                  .from('boxes')
+                  .select('id')
+                  .in('id', validBoxIds);
+                
+                const validBoxIdSet = new Set(validBoxes?.map(b => b.id) || []);
+                console.log('✅ Valid box IDs from database:', Array.from(validBoxIdSet));
+                
+                // Only use box IDs that actually exist
+                packageBoxIds = potentialBoxIds.map(id => validBoxIdSet.has(id) ? id : null);
+              }
+            }
+            
+            console.log('📦 Final package box IDs:', packageBoxIds);
           } else if (cartonData?.recommended_box_id) {
-            // Fallback: use single recommended box for all packages
-            packageBoxIds = packageRates.map(() => cartonData.recommended_box_id);
+            // Validate the recommended box exists
+            const { data: validBox } = await supabase
+              .from('boxes')
+              .select('id')
+              .eq('id', cartonData.recommended_box_id)
+              .single();
+            
+            if (validBox) {
+              packageBoxIds = packageRates.map(() => cartonData.recommended_box_id);
+              console.log('📦 Using validated recommended box for all packages:', cartonData.recommended_box_id);
+            } else {
+              console.warn('❌ Recommended box ID does not exist:', cartonData.recommended_box_id);
+            }
           }
         } catch (error) {
-          console.warn('Failed to fetch box IDs from cartonization:', error);
+          console.error('❌ Failed to fetch/validate box IDs:', error);
         }
+      }
+      
+      // Ensure packageBoxIds array matches packageRates length
+      if (packageBoxIds.length === 0) {
+        packageBoxIds = packageRates.map(() => null);
+        console.log('⚠️ No valid box IDs found, using null for all packages');
       }
       
       // Build array of selected rates with their shipment, rate IDs, and box info
@@ -225,6 +263,8 @@ export const ShippingRatesCardFooter = ({
       const epTo = (shipmentResponse as any)?.easypost_shipment?.to_address;
       const epFrom = (shipmentResponse as any)?.easypost_shipment?.from_address;
       
+      console.log('📍 Addresses for purchase:', { to: epTo?.city, from: epFrom?.city });
+      
       const result = await labelService.purchaseMultipleLabels({
         packages: packageRates.map(pkgRate => pkgRate.dimensions),
         orderId,
@@ -232,11 +272,15 @@ export const ShippingRatesCardFooter = ({
         from: epFrom || {},
         selectedRates
       });
+      
+      console.log('📋 Purchase result:', result);
 
       // Process results into label format
       const labels: any[] = [];
       if (result?.results) {
-        result.results.forEach((r: any) => {
+        console.log(`✅ Processing ${result.results.length} results`);
+        result.results.forEach((r: any, idx: number) => {
+          console.log(`Processing result ${idx + 1}:`, r);
           const p = r.purchase || r;
           const labelUrl = p?.postage_label?.label_url || p?.label_url;
           if (labelUrl) {
@@ -247,8 +291,17 @@ export const ShippingRatesCardFooter = ({
               carrier: p?.selected_rate?.carrier || p?.rate?.carrier || p?.carrier || 'Unknown',
               service: p?.selected_rate?.service || p?.rate?.service || p?.service || 'Unknown',
             });
+            console.log(`✅ Label ${labels.length} extracted:`, labels[labels.length - 1]);
+          } else {
+            console.warn(`❌ No label URL found in result ${idx + 1}:`, p);
           }
         });
+      } else {
+        console.error('❌ No results in response:', result);
+      }
+      
+      if (result?.errors && result.errors.length > 0) {
+        console.error('❌ Errors during purchase:', result.errors);
       }
 
       if (labels.length > 0) {
