@@ -139,8 +139,31 @@ export const ShippingRatesCardFooter = ({
     try {
       const labelService = new LabelService('');
       
-      // Build array of selected rates with their shipment and rate IDs
-      const selectedRates = packageRates.map((pkgRate) => {
+      // Fetch order cartonization data to get box IDs
+      let packageBoxIds: (string | null)[] = [];
+      
+      if (orderId) {
+        try {
+          const { data: cartonData } = await supabase
+            .from('order_cartonization')
+            .select('packages, recommended_box_id')
+            .eq('order_id', typeof orderId === 'string' ? parseInt(orderId, 10) : orderId)
+            .single();
+          
+          if (cartonData?.packages && Array.isArray(cartonData.packages)) {
+            // Extract box IDs from each package
+            packageBoxIds = cartonData.packages.map((pkg: any) => pkg.box_id || cartonData.recommended_box_id);
+          } else if (cartonData?.recommended_box_id) {
+            // Fallback: use single recommended box for all packages
+            packageBoxIds = packageRates.map(() => cartonData.recommended_box_id);
+          }
+        } catch (error) {
+          console.warn('Failed to fetch box IDs from cartonization:', error);
+        }
+      }
+      
+      // Build array of selected rates with their shipment, rate IDs, and box info
+      const selectedRates = packageRates.map((pkgRate, index) => {
         if (!pkgRate.selectedRate) return null;
         
         const selectedRate = pkgRate.selectedRate;
@@ -157,9 +180,10 @@ export const ShippingRatesCardFooter = ({
         return {
           shipmentId,
           rateId: selectedRate.id,
-          provider
+          provider,
+          boxId: packageBoxIds[index] || null
         };
-      }).filter(Boolean) as Array<{ shipmentId: string; rateId: string; provider: string }>;
+      }).filter(Boolean) as Array<{ shipmentId: string; rateId: string; provider: string; boxId: string | null }>;
       
       console.log('Purchasing multi-package labels with selected rates:', selectedRates);
       

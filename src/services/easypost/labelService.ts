@@ -34,7 +34,7 @@ export class LabelService {
     service?: string;
     to: any;
     from: any;
-    selectedRates?: Array<{ shipmentId: string; rateId: string; provider: string }>;
+    selectedRates?: Array<{ shipmentId: string; rateId: string; provider: string; boxId?: string | null }>;
   }): Promise<any> {
     try {
       if (!this.useEdgeFunctions) {
@@ -173,7 +173,7 @@ export class LabelService {
     service?: string;
     to: any;
     from: any;
-    selectedRates?: Array<{ shipmentId: string; rateId: string; provider: string }>;
+    selectedRates?: Array<{ shipmentId: string; rateId: string; provider: string; boxId?: string | null }>;
   }): Promise<{ results: any[]; errors: any[] }> {
     const { packages, orderId, selectedRates } = params;
     const results: any[] = [];
@@ -184,17 +184,20 @@ export class LabelService {
       console.log('Using pre-selected rates for multi-package purchase:', selectedRates);
       
       for (let i = 0; i < selectedRates.length; i++) {
-        const { shipmentId, rateId, provider } = selectedRates[i];
+        const { shipmentId, rateId, provider, boxId } = selectedRates[i];
         
         try {
-          console.log(`Purchasing label ${i + 1}/${selectedRates.length}:`, { shipmentId, rateId, provider });
+          console.log(`Purchasing label ${i + 1}/${selectedRates.length}:`, { shipmentId, rateId, provider, boxId });
+          
+          // Build selected box data if we have a box ID
+          const selectedBoxData = boxId ? { boxId } : undefined;
           
           const result = await this.purchaseLabelViaEdgeFunction(
             shipmentId,
             rateId,
             orderId,
             provider,
-            undefined
+            selectedBoxData
           );
           
           results.push({ purchase: result, index: i });
