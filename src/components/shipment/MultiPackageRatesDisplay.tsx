@@ -1,196 +1,264 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Package, Truck, DollarSign, Check, ChevronDown, ChevronUp } from 'lucide-react';
-import { SmartRate, Rate } from '@/services/easypost';
-import { RateShoppingService } from '@/services/rateShoppingService';
-import { LabelService } from '@/services/easypost/labelService';
-import { toast } from 'sonner';
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Loader2, Package, ChevronDown, ChevronUp, Truck, Check } from "lucide-react";
+import { RateShoppingService } from "@/services/rateShoppingService";
+import { toast } from "sonner";
+import { useState, useEffect } from "react";
+import { MultiPackageHeader } from "./MultiPackageHeader";
 
 interface PackageRate {
   packageIndex: number;
-  dimensions: { length: number; width: number; height: number; weight: number };
-  rates: (SmartRate | Rate)[];
-  selectedRate?: SmartRate | Rate;
+  packageDimensions: {
+    length: number;
+    width: number;
+    height: number;
+    weight: number;
+    boxId?: string;
+    boxSku?: string;
+    boxName?: string;
+  };
+  rates: any[];
+  selectedRate: any | null;
   loading: boolean;
   error?: string;
 }
 
 interface MultiPackageRatesDisplayProps {
-  packages: Array<{ length: number; width: number; height: number; weight: number }>;
-  toAddress: any;
+  packages: Array<{
+    length: number;
+    width: number;
+    height: number;
+    weight: number;
+    boxId?: string;
+    boxSku?: string;
+    boxName?: string;
+  }>;
   fromAddress: any;
-  onRatesCalculated: (packageRates: PackageRate[]) => void;
-  onPurchaseAll: (packageRates: PackageRate[]) => void;
+  toAddress: any;
+  requiredDeliveryDate?: string | null;
+  onRatesCalculated?: (totalCost: number, allRates: any[]) => void;
+  onPurchaseAll?: (selectedRates: any[]) => Promise<void>;
 }
 
-export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> = ({
+export const MultiPackageRatesDisplay = ({
   packages,
-  toAddress,
   fromAddress,
+  toAddress,
+  requiredDeliveryDate,
   onRatesCalculated,
   onPurchaseAll
-}) => {
+}: MultiPackageRatesDisplayProps) => {
   const [packageRates, setPackageRates] = useState<PackageRate[]>([]);
+  const [expandedPackages, setExpandedPackages] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
-  const [expandedPackages, setExpandedPackages] = useState<Set<number>>(new Set());
-  const [hasCalculated, setHasCalculated] = useState(false);
+  const [activeStrategy, setActiveStrategy] = useState<'optimal' | 'fastest' | 'cheapest'>('optimal');
 
-  useEffect(() => {
-    if (packages.length > 0 && toAddress && fromAddress && !hasCalculated) {
-      console.log('🔄 Initial rate calculation triggered');
-      calculateRatesForAllPackages();
-    } else if (hasCalculated) {
-      console.log('⏸️ Rate calculation skipped - already calculated');
-    }
-  }, [packages, toAddress, fromAddress, hasCalculated]);
-
-  const calculateRatesForAllPackages = async () => {
-    console.log('🚀 Starting rate calculation for', packages.length, 'packages');
-    setLoading(true);
-    const rateService = new RateShoppingService();
+  // Apply optimal strategy: Balance cost and speed, respect delivery date
+  const applyOptimalStrategy = (rates: any[], pkg: any) => {
+    let candidateRates = rates;
     
-    // Initialize package rates
-    const initialPackageRates: PackageRate[] = packages.map((pkg, index) => ({
-      packageIndex: index,
-      dimensions: pkg,
-      rates: [],
-      loading: true,
-    }));
-    
-    setPackageRates(initialPackageRates);
-
-    // Calculate rates for each package individually
-    const updatedPackageRates = [...initialPackageRates];
-    
-    for (let i = 0; i < packages.length; i++) {
-      try {
-        const shipmentData = {
-          to_address: toAddress,
-          from_address: fromAddress,
-          parcel: {
-            length: packages[i].length,
-            width: packages[i].width,
-            height: packages[i].height,
-            weight: packages[i].weight * 16 // Convert to ounces
-          }
-        };
-
-        console.log(`📦 Package ${i + 1}: Getting rates...`);
-        
-        const response = await rateService.getRatesFromAllProviders(shipmentData);
-        
-        // Add shipment IDs and full shipment data to each rate for later use
-        const allRates = [...(response.rates || []), ...(response.smartRates || [])].map(rate => ({
-          ...rate,
-          shipment_id: rate.provider === 'shippo' 
-            ? response.shippo_shipment?.object_id 
-            : response.easypost_shipment?.id,
-          _shipment_data: {
-            shippo_shipment: response.shippo_shipment,
-            easypost_shipment: response.easypost_shipment
-          }
-        }));
-        
-        console.log(`📦 Package ${i + 1}: Found ${allRates.length} rates`);
-        
-        // Auto-select the cheapest rate ONLY on initial load
-        const cheapestRate = allRates.length > 0 
-          ? allRates.reduce((prev, current) => 
-              parseFloat(current.rate) < parseFloat(prev.rate) ? current : prev
-            )
-          : undefined;
-
-        console.log(`📦 Package ${i + 1}: Auto-selected cheapest rate:`, cheapestRate?.carrier, cheapestRate?.service, `$${cheapestRate?.rate}`);
-
-        updatedPackageRates[i] = {
-          ...updatedPackageRates[i],
-          rates: allRates,
-          selectedRate: cheapestRate,
-          loading: false
-        };
-        
-        // Update state progressively
-        setPackageRates([...updatedPackageRates]);
-        
-      } catch (error) {
-        console.error(`❌ Package ${i + 1}: Error getting rates:`, error);
-        updatedPackageRates[i] = {
-          ...updatedPackageRates[i],
-          error: error instanceof Error ? error.message : 'Failed to get rates',
-          loading: false
-        };
-        setPackageRates([...updatedPackageRates]);
+    // Filter by required delivery date if provided
+    if (requiredDeliveryDate) {
+      const requiredDate = new Date(requiredDeliveryDate);
+      candidateRates = rates.filter(r => {
+        if (r.delivery_date) {
+          return new Date(r.delivery_date) <= requiredDate;
+        }
+        if (r.delivery_days != null) {
+          const eta = new Date();
+          eta.setDate(eta.getDate() + r.delivery_days);
+          return eta <= requiredDate;
+        }
+        return false;
+      });
+      
+      // If no rates meet the date, fall back to all rates
+      if (candidateRates.length === 0) {
+        candidateRates = rates;
       }
     }
     
-    setLoading(false);
-    setHasCalculated(true);
-    console.log('✅ Rate calculation complete for all packages');
-    onRatesCalculated(updatedPackageRates);
-  };
-
-  const handleRateSelection = (packageIndex: number, rate: SmartRate | Rate) => {
-    console.log(`👆 User selected rate for package ${packageIndex + 1}:`, rate.carrier, rate.service, `$${rate.rate}`);
-    
-    setPackageRates(prev => {
-      const updatedRates = prev.map(pkg => 
-        pkg.packageIndex === packageIndex 
-          ? { ...pkg, selectedRate: rate }
-          : pkg
-      );
-      
-      console.log('✅ Updated package rates with user selection');
-      
-      // Call onRatesCalculated in next tick to avoid state update conflicts
-      setTimeout(() => {
-        console.log('📤 Notifying parent of rate change');
-        onRatesCalculated(updatedRates);
-      }, 0);
-      
-      return updatedRates;
+    // Sort by price, then by speed
+    const byPrice = [...candidateRates].sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate));
+    const bySpeed = [...candidateRates].sort((a, b) => {
+      const aDays = a.delivery_days ?? 99;
+      const bDays = b.delivery_days ?? 99;
+      return aDays - bDays;
     });
-  };
-
-  const calculateTotalCost = () => {
-    return packageRates.reduce((total, pkg) => 
-      total + (pkg.selectedRate ? parseFloat(pkg.selectedRate.rate) : 0), 0
-    );
-  };
-
-  const canPurchaseAll = () => {
-    return packageRates.every(pkg => pkg.selectedRate && !pkg.loading && !pkg.error);
-  };
-
-  const handlePurchaseAll = async () => {
-    if (!canPurchaseAll()) return;
     
-    console.log('🚀 Starting multi-package purchase. Package rates:', packageRates.map((pkg, i) => ({
-      packageIndex: i + 1,
-      hasSelectedRate: !!pkg.selectedRate,
-      rateId: pkg.selectedRate?.id,
-      carrier: pkg.selectedRate?.carrier,
-      service: pkg.selectedRate?.service,
-      provider: (pkg.selectedRate as any)?.provider,
-      hasShipmentId: !!(pkg.selectedRate as any)?.shipment_id,
-      hasShipmentData: !!(pkg.selectedRate as any)?._shipment_data
-    })));
+    // Create ranking maps
+    const priceRanks = new Map<string, number>();
+    const speedRanks = new Map<string, number>();
+    byPrice.forEach((r, i) => priceRanks.set(r.id, i + 1));
+    bySpeed.forEach((r, i) => speedRanks.set(r.id, i + 1));
     
-    setPurchasing(true);
-    setLoading(true); // Hide "Loading..." text during purchase
-    try {
-      await onPurchaseAll(packageRates);
-    } catch (error) {
-      console.error('Purchase failed:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to purchase labels');
-    } finally {
-      setPurchasing(false);
-      setLoading(false);
+    // Score each rate (lower is better): 60% price, 40% speed
+    let bestRate = null;
+    let bestScore = Infinity;
+    
+    for (const rate of candidateRates) {
+      const priceRank = priceRanks.get(rate.id) || 999;
+      const speedRank = speedRanks.get(rate.id) || 999;
+      const score = priceRank * 0.6 + speedRank * 0.4;
+      
+      if (score < bestScore) {
+        bestScore = score;
+        bestRate = rate;
+      }
     }
+    
+    return bestRate || byPrice[0];
+  };
+
+  // Apply fastest strategy: Select fastest delivery
+  const applyFastestStrategy = (rates: any[]) => {
+    return [...rates].sort((a, b) => {
+      const aDays = a.delivery_days ?? 99;
+      const bDays = b.delivery_days ?? 99;
+      return aDays - bDays;
+    })[0];
+  };
+
+  // Apply cheapest strategy: Select lowest cost, respect delivery date
+  const applyCheapestStrategy = (rates: any[]) => {
+    let candidateRates = rates;
+    
+    // Filter by required delivery date if provided
+    if (requiredDeliveryDate) {
+      const requiredDate = new Date(requiredDeliveryDate);
+      candidateRates = rates.filter(r => {
+        if (r.delivery_date) {
+          return new Date(r.delivery_date) <= requiredDate;
+        }
+        if (r.delivery_days != null) {
+          const eta = new Date();
+          eta.setDate(eta.getDate() + r.delivery_days);
+          return eta <= requiredDate;
+        }
+        return false;
+      });
+      
+      // If no rates meet the date, fall back to all rates
+      if (candidateRates.length === 0) {
+        candidateRates = rates;
+      }
+    }
+    
+    return [...candidateRates].sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+  };
+
+  // Calculate rates for all packages on mount
+  const calculateRatesForAllPackages = async () => {
+    setLoading(true);
+    const rateShoppingService = new RateShoppingService();
+    
+    const newPackageRates: PackageRate[] = [];
+    
+    for (let i = 0; i < packages.length; i++) {
+      const pkg = packages[i];
+      
+      try {
+        const shipmentData = {
+          from_address: fromAddress,
+          to_address: toAddress,
+          parcel: {
+            length: pkg.length,
+            width: pkg.width,
+            height: pkg.height,
+            weight: pkg.weight
+          }
+        };
+
+        const response = await rateShoppingService.getRatesFromAllProviders(shipmentData);
+        
+        if (response.rates && response.rates.length > 0) {
+          // Auto-select using optimal strategy by default
+          const selectedRate = applyOptimalStrategy(response.rates, pkg);
+          
+          newPackageRates.push({
+            packageIndex: i,
+            packageDimensions: pkg,
+            rates: response.rates,
+            selectedRate: selectedRate,
+            loading: false
+          });
+        } else {
+          newPackageRates.push({
+            packageIndex: i,
+            packageDimensions: pkg,
+            rates: [],
+            selectedRate: null,
+            loading: false,
+            error: 'No rates available'
+          });
+        }
+      } catch (error) {
+        console.error(`Error getting rates for package ${i + 1}:`, error);
+        newPackageRates.push({
+          packageIndex: i,
+          packageDimensions: pkg,
+          rates: [],
+          selectedRate: null,
+          loading: false,
+          error: 'Failed to fetch rates'
+        });
+      }
+    }
+    
+    setPackageRates(newPackageRates);
+    setLoading(false);
+    
+    // Notify parent of total cost
+    const totalCost = newPackageRates.reduce((sum, pkg) => {
+      return sum + (pkg.selectedRate ? parseFloat(pkg.selectedRate.rate) : 0);
+    }, 0);
+    
+    if (onRatesCalculated) {
+      const allRates = newPackageRates.map(pkg => pkg.selectedRate).filter(Boolean);
+      onRatesCalculated(totalCost, allRates);
+    }
+  };
+
+  useEffect(() => {
+    if (packages.length > 0) {
+      calculateRatesForAllPackages();
+    }
+  }, [packages.length]);
+
+  const handleRateSelection = (packageIndex: number, rate: any) => {
+    setPackageRates(prev => prev.map(pkg =>
+      pkg.packageIndex === packageIndex
+        ? { ...pkg, selectedRate: rate }
+        : pkg
+    ));
+  };
+
+  const handleStrategyChange = (strategy: 'optimal' | 'fastest' | 'cheapest') => {
+    setActiveStrategy(strategy);
+    
+    // Apply the selected strategy to all packages
+    setPackageRates(prev => prev.map(pkg => {
+      if (!pkg.rates || pkg.rates.length === 0) return pkg;
+      
+      let selectedRate;
+      switch (strategy) {
+        case 'optimal':
+          selectedRate = applyOptimalStrategy(pkg.rates, pkg.packageDimensions);
+          break;
+        case 'fastest':
+          selectedRate = applyFastestStrategy(pkg.rates);
+          break;
+        case 'cheapest':
+          selectedRate = applyCheapestStrategy(pkg.rates);
+          break;
+      }
+      
+      return { ...pkg, selectedRate };
+    }));
+    
+    toast.success(`Applied ${strategy} strategy to all packages`);
   };
 
   const togglePackageExpanded = (packageIndex: number) => {
@@ -205,165 +273,158 @@ export const MultiPackageRatesDisplay: React.FC<MultiPackageRatesDisplayProps> =
     });
   };
 
-  if (loading && packageRates.length === 0) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <LoadingSpinner className="mr-2" />
-          <span>Calculating rates for {packages.length} packages...</span>
-        </CardContent>
-      </Card>
+  const calculateTotalCost = () => {
+    return packageRates.reduce((sum, pkg) => 
+      sum + (pkg.selectedRate ? parseFloat(pkg.selectedRate.rate) : 0), 0
     );
-  }
+  };
+
+  const canPurchaseAll = () => {
+    return packageRates.length > 0 && packageRates.every(pkg => pkg.selectedRate && !pkg.loading && !pkg.error);
+  };
+
+  const handlePurchaseAll = async () => {
+    if (!canPurchaseAll() || !onPurchaseAll) return;
+    
+    setPurchasing(true);
+    try {
+      const selectedRates = packageRates.map(pkg => pkg.selectedRate).filter(Boolean);
+      await onPurchaseAll(selectedRates);
+    } catch (error) {
+      console.error('Purchase failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to purchase labels');
+    } finally {
+      setPurchasing(false);
+    }
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Summary Header */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Multi-Package Shipping Rates
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-bold">{packages.length}</div>
-              <div className="text-sm text-muted-foreground">Packages</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold">${calculateTotalCost().toFixed(2)}</div>
-              <div className="text-sm text-muted-foreground">Total Cost</div>
-            </div>
-            <div>
-              <Button 
-                onClick={handlePurchaseAll}
-                disabled={!canPurchaseAll() || purchasing}
-                className="w-full"
-              >
-                {purchasing ? (
-                  <>
-                    <LoadingSpinner className="mr-2 h-4 w-4" />
-                    Purchasing...
-                  </>
-                ) : (
-                  'Purchase All Labels'
-                )}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      {loading && (
+        <Card className="p-8 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-tms-blue" />
+          <p className="text-muted-foreground">Calculating rates for {packages.length} packages...</p>
+        </Card>
+      )}
 
-      {/* Individual Package Rates */}
-      <div className="space-y-4">
-        {packageRates.map((packageRate, index) => (
-          <Card key={index}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Package {index + 1}
-                </CardTitle>
-                <div className="text-sm text-muted-foreground">
-                  {packageRate.dimensions.length}" × {packageRate.dimensions.width}" × {packageRate.dimensions.height}" 
-                  • {packageRate.dimensions.weight} lbs
+      {!loading && packageRates.length > 0 && (
+        <>
+          {/* Multi-Package Header with Strategy Buttons */}
+          <MultiPackageHeader
+            packageCount={packages.length}
+            totalCost={calculateTotalCost()}
+            onPurchaseAll={handlePurchaseAll}
+            onStrategyChange={handleStrategyChange}
+            activeStrategy={activeStrategy}
+            purchasing={purchasing}
+            disabled={!canPurchaseAll()}
+          />
+
+          {/* Individual Package Cards */}
+          <div className="space-y-4">
+            {packageRates.map((packageRate, index) => (
+              <Card key={index} className="border-border/50">
+                <div className="p-4 border-b border-border/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Package className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <h3 className="font-semibold">Package {index + 1}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {packageRate.packageDimensions.length}" × {packageRate.packageDimensions.width}" × {packageRate.packageDimensions.height}" • {packageRate.packageDimensions.weight} lbs
+                        </p>
+                      </div>
+                    </div>
+                    {packageRate.selectedRate && (
+                      <div className="text-right">
+                        <p className="font-bold text-lg">${parseFloat(packageRate.selectedRate.rate).toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {packageRate.selectedRate.carrier} {packageRate.selectedRate.service}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            
-            <CardContent>
-              {packageRate.loading ? (
-                <div className="flex items-center justify-center py-4">
-                  <LoadingSpinner className="mr-2" />
-                  <span>Loading rates...</span>
-                </div>
-              ) : packageRate.error ? (
-                <div className="text-center py-4 text-destructive">
-                  Error: {packageRate.error}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid gap-2">
-                    {(expandedPackages.has(index) ? packageRate.rates : packageRate.rates.slice(0, 5)).map((rate, rateIndex) => (
-                      <div
-                        key={rateIndex}
-                        className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                          packageRate.selectedRate?.id === rate.id
-                            ? 'border-primary bg-primary/5'
-                            : 'hover:border-primary/50'
-                        }`}
-                        onClick={() => handleRateSelection(index, rate)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {packageRate.selectedRate?.id === rate.id && (
-                              <Check className="h-4 w-4 text-primary" />
-                            )}
-                            <Truck className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <div className="font-medium text-sm">
-                                {rate.carrier} {rate.service}
-                              </div>
-                              {rate.delivery_days && (
-                                <div className="text-xs text-muted-foreground">
-                                  {rate.delivery_days} business days
+
+                <div className="p-4">
+                  {packageRate.loading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <span className="text-sm">Loading rates...</span>
+                    </div>
+                  ) : packageRate.error ? (
+                    <div className="text-center py-4 text-destructive text-sm">
+                      {packageRate.error}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {(expandedPackages.has(index) ? packageRate.rates : packageRate.rates.slice(0, 5)).map((rate, rateIndex) => (
+                        <div
+                          key={rateIndex}
+                          className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                            packageRate.selectedRate?.id === rate.id
+                              ? 'border-tms-blue bg-tms-blue/5'
+                              : 'border-border hover:border-tms-blue/50'
+                          }`}
+                          onClick={() => handleRateSelection(index, rate)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {packageRate.selectedRate?.id === rate.id && (
+                                <Check className="h-4 w-4 text-tms-blue" />
+                              )}
+                              <Truck className="h-4 w-4 text-muted-foreground" />
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {rate.carrier} {rate.service}
                                 </div>
+                                {rate.delivery_days && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {rate.delivery_days} business days
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold">${parseFloat(rate.rate).toFixed(2)}</div>
+                              {rate.provider && (
+                                <Badge variant="secondary" className="text-xs mt-1">
+                                  {rate.provider}
+                                </Badge>
                               )}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold">${parseFloat(rate.rate).toFixed(2)}</div>
-                            {(rate as SmartRate).time_in_transit && (
-                              <Badge variant="secondary" className="text-xs">
-                                Smart Rate
-                              </Badge>
-                            )}
-                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
 
-                  {packageRate.rates.length > 5 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => togglePackageExpanded(index)}
-                      className="w-full gap-2"
-                    >
-                      {expandedPackages.has(index) ? (
-                        <>
-                          <ChevronUp className="h-4 w-4" />
-                          Show Less
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-4 w-4" />
-                          View All {packageRate.rates.length} Rates
-                        </>
+                      {packageRate.rates.length > 5 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => togglePackageExpanded(index)}
+                          className="w-full gap-2"
+                        >
+                          {expandedPackages.has(index) ? (
+                            <>
+                              <ChevronUp className="h-4 w-4" />
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4" />
+                              View All {packageRate.rates.length} Rates
+                            </>
+                          )}
+                        </Button>
                       )}
-                    </Button>
-                  )}
-                  
-                  {packageRate.selectedRate && (
-                    <div className="pt-3 border-t">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Selected:</span>
-                        <span className="font-bold text-primary">
-                          {packageRate.selectedRate.carrier} {packageRate.selectedRate.service} - 
-                          ${parseFloat(packageRate.selectedRate.rate).toFixed(2)}
-                        </span>
-                      </div>
                     </div>
                   )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -2,6 +2,7 @@
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { ShipmentForm } from "@/components/shipment/ShipmentForm";
 import { ShippingRatesCard } from "@/components/shipment/ShippingRatesCard";
+import { MultiPackageRatesDisplay } from "@/components/shipment/MultiPackageRatesDisplay";
 import { useShipment } from "@/hooks/useShipment";
 import { useState, useEffect } from "react";
 import { ShippingLabelDialog } from "@/components/shipment/ShippingLabelDialog";
@@ -31,6 +32,11 @@ const CreateShipment = () => {
   const [labelData, setLabelData] = useState<any>(null);
   const [showLabelDialog, setShowLabelDialog] = useState(false);
   const [selectedBoxData, setSelectedBoxData] = useState<any>(null);
+  const [requiredDeliveryDate, setRequiredDeliveryDate] = useState<string | null>(null);
+  const [shipmentAddresses, setShipmentAddresses] = useState<{ from: any; to: any } | null>(null);
+  
+  // Detect if this is a multi-package shipment (check if we have multiple boxes selected)
+  const isMultiPackage = selectedBoxData?.selectedBoxes && selectedBoxData.selectedBoxes.length > 1;
 
   // Log user context for debugging
   useEffect(() => {
@@ -135,35 +141,76 @@ const CreateShipment = () => {
           if (boxData) {
             setSelectedBoxData(boxData);
           }
+          // Extract required delivery date and addresses from form
+          const formElement = document.querySelector('input[name="requiredDeliveryDate"]') as HTMLInputElement;
+          if (formElement?.value) {
+            setRequiredDeliveryDate(formElement.value);
+          }
+          
+          // Store addresses for multi-package display
+          if (response.easypost_shipment) {
+            setShipmentAddresses({
+              from: response.easypost_shipment.from_address,
+              to: response.easypost_shipment.to_address
+            });
+          } else if (response.shippo_shipment) {
+            setShipmentAddresses({
+              from: response.shippo_shipment.address_from,
+              to: response.shippo_shipment.address_to
+            });
+          }
+          
           handleShipmentCreated(response);
         }} />
       ) : (
         <div className="space-y-8">
-          <ShippingRatesCard
-            shipmentResponse={shipmentResponse}
-            selectedRate={selectedRate}
-            setSelectedRate={setSelectedRate}
-            recommendedRate={recommendedRate}
-            onBack={resetShipment}
-            onBuyLabel={async (shipmentId, rateId) => {
-              console.log('Purchasing label with selected box data:', selectedBoxData);
-              const result = await purchaseLabel(shipmentId, rateId, selectedBoxData);
-              if (result) {
-                // Client-side fallback: mark order shipped and link shipment if provided
-                try {
-                  if (orderId && !isNaN(Number(orderId))) {
-                    const update: any = { status: 'shipped' };
-                    if ((result as any).shipment_id) update.shipment_id = (result as any).shipment_id;
-                    await supabase.from('orders').update(update).eq('id', Number(orderId));
+          {isMultiPackage && shipmentAddresses ? (
+            <MultiPackageRatesDisplay
+              packages={selectedBoxData.selectedBoxes.map((box: any) => ({
+                length: box.length || 0,
+                width: box.width || 0,
+                height: box.height || 0,
+                weight: box.weight || 0,
+                boxId: box.boxId,
+                boxSku: box.boxSku,
+                boxName: box.boxName,
+              }))}
+              fromAddress={shipmentAddresses.from}
+              toAddress={shipmentAddresses.to}
+              requiredDeliveryDate={requiredDeliveryDate}
+              onPurchaseAll={async (selectedRates) => {
+                console.log('Purchasing all labels with rates:', selectedRates);
+                // TODO: Implement multi-package purchase logic
+                toast.info('Multi-package purchase coming soon!');
+              }}
+            />
+          ) : (
+            <ShippingRatesCard
+              shipmentResponse={shipmentResponse}
+              selectedRate={selectedRate}
+              setSelectedRate={setSelectedRate}
+              recommendedRate={recommendedRate}
+              onBack={resetShipment}
+              onBuyLabel={async (shipmentId, rateId) => {
+                console.log('Purchasing label with selected box data:', selectedBoxData);
+                const result = await purchaseLabel(shipmentId, rateId, selectedBoxData);
+                if (result) {
+                  // Client-side fallback: mark order shipped and link shipment if provided
+                  try {
+                    if (orderId && !isNaN(Number(orderId))) {
+                      const update: any = { status: 'shipped' };
+                      if ((result as any).shipment_id) update.shipment_id = (result as any).shipment_id;
+                      await supabase.from('orders').update(update).eq('id', Number(orderId));
+                    }
+                  } catch (e) {
+                    console.warn('Failed to update order after purchase (client fallback):', e);
                   }
-                } catch (e) {
-                  console.warn('Failed to update order after purchase (client fallback):', e);
+                  await handleLabelPurchased(result);
                 }
-                await handleLabelPurchased(result);
-              }
-              return result;
-            }}
-          />
+                return result;
+              }}
+            />
+          )}
 
           {/* Shipping Label Dialog */}
           <ShippingLabelDialog
