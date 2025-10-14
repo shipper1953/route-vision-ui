@@ -9,6 +9,8 @@ export interface OrderForShipping {
   recommendedBox: Box;
   recommendedService?: string;
   requiredDeliveryDate?: string;
+  isMultiPackage?: boolean;
+  packageCount?: number;
 }
 
 export interface BoxShippingGroup {

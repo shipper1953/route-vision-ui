@@ -15,6 +15,7 @@ export class OrderProcessor {
 
     // Group orders by recommended box
     const boxGroups = new Map<string, BoxShippingGroup>();
+    const excludedOrders: { orderId: string; reason: string; packageCount: number }[] = [];
 
     for (const order of readyToShipOrders) {
       console.log(`Processing order ${order.id} for cartonization:`, order);
@@ -36,8 +37,20 @@ export class OrderProcessor {
             optimizeForSpace: false // Prioritize utilization, not smallest box
           });
           console.log(`Running enhanced cartonization for order ${order.id} with ${this.boxes.length} available boxes`);
-          const result = engine.calculateOptimalBox(items);
+          const result = engine.calculateOptimalBox(items, true); // Enable multi-package detection
           console.log(`Enhanced cartonization result for order ${order.id}:`, result);
+          
+          // Check if this order requires multiple packages
+          if (result && result.multiPackageResult && result.multiPackageResult.totalPackages > 1) {
+            console.log(`⚠️ Order ${order.id} requires ${result.multiPackageResult.totalPackages} packages - excluding from bulk ship`);
+            console.log(`   Packages needed:`, result.multiPackageResult.packages.map(pkg => pkg.box.name));
+            excludedOrders.push({
+              orderId: order.id,
+              reason: 'Multi-package order',
+              packageCount: result.multiPackageResult.totalPackages
+            });
+            continue; // Skip multi-package orders for bulk shipping
+          }
           
           if (result && result.recommendedBox) {
             console.log(`✅ Found recommended box for order ${order.id}:`, result.recommendedBox.name);
@@ -98,6 +111,16 @@ export class OrderProcessor {
       } else {
         console.warn(`❌ Order ${order.id} has no items or items is not an array:`, order.items);
       }
+    }
+
+    // Log bulk ship summary
+    if (excludedOrders.length > 0) {
+      console.log(`\n📋 Bulk Ship Summary:`);
+      console.log(`   ✅ ${boxGroups.size} box groups with eligible orders`);
+      console.log(`   ⚠️ ${excludedOrders.length} orders excluded (multi-package):`);
+      excludedOrders.forEach(ex => {
+        console.log(`      - Order ${ex.orderId}: ${ex.packageCount} packages required`);
+      });
     }
 
     // Convert to array and sort by number of orders (descending)
