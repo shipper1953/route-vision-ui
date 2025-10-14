@@ -92,32 +92,30 @@ export const HistoricalBoxUsageSimplified = () => {
         }
       });
 
-      // Get box details from boxes table
-      const boxSkus = Array.from(boxUsageMap.keys());
+      // Get all boxes for the company (to match against both name and SKU)
       const { data: boxes, error: boxError } = await supabase
         .from('boxes')
         .select('sku, name, length, width, height, cost')
-        .eq('company_id', userProfile.company_id)
-        .in('name', boxSkus);
+        .eq('company_id', userProfile.company_id);
 
       if (boxError) throw boxError;
       
-      console.log('Box SKUs from shipments:', boxSkus);
+      console.log('Box identifiers from shipments:', Array.from(boxUsageMap.keys()));
       console.log('Boxes found in database:', boxes);
 
-      // Combine data
+      // Combine data - match by name OR sku
       const usageData: BoxUsageData[] = Array.from(boxUsageMap.entries())
-        .map(([sku, usage]) => {
-          const boxInfo = boxes?.find(b => b.name === sku);
+        .map(([identifier, usage]) => {
+          const boxInfo = boxes?.find(b => b.name === identifier || b.sku === identifier);
           const sortedDates = usage.dates.sort((a, b) => a.getTime() - b.getTime());
           
           if (!boxInfo) {
-            console.warn(`Box info not found for SKU: ${sku}`);
+            console.warn(`Box info not found for identifier: ${identifier}`);
           }
           
           return {
-            boxSku: sku,
-            boxName: boxInfo?.name || sku,
+            boxSku: boxInfo?.sku || identifier,
+            boxName: boxInfo?.name || identifier,
             length: Number(boxInfo?.length) || 0,
             width: Number(boxInfo?.width) || 0,
             height: Number(boxInfo?.height) || 0,
