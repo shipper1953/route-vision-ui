@@ -2,9 +2,10 @@
 import { useAuth } from "@/hooks/useAuth";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { DashboardCharts } from "@/components/dashboard/DashboardCharts";
-import { ShipmentCard } from "@/components/dashboard/ShipmentCard";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
+import { BoxOpportunitiesCard } from "@/components/dashboard/BoxOpportunitiesCard";
+import { OrdersToShipCard } from "@/components/dashboard/OrdersToShipCard";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -36,17 +37,6 @@ const Index = () => {
     return null;
   }
 
-  // Sample shipment data for the ShipmentCard
-  const sampleShipment = {
-    id: "SHP-001",
-    title: "Package to New York",
-    origin: "Boston, MA",
-    destination: "New York, NY",
-    date: "2025-06-01",
-    status: "in_transit" as const,
-    client: "Acme Corp"
-  };
-
   return (
     <TmsLayout>
       <div className="space-y-6">
@@ -54,13 +44,13 @@ const Index = () => {
         
         <MetricsGrid />
 
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-7">
-          <div className="col-span-4">
-            <DashboardCharts />
-          </div>
-          <div className="col-span-3">
-            <ShipmentCard shipment={sampleShipment} />
-          </div>
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          <DashboardCharts />
+        </div>
+
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          <BoxOpportunitiesCard />
+          <OrdersToShipCard />
         </div>
       </div>
     </TmsLayout>

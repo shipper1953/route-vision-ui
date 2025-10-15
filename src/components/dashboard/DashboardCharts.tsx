@@ -7,41 +7,47 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell
 } from 'recharts';
-import { cn } from '@/lib/utils';
-
-// Data for the charts
-const monthlyData = [
-  { month: 'Jan', parcels: 65 },
-  { month: 'Feb', parcels: 59 },
-  { month: 'Mar', parcels: 80 },
-  { month: 'Apr', parcels: 81 },
-  { month: 'May', parcels: 56 },
-  { month: 'Jun', parcels: 55 },
-  { month: 'Jul', parcels: 40 },
-];
-
-const deliveryPerformance = [
-  { name: 'On Time', value: 68 },
-  { name: 'Delayed', value: 23 },
-  { name: 'Early', value: 9 },
-];
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDashboardCharts } from '@/hooks/useDashboardCharts';
 
 const COLORS = ['#0d9488', '#f59e0b', '#1a365d'];
 
 export function ShipmentsChart() {
+  const { parcelData, loading } = useDashboardCharts();
+
+  if (loading) {
+    return (
+      <div className="tms-card h-full flex flex-col">
+        <h3 className="tms-section-title">Parcel Volume</h3>
+        <div className="flex-1 flex items-center justify-center">
+          <Skeleton className="h-[250px] w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (parcelData.length === 0) {
+    return (
+      <div className="tms-card h-full flex flex-col">
+        <h3 className="tms-section-title">Parcel Volume</h3>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">No shipment data available</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="tms-card h-full flex flex-col">
       <h3 className="tms-section-title">Parcel Volume</h3>
-      <div className="flex-1">
+      <div className="flex-1 min-h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
-            data={monthlyData}
+            data={parcelData}
             margin={{
               top: 10,
               right: 30,
@@ -62,14 +68,38 @@ export function ShipmentsChart() {
 }
 
 export function DeliveryPerformanceChart() {
+  const { carrierData, loading } = useDashboardCharts();
+
+  if (loading) {
+    return (
+      <div className="tms-card h-full flex flex-col">
+        <h3 className="tms-section-title">Carrier Performance</h3>
+        <div className="flex-1 flex items-center justify-center">
+          <Skeleton className="h-[250px] w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (carrierData.length === 0 || carrierData.every(d => d.value === 0)) {
+    return (
+      <div className="tms-card h-full flex flex-col">
+        <h3 className="tms-section-title">Carrier Performance</h3>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">No delivery data available</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="tms-card h-full flex flex-col">
       <h3 className="tms-section-title">Carrier Performance</h3>
-      <div className="flex-1 flex justify-center">
+      <div className="flex-1 flex justify-center min-h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={deliveryPerformance}
+              data={carrierData}
               cx="50%"
               cy="50%"
               innerRadius={60}
@@ -79,7 +109,7 @@ export function DeliveryPerformanceChart() {
               dataKey="value"
               label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
             >
-              {deliveryPerformance.map((entry, index) => (
+              {carrierData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
