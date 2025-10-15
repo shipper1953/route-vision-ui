@@ -234,19 +234,38 @@ export const PackagingIntelligenceDashboard = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             {lowStockBoxes.map((box) => {
-              const unitsFromMin = box.in_stock - box.min_stock;
-              const severity = unitsFromMin <= 5 ? 'critical' : unitsFromMin <= 10 ? 'warning' : 'info';
+              const stockDifference = box.in_stock - box.min_stock;
+              const severity = 
+                stockDifference <= 0 ? 'critical' : 
+                stockDifference <= 5 ? 'high' : 
+                stockDifference <= 10 ? 'medium' : 'ok';
               const progress = Math.max(0, Math.min(100, (box.in_stock / (box.min_stock + 20)) * 100));
               
               return (
-                <div key={box.id} className="p-3 border border-orange-200 rounded-lg bg-white">
+                <div key={box.id} className={`p-3 border rounded-lg bg-white ${
+                  severity === 'critical' ? 'border-red-300' :
+                  severity === 'high' ? 'border-orange-300' :
+                  'border-yellow-300'
+                }`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4" />
                       <span className="font-medium">{box.name || box.sku}</span>
                     </div>
-                    <Badge variant={severity === 'critical' ? 'destructive' : 'secondary'}>
-                      {severity === 'critical' ? 'CRITICAL' : 'LOW'}
+                    <Badge 
+                      variant={
+                        severity === 'critical' ? 'destructive' : 
+                        'warning'
+                      }
+                      className={
+                        severity === 'high' ? 'bg-orange-500 text-white hover:bg-orange-600' :
+                        severity === 'medium' ? 'bg-yellow-500 text-black hover:bg-yellow-600' :
+                        ''
+                      }
+                    >
+                      {severity === 'critical' ? 'CRITICAL' : 
+                       severity === 'high' ? 'HIGH' : 
+                       'MEDIUM'}
                     </Badge>
                   </div>
                   <div className="space-y-2">

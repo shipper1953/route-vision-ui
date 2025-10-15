@@ -465,9 +465,28 @@ export const BoxInventoryManager = () => {
                   <Badge variant="secondary">
                     {box.type.replace('_', ' ').toUpperCase()}
                   </Badge>
-                  <Badge variant={box.inStock > 0 ? "default" : "destructive"}>
-                    {box.inStock} in stock
-                  </Badge>
+                  {(() => {
+                    const stockDifference = box.inStock - box.minStock;
+                    let variant: "destructive" | "warning" | "default" = "default";
+                    let className = "";
+                    
+                    if (stockDifference <= 0) {
+                      variant = "destructive";
+                      className = "bg-red-500 text-white hover:bg-red-600";
+                    } else if (stockDifference <= 5) {
+                      variant = "warning";
+                      className = "bg-orange-500 text-white hover:bg-orange-600";
+                    } else if (stockDifference <= 10) {
+                      variant = "warning";
+                      className = "bg-yellow-500 text-black hover:bg-yellow-600";
+                    }
+                    
+                    return (
+                      <Badge variant={variant} className={className}>
+                        {box.inStock} in stock
+                      </Badge>
+                    );
+                  })()}
                 </div>
               </Card>
             ))}
