@@ -1,7 +1,7 @@
 
 import { useAuth } from "@/hooks/useAuth";
 import { TmsLayout } from "@/components/layout/TmsLayout";
-import { DashboardCharts } from "@/components/dashboard/DashboardCharts";
+import { ShipmentsChart, DeliveryPerformanceChart } from "@/components/dashboard/DashboardCharts";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { BoxOpportunitiesCard } from "@/components/dashboard/BoxOpportunitiesCard";
@@ -44,8 +44,11 @@ const Index = () => {
         
         <MetricsGrid />
 
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-          <DashboardCharts />
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <ShipmentsChart />
+          </div>
+          <DeliveryPerformanceChart />
         </div>
 
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">

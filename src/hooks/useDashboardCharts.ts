@@ -3,9 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format, subMonths, startOfMonth } from 'date-fns';
 
+interface CarrierServiceData {
+  carrier: string;
+  service: string;
+  count: number;
+}
+
 interface MonthlyParcelData {
   month: string;
-  parcels: number;
+  [carrier: string]: string | number | any;
+  carrierDetails: {
+    [carrier: string]: CarrierServiceData[];
+  };
 }
 
 interface CarrierPerformanceData {
@@ -17,6 +26,7 @@ export const useDashboardCharts = () => {
   const { userProfile } = useAuth();
   const [parcelData, setParcelData] = useState<MonthlyParcelData[]>([]);
   const [carrierData, setCarrierData] = useState<CarrierPerformanceData[]>([]);
+  const [carriers, setCarriers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,36 +42,70 @@ export const useDashboardCharts = () => {
         
         const { data: shipments, error: shipmentsError } = await supabase
           .from('shipments')
-          .select('created_at')
+          .select('created_at, carrier, service')
           .eq('company_id', userProfile.company_id)
           .gte('created_at', sixMonthsAgo.toISOString());
 
         if (shipmentsError) throw shipmentsError;
 
-        // Group shipments by month
-        const monthlyGroups: { [key: string]: number } = {};
-        
-        // Initialize last 6 months with 0
+        // Group shipments by month and carrier
+        const monthlyGroups: { 
+          [month: string]: { 
+            [carrier: string]: { 
+              total: number; 
+              services: { [service: string]: number } 
+            } 
+          } 
+        } = {};
+
+        // Initialize last 6 months
         for (let i = 5; i >= 0; i--) {
           const month = subMonths(new Date(), i);
           const monthKey = format(startOfMonth(month), 'MMM');
-          monthlyGroups[monthKey] = 0;
+          monthlyGroups[monthKey] = {};
         }
 
-        // Count shipments per month
+        // Count shipments per month, carrier, and service
         shipments?.forEach(shipment => {
           const monthKey = format(new Date(shipment.created_at), 'MMM');
-          if (monthlyGroups[monthKey] !== undefined) {
-            monthlyGroups[monthKey]++;
+          const carrier = shipment.carrier || 'Unknown';
+          const service = shipment.service || 'Unknown';
+          
+          if (monthlyGroups[monthKey]) {
+            if (!monthlyGroups[monthKey][carrier]) {
+              monthlyGroups[monthKey][carrier] = { total: 0, services: {} };
+            }
+            monthlyGroups[monthKey][carrier].total++;
+            monthlyGroups[monthKey][carrier].services[service] = 
+              (monthlyGroups[monthKey][carrier].services[service] || 0) + 1;
           }
         });
 
-        const parcelVolumeData = Object.entries(monthlyGroups).map(([month, parcels]) => ({
-          month,
-          parcels
-        }));
+        // Transform to chart format
+        const parcelVolumeData = Object.entries(monthlyGroups).map(([month, carriers]) => {
+          const dataPoint: any = { month, carrierDetails: {} };
+          
+          Object.entries(carriers).forEach(([carrier, data]) => {
+            dataPoint[carrier] = data.total;
+            dataPoint.carrierDetails[carrier] = Object.entries(data.services).map(([service, count]) => ({
+              carrier,
+              service,
+              count
+            }));
+          });
+          
+          return dataPoint;
+        });
+
+        // Extract unique carriers for chart configuration
+        const uniqueCarriers = Array.from(
+          new Set(
+            shipments?.map(s => s.carrier || 'Unknown') || []
+          )
+        ).sort();
 
         setParcelData(parcelVolumeData);
+        setCarriers(uniqueCarriers);
 
         // Fetch carrier performance data (last 90 days)
         const ninetyDaysAgo = subMonths(new Date(), 3);
@@ -118,5 +162,5 @@ export const useDashboardCharts = () => {
     fetchChartData();
   }, [userProfile?.company_id]);
 
-  return { parcelData, carrierData, loading };
+  return { parcelData, carrierData, loading, carriers };
 };
