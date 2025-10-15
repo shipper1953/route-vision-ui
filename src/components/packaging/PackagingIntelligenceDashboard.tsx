@@ -238,14 +238,15 @@ export const PackagingIntelligenceDashboard = () => {
               const severity = 
                 stockDifference <= 0 ? 'critical' : 
                 stockDifference <= 5 ? 'high' : 
-                stockDifference <= 10 ? 'medium' : 'ok';
+                stockDifference <= 10 ? 'medium' : 'low';
               const progress = Math.max(0, Math.min(100, (box.in_stock / (box.min_stock + 20)) * 100));
               
               return (
                 <div key={box.id} className={`p-3 border rounded-lg bg-white ${
                   severity === 'critical' ? 'border-red-300' :
                   severity === 'high' ? 'border-orange-300' :
-                  'border-yellow-300'
+                  severity === 'medium' ? 'border-yellow-300' :
+                  'border-gray-300'
                 }`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -255,6 +256,7 @@ export const PackagingIntelligenceDashboard = () => {
                     <Badge 
                       variant={
                         severity === 'critical' ? 'destructive' : 
+                        severity === 'low' ? 'secondary' :
                         'warning'
                       }
                       className={
@@ -265,7 +267,8 @@ export const PackagingIntelligenceDashboard = () => {
                     >
                       {severity === 'critical' ? 'CRITICAL' : 
                        severity === 'high' ? 'HIGH' : 
-                       'MEDIUM'}
+                       severity === 'medium' ? 'MEDIUM' :
+                       'LOW'}
                     </Badge>
                   </div>
                   <div className="space-y-2">
