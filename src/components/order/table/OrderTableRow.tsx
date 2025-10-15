@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, Package, Truck, Box, ExternalLink, Copy } from "lucide-react";
+import { Eye, Package, Truck, Box, ExternalLink, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -42,6 +42,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const navigate = useNavigate();
   const [cartonizationData, setCartonizationData] = useState<CartonizationData | null>(null);
   const [allShipments, setAllShipments] = useState<ShipmentInfo[]>([]);
+  const [isShipmentsExpanded, setIsShipmentsExpanded] = useState(false);
 
   // Fetch cartonization data for this order
   useEffect(() => {
@@ -235,45 +236,85 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
       <TableCell>
         {(order.status === 'shipped' || order.status === 'delivered') && allShipments.length > 0 ? (
           <div className="space-y-2 max-w-xs">
-            {allShipments.length > 1 && (
-              <div className="text-xs font-medium text-tms-blue mb-1">
-                {allShipments.length} Packages
-              </div>
-            )}
-            {allShipments.map((shipment, index) => (
-              <div key={`${shipment.id}-${index}`} className="space-y-1 border-b border-gray-100 pb-1 last:border-b-0 last:pb-0">
-                {allShipments.length > 1 && (
-                  <div className="text-xs text-muted-foreground">
-                    Package {shipment.packageIndex !== undefined ? shipment.packageIndex + 1 : index + 1}
+            {allShipments.length > 1 ? (
+              <div>
+                <button
+                  onClick={() => setIsShipmentsExpanded(!isShipmentsExpanded)}
+                  aria-expanded={isShipmentsExpanded}
+                  aria-label={`${isShipmentsExpanded ? 'Collapse' : 'Expand'} shipment details for ${allShipments.length} packages`}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent transition-colors border border-border text-sm font-medium text-primary"
+                >
+                  <span>Multiple</span>
+                  {isShipmentsExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </button>
+                
+                {isShipmentsExpanded && (
+                  <div className="mt-2 space-y-2">
+                    {allShipments.map((shipment, index) => (
+                      <div key={`${shipment.id}-${index}`} className="space-y-1 border-b border-border pb-2 last:border-b-0 last:pb-0">
+                        <div className="text-xs font-medium text-muted-foreground">
+                          Package {shipment.packageIndex !== undefined ? shipment.packageIndex + 1 : index + 1}
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          <Truck className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">{shipment.carrier} {shipment.service}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          {shipment.trackingUrl ? (
+                            <a 
+                              href={shipment.trackingUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-sm text-primary hover:underline flex items-center gap-1"
+                            >
+                              {shipment.trackingNumber}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-sm font-mono">{shipment.trackingNumber}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
+              </div>
+            ) : (
+              <div className="space-y-1">
                 <div className="flex items-center gap-1">
                   <Truck className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">{shipment.carrier} {shipment.service}</span>
+                  <span className="text-sm font-medium">{allShipments[0].carrier} {allShipments[0].service}</span>
                 </div>
                 
                 <div className="flex items-center gap-1">
                   <Package className="h-4 w-4 text-muted-foreground" />
-                  {shipment.trackingUrl ? (
+                  {allShipments[0].trackingUrl ? (
                     <a 
-                      href={shipment.trackingUrl} 
+                      href={allShipments[0].trackingUrl} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                      className="text-sm text-primary hover:underline flex items-center gap-1"
                     >
-                      {shipment.trackingNumber}
+                      {allShipments[0].trackingNumber}
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   ) : (
-                    <span className="text-sm font-mono">{shipment.trackingNumber}</span>
+                    <span className="text-sm font-mono">{allShipments[0].trackingNumber}</span>
                   )}
                 </div>
               </div>
-            ))}
+            )}
           </div>
         ) : cartonizationData?.recommendedBox ? (
           <div className="flex items-center gap-2">
-            <Box className="h-4 w-4 text-tms-blue" />
+            <Box className="h-4 w-4 text-primary" />
             <div className="text-sm">
               <div className="font-medium">{cartonizationData.recommendedBox.name}</div>
               <div className="text-muted-foreground">
