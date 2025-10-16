@@ -43,10 +43,10 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
           <TabsTrigger value="connection">Connection</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="fulfillment">Fulfillment</TabsTrigger>
-          <TabsTrigger value="inventory" disabled={!settings.features.inventory_sync}>
+          <TabsTrigger value="inventory">
             Inventory
           </TabsTrigger>
-          <TabsTrigger value="products" disabled={!settings.features.product_sync}>
+          <TabsTrigger value="products">
             Products
           </TabsTrigger>
           <TabsTrigger value="advanced">Advanced</TabsTrigger>
@@ -93,6 +93,7 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
               setHasChanges(false);
             }}
             onChange={() => setHasChanges(true)}
+            companyId={companyId}
           />
         </TabsContent>
 
@@ -104,6 +105,7 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
               setHasChanges(false);
             }}
             onChange={() => setHasChanges(true)}
+            companyId={companyId}
           />
         </TabsContent>
 
