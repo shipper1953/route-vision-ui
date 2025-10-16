@@ -8,10 +8,10 @@ interface OrderStatusProps {
 export const OrderStatus = ({ status }: OrderStatusProps) => {
   const getStatusDetails = (status: string) => {
     switch (status) {
-      case 'processing':
-        return { label: 'Processing', variant: 'outline' };
       case 'ready_to_ship':
         return { label: 'Ready to Ship', variant: 'warning' };
+      case 'partially_fulfilled':
+        return { label: 'Partially Fulfilled', variant: 'secondary' };
       case 'shipped':
         return { label: 'Shipped', variant: 'default' };
       case 'in_transit':

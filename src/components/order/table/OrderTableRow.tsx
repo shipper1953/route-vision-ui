@@ -13,6 +13,8 @@ import { renderOrderItems } from "../helpers/orderItemsHelper";
 import { getStatusBadgeVariant } from "../helpers/statusHelper";
 import { recalculateOrderCartonization } from "@/utils/recalculateOrderCartonization";
 import { toast } from "sonner";
+import { FulfillmentBadge } from "../FulfillmentBadge";
+import { OrderStatus } from "../OrderStatus";
 
 interface CartonizationData {
   recommendedBox: any;

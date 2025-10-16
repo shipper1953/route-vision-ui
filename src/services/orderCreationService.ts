@@ -330,7 +330,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
     customerPhone: data.customer_phone || undefined,
     orderDate: data.order_date || '',
     requiredDeliveryDate: data.required_delivery_date || '',
-    status: data.status || 'processing',
+    status: data.status || 'ready_to_ship',
     items: Array.isArray(data.items) ? data.items.length : 1,
     value: data.value?.toString() || '0',
     shippingAddress: shippingAddress

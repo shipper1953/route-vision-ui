@@ -3,8 +3,10 @@ export const getStatusBadgeVariant = (status: string) => {
   switch (status.toLowerCase()) {
     case 'pending':
       return 'secondary';
-    case 'processing':
-      return 'default';
+    case 'ready_to_ship':
+      return 'warning';
+    case 'partially_fulfilled':
+      return 'secondary';
     case 'shipped':
       return 'default';
     case 'delivered':

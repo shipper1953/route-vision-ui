@@ -3,8 +3,11 @@ import { Button } from "@/components/ui/button";
 import { OrderData, OrderItem } from "@/types/orderTypes";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Truck, ExternalLink, ChevronRight, ChevronDown, DollarSign, Calendar, Box } from "lucide-react";
+import { Package, Truck, ExternalLink, ChevronRight, ChevronDown, DollarSign, Calendar, Box, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom";
 
 interface ShipmentDetail {
   id: string;
@@ -30,6 +33,38 @@ export const OrderShipmentsDetailCard = ({ order }: OrderShipmentsDetailCardProp
   const [shipments, setShipments] = useState<ShipmentDetail[]>([]);
   const [expandedShipments, setExpandedShipments] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  // Calculate fulfillment data from order
+  const fulfillmentData = {
+    items_total: (order as any).items_total || 0,
+    items_shipped: (order as any).items_shipped || 0,
+    fulfillment_percentage: (order as any).fulfillment_percentage || 0,
+    fulfillment_status: (order as any).fulfillment_status || 'unfulfilled'
+  };
+
+  const getRemainingItems = (): OrderItem[] => {
+    if (!Array.isArray(order.items)) return [];
+    
+    const shippedItems = new Map<string, number>();
+    shipments.forEach(shipment => {
+      shipment.items.forEach(item => {
+        const current = shippedItems.get(item.itemId) || 0;
+        shippedItems.set(item.itemId, current + item.quantity);
+      });
+    });
+
+    const remaining: OrderItem[] = [];
+    order.items.forEach(item => {
+      const shipped = shippedItems.get(item.itemId) || 0;
+      const remainingQty = item.quantity - shipped;
+      if (remainingQty > 0) {
+        remaining.push({ ...item, quantity: remainingQty });
+      }
+    });
+
+    return remaining;
+  };
 
   useEffect(() => {
     const fetchShipmentDetails = async () => {
@@ -181,7 +216,59 @@ export const OrderShipmentsDetailCard = ({ order }: OrderShipmentsDetailCardProp
           Shipment Details ({shipments.length} package{shipments.length !== 1 ? 's' : ''})
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        {/* Fulfillment Summary Section */}
+        {fulfillmentData.items_total > 0 && (
+          <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+            <div className="font-semibold text-lg">Fulfillment Status</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-sm text-muted-foreground">Items Shipped</div>
+                <div className="text-2xl font-bold">{fulfillmentData.items_shipped}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Items Total</div>
+                <div className="text-2xl font-bold">{fulfillmentData.items_total}</div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Progress</span>
+                <span className="font-medium">{Math.round(fulfillmentData.fulfillment_percentage)}%</span>
+              </div>
+              <Progress value={fulfillmentData.fulfillment_percentage} className="h-3" />
+            </div>
+          </div>
+        )}
+
+        {/* Remaining Items Section */}
+        {getRemainingItems().length > 0 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex flex-col gap-3">
+              <div>
+                <div className="font-semibold mb-2">Items Still to Ship:</div>
+                <div className="space-y-1">
+                  {getRemainingItems().map((item, idx) => (
+                    <div key={idx} className="text-sm flex items-center justify-between">
+                      <span>{item.name || item.sku} </span>
+                      <span className="font-medium">× {item.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <Button 
+                onClick={() => navigate(`/shipments/create?orderId=${order.id}&remainingOnly=true`)}
+                size="sm"
+                className="w-full"
+              >
+                Ship Remaining Items
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Shipments List */}
         {shipments.map((shipment) => (
           <div key={`${shipment.id}-${shipment.packageIndex}`} className="border rounded-lg p-4 space-y-3">
             {/* Package header */}

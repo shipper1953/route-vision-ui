@@ -30,7 +30,7 @@ export const useDashboardOrders = () => {
           .from('orders')
           .select('id, order_id, customer_name, customer_company, shipping_address, status, order_date, required_delivery_date')
           .eq('company_id', userProfile.company_id)
-          .in('status', ['processing', 'ready_to_ship'])
+          .in('status', ['ready_to_ship', 'partially_fulfilled'])
           .order('order_date', { ascending: true })
           .limit(5);
 

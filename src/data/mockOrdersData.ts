@@ -38,7 +38,7 @@ const mockOrders: OrderData[] = [
     customerEmail: "shipping@xyzcorp.com",
     orderDate: "2025-05-14",
     requiredDeliveryDate: "2025-05-22",
-    status: "processing",
+    status: "ready_to_ship",
     items: 1,
     value: "$129.50",
     shippingAddress: {

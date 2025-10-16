@@ -405,8 +405,12 @@ export type Database = {
           customer_name: string | null
           customer_phone: string | null
           estimated_delivery_date: string | null
+          fulfillment_percentage: number | null
+          fulfillment_status: string | null
           id: number
           items: Json
+          items_shipped: number | null
+          items_total: number | null
           order_date: string | null
           order_id: string
           qboid_dimensions: Json | null
@@ -427,8 +431,12 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           estimated_delivery_date?: string | null
+          fulfillment_percentage?: number | null
+          fulfillment_status?: string | null
           id?: number
           items?: Json
+          items_shipped?: number | null
+          items_total?: number | null
           order_date?: string | null
           order_id: string
           qboid_dimensions?: Json | null
@@ -449,8 +457,12 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           estimated_delivery_date?: string | null
+          fulfillment_percentage?: number | null
+          fulfillment_status?: string | null
           id?: number
           items?: Json
+          items_shipped?: number | null
+          items_total?: number | null
           order_date?: string | null
           order_id?: string
           qboid_dimensions?: Json | null
@@ -1312,6 +1324,15 @@ export type Database = {
       auth_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      calculate_order_fulfillment: {
+        Args: { p_order_id: number }
+        Returns: {
+          fulfillment_percentage: number
+          fulfillment_status: string
+          items_shipped: number
+          items_total: number
+        }[]
       }
       get_company_boxes_for_cartonization: {
         Args: { p_company_id: string }
