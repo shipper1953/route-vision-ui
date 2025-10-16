@@ -160,6 +160,25 @@ export const useDashboardCharts = () => {
     };
 
     fetchChartData();
+
+    // Auto-refresh every 30 seconds to catch new shipments
+    const refreshInterval = setInterval(() => {
+      fetchChartData();
+    }, 30000);
+
+    // Refresh when page becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchChartData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(refreshInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [userProfile?.company_id]);
 
   return { parcelData, carrierData, loading, carriers };
