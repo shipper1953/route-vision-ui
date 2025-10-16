@@ -103,13 +103,21 @@ export const ShippingRatesCard = ({
     }
   }, [availableRates, company]);
 
-  // Alert user if no rates are available
+  // Alert user if no rates are available and ensure selected rate is marked up
   useEffect(() => {
     if (!availableRates.length) {
       toast.error("No shipping rates available. Please check the shipping details and try again.");
-    } else {
+    } else if (markedUpRates.length > 0) {
+      // If we have a selected rate that doesn't have markup applied, replace it with the marked up version
+      if (selectedRate && !('original_rate' in selectedRate)) {
+        const markedUpVersion = markedUpRates.find(rate => rate.id === selectedRate.id);
+        if (markedUpVersion) {
+          console.log('Replacing original rate with marked up version:', markedUpVersion);
+          setSelectedRate(markedUpVersion);
+        }
+      }
       // If we have rates and a recommended rate is available but not selected, select it
-      if (recommendedRate && !selectedRate) {
+      else if (recommendedRate && !selectedRate) {
         // Find the marked up version of the recommended rate
         const markedUpRecommended = markedUpRates.find(rate => rate.id === recommendedRate.id);
         if (markedUpRecommended) {
