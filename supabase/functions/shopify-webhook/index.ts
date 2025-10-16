@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { ShopifyOrderSchema, sanitizeString } from './validation.ts';
+import { ZodError } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +27,20 @@ serve(async (req) => {
 
     const rawBody = await req.text();
     const webhookData = JSON.parse(rawBody);
+    
+    // Validate webhook data for orders
+    let validatedOrder;
+    if (topic === 'orders/create' || topic === 'orders/updated') {
+      try {
+        validatedOrder = ShopifyOrderSchema.parse(webhookData);
+      } catch (validationError) {
+        console.error('Order validation failed:', validationError);
+        if (validationError instanceof ZodError) {
+          console.error('Validation errors:', validationError.errors);
+        }
+        throw new Error('Invalid order data from Shopify');
+      }
+    }
 
     // Find company by shop domain
     const { data: companies, error: companyError } = await supabase
@@ -87,24 +103,27 @@ serve(async (req) => {
         .eq('is_default', true)
         .single();
 
-      // Transform Shopify order to Ship Tornado format
+      // Transform Shopify order to Ship Tornado format with sanitization
       const orderData = {
-        order_id: `SHOP-${shopifyOrder.order_number}`,
-        customer_name: `${shopifyOrder.customer?.first_name || ''} ${shopifyOrder.customer?.last_name || ''}`.trim() || 'Unknown',
-        customer_email: shopifyOrder.customer?.email || null,
-        customer_phone: shopifyOrder.customer?.phone || null,
-        customer_company: shopifyOrder.customer?.company || null,
+        order_id: sanitizeString(`SHOP-${shopifyOrder.order_number}`, 50) || 'UNKNOWN',
+        customer_name: sanitizeString(
+          `${shopifyOrder.customer?.first_name || ''} ${shopifyOrder.customer?.last_name || ''}`.trim(),
+          255
+        ) || 'Unknown',
+        customer_email: sanitizeString(shopifyOrder.customer?.email, 255),
+        customer_phone: sanitizeString(shopifyOrder.customer?.phone, 20),
+        customer_company: sanitizeString(shopifyOrder.customer?.company, 255),
         shipping_address: shopifyOrder.shipping_address ? {
-          street1: shopifyOrder.shipping_address.address1 || '',
-          street2: shopifyOrder.shipping_address.address2 || '',
-          city: shopifyOrder.shipping_address.city || '',
-          state: shopifyOrder.shipping_address.province_code || '',
-          zip: shopifyOrder.shipping_address.zip || '',
-          country: shopifyOrder.shipping_address.country_code || 'US'
+          street1: sanitizeString(shopifyOrder.shipping_address.address1, 255) || '',
+          street2: sanitizeString(shopifyOrder.shipping_address.address2, 255) || '',
+          city: sanitizeString(shopifyOrder.shipping_address.city, 100) || '',
+          state: sanitizeString(shopifyOrder.shipping_address.province_code, 10) || '',
+          zip: sanitizeString(shopifyOrder.shipping_address.zip, 20) || '',
+          country: sanitizeString(shopifyOrder.shipping_address.country_code, 2) || 'US'
         } : null,
         items: shopifyOrder.line_items?.map((item: any) => ({
-          sku: item.sku || item.name,
-          name: item.name,
+          sku: sanitizeString(item.sku || item.name, 100),
+          name: sanitizeString(item.name, 255),
           quantity: item.quantity,
           unitPrice: parseFloat(item.price)
         })) || [],

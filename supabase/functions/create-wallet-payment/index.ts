@@ -2,6 +2,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { WalletPaymentSchema } from './validation.ts';
+import { ZodError } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,11 +16,11 @@ serve(async (req) => {
   }
 
   try {
-    const { amount, companyId, savePaymentMethod = false } = await req.json();
-
-    if (!amount || !companyId) {
-      throw new Error("Amount and company ID are required");
-    }
+    const requestBody = await req.json();
+    
+    // Validate input with Zod
+    const validated = WalletPaymentSchema.parse(requestBody);
+    const { amount, companyId, savePaymentMethod } = validated;
 
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -106,6 +108,21 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error creating payment session:", error);
+    
+    // Handle validation errors separately
+    if (error instanceof ZodError) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid request data", 
+          details: error.errors 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error.message }),
       {
