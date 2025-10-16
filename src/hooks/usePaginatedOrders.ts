@@ -4,7 +4,7 @@ import { fetchOrdersPaginated, PaginatedOrdersResult } from "@/services/orderFet
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export const usePaginatedOrders = (pageSize: number = 10) => {
+export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: string = 'all') => {
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -13,12 +13,13 @@ export const usePaginatedOrders = (pageSize: number = 10) => {
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   
   const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastReloadRef = useRef<number>(0);
   const MIN_RELOAD_INTERVAL = 1000; // 1 second minimum between reloads
 
-  const loadOrders = useCallback(async (page: number, search?: string) => {
+  const loadOrders = useCallback(async (page: number, search?: string, status?: string) => {
     try {
       const isSearching = search !== undefined;
       if (isSearching) {
@@ -27,7 +28,8 @@ export const usePaginatedOrders = (pageSize: number = 10) => {
         setLoading(true);
       }
 
-      const result = await fetchOrdersPaginated(page, pageSize, search || searchTerm);
+      const currentStatus = status !== undefined ? status : statusFilter;
+      const result = await fetchOrdersPaginated(page, pageSize, search || searchTerm, currentStatus);
       
       setOrders(result.orders);
       setTotalCount(result.totalCount);
@@ -35,7 +37,7 @@ export const usePaginatedOrders = (pageSize: number = 10) => {
       setHasPreviousPage(result.hasPreviousPage);
       setCurrentPage(page);
       
-      console.log(`Loaded page ${page}: ${result.orders.length} orders, total: ${result.totalCount}`);
+      console.log(`Loaded page ${page}: ${result.orders.length} orders, total: ${result.totalCount}, status: ${currentStatus}`);
     } catch (error) {
       console.error("Error loading orders:", error);
       setOrders([]);
@@ -46,25 +48,21 @@ export const usePaginatedOrders = (pageSize: number = 10) => {
       setLoading(false);
       setSearchLoading(false);
     }
-  }, [pageSize, searchTerm]);
+  }, [pageSize, searchTerm, statusFilter]);
 
   // Initial load
   useEffect(() => {
-    loadOrders(1);
-  }, [loadOrders]);
+    loadOrders(1, '', initialStatusFilter);
+  }, []);
 
   // Search with debouncing
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (searchTerm.trim() !== '') {
-        loadOrders(1, searchTerm);
-      } else {
-        loadOrders(1, '');
-      }
+      loadOrders(1, searchTerm, statusFilter);
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, loadOrders]);
+  }, [searchTerm, statusFilter]);
 
   // Realtime updates with debouncing and rate limiting
   useEffect(() => {
@@ -150,6 +148,8 @@ export const usePaginatedOrders = (pageSize: number = 10) => {
     nextPage,
     previousPage,
     refreshOrders,
-    pageSize
+    pageSize,
+    statusFilter,
+    setStatusFilter,
   };
 };

@@ -1,5 +1,6 @@
 
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 interface StatCardProps {
   title: string;
@@ -10,9 +11,16 @@ interface StatCardProps {
     positive: boolean;
   };
   className?: string;
+  linkTo?: string;
 }
 
-export function StatCard({ title, value, icon, trend, className }: StatCardProps) {
+export function StatCard({ title, value, icon, trend, className, linkTo }: StatCardProps) {
+  const valueContent = (
+    <div className="tms-stat-value">
+      {value}
+    </div>
+  );
+
   return (
     <div className={cn("tms-stat-card", className)}>
       <div className="flex justify-between items-start mb-2">
@@ -20,7 +28,13 @@ export function StatCard({ title, value, icon, trend, className }: StatCardProps
         {icon && <div className="text-muted-foreground">{icon}</div>}
       </div>
       <div className="flex items-end justify-between">
-        <div className="tms-stat-value">{value}</div>
+        {linkTo ? (
+          <Link to={linkTo} className="hover:text-primary transition-colors">
+            {valueContent}
+          </Link>
+        ) : (
+          valueContent
+        )}
         {trend && (
           <div className={cn(
             "text-xs font-medium flex items-center",

@@ -15,9 +15,10 @@ export interface PaginatedOrdersResult {
 export async function fetchOrdersPaginated(
   page: number = 1,
   pageSize: number = 10,
-  searchTerm?: string
+  searchTerm?: string,
+  statusFilter?: string
 ): Promise<PaginatedOrdersResult> {
-  console.log(`Fetching paginated orders: page ${page}, size ${pageSize}, search: ${searchTerm}`);
+  console.log(`Fetching paginated orders: page ${page}, size ${pageSize}, search: ${searchTerm}, status: ${statusFilter}`);
   
   try {
     // Calculate offset
@@ -42,6 +43,11 @@ export async function fetchOrdersPaginated(
     if (searchTerm && searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase().trim();
       query = query.or(`id.ilike.%${searchLower}%,customer_name.ilike.%${searchLower}%,order_id.ilike.%${searchLower}%`);
+    }
+    
+    // Add status filter if provided and not "all"
+    if (statusFilter && statusFilter !== 'all') {
+      query = query.eq('status', statusFilter);
     }
     
     // Add pagination and ordering

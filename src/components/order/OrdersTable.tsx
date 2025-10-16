@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { OrderData } from "@/types/orderTypes";
@@ -10,14 +10,33 @@ import { OrderTableHeader } from "./table/OrderTableHeader";
 interface OrdersTableProps {
   orders: OrderData[];
   loading?: boolean;
+  initialStatusFilter?: string;
+  onStatusFilterChange?: (status: string) => void;
 }
 
-export const OrdersTable = ({ orders, loading = false }: OrdersTableProps) => {
+export const OrdersTable = ({ 
+  orders, 
+  loading = false,
+  initialStatusFilter = "all",
+  onStatusFilterChange
+}: OrdersTableProps) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  // Sync status filter with parent
+  useEffect(() => {
+    setStatusFilter(initialStatusFilter);
+  }, [initialStatusFilter]);
+
+  const handleStatusChange = (newStatus: string) => {
+    setStatusFilter(newStatus);
+    if (onStatusFilterChange) {
+      onStatusFilterChange(newStatus);
+    }
+  };
 
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
@@ -61,7 +80,7 @@ export const OrdersTable = ({ orders, loading = false }: OrdersTableProps) => {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
+            onStatusChange={handleStatusChange}
             dateFrom={dateFrom}
             onDateFromChange={setDateFrom}
             dateTo={dateTo}

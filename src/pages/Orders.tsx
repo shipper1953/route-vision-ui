@@ -16,6 +16,7 @@ import { usePaginatedOrders } from "@/hooks/usePaginatedOrders";
 const Orders = () => {
   const [searchParams] = useSearchParams();
   const highlightedOrderId = searchParams.get('highlight');
+  const statusFromUrl = searchParams.get('status') || 'all';
   
   const {
     orders,
@@ -31,8 +32,10 @@ const Orders = () => {
     goToPage,
     nextPage,
     previousPage,
-    pageSize
-  } = usePaginatedOrders(10);
+    pageSize,
+    statusFilter,
+    setStatusFilter,
+  } = usePaginatedOrders(10, statusFromUrl);
 
   return (
     <TmsLayout>
@@ -60,6 +63,8 @@ const Orders = () => {
                 <OrdersTable 
                   orders={orders}
                   loading={searchLoading}
+                  initialStatusFilter={statusFilter}
+                  onStatusFilterChange={setStatusFilter}
                 />
               </div>
               

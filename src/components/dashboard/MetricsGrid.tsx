@@ -62,6 +62,7 @@ export const MetricsGrid = () => {
           value: `${metrics.ordersToShip} pending`,
           positive: metrics.ordersToShip < 5
         }}
+        linkTo="/orders?status=ready_to_ship"
       />
       <StatCard
         title="Total Revenue"
