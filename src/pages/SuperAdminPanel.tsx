@@ -8,6 +8,8 @@ import { SuperAdminUserCreation } from "@/components/admin/SuperAdminUserCreatio
 import { SuperAdminShipmentsReport } from "@/components/admin/SuperAdminShipmentsReport";
 import { SuperAdminPackageInventory } from "@/components/admin/SuperAdminPackageInventory";
 import { FulfillmentBackfillTool } from "@/components/admin/FulfillmentBackfillTool";
+import { PartialFulfillmentTestingPanel } from "@/components/admin/PartialFulfillmentTestingPanel";
+import { PartialFulfillmentDocs } from "@/components/admin/PartialFulfillmentDocs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const SuperAdminPanel = () => {
@@ -91,7 +93,11 @@ const SuperAdminPanel = () => {
           </TabsContent>
           
           <TabsContent value="tools" className="space-y-4">
-            <FulfillmentBackfillTool />
+            <div className="grid gap-4">
+              <PartialFulfillmentDocs />
+              <PartialFulfillmentTestingPanel />
+              <FulfillmentBackfillTool />
+            </div>
           </TabsContent>
         </Tabs>
       </div>
