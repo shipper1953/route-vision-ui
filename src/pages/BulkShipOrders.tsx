@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BulkShipOrdersTable } from "@/components/cartonization/BulkShipOrdersTable";
 
 const BulkShipOrders = () => {
-  const { boxShippingGroups, loading, handleFetchRates, handleBulkShip } = useBulkShipping();
+  const { boxShippingGroups, loading, handleFetchRates, handleBulkShip, refreshShippingGroups } = useBulkShipping();
 
   return (
     <TmsLayout>
@@ -58,6 +58,7 @@ const BulkShipOrders = () => {
                   orders={group.orders}
                   onFetchRates={handleFetchRates}
                   onBulkShip={handleBulkShip}
+                  onRefresh={refreshShippingGroups}
                 />
               ))
             )}
