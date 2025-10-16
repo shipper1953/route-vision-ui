@@ -77,7 +77,14 @@ const EditOrder = () => {
         form.setValue("customerCompany", orderData.customerCompany || "");
         form.setValue("customerEmail", orderData.customerEmail || "");
         form.setValue("customerPhone", orderData.customerPhone || "");
-        form.setValue("requiredDeliveryDate", new Date(orderData.requiredDeliveryDate));
+        
+        // Safely parse date - only set if valid
+        if (orderData.requiredDeliveryDate) {
+          const parsedDate = new Date(orderData.requiredDeliveryDate);
+          if (!isNaN(parsedDate.getTime())) {
+            form.setValue("requiredDeliveryDate", parsedDate);
+          }
+        }
         
         // Convert existing items data to orderItems array
         if (orderData.items && Array.isArray(orderData.items)) {
