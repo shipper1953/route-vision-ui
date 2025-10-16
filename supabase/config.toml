@@ -73,20 +73,11 @@ url = ""
 [functions]
 # Configuration for Edge Functions.
 
-[functions.label-proxy]
-verify_jwt = false
-
-[functions.create-shipment]
-verify_jwt = false
+# SECURITY: JWT verification ENABLED for financial functions
+# label-proxy, create-shipment, purchase-label, get-smartrates now require authentication
 
 [functions.debug-env]
-verify_jwt = false
-
-[functions.get-smartrates]
-verify_jwt = false
-
-[functions.purchase-label]
-verify_jwt = false
+verify_jwt = false  # Keep disabled for debugging (restrict access via code)
 
 [functions.qboid-wifi-api-handler]
 verify_jwt = false

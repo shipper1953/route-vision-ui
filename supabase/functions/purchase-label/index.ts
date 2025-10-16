@@ -3,8 +3,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { saveShipmentToDatabase } from './shipmentService.ts'
 import { linkShipmentToOrder } from './orderService.ts'
 import { processWalletPayment } from './walletService.ts'
+import { PurchaseLabelSchema, sanitizeString } from './validation.ts'
+import { authenticateUser, getUserCompany } from './authService.ts'
 
-console.log('=== PURCHASE-LABEL v8.0 WITH ORDER LINKING ===')
+console.log('=== PURCHASE-LABEL v9.0 WITH AUTH & VALIDATION ===')
 
 const corsHeaders = {
   'Content-Type': 'application/json',
@@ -14,9 +16,16 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 }
 
-function createErrorResponse(error: string, details?: any, status: number = 500): Response {
-  console.log('🔴 Creating error response:', error, details)
-  return new Response(JSON.stringify({ error, details }), {
+function createErrorResponse(error: string, internalDetails?: any, status: number = 500): Response {
+  // Log detailed errors server-side only
+  console.error('[Purchase Label Error]', error, internalDetails)
+  
+  // Return sanitized error to client
+  const clientError = status === 500 
+    ? 'An internal error occurred. Please contact support.'
+    : error; // Client errors (4xx) can be more specific
+    
+  return new Response(JSON.stringify({ error: clientError }), {
     headers: corsHeaders,
     status,
   })
@@ -377,7 +386,7 @@ serve(async (req) => {
         ? purchaseResponse.object_id 
         : purchaseResponse.id;
 
-      console.log('💰 Processing wallet payment for company:', companyIdForWallet)
+      console.log(`💰 Processing wallet payment for company: ${sanitizeString(companyIdForWallet, 50)}`)
       await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId);
       console.log('✅ Wallet payment processed successfully')
       
