@@ -32,6 +32,8 @@ export interface Shipment {
   labelUrl?: string;
   orderId?: number | string;  // Order database ID
   orderNumber?: string;  // Order display number (order_id field)
+  items?: Array<{ sku: string; name: string; quantity: number }>;  // Items in this shipment
+  packageIndex?: number | null;  // Package number for multi-package orders
 }
 
 interface ShipmentsTableProps {
@@ -78,6 +80,7 @@ export const ShipmentsTable = ({
           <TableRow>
             <TableHead>Tracking</TableHead>
             <TableHead>Order #</TableHead>
+            <TableHead>Items</TableHead>
             <TableHead>Carrier</TableHead>
             <TableHead>Service</TableHead>
             <TableHead>Weight</TableHead>
@@ -117,9 +120,26 @@ export const ShipmentsTable = ({
                     className="text-tms-blue hover:underline"
                   >
                     {shipment.orderNumber}
+                    {shipment.packageIndex != null && shipment.packageIndex > 0 && (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        (Pkg {shipment.packageIndex + 1})
+                      </span>
+                    )}
                   </a>
                 ) : (
                   <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {shipment.items && shipment.items.length > 0 ? (
+                  <div className="text-sm">
+                    <div className="font-medium">{shipment.items.length} item{shipment.items.length !== 1 ? 's' : ''}</div>
+                    <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={shipment.items.map(i => `${i.name} (${i.quantity})`).join(', ')}>
+                      {shipment.items.map(i => `${i.name} (${i.quantity})`).join(', ')}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground">No items</span>
                 )}
               </TableCell>
               <TableCell>
@@ -166,7 +186,7 @@ export const ShipmentsTable = ({
           
           {filteredShipments.length === 0 && (
             <TableRow>
-              <TableCell colSpan={11} className="h-24 text-center">
+              <TableCell colSpan={12} className="h-24 text-center">
                 No shipments found.
               </TableCell>
             </TableRow>

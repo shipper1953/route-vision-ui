@@ -118,6 +118,16 @@ export const useSupabaseShipments = () => {
         // Add/overwrite with new-style multi-package orders (more detailed info)
         newStyleLinks.data?.forEach(link => {
           const order = (link as any).orders;
+          
+          // Extract items from package_info if available
+          let items: Array<{ sku: string; name: string; quantity: number }> = [];
+          if (link.package_info && typeof link.package_info === 'object') {
+            const packageInfo = link.package_info as any;
+            if (Array.isArray(packageInfo.items)) {
+              items = packageInfo.items;
+            }
+          }
+          
           shipmentToOrderMap.set(link.shipment_id, {
             id: order.id,
             order_id: order.order_id,
@@ -125,7 +135,8 @@ export const useSupabaseShipments = () => {
             shipping_address: order.shipping_address,
             qboid_dimensions: order.qboid_dimensions,
             packageIndex: link.package_index,
-            packageInfo: link.package_info
+            packageInfo: link.package_info,
+            items
           });
         });
         
@@ -193,7 +204,9 @@ export const useSupabaseShipments = () => {
             weight,
             labelUrl: s.label_url,
             orderId: orderData?.id,
-            orderNumber: orderData?.order_id
+            orderNumber: orderData?.order_id,
+            items: orderData?.items || [],
+            packageIndex: orderData?.packageIndex
           };
         });
         

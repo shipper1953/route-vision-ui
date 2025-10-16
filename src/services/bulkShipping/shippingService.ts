@@ -51,7 +51,15 @@ export class BulkShippingService {
             selectedBoxName: order.recommendedBox.name
           } : undefined;
 
+          // For bulk shipping, include all items from the order
+          const selectedItems = order.items.map(item => ({
+            sku: item.sku || item.name,
+            name: item.name || item.sku,
+            quantity: parseInt(item.quantity?.toString() || '1')
+          }));
+
           console.log(`Purchasing label for order ${order.id} with box:`, selectedBoxData);
+          console.log(`Selected items for order ${order.id}:`, selectedItems);
           console.log(`Selected rate for order ${order.id}:`, { 
             carrier: selectedRate.carrier, 
             service: selectedRate.service, 
@@ -68,7 +76,7 @@ export class BulkShippingService {
             order.id,
             undefined, // provider - let it default
             selectedBoxData,
-            undefined, // selectedItems
+            selectedItems, // Pass items for partial fulfillment tracking
             originalCost,
             markedUpCost
           );
