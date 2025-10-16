@@ -104,6 +104,8 @@ export async function linkShipmentToOrder(
     
     // ALWAYS create order_shipments record (even for subsequent packages)
     console.log(`🔗 Creating order_shipments link record for package ${packageMetadata?.packageIndex || 0}...`);
+    console.log(`📦 Package metadata items:`, packageMetadata?.items);
+    
     const { error: linkError } = await supabaseClient
       .from('order_shipments')
       .insert({
@@ -111,13 +113,13 @@ export async function linkShipmentToOrder(
         shipment_id: finalShipmentId,
         package_index: packageMetadata?.packageIndex || 0,
         package_info: packageMetadata ? {
-          boxName: packageMetadata.boxData.name,
-          boxDimensions: {
+          boxName: packageMetadata.boxData?.name,
+          boxDimensions: packageMetadata.boxData ? {
             length: packageMetadata.boxData.length,
             width: packageMetadata.boxData.width,
             height: packageMetadata.boxData.height
-          },
-          items: packageMetadata.items,
+          } : null,
+          items: packageMetadata.items || [],
           weight: packageMetadata.weight
         } : null
       });

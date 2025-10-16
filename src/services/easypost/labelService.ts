@@ -17,6 +17,7 @@ export class LabelService {
     orderId?: string | null,
     provider?: string,
     selectedBoxData?: any,
+    selectedItems?: any[],
     originalCost?: number | null,
     markedUpCost?: number | null
   ): Promise<any> {
@@ -24,7 +25,7 @@ export class LabelService {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} using ${provider || 'easypost'}`);
       
       if (this.useEdgeFunctions) {
-        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData, originalCost, markedUpCost);
+        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData, selectedItems, originalCost, markedUpCost);
       }
       
       return this.purchaseLabelDirectly(shipmentId, rateId);
@@ -150,6 +151,7 @@ export class LabelService {
     orderId?: string | null,
     provider?: string,
     selectedBoxData?: any,
+    selectedItems?: any[],
     originalCost?: number | null,
     markedUpCost?: number | null,
     packageMetadata?: {
@@ -187,6 +189,12 @@ export class LabelService {
     if (markedUpCost !== null && markedUpCost !== undefined) {
       requestBody.markedUpCost = markedUpCost;
       console.log('Including marked-up cost in edge function request:', markedUpCost);
+    }
+
+    // Include selected items if provided
+    if (selectedItems && selectedItems.length > 0) {
+      requestBody.selectedItems = selectedItems;
+      console.log('Including selected items in edge function request:', selectedItems);
     }
 
     // Include package metadata if provided
@@ -260,6 +268,7 @@ export class LabelService {
             orderId,
             provider,
             selectedBoxData,
+            items, // selectedItems
             undefined, // originalCost
             undefined, // markedUpCost
             packageMetadata
@@ -407,7 +416,9 @@ export class LabelService {
             actualShipmentId,
             selectedRate.id,
             orderId,
-            selectedRate.provider
+            selectedRate.provider,
+            undefined, // selectedBoxData
+            undefined // selectedItems
           );
         } catch (primaryErr: any) {
           console.warn(`Primary purchase failed for parcel ${i}:`, primaryErr?.message || primaryErr);
@@ -421,7 +432,9 @@ export class LabelService {
                 combined.easypost_shipment.id,
                 epRate.id,
                 orderId,
-                'easypost'
+                'easypost',
+                undefined, // selectedBoxData
+                undefined // selectedItems
               );
             }
           } else if (selectedRate.provider === 'easypost' && combined.shippo_shipment?.object_id) {
@@ -433,7 +446,9 @@ export class LabelService {
                 combined.shippo_shipment.object_id,
                 shRate.id,
                 orderId,
-                'shippo'
+                'shippo',
+                undefined, // selectedBoxData
+                undefined // selectedItems
               );
             }
           }

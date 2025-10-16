@@ -288,7 +288,8 @@ serve(async (req) => {
       selectedBox,
       originalCost = null,
       markedUpCost = null,
-      packageMetadata = null
+      packageMetadata = null,
+      selectedItems = null
     } = requestBody
     
     console.log('🔍 Extracted parameters:', { shipmentId, rateId, orderId, provider })
@@ -411,9 +412,27 @@ serve(async (req) => {
     if (orderId && finalShipmentId) {
       try {
         console.log('🔗 Linking order to shipment...')
-        const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId, packageMetadata)
+        console.log('📦 Selected items for this shipment:', selectedItems)
+        
+        // Enhance packageMetadata with selected items if provided
+        const enhancedMetadata = packageMetadata ? {
+          ...packageMetadata,
+          items: selectedItems || packageMetadata.items
+        } : (selectedItems ? {
+          packageIndex: 0,
+          items: selectedItems,
+          boxData: selectedBox ? {
+            name: selectedBox.selectedBoxName,
+            length: selectedBox.length || 0,
+            width: selectedBox.width || 0,
+            height: selectedBox.height || 0
+          } : null,
+          weight: 0
+        } : null);
+        
+        const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId, enhancedMetadata)
         if (linkSuccess) {
-          console.log('✅ Order successfully linked to shipment')
+          console.log('✅ Order successfully linked to shipment with item tracking')
           // Fire Slack notification for "order shipped"
           try {
             const slackWebhook = Deno.env.get('SLACK_WEBHOOK_URL')

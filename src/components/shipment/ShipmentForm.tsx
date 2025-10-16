@@ -9,6 +9,9 @@ import { shipmentSchema, ShipmentForm as ShipmentFormType } from "@/types/shipme
 import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
 import { OrderLookupSection } from "./form/OrderLookupSection";
 import { ShipmentFormSubmission } from "./form/ShipmentFormSubmission";
+import { ShipmentItemSelector } from "./ShipmentItemSelector";
+import { SelectedItem } from "@/types/fulfillment";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ShipmentFormProps {
   onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
@@ -19,6 +22,8 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   const [orderLookupComplete, setOrderLookupComplete] = useState(false);
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [selectedBoxData, setSelectedBoxData] = useState<any>(null);
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
+  const [itemsAlreadyShipped, setItemsAlreadyShipped] = useState<{ [itemId: string]: number }>({});
   const { getDefaultShippingAddress, warehouseAddress } = useDefaultAddressValues();
   
   const form = useForm<ShipmentFormType>({
@@ -85,6 +90,43 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   useEffect(() => {
     console.log("ShipmentForm - orderItems updated:", orderItems);
   }, [orderItems]);
+
+  // Fetch items already shipped when orderId changes
+  useEffect(() => {
+    const fetchShippedItems = async () => {
+      const orderId = form.getValues('orderId');
+      if (!orderId) return;
+
+      try {
+        const { data: shipments, error } = await supabase
+          .from('order_shipments')
+          .select('package_info')
+          .eq('order_id', parseInt(orderId, 10));
+
+        if (error) {
+          console.error('Error fetching shipped items:', error);
+          return;
+        }
+
+        // Calculate quantities already shipped for each item
+        const shippedMap: { [itemId: string]: number } = {};
+        shipments?.forEach(shipment => {
+          const packageInfo = shipment.package_info as any;
+          const items = packageInfo?.items || [];
+          items.forEach((item: any) => {
+            shippedMap[item.itemId] = (shippedMap[item.itemId] || 0) + item.quantity;
+          });
+        });
+
+        setItemsAlreadyShipped(shippedMap);
+        console.log('Items already shipped:', shippedMap);
+      } catch (err) {
+        console.error('Error calculating shipped items:', err);
+      }
+    };
+
+    fetchShippedItems();
+  }, [form.watch('orderId')]);
   
   return (
     <FormProvider {...form}>
@@ -94,11 +136,22 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       />
       
       <form onSubmit={form.handleSubmit(() => {})} className="space-y-8">
+        {/* Show item selector if order has items */}
+        {orderLookupComplete && orderItems.length > 0 && (
+          <ShipmentItemSelector
+            orderItems={orderItems}
+            onItemsSelected={setSelectedItems}
+            selectedItems={selectedItems}
+            itemsAlreadyShipped={itemsAlreadyShipped}
+          />
+        )}
+        
         <ShipmentFormTabs orderItems={orderItems} />
         
         <ShipmentFormSubmission 
           loading={loading}
           setLoading={setLoading}
+          selectedItems={selectedItems}
           onShipmentCreated={(response, selectedRate, boxData) => {
             if (boxData) {
               setSelectedBoxData(boxData);

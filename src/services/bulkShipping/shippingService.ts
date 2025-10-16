@@ -68,6 +68,7 @@ export class BulkShippingService {
             order.id,
             undefined, // provider - let it default
             selectedBoxData,
+            undefined, // selectedItems
             originalCost,
             markedUpCost
           );

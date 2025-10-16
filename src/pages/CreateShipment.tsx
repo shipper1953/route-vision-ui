@@ -366,7 +366,8 @@ const CreateShipment = () => {
               onBack={resetShipment}
               onBuyLabel={async (shipmentId, rateId) => {
                 console.log('Purchasing label with selected box data:', selectedBoxData);
-                const result = await purchaseLabel(shipmentId, rateId, selectedBoxData);
+                const selectedItems = selectedBoxData?.selectedItems;
+                const result = await purchaseLabel(shipmentId, rateId, selectedBoxData, selectedItems);
                 if (result) {
                   // Client-side fallback: mark order shipped and link shipment if provided
                   try {

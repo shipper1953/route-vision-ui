@@ -10,15 +10,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { recommendRate } from "@/services/shipping/rateSelection";
 import { logEvent } from "@/services/shipping/analytics";
+import { SelectedItem } from "@/types/fulfillment";
+
 interface UseShipmentSubmissionProps {
   loading: boolean;
   setLoading: (loading: boolean) => void;
+  selectedItems?: SelectedItem[];
   onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
 }
 
 export const useShipmentSubmission = ({ 
   loading, 
-  setLoading, 
+  setLoading,
+  selectedItems,
   onShipmentCreated 
 }: UseShipmentSubmissionProps) => {
   const form = useFormContext<ShipmentForm>();
@@ -115,7 +119,8 @@ export const useShipmentSubmission = ({
         selectedBoxId: data.selectedBoxId,
         selectedBoxSku: data.selectedBoxSku || data.selectedBoxName, // Use name as fallback for SKU
         selectedBoxName: data.selectedBoxName,
-        selectedBoxes: data.selectedBoxes
+        selectedBoxes: data.selectedBoxes,
+        selectedItems: selectedItems // Include selected items
       };
 
       toast.success(`Found ${totalRates} rates from multiple providers (EasyPost: ${easyPostCount}, Shippo: ${shippoCount})`);
