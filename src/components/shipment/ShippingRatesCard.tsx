@@ -100,8 +100,17 @@ export const ShippingRatesCard = ({
       const ratesWithMarkup = applyMarkupToRates(availableRates, company);
       setMarkedUpRates(ratesWithMarkup);
       console.log('Applied markup to rates:', ratesWithMarkup);
+      
+      // Immediately update selected rate if it exists and doesn't have markup
+      if (selectedRate && !('original_rate' in selectedRate)) {
+        const markedUpVersion = ratesWithMarkup.find(rate => rate.id === selectedRate.id);
+        if (markedUpVersion) {
+          console.log('Immediately replacing selected rate with marked up version:', markedUpVersion);
+          setSelectedRate(markedUpVersion);
+        }
+      }
     }
-  }, [availableRates, company]);
+  }, [availableRates, company, selectedRate, setSelectedRate]);
 
   // Alert user if no rates are available and ensure selected rate is marked up
   useEffect(() => {
