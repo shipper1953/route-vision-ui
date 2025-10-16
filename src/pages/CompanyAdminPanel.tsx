@@ -7,6 +7,7 @@ import { CompanyProfile } from "@/components/admin/CompanyProfile";
 import { WarehouseManagement } from "@/components/admin/WarehouseManagement";
 import { WalletManagement } from "@/components/admin/WalletManagement";
 import { UserManagement } from "@/components/admin/UserManagement";
+import { ShopifyIntegrationSettings } from "@/components/admin/integrations/ShopifyIntegrationSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -168,6 +169,7 @@ const CompanyAdminPanel = () => {
             <TabsTrigger value="shipments">Company Shipments</TabsTrigger>
             <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
             <TabsTrigger value="wallet">Wallet & Billing</TabsTrigger>
+            <TabsTrigger value="integrations">Integrations</TabsTrigger>
           </TabsList>
           
           <TabsContent value="profile">
@@ -294,6 +296,10 @@ const CompanyAdminPanel = () => {
           
           <TabsContent value="wallet">
             <WalletManagement companyId={userProfile?.company_id} />
+          </TabsContent>
+          
+          <TabsContent value="integrations">
+            <ShopifyIntegrationSettings companyId={userProfile?.company_id} />
           </TabsContent>
         </Tabs>
       </div>
