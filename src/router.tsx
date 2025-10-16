@@ -1,27 +1,47 @@
 
+import { lazy, Suspense } from "react";
 import {
   createBrowserRouter,
 } from "react-router-dom";
+import { Loader2 } from "lucide-react";
+
+// Eager load critical pages (landing, auth)
 import Index from "@/pages/Index";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
-import Orders from "@/pages/Orders";
-import CreateOrder from "@/pages/CreateOrder";
-import EditOrder from "@/pages/EditOrder";
-import OrderDetails from "@/pages/OrderDetails";
-import BulkShipOrders from "@/pages/BulkShipOrders";
-import Shipments from "@/pages/Shipments";
-import CreateShipment from "@/pages/CreateShipment";
-import ItemMaster from "@/pages/ItemMaster";
-import Users from "@/pages/Users";
-import CreateUser from "@/pages/CreateUser";
-import Settings from "@/pages/Settings";
-import ProfileSettings from "@/pages/ProfileSettings";
-import AdminPanel from "@/pages/AdminPanel";
-import SuperAdminPanel from "@/pages/SuperAdminPanel";
-import CompanyAdminPanel from "@/pages/CompanyAdminPanel";
-import GenerateDemoOrders from "@/pages/GenerateDemoOrders";
-import NotFound from "@/pages/NotFound";
+
+// Lazy load all other pages for code splitting
+const Orders = lazy(() => import("@/pages/Orders"));
+const CreateOrder = lazy(() => import("@/pages/CreateOrder"));
+const EditOrder = lazy(() => import("@/pages/EditOrder"));
+const OrderDetails = lazy(() => import("@/pages/OrderDetails"));
+const BulkShipOrders = lazy(() => import("@/pages/BulkShipOrders"));
+const Shipments = lazy(() => import("@/pages/Shipments"));
+const CreateShipment = lazy(() => import("@/pages/CreateShipment"));
+const ItemMaster = lazy(() => import("@/pages/ItemMaster"));
+const Users = lazy(() => import("@/pages/Users"));
+const CreateUser = lazy(() => import("@/pages/CreateUser"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const ProfileSettings = lazy(() => import("@/pages/ProfileSettings"));
+const AdminPanel = lazy(() => import("@/pages/AdminPanel"));
+const SuperAdminPanel = lazy(() => import("@/pages/SuperAdminPanel"));
+const CompanyAdminPanel = lazy(() => import("@/pages/CompanyAdminPanel"));
+const GenerateDemoOrders = lazy(() => import("@/pages/GenerateDemoOrders"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+
+// Loading component for Suspense fallback
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
+
+// Wrapper component to add Suspense to lazy-loaded routes
+const LazyRoute = ({ Component }: { Component: React.LazyExoticComponent<() => JSX.Element> }) => (
+  <Suspense fallback={<PageLoader />}>
+    <Component />
+  </Suspense>
+);
 
 const router = createBrowserRouter([
   {
@@ -38,75 +58,75 @@ const router = createBrowserRouter([
   },
   {
     path: "/orders",
-    element: <Orders />,
+    element: <LazyRoute Component={Orders} />,
   },
   {
     path: "/orders/create",
-    element: <CreateOrder />,
+    element: <LazyRoute Component={CreateOrder} />,
   },
   {
     path: "/orders/:id",
-    element: <OrderDetails />,
+    element: <LazyRoute Component={OrderDetails} />,
   },
   {
     path: "/orders/:id/edit",
-    element: <EditOrder />,
+    element: <LazyRoute Component={EditOrder} />,
   },
   {
     path: "/orders/bulk-ship",
-    element: <BulkShipOrders />,
+    element: <LazyRoute Component={BulkShipOrders} />,
   },
   {
     path: "/shipments",
-    element: <Shipments />,
+    element: <LazyRoute Component={Shipments} />,
   },
   {
     path: "/shipments/create",
-    element: <CreateShipment />,
+    element: <LazyRoute Component={CreateShipment} />,
   },
     {
       path: "/item-master",
-      element: <ItemMaster />,
+      element: <LazyRoute Component={ItemMaster} />,
     },
     {
       path: "/item-master/create",
-      element: <ItemMaster />,
+      element: <LazyRoute Component={ItemMaster} />,
     },
   {
     path: "/users",
-    element: <Users />,
+    element: <LazyRoute Component={Users} />,
   },
   {
     path: "/users/create",
-    element: <CreateUser />,
+    element: <LazyRoute Component={CreateUser} />,
   },
   {
     path: "/packaging",
-    element: <Settings />,
+    element: <LazyRoute Component={Settings} />,
   },
   {
     path: "/settings",
-    element: <ProfileSettings />,
+    element: <LazyRoute Component={ProfileSettings} />,
   },
   {
     path: "/admin",
-    element: <AdminPanel />,
+    element: <LazyRoute Component={AdminPanel} />,
   },
   {
     path: "/super-admin",
-    element: <SuperAdminPanel />,
+    element: <LazyRoute Component={SuperAdminPanel} />,
   },
   {
     path: "/company-admin",
-    element: <CompanyAdminPanel />,
+    element: <LazyRoute Component={CompanyAdminPanel} />,
   },
   {
     path: "/generate-demo-orders",
-    element: <GenerateDemoOrders />,
+    element: <LazyRoute Component={GenerateDemoOrders} />,
   },
   {
     path: "*",
-    element: <NotFound />,
+    element: <LazyRoute Component={NotFound} />,
   },
 ]);
 
