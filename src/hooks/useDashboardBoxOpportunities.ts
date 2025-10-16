@@ -23,6 +23,17 @@ export const useDashboardBoxOpportunities = () => {
       }
 
       try {
+        // Fetch existing boxes to filter out boxes already in inventory
+        const { data: existingBoxes } = await supabase
+          .from('boxes')
+          .select('sku')
+          .eq('company_id', userProfile.company_id)
+          .eq('is_active', true);
+
+        const existingBoxSkus = new Set(
+          (existingBoxes || []).map(box => box.sku).filter(Boolean)
+        );
+
         // Get the most recent packaging intelligence report
         const { data: reports, error } = await supabase
           .from('packaging_intelligence_reports')
@@ -35,8 +46,12 @@ export const useDashboardBoxOpportunities = () => {
 
         if (reports && reports.length > 0 && reports[0].top_5_box_discrepancies) {
           const discrepancies = reports[0].top_5_box_discrepancies as unknown as BoxOpportunity[];
-          // Get top 3 opportunities
-          setOpportunities(discrepancies.slice(0, 3));
+          // Filter out boxes that already exist in inventory
+          const availableOpportunities = discrepancies.filter(
+            opp => !existingBoxSkus.has(opp.master_box_sku)
+          );
+          // Get top 3 opportunities from filtered list
+          setOpportunities(availableOpportunities.slice(0, 3));
         } else {
           setOpportunities([]);
         }
