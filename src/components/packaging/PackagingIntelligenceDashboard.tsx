@@ -62,6 +62,7 @@ export const PackagingIntelligenceDashboard = ({ onAddToInventory }: PackagingIn
   const { userProfile } = useAuth();
   const [report, setReport] = useState<PackagingReport | null>(null);
   const [lowStockBoxes, setLowStockBoxes] = useState<any[]>([]);
+  const [existingBoxSkus, setExistingBoxSkus] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [addingBoxSku, setAddingBoxSku] = useState<string | null>(null);
 
@@ -159,6 +160,12 @@ export const PackagingIntelligenceDashboard = ({ onAddToInventory }: PackagingIn
       if (error) {
         console.error('Error fetching boxes:', error);
         return;
+      }
+
+      // Store all active box SKUs for filtering recommendations
+      if (data) {
+        const allSkus = new Set(data.map(box => box.sku).filter(Boolean));
+        setExistingBoxSkus(allSkus);
       }
 
       // Filter boxes within 20 units of minimum
@@ -434,13 +441,28 @@ export const PackagingIntelligenceDashboard = ({ onAddToInventory }: PackagingIn
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {!Array.isArray(report.top_5_box_discrepancies) || report.top_5_box_discrepancies.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">
-                    No optimization opportunities found. Your packaging choices look efficient!
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {report.top_5_box_discrepancies.map((opportunity: any, index: number) => {
+                {(() => {
+                  // Filter out boxes that already exist in inventory
+                  const availableOpportunities = Array.isArray(report.top_5_box_discrepancies)
+                    ? report.top_5_box_discrepancies.filter(
+                        (opp: any) => !existingBoxSkus.has(opp.master_box_sku)
+                      )
+                    : [];
+
+                  if (availableOpportunities.length === 0) {
+                    return (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        {report.top_5_box_discrepancies.length > 0 
+                          ? "🎉 Great job! All recommended boxes have been added to your inventory."
+                          : "No optimization opportunities found. Your packaging choices look efficient!"
+                        }
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {availableOpportunities.map((opportunity: any, index: number) => {
                       const priority = opportunity.shipment_count >= 10 ? 'HIGH' : 
                                      opportunity.shipment_count >= 5 ? 'MEDIUM' : 'LOW';
                       const priorityColor = priority === 'HIGH' ? 'destructive' : 
@@ -494,7 +516,8 @@ export const PackagingIntelligenceDashboard = ({ onAddToInventory }: PackagingIn
                       );
                     })}
                   </div>
-                )}
+                );
+                })()}
               </CardContent>
             </Card>
 
