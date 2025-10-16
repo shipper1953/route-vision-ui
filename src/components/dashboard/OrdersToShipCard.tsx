@@ -79,7 +79,12 @@ export const OrdersToShipCard = () => {
         {orders.map(order => (
           <div key={order.id} className="flex justify-between items-center py-2 border-b last:border-0">
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm truncate">{order.order_id}</div>
+              <Link 
+                to={`/orders/${order.id}/edit`}
+                className="font-medium text-sm truncate text-primary hover:underline cursor-pointer block"
+              >
+                {order.order_id}
+              </Link>
               <div className="text-xs text-muted-foreground truncate">
                 {order.customer_name || order.customer_company || 'No customer name'}
               </div>
@@ -90,9 +95,14 @@ export const OrdersToShipCard = () => {
               )}
             </div>
             <div className="text-right ml-4">
-              <Badge variant={getStatusVariant(order.status)} className="mb-1">
-                {order.status === 'ready_to_ship' ? 'Ready' : 'Processing'}
-              </Badge>
+              <Link to={`/shipments/create?orderId=${order.order_id}`}>
+                <Badge 
+                  variant={getStatusVariant(order.status)} 
+                  className="mb-1 cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  {order.status === 'ready_to_ship' ? 'Ready' : 'Processing'}
+                </Badge>
+              </Link>
               <div className="text-xs text-muted-foreground whitespace-nowrap">
                 {format(new Date(order.order_date), 'MMM d')}
               </div>
