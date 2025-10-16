@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -135,23 +140,68 @@ serve(async (req) => {
 
     console.log('Shopify OAuth connection successful for company:', companyId);
 
-    // Redirect back to app with success message
-    return new Response(null, {
-      status: 302,
+    // Return HTML that sends postMessage and closes popup
+    const successHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head><title>Shopify Connected</title></head>
+        <body>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ 
+                type: 'shopify-oauth-success',
+                message: 'Shopify store connected successfully'
+              }, '*');
+              window.close();
+            } else {
+              window.location.href = '${supabaseUrl.replace('https://gidrlosmhpvdcogrkidj.supabase.co', 'https://gidrlosmhpvdcogrkidj.lovable.app')}/company-admin?shopify=connected';
+            }
+          </script>
+          <p>Shopify connected successfully! This window will close automatically...</p>
+        </body>
+      </html>
+    `;
+
+    return new Response(successHtml, {
       headers: {
-        'Location': `${supabaseUrl.replace('https://gidrlosmhpvdcogrkidj.supabase.co', 'https://gidrlosmhpvdcogrkidj.lovable.app')}/company-admin?shopify=connected`,
+        ...corsHeaders,
+        'Content-Type': 'text/html',
       },
     });
 
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    // Redirect back with error
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    return new Response(null, {
-      status: 302,
+    
+    // Return HTML that sends error postMessage and closes popup
+    const errorHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head><title>Connection Failed</title></head>
+        <body>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ 
+                type: 'shopify-oauth-error',
+                message: '${error.message.replace(/'/g, "\\'")}'
+              }, '*');
+              setTimeout(() => window.close(), 2000);
+            } else {
+              window.location.href = '${supabaseUrl.replace('https://gidrlosmhpvdcogrkidj.supabase.co', 'https://gidrlosmhpvdcogrkidj.lovable.app')}/company-admin?shopify=error&message=${encodeURIComponent(error.message)}';
+            }
+          </script>
+          <p>Connection failed: ${error.message}</p>
+          <p>This window will close automatically...</p>
+        </body>
+      </html>
+    `;
+
+    return new Response(errorHtml, {
+      status: 400,
       headers: {
-        'Location': `${supabaseUrl.replace('https://gidrlosmhpvdcogrkidj.supabase.co', 'https://gidrlosmhpvdcogrkidj.lovable.app')}/company-admin?shopify=error&message=${encodeURIComponent(error.message)}`,
+        ...corsHeaders,
+        'Content-Type': 'text/html',
       },
     });
   }
