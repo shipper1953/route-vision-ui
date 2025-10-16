@@ -95,7 +95,7 @@ export const OrdersToShipCard = () => {
               )}
             </div>
             <div className="text-right ml-4">
-              <Link to={`/shipments/create?orderId=${order.order_id}`}>
+              <Link to={`/shipments/create?orderId=${order.id}`}>
                 <Badge 
                   variant={getStatusVariant(order.status)} 
                   className="mb-1 cursor-pointer hover:opacity-80 transition-opacity"
