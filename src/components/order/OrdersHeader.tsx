@@ -3,6 +3,7 @@ import { FileDown, ShoppingBag, Ship } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { RecalculateBoxesDialog } from "./RecalculateBoxesDialog";
+import { ShopifyConnectionButton } from "@/components/integrations/ShopifyConnectionButton";
 
 export const OrdersHeader = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export const OrdersHeader = () => {
         <p className="text-muted-foreground">Manage your customer orders</p>
       </div>
       <div className="mt-4 md:mt-0 flex gap-3">
+        <ShopifyConnectionButton />
         <RecalculateBoxesDialog />
         <Button className="bg-tms-blue hover:bg-tms-blue-400" onClick={() => navigate('/orders/create')}>
           <ShoppingBag className="mr-2 h-4 w-4" />

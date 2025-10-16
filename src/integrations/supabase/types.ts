@@ -993,6 +993,104 @@ export type Database = {
         }
         Relationships: []
       }
+      shopify_order_mappings: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          id: string
+          last_synced_at: string | null
+          metadata: Json | null
+          ship_tornado_order_id: number
+          shopify_order_id: string
+          shopify_order_number: string | null
+          sync_status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          metadata?: Json | null
+          ship_tornado_order_id: number
+          shopify_order_id: string
+          shopify_order_number?: string | null
+          sync_status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          metadata?: Json | null
+          ship_tornado_order_id?: number
+          shopify_order_id?: string
+          shopify_order_number?: string | null
+          sync_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_order_mappings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_order_mappings_ship_tornado_order_id_fkey"
+            columns: ["ship_tornado_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopify_sync_logs: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          direction: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          ship_tornado_order_id: number | null
+          shopify_order_id: string | null
+          status: string
+          sync_type: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          direction: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          ship_tornado_order_id?: number | null
+          shopify_order_id?: string | null
+          status: string
+          sync_type: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          direction?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          ship_tornado_order_id?: number | null
+          shopify_order_id?: string | null
+          status?: string
+          sync_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_sync_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
