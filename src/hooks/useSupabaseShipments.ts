@@ -16,7 +16,7 @@ export const useSupabaseShipments = () => {
       try {
         console.log("Loading shipments from Supabase...");
         
-        // Get current user to ensure we only fetch their shipments
+        // Get current user and their company
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           console.log("No authenticated user found");
@@ -25,11 +25,32 @@ export const useSupabaseShipments = () => {
           return;
         }
 
-        // Get all shipments for the current user
+        // Get user's company_id
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('company_id, role')
+          .eq('id', user.id)
+          .single();
+
+        if (userError) {
+          console.error("Error fetching user data:", userError);
+          setShipments([]);
+          setLoading(false);
+          return;
+        }
+
+        if (!userData?.company_id) {
+          console.log("No company associated with user");
+          setShipments([]);
+          setLoading(false);
+          return;
+        }
+
+        // Get all shipments for the company (not just for this user)
         const { data: supabaseShipments, error: shipmentsError } = await supabase
           .from('shipments')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('company_id', userData.company_id)
           .order('created_at', { ascending: false });
         
         console.log("Supabase shipments query result:", { 
