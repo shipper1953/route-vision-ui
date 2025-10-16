@@ -246,55 +246,51 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
             const boxWeight = result.recommendedBox.cost * 0.1; // Estimate box weight
             const totalWeight = itemsWeight + boxWeight;
 
-            console.log("Storing cartonization data:", {
-              orderId: data.id,
-              boxId: result.recommendedBox.id,
-              utilization: result.utilization,
-              confidence: result.confidence,
-              totalWeight,
-              multiPackage: !!multiPackageResult
-            });
+            if (import.meta.env.DEV) {
+              console.log("Storing cartonization data:", {
+                orderId: data.id,
+                boxId: result.recommendedBox.id,
+                utilization: result.utilization,
+                confidence: result.confidence,
+                totalWeight,
+                multiPackage: !!multiPackageResult
+              });
+            }
 
-            // Store cartonization result with multi-package data
-            const { error: cartonError } = await supabase.rpc('update_order_cartonization', {
-              p_order_id: data.id,
-              p_recommended_box_id: result.recommendedBox.id,
-              p_recommended_box_data: JSON.parse(JSON.stringify({
+            // Store cartonization result with direct INSERT/UPDATE (better error visibility than RPC)
+            const cartonizationRecord = {
+              order_id: data.id,
+              recommended_box_id: result.recommendedBox.id,
+              recommended_box_data: {
                 ...result.recommendedBox,
                 multiPackageResult: multiPackageResult || null
-              })),
-              p_utilization: result.utilization,
-              p_confidence: result.confidence,
-              p_total_weight: totalWeight,
-              p_items_weight: itemsWeight,
-              p_box_weight: boxWeight
-            });
+              },
+              utilization: Number(result.utilization),
+              confidence: Number(result.confidence),
+              total_weight: Number(totalWeight),
+              items_weight: Number(itemsWeight),
+              box_weight: Number(boxWeight),
+              calculation_timestamp: new Date().toISOString(),
+              packages: multiPackageResult?.packages || [],
+              total_packages: multiPackageResult?.totalPackages || 1,
+              splitting_strategy: multiPackageResult?.splittingStrategy || null,
+              optimization_objective: multiPackageResult?.optimizationObjective || 'balanced'
+            };
+
+            const { error: cartonError } = await supabase
+              .from('order_cartonization')
+              .upsert(cartonizationRecord, {
+                onConflict: 'order_id'
+              });
 
             if (cartonError) {
               console.error("Error storing cartonization data:", cartonError);
+              console.error("Cartonization record that failed:", cartonizationRecord);
             } else {
-              console.log("Cartonization data stored successfully for order:", data.id);
-              
-              // If multi-package result exists, also store multi-package specific data
-              if (multiPackageResult) {
-                try {
-                  const { error: updateError } = await supabase
-                    .from('order_cartonization')
-                    .update({
-                      packages: multiPackageResult.packages,
-                      total_packages: multiPackageResult.totalPackages,
-                      splitting_strategy: multiPackageResult.splittingStrategy,
-                      optimization_objective: multiPackageResult.optimizationObjective
-                    })
-                    .eq('order_id', data.id);
-
-                  if (updateError) {
-                    console.error("Error updating multi-package data:", updateError);
-                  } else {
-                    console.log("Multi-package data stored successfully");
-                  }
-                } catch (mpError) {
-                  console.error("Error storing multi-package data:", mpError);
+              if (import.meta.env.DEV) {
+                console.log("Cartonization data stored successfully for order:", data.id);
+                if (multiPackageResult) {
+                  console.log(`Multi-package data stored: ${multiPackageResult.totalPackages} packages`);
                 }
               }
             }

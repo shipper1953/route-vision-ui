@@ -69,15 +69,22 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
           console.warn("No valid shipping address found in order");
         }
         
-        // Set parcel dimensions and weight if available
-        if (order.parcelInfo && Object.keys(order.parcelInfo).length > 0) {
+        // Set parcel dimensions and weight from cartonization data (preferred) or parcelInfo
+        if (order.recommendedBox) {
+          console.log("Setting dimensions from recommended box:", order.recommendedBox);
+          form.setValue("length", order.recommendedBox.length || 0);
+          form.setValue("width", order.recommendedBox.width || 0);
+          form.setValue("height", order.recommendedBox.height || 0);
+          form.setValue("weight", order.packageWeight?.totalWeight || 0);
+          toast.success(`Using recommended ${order.recommendedBox.name}`);
+        } else if (order.parcelInfo && Object.keys(order.parcelInfo).length > 0) {
           console.log("Setting parcel info from order:", order.parcelInfo);
           form.setValue("length", order.parcelInfo.length || 0);
           form.setValue("width", order.parcelInfo.width || 0);
           form.setValue("height", order.parcelInfo.height || 0);
           form.setValue("weight", order.parcelInfo.weight || 0);
         } else {
-          console.warn("No valid parcel info found in order");
+          console.warn("No valid parcel info or recommended box found in order");
         }
         
         // Set order details

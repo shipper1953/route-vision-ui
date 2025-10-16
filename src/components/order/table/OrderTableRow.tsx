@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, Package, Truck, Box, ExternalLink, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import { Eye, Package, Truck, Box, ExternalLink, Copy, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -11,6 +11,8 @@ import { OrderData } from "@/types/orderTypes";
 import { supabase } from "@/integrations/supabase/client";
 import { renderOrderItems } from "../helpers/orderItemsHelper";
 import { getStatusBadgeVariant } from "../helpers/statusHelper";
+import { recalculateOrderCartonization } from "@/utils/recalculateOrderCartonization";
+import { toast } from "sonner";
 
 interface CartonizationData {
   recommendedBox: any;
@@ -43,6 +45,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const [cartonizationData, setCartonizationData] = useState<CartonizationData | null>(null);
   const [allShipments, setAllShipments] = useState<ShipmentInfo[]>([]);
   const [isShipmentsExpanded, setIsShipmentsExpanded] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   // Fetch cartonization data for this order
   useEffect(() => {
@@ -177,6 +180,42 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
       items: order.items
     }));
     navigate(`/orders/create?copy=${orderData}`);
+  };
+
+  const handleRecalculateBox = async () => {
+    setIsRecalculating(true);
+    try {
+      const orderId = typeof order.id === 'string' ? parseInt(order.id) : order.id;
+      const result = await recalculateOrderCartonization(orderId);
+      
+      if (result.success) {
+        toast.success(`Box recalculated: ${result.boxName}`);
+        // Refresh cartonization data
+        const { data, error } = await supabase
+          .from('order_cartonization')
+          .select('*')
+          .eq('order_id', orderId)
+          .single();
+        
+        if (!error && data) {
+          setCartonizationData({
+            recommendedBox: data.recommended_box_data,
+            utilization: data.utilization || 0,
+            confidence: data.confidence || 0,
+            totalWeight: data.total_weight || 0,
+            itemsWeight: data.items_weight || 0,
+            boxWeight: data.box_weight || 0
+          });
+        }
+      } else {
+        toast.error(`Failed to recalculate: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error recalculating box:', error);
+      toast.error('Failed to recalculate box');
+    } finally {
+      setIsRecalculating(false);
+    }
   };
 
   // Get the earliest estimated delivery date from all shipments
@@ -326,7 +365,18 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
             </div>
           </div>
         ) : (
-          <span className="text-muted-foreground text-sm">-</span>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground text-sm">No box</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRecalculateBox}
+              disabled={isRecalculating}
+              className="h-7 px-2"
+            >
+              <RefreshCw className={`h-3 w-3 ${isRecalculating ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         )}
       </TableCell>
       <TableCell>
