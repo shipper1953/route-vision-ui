@@ -292,11 +292,11 @@ export class CartonizationEngine {
     return viableBoxes.sort((a, b) => {
       // PRIMARY: Highest utilization up to 99% (descending order)
       const utilizationDiff = b.utilization - a.utilization;
-      if (Math.abs(utilizationDiff) > 1) { // 1% difference threshold
+      if (Math.abs(utilizationDiff) > 0.01) { // Only use tiebreaker if virtually identical
         return utilizationDiff; // Higher utilization first
       }
 
-      // SECONDARY: For boxes within 1% utilization, prefer smaller box
+      // SECONDARY: Only for virtually identical utilization, prefer smaller box
       const volumeA = a.box.length * a.box.width * a.box.height;
       const volumeB = b.box.length * b.box.width * b.box.height;
       return volumeA - volumeB; // Smaller volume as tiebreaker only
