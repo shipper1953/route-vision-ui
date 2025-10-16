@@ -4,16 +4,22 @@
 import { OrderData, OrderItem } from "@/types/orderTypes";
 
 export const parseOrderItems = (rawItems: any): OrderItem[] => {
-  console.log("Parsing order items:", rawItems);
+  if (import.meta.env.DEV) {
+    console.log("Parsing order items:", rawItems);
+  }
   
   if (!rawItems) {
-    console.log("No raw items provided");
+    if (import.meta.env.DEV) {
+      console.log("No raw items provided");
+    }
     return [];
   }
 
   // Handle if items is already an array
   if (Array.isArray(rawItems)) {
-    console.log("Items is already an array:", rawItems);
+    if (import.meta.env.DEV) {
+      console.log("Items is already an array:", rawItems);
+    }
     return rawItems.map((item: any) => ({
       itemId: item.itemId || item.id || `item-${Math.random()}`,
       quantity: item.quantity || item.count || 1,
@@ -28,7 +34,9 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
   if (typeof rawItems === 'string') {
     try {
       const parsed = JSON.parse(rawItems);
-      console.log("Parsed items from JSON:", parsed);
+      if (import.meta.env.DEV) {
+        console.log("Parsed items from JSON:", parsed);
+      }
       return parseOrderItems(parsed);
     } catch (error) {
       console.error("Error parsing items JSON:", error);
@@ -38,7 +46,9 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
 
   // Handle if items is a number (count only)
   if (typeof rawItems === 'number') {
-    console.log("Items is just a count:", rawItems);
+    if (import.meta.env.DEV) {
+      console.log("Items is just a count:", rawItems);
+    }
     // Create placeholder items
     return Array.from({ length: rawItems }, (_, index) => ({
       itemId: `placeholder-${index}`,
@@ -47,19 +57,25 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
     }));
   }
 
-  console.log("Unknown items format:", typeof rawItems, rawItems);
+  if (import.meta.env.DEV) {
+    console.log("Unknown items format:", typeof rawItems, rawItems);
+  }
   return [];
 };
 
 export const parseParcelInfo = (qboidData: any) => {
   if (!qboidData) {
-    console.warn("No Qboid dimensions found for order");
+    if (import.meta.env.DEV) {
+      console.warn("No Qboid dimensions found for order");
+    }
     return null;
   }
 
   try {
     const parsed = typeof qboidData === 'string' ? JSON.parse(qboidData) : qboidData;
-    console.log("Qboid dimensions found for order:", parsed.orderId, parsed);
+    if (import.meta.env.DEV) {
+      console.log("Qboid dimensions found for order:", parsed.orderId, parsed);
+    }
     return {
       length: parsed.length || 0,
       width: parsed.width || 0,
@@ -103,14 +119,16 @@ export const parseShippingAddress = (addressData: any) => {
     };
   }
 
-  console.log("Parsed shipping address:", {
-    street1: addressData.street1 || "",
-    street2: addressData.street2 || "",
-    city: addressData.city || "",
-    state: addressData.state || "",
-    zip: addressData.zip || "",
-    country: addressData.country || "US"
-  });
+  if (import.meta.env.DEV) {
+    console.log("Parsed shipping address:", {
+      street1: addressData.street1 || "",
+      street2: addressData.street2 || "",
+      city: addressData.city || "",
+      state: addressData.state || "",
+      zip: addressData.zip || "",
+      country: addressData.country || "US"
+    });
+  }
 
   return {
     street1: addressData.street1 || "",
@@ -123,10 +141,14 @@ export const parseShippingAddress = (addressData: any) => {
 };
 
 export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
-  console.log("Converting Supabase order to OrderData:", supabaseOrder);
+  if (import.meta.env.DEV) {
+    console.log("Converting Supabase order to OrderData:", supabaseOrder);
+  }
   
   const parsedItems = parseOrderItems(supabaseOrder.items);
-  console.log("Parsed items for order:", supabaseOrder.id, parsedItems);
+  if (import.meta.env.DEV) {
+    console.log("Parsed items for order:", supabaseOrder.id, parsedItems);
+  }
 
   return {
     id: String(supabaseOrder.id), // Always convert to string for consistency

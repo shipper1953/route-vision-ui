@@ -1,6 +1,6 @@
 
 import { CartonizationEngine, Box } from "@/services/cartonization/cartonizationEngine";
-import { fetchOrders } from "@/services/orderService";
+import { fetchReadyToShipOrders } from "@/services/orderFetchService";
 
 // Comprehensive Uline-style box catalog with ECT-32 equivalent options
 export const CATALOG_BOXES: Box[] = [
@@ -189,11 +189,10 @@ export const analyzeBoxRecommendations = async (
   parameters: any, 
   createItemsFromOrderData: (items: any[], masterItems: any[]) => any[]
 ): Promise<BoxRecommendation[]> => {
-  const orders = await fetchOrders();
+  const orders = await fetchReadyToShipOrders(300); // Limit to 300 orders for performance
   
-  // Filter for recent orders that need better packaging
-  const recentOrders = orders.filter(order => 
-    (order.status === 'ready_to_ship' || order.status === 'processing') &&
+  // Orders are already filtered to ready_to_ship
+  const recentOrders = orders.filter(order =>
     order.items && Array.isArray(order.items) && order.items.length > 0
   );
 

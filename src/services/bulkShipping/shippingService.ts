@@ -72,7 +72,7 @@ export class BulkShippingService {
             markedUpCost
           );
 
-          console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
+        console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
 
           results.push({
             orderId: order.id,
@@ -90,27 +90,27 @@ export class BulkShippingService {
               success: false,
               error: 'Rate limited during label purchase - please try again later'
             });
-            break;
+            break; // Stop processing and return what we have
           }
           throw labelError;
         }
 
-        // Add delay between orders to prevent rate limiting (1 second)
-        if (i < orders.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error processing order ${order.id}:`, error);
+        
+        // Check if it's a rate limit error
+        const isRateLimited = error.message?.includes('rate-limited') || error.message?.includes('RATE_LIMITED');
+        
         results.push({
           orderId: order.id,
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
 
-        // If we encounter errors, add a delay before the next order
-        if (i < orders.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        // If rate limited, stop processing more orders
+        if (isRateLimited) {
+          console.error('Rate limit detected, stopping batch processing');
+          break;
         }
       }
     }
@@ -243,7 +243,7 @@ export class BulkShippingService {
         .from('orders')
         .select('shipping_address')
         .eq('order_id', orderId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error(`Error fetching shipping address for order ${orderId}:`, error);
@@ -255,7 +255,6 @@ export class BulkShippingService {
       console.error(`Failed to get shipping address for order ${orderId}:`, error);
       return null;
     }
-
   }
 
   private reportResults(results: ShippingResult[]): void {

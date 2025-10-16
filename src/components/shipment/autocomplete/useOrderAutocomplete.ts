@@ -1,6 +1,6 @@
 
 import { useState, useMemo, useCallback } from "react";
-import { fetchOrders } from "@/services/orderService";
+import { fetchReadyToShipOrders } from "@/services/orderFetchService";
 import { OrderData } from "@/services/orderService";
 import { useQuery } from "@tanstack/react-query";
 
@@ -12,15 +12,13 @@ export const useOrderAutocomplete = () => {
   // Use React Query to fetch orders with caching
   const { data: orders = [], isLoading: loading } = useQuery({
     queryKey: ['orders', 'ready_to_ship'],
-    queryFn: fetchOrders,
+    queryFn: () => fetchReadyToShipOrders(200), // Limit to 200 most recent
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     refetchOnWindowFocus: false,
   });
 
-  // Filter orders to only show ready to ship orders
-  const readyToShipOrders = useMemo(() => {
-    return orders.filter(order => order.status === 'ready_to_ship');
-  }, [orders]);
+  // Orders are already filtered to ready_to_ship
+  const readyToShipOrders = orders;
 
   // Filter orders based on input value
   const filteredOrders = useMemo(() => {

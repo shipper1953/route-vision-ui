@@ -1,4 +1,4 @@
-import { fetchOrders } from "@/services/orderService";
+import { fetchReadyToShipOrders } from "@/services/orderFetchService";
 import { CartonizationEngine, Box } from "@/services/cartonization/cartonizationEngine";
 import { OrderForShipping, BoxShippingGroup } from "@/types/bulkShipping";
 
@@ -6,12 +6,10 @@ export class OrderProcessor {
   constructor(private boxes: Box[], private createItemsFromOrderData: Function) {}
 
   async processOrdersForShipping(): Promise<BoxShippingGroup[]> {
-    const orders = await fetchOrders();
+    const orders = await fetchReadyToShipOrders(500); // Limit to 500 orders for performance
     
-    // Filter for orders that are ready to ship
-    const readyToShipOrders = orders.filter(order => 
-      order.status === 'ready_to_ship' || order.status === 'processing'
-    );
+    // Filter for orders that are ready to ship (already filtered by fetchReadyToShipOrders)
+    const readyToShipOrders = orders;
 
     // Group orders by recommended box
     const boxGroups = new Map<string, BoxShippingGroup>();

@@ -169,13 +169,19 @@ export class RateService {
 
         console.log(`Rates fetched for order ${order.id}:`, shipmentResponse.id);
 
-        // Add delay between requests to prevent rate limiting
-        if (i < orders.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error fetching rates for order ${order.id}:`, error);
+        
+        // Check for rate limiting and break the loop if detected
+        if (error.message?.includes('rate-limited') || error.message?.includes('RATE_LIMITED')) {
+          console.error('Rate limit detected, stopping batch processing');
+          ordersWithRates.push({
+            ...order,
+            rates: []
+          });
+          break; // Stop processing more orders
+        }
+        
         // Add order with empty rates on error
         ordersWithRates.push({
           ...order,

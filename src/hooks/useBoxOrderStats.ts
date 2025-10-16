@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { fetchOrders } from "@/services/orderService";
+import { fetchReadyToShipOrders } from "@/services/orderFetchService";
 import { useCartonization } from "@/hooks/useCartonization";
 import { CartonizationEngine } from "@/services/cartonization/cartonizationEngine";
 import { Box } from "@/services/cartonization/cartonizationEngine";
@@ -19,12 +19,9 @@ export const useBoxOrderStats = () => {
     const calculateBoxStats = async () => {
       try {
         setLoading(true);
-        const orders = await fetchOrders();
+        const orders = await fetchReadyToShipOrders(300); // Limit to 300 orders for performance
         
-        // Filter for open orders that need to ship
-        const openOrders = orders.filter(order => 
-          order.status === 'ready_to_ship' || order.status === 'processing'
-        );
+        // Orders are already filtered to ready_to_ship
 
         // Initialize stats for each box
         const statsMap = new Map<string, BoxOrderStats>();
@@ -37,7 +34,7 @@ export const useBoxOrderStats = () => {
         });
 
         // Calculate recommendations for each open order
-        for (const order of openOrders) {
+        for (const order of orders) {
           // Check if order.items is an array and has items
           if (order.items && Array.isArray(order.items) && order.items.length > 0) {
             // Create items from order data (using empty master items array for now)

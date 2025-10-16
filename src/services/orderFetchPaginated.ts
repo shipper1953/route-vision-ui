@@ -23,10 +23,20 @@ export async function fetchOrdersPaginated(
     // Calculate offset
     const offset = (page - 1) * pageSize;
     
-    // Build base query
+    // Build base query with specific column projection
     let query = supabase
       .from('orders')
-      .select('*, shipments(*)', { count: 'exact' });
+      .select(`
+        id, order_id, customer_name, customer_company, customer_email, customer_phone,
+        status, order_date, required_delivery_date, value, items, shipping_address,
+        qboid_dimensions, user_id, company_id, warehouse_id, created_at,
+        estimated_delivery_date, actual_delivery_date, shipment_id,
+        shipments(
+          id, easypost_id, carrier, service, status, tracking_number, tracking_url,
+          cost, original_cost, label_url, estimated_delivery_date, actual_delivery_date,
+          package_dimensions, package_weights, actual_package_sku, actual_package_master_id, package_count
+        )
+      `, { count: 'exact' });
     
     // Add search filter if provided
     if (searchTerm && searchTerm.trim()) {
@@ -62,16 +72,19 @@ export async function fetchOrdersPaginated(
     
     console.log(`Found ${data.length} orders on page ${page}, total: ${count}`);
     
-    // Batch fetch qboid data for all orders in current page - OPTIMIZED with limit
+    // Batch fetch qboid data for all orders in current page - OPTIMIZED with date filter
     const orderIdLinks = data.map(order => `ORD-${order.order_id || order.id}`);
     
-    // Fetch recent qboid events with a reasonable limit instead of entire table
+    // Fetch recent qboid events (last 30 days) instead of entire table
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
     const { data: allQboidData } = await supabase
       .from('qboid_events')
       .select('*')
       .eq('event_type', 'dimensions_received')
-      .order('created_at', { ascending: false })
-      .limit(100); // Cap at recent 100 instead of fetching all
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .order('created_at', { ascending: false });
     
     // Filter to only events matching current page's orders
     const qboidData = allQboidData?.filter(event => {

@@ -30,12 +30,19 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
     throw new Error("User must be authenticated to create orders");
   }
 
-  // Get user's profile to get company_id
-  const { data: userProfile, error: profileError } = await supabase
-    .from('users')
-    .select('company_id, warehouse_ids')
-    .eq('id', user.id)
-    .single();
+  // Parallelize user profile and warehouse queries
+  const [
+    { data: userProfile, error: profileError },
+    { data: defaultWarehouse, error: warehouseError }
+  ] = await Promise.all([
+    supabase
+      .from('users')
+      .select('company_id, warehouse_ids')
+      .eq('id', user.id)
+      .single(),
+    // Fetch default warehouse in parallel (will use company_id once we have it)
+    Promise.resolve({ data: null, error: null }) // Placeholder, will fetch after getting company_id
+  ]);
 
   if (profileError || !userProfile?.company_id) {
     throw new Error("User profile not found or not assigned to a company");
@@ -52,15 +59,15 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
 
   // If still no warehouse, get the default warehouse for the company
   if (!finalWarehouseId) {
-    const { data: defaultWarehouse, error: warehouseError } = await supabase
+    const { data: defaultWarehouseData, error: defaultWarehouseError } = await supabase
       .from('warehouses')
       .select('id')
       .eq('company_id', userProfile.company_id)
       .eq('is_default', true)
-      .single();
+      .maybeSingle();
     
-    if (!warehouseError && defaultWarehouse) {
-      finalWarehouseId = defaultWarehouse.id;
+    if (!defaultWarehouseError && defaultWarehouseData) {
+      finalWarehouseId = defaultWarehouseData.id;
       console.log("Using company default warehouse:", finalWarehouseId);
     }
   }
@@ -148,7 +155,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
       // Get company boxes for cartonization
       const { data: boxes, error: boxError } = await supabase
         .from('boxes')
-        .select('*')
+        .select('id, name, sku, length, width, height, max_weight, cost, in_stock, min_stock, max_stock, box_type')
         .eq('company_id', userProfile.company_id)
         .eq('is_active', true)
         .gt('in_stock', 0);

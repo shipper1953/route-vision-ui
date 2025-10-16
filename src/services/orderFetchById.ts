@@ -5,7 +5,9 @@ import { convertSupabaseToOrderData } from "./orderDataParser";
 
 export const fetchOrderById = async (orderId: string): Promise<OrderData | null> => {
   try {
-    console.log(`Fetching order by ID: ${orderId}`);
+    if (import.meta.env.DEV) {
+      console.log(`Fetching order by ID: ${orderId}`);
+    }
     
     // Convert orderId to number since the database id column is bigint
     const orderIdNumber = parseInt(orderId, 10);
@@ -17,7 +19,12 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
     
     const { data: order, error } = await supabase
       .from('orders')
-      .select('*')
+      .select(`
+        id, order_id, customer_name, customer_company, customer_email, customer_phone,
+        status, order_date, required_delivery_date, value, items, shipping_address,
+        qboid_dimensions, user_id, company_id, warehouse_id, created_at,
+        estimated_delivery_date, actual_delivery_date, shipment_id
+      `)
       .eq('id', orderIdNumber)
       .maybeSingle();
 
@@ -27,13 +34,19 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
     }
 
     if (!order) {
-      console.log(`Order ${orderId} not found`);
+      if (import.meta.env.DEV) {
+        console.log(`Order ${orderId} not found`);
+      }
       return null;
     }
 
-    console.log("Raw order data from database:", order);
+    if (import.meta.env.DEV) {
+      console.log("Raw order data from database:", order);
+    }
     const convertedOrder = convertSupabaseToOrderData(order);
-    console.log("Converted order data:", convertedOrder);
+    if (import.meta.env.DEV) {
+      console.log("Converted order data:", convertedOrder);
+    }
     
     return convertedOrder;
 
