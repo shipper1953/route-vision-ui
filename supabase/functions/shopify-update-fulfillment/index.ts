@@ -20,10 +20,10 @@ serve(async (req) => {
 
     console.log('Updating Shopify fulfillment:', { shipmentId, status });
 
-    // Find order linked to this shipment
+    // Find order linked to this shipment with package info
     const { data: orderShipment } = await supabase
       .from('order_shipments')
-      .select('order_id')
+      .select('order_id, package_info, orders!inner(items)')
       .eq('shipment_id', shipmentId)
       .single();
 
@@ -77,6 +77,37 @@ serve(async (req) => {
 
     const { order } = await orderResponse.json();
 
+    // Extract shipped items from package_info for partial fulfillment
+    let lineItemsToFulfill: any[] = [];
+    
+    if (orderShipment.package_info?.items && Array.isArray(orderShipment.package_info.items)) {
+      // We have item-level tracking - only fulfill the items in this shipment
+      const shippedItems = orderShipment.package_info.items;
+      console.log('Shipped items in this package:', shippedItems);
+      
+      // Match shipped items to Shopify line items by SKU
+      lineItemsToFulfill = order.line_items.filter((lineItem: any) => {
+        const shippedItem = shippedItems.find((si: any) => 
+          si.sku === lineItem.sku || si.name === lineItem.name
+        );
+        return shippedItem !== undefined;
+      }).map((lineItem: any) => {
+        const shippedItem = shippedItems.find((si: any) => 
+          si.sku === lineItem.sku || si.name === lineItem.name
+        );
+        return {
+          id: lineItem.id,
+          quantity: shippedItem.quantity // Fulfill only the quantity shipped
+        };
+      });
+      
+      console.log(`Fulfilling ${lineItemsToFulfill.length} line items (partial fulfillment)`);
+    } else {
+      // No item tracking - fulfill all items (legacy behavior)
+      lineItemsToFulfill = order.line_items.map((item: any) => ({ id: item.id }));
+      console.log('No item tracking - fulfilling all line items');
+    }
+
     // Create or update fulfillment
     const fulfillmentData = {
       tracking_number: trackingNumber,
@@ -102,7 +133,7 @@ serve(async (req) => {
         }
       );
     } else {
-      // Create new fulfillment
+      // Create new fulfillment with specific line items
       fulfillmentResponse = await fetch(
         `https://${shopifySettings.store_url}/admin/api/2024-01/orders/${mapping.shopify_order_id}/fulfillments.json`,
         {
@@ -114,7 +145,7 @@ serve(async (req) => {
           body: JSON.stringify({
             fulfillment: {
               ...fulfillmentData,
-              line_items: order.line_items.map((item: any) => ({ id: item.id })),
+              line_items: lineItemsToFulfill,
             },
           }),
         }

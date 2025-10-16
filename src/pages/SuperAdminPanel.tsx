@@ -7,6 +7,7 @@ import { CompanyManagement } from "@/components/admin/CompanyManagement";
 import { SuperAdminUserCreation } from "@/components/admin/SuperAdminUserCreation";
 import { SuperAdminShipmentsReport } from "@/components/admin/SuperAdminShipmentsReport";
 import { SuperAdminPackageInventory } from "@/components/admin/SuperAdminPackageInventory";
+import { FulfillmentBackfillTool } from "@/components/admin/FulfillmentBackfillTool";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const SuperAdminPanel = () => {
@@ -70,6 +71,7 @@ const SuperAdminPanel = () => {
             <TabsTrigger value="companies">Companies</TabsTrigger>
             <TabsTrigger value="packages">Package Inventory</TabsTrigger>
             <TabsTrigger value="shipments">Shipments Report</TabsTrigger>
+            <TabsTrigger value="tools">Data Tools</TabsTrigger>
           </TabsList>
           
           <TabsContent value="users" className="space-y-4">
@@ -86,6 +88,10 @@ const SuperAdminPanel = () => {
           
           <TabsContent value="shipments" className="space-y-4">
             <SuperAdminShipmentsReport />
+          </TabsContent>
+          
+          <TabsContent value="tools" className="space-y-4">
+            <FulfillmentBackfillTool />
           </TabsContent>
         </Tabs>
       </div>
