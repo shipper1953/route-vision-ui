@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Store, Loader2 } from "lucide-react";
 
 interface ShopifyConnectionDialogProps {
   open: boolean;
@@ -21,79 +21,14 @@ export const ShopifyConnectionDialog = ({
   onSuccess,
 }: ShopifyConnectionDialogProps) => {
   const { toast } = useToast();
+  const [storeUrl, setStoreUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  
-  const [formData, setFormData] = useState({
-    storeUrl: "",
-    accessToken: "",
-  });
 
-  const handleTestConnection = async () => {
-    if (!formData.storeUrl || !formData.accessToken) {
+  const handleConnect = async () => {
+    if (!storeUrl) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setTesting(true);
-    setTestResult(null);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('shopify-test-connection', {
-        body: {
-          storeUrl: formData.storeUrl,
-          accessToken: formData.accessToken,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data.success) {
-        setTestResult({
-          success: true,
-          message: `Connected to ${data.shop.name}`,
-        });
-        toast({
-          title: "Connection Successful",
-          description: `Successfully connected to ${data.shop.name}`,
-        });
-      } else {
-        setTestResult({
-          success: false,
-          message: data.error || "Connection failed",
-        });
-        toast({
-          title: "Connection Failed",
-          description: data.error || "Unable to connect to Shopify",
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      console.error('Test connection error:', error);
-      setTestResult({
-        success: false,
-        message: error.message,
-      });
-      toast({
-        title: "Connection Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!formData.storeUrl || !formData.accessToken) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields",
+        description: "Please enter your store URL",
         variant: "destructive",
       });
       return;
@@ -102,36 +37,28 @@ export const ShopifyConnectionDialog = ({
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('shopify-save-credentials', {
+      const { data, error } = await supabase.functions.invoke('shopify-oauth-start', {
         body: {
+          storeUrl,
           companyId,
-          storeUrl: formData.storeUrl,
-          accessToken: formData.accessToken,
         },
       });
 
       if (error) throw error;
 
-      if (data.success) {
-        toast({
-          title: "Shopify Connected",
-          description: "Your Shopify store has been connected successfully",
-        });
-        onSuccess();
-        onOpenChange(false);
-        setFormData({ storeUrl: "", accessToken: "" });
-        setTestResult(null);
+      if (data.authUrl) {
+        // Redirect to Shopify OAuth page
+        window.location.href = data.authUrl;
       } else {
-        throw new Error(data.error || "Failed to save credentials");
+        throw new Error('No authorization URL received');
       }
     } catch (error: any) {
-      console.error('Save credentials error:', error);
+      console.error('OAuth start error:', error);
       toast({
         title: "Connection Failed",
-        description: error.message,
+        description: error.message || "Failed to start Shopify connection",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -140,71 +67,49 @@ export const ShopifyConnectionDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Connect Shopify Store</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Store className="h-5 w-5" />
+            Connect Shopify Store
+          </DialogTitle>
           <DialogDescription>
-            Enter your Shopify store credentials to enable bidirectional order sync
+            Enter your Shopify store URL to begin the secure OAuth connection process.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="storeUrl">Store URL *</Label>
+            <Label htmlFor="storeUrl">Store URL</Label>
             <Input
               id="storeUrl"
-              placeholder="mystore.myshopify.com"
-              value={formData.storeUrl}
-              onChange={(e) => setFormData({ ...formData, storeUrl: e.target.value })}
+              placeholder="your-store.myshopify.com"
+              value={storeUrl}
+              onChange={(e) => setStoreUrl(e.target.value)}
+              disabled={loading}
             />
-            <p className="text-xs text-muted-foreground">
-              Your Shopify store URL (e.g., mystore.myshopify.com)
+            <p className="text-sm text-muted-foreground">
+              Enter your .myshopify.com domain
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="accessToken">Admin API Access Token *</Label>
-            <Input
-              id="accessToken"
-              type="password"
-              placeholder="shpat_..."
-              value={formData.accessToken}
-              onChange={(e) => setFormData({ ...formData, accessToken: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Create a custom app in your Shopify admin to get an access token
-            </p>
+          <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+            <h4 className="font-medium text-sm">What happens next?</h4>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li>• You'll be redirected to Shopify to authorize the connection</li>
+              <li>• No need to manually create API keys or tokens</li>
+              <li>• Secure OAuth authentication</li>
+              <li>• Automatic webhook setup for order syncing</li>
+            </ul>
           </div>
 
-          {testResult && (
-            <div className={`flex items-center gap-2 p-3 rounded-lg ${
-              testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-            }`}>
-              {testResult.success ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : (
-                <XCircle className="h-4 w-4" />
-              )}
-              <span className="text-sm">{testResult.message}</span>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="gap-2">
           <Button
-            variant="outline"
-            onClick={handleTestConnection}
-            disabled={testing || loading}
-          >
-            {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Test Connection
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={loading || testing || !testResult?.success}
+            onClick={handleConnect}
+            disabled={loading || !storeUrl}
+            className="w-full"
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Connect
+            {loading ? "Redirecting to Shopify..." : "Connect with Shopify"}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
