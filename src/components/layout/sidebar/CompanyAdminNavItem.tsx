@@ -31,7 +31,8 @@ export const CompanyAdminNavItem = () => {
     { label: "Company Orders", path: "/company-admin?tab=orders" },
     { label: "Company Shipments", path: "/company-admin?tab=shipments" },
     { label: "Warehouses", path: "/company-admin?tab=warehouses" },
-    { label: "Wallet & Billing", path: "/company-admin?tab=wallet" }
+    { label: "Wallet & Billing", path: "/company-admin?tab=wallet" },
+    { label: "Integrations", path: "/company-admin?tab=integrations" }
   ];
 
   return (
