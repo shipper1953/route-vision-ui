@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { OrderData } from "@/types/orderTypes";
 import { fetchOrdersPaginated, PaginatedOrdersResult } from "@/services/orderFetchPaginated";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,10 @@ export const usePaginatedOrders = (pageSize: number = 10) => {
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
+  
+  const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastReloadRef = useRef<number>(0);
+  const MIN_RELOAD_INTERVAL = 1000; // 1 second minimum between reloads
 
   const loadOrders = useCallback(async (page: number, search?: string) => {
     try {
@@ -62,17 +66,35 @@ export const usePaginatedOrders = (pageSize: number = 10) => {
     return () => clearTimeout(timeoutId);
   }, [searchTerm, loadOrders]);
 
-  // Realtime updates
+  // Realtime updates with debouncing and rate limiting
   useEffect(() => {
     const channel = supabase
       .channel('public:orders')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'orders' }, 
+        { event: 'UPDATE', schema: 'public', table: 'orders' }, 
         async (payload) => {
           console.log('Realtime order update:', payload);
           
-          // Refresh current page on any change
-          await loadOrders(currentPage);
+          // Clear any pending reload
+          if (reloadTimeoutRef.current) {
+            clearTimeout(reloadTimeoutRef.current);
+          }
+          
+          // Check if enough time has passed since last reload
+          const now = Date.now();
+          const timeSinceLastReload = now - lastReloadRef.current;
+          
+          if (timeSinceLastReload < MIN_RELOAD_INTERVAL) {
+            // Debounce: wait before reloading
+            reloadTimeoutRef.current = setTimeout(() => {
+              lastReloadRef.current = Date.now();
+              loadOrders(currentPage);
+            }, MIN_RELOAD_INTERVAL - timeSinceLastReload);
+          } else {
+            // Enough time has passed, reload immediately
+            lastReloadRef.current = now;
+            await loadOrders(currentPage);
+          }
           
           if (payload.eventType === 'UPDATE' && payload.new?.status === 'shipped') {
             toast.success(`Order ${payload.new.id} marked as shipped`);
@@ -82,6 +104,9 @@ export const usePaginatedOrders = (pageSize: number = 10) => {
       .subscribe();
 
     return () => {
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current);
+      }
       supabase.removeChannel(channel);
     };
   }, [currentPage, loadOrders]);
