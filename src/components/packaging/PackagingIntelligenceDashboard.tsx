@@ -13,7 +13,8 @@ import {
   Package, 
   BarChart3,
   RefreshCw,
-  Bell
+  Bell,
+  Plus
 } from "lucide-react";
 
 interface PackagingReport {
@@ -41,11 +42,28 @@ interface PackagingReport {
   };
 }
 
-export const PackagingIntelligenceDashboard = () => {
+interface PackagingIntelligenceDashboardProps {
+  onAddToInventory?: (boxData: {
+    name: string;
+    sku: string;
+    length: number;
+    width: number;
+    height: number;
+    cost: number;
+    box_type: 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom';
+    max_weight?: number;
+    in_stock?: number;
+    min_stock?: number;
+    max_stock?: number;
+  }) => void;
+}
+
+export const PackagingIntelligenceDashboard = ({ onAddToInventory }: PackagingIntelligenceDashboardProps) => {
   const { userProfile } = useAuth();
   const [report, setReport] = useState<PackagingReport | null>(null);
   const [lowStockBoxes, setLowStockBoxes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addingBoxSku, setAddingBoxSku] = useState<string | null>(null);
 
   const generateReport = async () => {
     if (!userProfile?.company_id) return;
@@ -158,6 +176,49 @@ export const PackagingIntelligenceDashboard = () => {
       setLowStockBoxes(lowStock);
     } catch (error) {
       console.error('Error fetching low stock boxes:', error);
+    }
+  };
+
+  const handleAddBoxToInventory = async (opportunity: any) => {
+    if (!onAddToInventory) return;
+    
+    setAddingBoxSku(opportunity.master_box_sku);
+    
+    try {
+      // Fetch full box details from packaging_master_list
+      const { data: masterBox, error } = await supabase
+        .from('packaging_master_list')
+        .select('*')
+        .eq('vendor_sku', opportunity.master_box_sku)
+        .single();
+
+      if (error || !masterBox) {
+        toast.error('Could not find box details in master list');
+        setAddingBoxSku(null);
+        return;
+      }
+
+      // Map packaging_master_list fields to box data
+      const boxData = {
+        name: masterBox.name,
+        sku: masterBox.vendor_sku,
+        length: Number(masterBox.length_in),
+        width: Number(masterBox.width_in),
+        height: Number(masterBox.height_in),
+        cost: Number(masterBox.cost),
+        box_type: (masterBox.type || 'box') as 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom',
+        max_weight: 50, // Default max weight
+        in_stock: 0,
+        min_stock: 10,
+        max_stock: 100,
+      };
+
+      onAddToInventory(boxData);
+    } catch (error) {
+      console.error('Error fetching box details:', error);
+      toast.error('Failed to load box details');
+    } finally {
+      setAddingBoxSku(null);
     }
   };
 
@@ -417,6 +478,18 @@ export const PackagingIntelligenceDashboard = () => {
                               <strong>Potential Savings:</strong> ${opportunity.total_savings?.toFixed(2)}
                             </div>
                           </div>
+                          {onAddToInventory && (
+                            <div className="flex justify-end pt-2 mt-2 border-t">
+                              <Button
+                                size="sm"
+                                onClick={() => handleAddBoxToInventory(opportunity)}
+                                disabled={addingBoxSku === opportunity.master_box_sku}
+                              >
+                                <Plus className="mr-1 h-4 w-4" />
+                                {addingBoxSku === opportunity.master_box_sku ? 'Loading...' : 'Add to Inventory'}
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

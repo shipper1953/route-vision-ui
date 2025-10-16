@@ -25,7 +25,24 @@ interface PackagingMasterItem {
   vendor: string;
 }
 
-export const BoxInventoryManager = () => {
+interface BoxInventoryManagerProps {
+  initialBoxData?: {
+    name?: string;
+    sku?: string;
+    length?: number;
+    width?: number;
+    height?: number;
+    cost?: number;
+    box_type?: 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom';
+    max_weight?: number;
+    in_stock?: number;
+    min_stock?: number;
+    max_stock?: number;
+  };
+  onInitialDataConsumed?: () => void;
+}
+
+export const BoxInventoryManager = ({ initialBoxData, onInitialDataConsumed }: BoxInventoryManagerProps = {}) => {
   const { boxes, loading, updateBoxInventory } = useCartonization();
   const { userProfile } = useAuth();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -50,6 +67,28 @@ export const BoxInventoryManager = () => {
   useEffect(() => {
     fetchMasterList();
   }, []);
+
+  // Handle initialBoxData prop
+  useEffect(() => {
+    if (initialBoxData) {
+      setNewBox({
+        name: initialBoxData.name || '',
+        sku: initialBoxData.sku || '',
+        length: initialBoxData.length || 0,
+        width: initialBoxData.width || 0,
+        height: initialBoxData.height || 0,
+        max_weight: initialBoxData.max_weight || 50,
+        cost: initialBoxData.cost || 0,
+        box_type: initialBoxData.box_type || 'box',
+        in_stock: initialBoxData.in_stock || 0,
+        min_stock: initialBoxData.min_stock || 10,
+        max_stock: initialBoxData.max_stock || 100,
+        description: ''
+      });
+      setIsAddDialogOpen(true);
+      onInitialDataConsumed?.();
+    }
+  }, [initialBoxData, onInitialDataConsumed]);
 
   const fetchMasterList = async () => {
     try {

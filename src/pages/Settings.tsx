@@ -1,5 +1,6 @@
 
 import { useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { CartonizationSettings } from "@/components/settings/CartonizationSettings";
@@ -11,13 +12,37 @@ import { HistoricalBoxUsageSimplified } from "@/components/packaging/HistoricalB
 import { PrintNodeSettings } from "@/components/settings/PrintNodeSettings";
 import { useCartonization } from "@/hooks/useCartonization";
 
+interface PendingBoxData {
+  name: string;
+  sku: string;
+  length: number;
+  width: number;
+  height: number;
+  cost: number;
+  box_type: 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom';
+  max_weight?: number;
+  in_stock?: number;
+  min_stock?: number;
+  max_stock?: number;
+}
+
 const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'box-recommendations';
   const { boxes, setBoxes, parameters, updateParameters } = useCartonization();
+  const [pendingBoxData, setPendingBoxData] = useState<PendingBoxData | null>(null);
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
+  };
+
+  const handleAddToInventory = (boxData: PendingBoxData) => {
+    setPendingBoxData(boxData);
+    setSearchParams({ tab: 'box-inventory' });
+  };
+
+  const handleInitialDataConsumed = () => {
+    setPendingBoxData(null);
   };
 
   console.log('Settings - activeTab:', activeTab);
@@ -60,11 +85,14 @@ const Settings = () => {
           </TabsContent>
           
           <TabsContent value="box-inventory" className="space-y-4">
-            <BoxInventoryManager />
+            <BoxInventoryManager 
+              initialBoxData={pendingBoxData}
+              onInitialDataConsumed={handleInitialDataConsumed}
+            />
           </TabsContent>
           
           <TabsContent value="box-recommendations" className="space-y-4">
-            <BoxRecommendations />
+            <BoxRecommendations onAddToInventory={handleAddToInventory} />
           </TabsContent>
           
           <TabsContent value="packaging-rules" className="space-y-4">
