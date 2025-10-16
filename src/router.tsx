@@ -20,6 +20,7 @@ import ProfileSettings from "@/pages/ProfileSettings";
 import AdminPanel from "@/pages/AdminPanel";
 import SuperAdminPanel from "@/pages/SuperAdminPanel";
 import CompanyAdminPanel from "@/pages/CompanyAdminPanel";
+import GenerateDemoOrders from "@/pages/GenerateDemoOrders";
 import NotFound from "@/pages/NotFound";
 
 const router = createBrowserRouter([
@@ -98,6 +99,10 @@ const router = createBrowserRouter([
   {
     path: "/company-admin",
     element: <CompanyAdminPanel />,
+  },
+  {
+    path: "/generate-demo-orders",
+    element: <GenerateDemoOrders />,
   },
   {
     path: "*",
