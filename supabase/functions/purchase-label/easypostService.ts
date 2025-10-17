@@ -112,6 +112,28 @@ export async function purchaseShippingLabel(shipmentId: string, rateId: string, 
     throw new Error(errorMessage);
   }
   
+  // After successful purchase, check for ZPL URL and fetch if available
+  if (responseData.postage_label?.label_zpl_url) {
+    console.log('📋 Found label_zpl_url, fetching ZPL content...');
+    try {
+      const zplResponse = await fetch(responseData.postage_label.label_zpl_url, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
+      
+      if (zplResponse.ok) {
+        const zplContent = await zplResponse.text();
+        if (zplContent.trim().startsWith('^XA')) {
+          console.log('✅ Successfully fetched ZPL from postage_label.label_zpl_url');
+          responseData.label_zpl = zplContent;
+        }
+      }
+    } catch (zplError) {
+      console.warn('⚠️ Failed to fetch ZPL from label_zpl_url:', zplError);
+    }
+  }
+  
   return responseData;
 }
 

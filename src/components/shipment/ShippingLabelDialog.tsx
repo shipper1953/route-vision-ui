@@ -159,12 +159,13 @@ export const ShippingLabelDialog = ({
   const handlePrintNode = async () => {
     if (!labelUrl) return;
     
-    // ZPL printers prefer ZPL format, but can also print images via PrintNode conversion
+    // Smart printing: Use native ZPL if available, otherwise fallback to image conversion
     if (isZplPrinter && zplContent) {
-      console.log('🖨️ Printing native ZPL to thermal printer');
+      console.log('🖨️ Using native ZPL format for optimal thermal printing');
       await printZPL(zplContent, `Shipping Label ${shipmentId}`);
     } else {
-      // PrintNode can convert images for ZPL printers
+      console.log('⚠️ Using image-to-ZPL conversion (native ZPL not available)');
+      // PrintNode will convert PNG to ZPL for thermal printers
       const proxyUrl = getProxyUrl(labelUrl);
       await printPDF(proxyUrl, `Shipping Label ${shipmentId}`);
     }
@@ -250,24 +251,33 @@ export const ShippingLabelDialog = ({
                       </Select>
                       <Button 
                         onClick={handlePrintNode}
-                        disabled={true}
+                        disabled={!selectedPrinter || printLoading}
                         size="sm"
-                        variant="secondary"
                       >
                         <Send className="h-4 w-4 mr-2" />
-                        Thermal Print Disabled
+                        Send to Printer
                       </Button>
                     </div>
                     {isZplPrinter && selectedPrinter && (
-                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">
-                        <p className="font-medium mb-1">🚫 ZPL Printing Disabled</p>
-                        <p className="text-xs mb-2">
-                          Native ZPL format is not available from EasyPost in test mode, and image-to-ZPL conversion has been found to produce incompatible data for thermal printers.
-                        </p>
-                        <p className="text-xs font-medium">
-                          Please download the PDF label below and print using a regular laser/inkjet printer.
-                        </p>
-                      </div>
+                      zplContent ? (
+                        <div className="text-sm text-green-600 bg-green-50 p-3 rounded border border-green-200">
+                          <p className="font-medium mb-1">✅ Native ZPL Format Ready</p>
+                          <p className="text-xs">
+                            This label has raw ZPL data ({Math.round(zplContent.length / 1024)}KB) for optimal thermal printing.
+                            Direct ZPL printing to thermal printer will produce the best results.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+                          <p className="font-medium mb-1">⚠️ Image-Based Printing</p>
+                          <p className="text-xs mb-2">
+                            Native ZPL not available (likely test mode or carrier limitation). Will use PNG-to-ZPL conversion.
+                          </p>
+                          <p className="text-xs font-medium">
+                            💡 For production: Use FedEx/UPS with production API key for native ZPL support.
+                          </p>
+                        </div>
+                      )
                     )}
                   </>
                 )}

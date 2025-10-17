@@ -162,8 +162,20 @@ export async function saveShipmentToDatabase(
     //  EasyPost response structure (default)
     console.log('📋 EasyPost postage_label info:', {
       label_url: purchaseResponse.postage_label?.label_url,
-      has_zpl: !!purchaseResponse.label_zpl
+      label_zpl_url: purchaseResponse.postage_label?.label_zpl_url,
+      has_zpl_in_response: !!purchaseResponse.label_zpl
     });
+    
+    // Try to get ZPL content from multiple sources
+    let zplContent = purchaseResponse.label_zpl || null;
+    
+    // If no ZPL in response but we have a label_zpl_url, fetch it
+    if (!zplContent && purchaseResponse.postage_label?.label_zpl_url && apiKey) {
+      console.log('🔄 Fetching ZPL from postage_label.label_zpl_url...');
+      zplContent = await fetchZplContent(purchaseResponse.postage_label.label_zpl_url, apiKey);
+    }
+    
+    console.log('📋 Final ZPL status:', zplContent ? `✅ ${Math.round(zplContent.length / 1024)}KB` : '❌ Not available');
     
     shipmentData = {
       easypost_id: purchaseResponse.id,
@@ -172,7 +184,7 @@ export async function saveShipmentToDatabase(
       service: purchaseResponse.selected_rate?.service,
       status: 'purchased',
       label_url: purchaseResponse.postage_label?.label_url,
-      label_zpl: purchaseResponse.label_zpl || null,
+      label_zpl: zplContent,
       tracking_url: purchaseResponse.tracker?.public_url,
       original_cost: finalOriginalCost,
       cost: finalMarkedUpCost,
