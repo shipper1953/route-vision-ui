@@ -46,10 +46,19 @@ serve(async (req) => {
     const authHeader = req.headers.get('authorization')
     const apiToken = authHeader?.replace('Bearer ', '') || qboidData.token
     
-    console.log('Received token:', apiToken ? 'Token provided' : 'null')
+    // SECURITY: Never log tokens, even presence check
+    console.log('Token validation attempt')
 
     // Validate API token
     const expectedToken = Deno.env.get('QBOID_API_TOKEN')
+    
+    if (!expectedToken) {
+      console.error('QBOID_API_TOKEN not configured')
+      return new Response(JSON.stringify({ error: 'Service configuration error' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      })
+    }
     if (!expectedToken) {
       console.error('QBOID_API_TOKEN not configured in environment')
       return new Response('Server configuration error', { 

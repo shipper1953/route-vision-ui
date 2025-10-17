@@ -56,24 +56,35 @@ serve(async (req) => {
     const company = companies[0];
     const shopifySettings = company.settings?.shopify;
 
-    // Verify HMAC
-    if (hmacHeader && shopifySettings?.webhook_secret) {
-      const encoder = new TextEncoder();
-      const key = await crypto.subtle.importKey(
-        'raw',
-        encoder.encode(shopifySettings.webhook_secret),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-      );
-      const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
-      const computedHmac = btoa(String.fromCharCode(...new Uint8Array(signature)));
-      
-      if (computedHmac !== hmacHeader) {
-        console.error('HMAC verification failed');
-        throw new Error('Invalid webhook signature');
-      }
+    // SECURITY: HMAC validation is MANDATORY
+    if (!hmacHeader) {
+      console.error('Missing HMAC signature header');
+      throw new Error('Missing webhook signature - HMAC header required');
     }
+
+    if (!shopifySettings?.webhook_secret) {
+      console.error('Webhook secret not configured for company:', company.id);
+      throw new Error('Webhook secret not configured');
+    }
+
+    // Verify HMAC signature
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(shopifySettings.webhook_secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
+    const computedHmac = btoa(String.fromCharCode(...new Uint8Array(signature)));
+    
+    if (computedHmac !== hmacHeader) {
+      console.error('HMAC verification failed - signature mismatch');
+      throw new Error('Invalid webhook signature');
+    }
+
+    console.log('✅ HMAC signature verified successfully');
 
     // Handle orders/create webhook
     if (topic === 'orders/create') {

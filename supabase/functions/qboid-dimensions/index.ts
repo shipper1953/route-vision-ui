@@ -53,21 +53,23 @@ serve(async (req) => {
       // This is actual data from Qboid device
       console.log('Received data from Qboid device:', body);
       
-      // Verify the Qboid API token
+      // SECURITY: Token validation is MANDATORY
       const qboidToken = req.headers.get('x-qboid-token');
-      const validToken = Deno.env.get('QBOID_API_TOKEN') || 'test_token'; // Fallback for testing
-      
-      if (!qboidToken) {
-        console.warn('Missing Qboid API token');
-        // For development, allow missing token with a warning
-        // In production, you would return 401 here
-      } else if (qboidToken !== validToken) {
-        console.error('Invalid Qboid API token');
-        return new Response(JSON.stringify({ 
-          error: 'Unauthorized - Invalid API token' 
-        }), {
+      const validToken = Deno.env.get('QBOID_API_TOKEN');
+
+      if (!validToken) {
+        console.error('QBOID_API_TOKEN environment variable not configured');
+        return new Response(JSON.stringify({ error: 'Service configuration error' }), {
+          status: 500,
           headers: corsHeaders,
+        });
+      }
+
+      if (!qboidToken || qboidToken !== validToken) {
+        console.error('Invalid or missing Qboid API token');
+        return new Response(JSON.stringify({ error: 'Unauthorized - Invalid API token' }), {
           status: 401,
+          headers: corsHeaders,
         });
       }
       
