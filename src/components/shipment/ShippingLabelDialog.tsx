@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { usePrintNode } from "@/hooks/usePrintNode";
+import { toast } from "sonner";
 
 interface OrderDetails {
   carrier: string;
@@ -151,12 +152,16 @@ export const ShippingLabelDialog = ({
   const handlePrintNode = async () => {
     if (!labelUrl) return;
     
-    // Use ZPL for thermal printers if available
-    if (isZplPrinter && zplContent) {
+    // ZPL printers REQUIRE ZPL format - cannot print PNG/PDF images
+    if (isZplPrinter) {
+      if (!zplContent) {
+        toast.error('ZPL printer requires ZPL format label. This label is only available as an image. Use Download or Browser Print instead.');
+        return;
+      }
       console.log('🖨️ Printing ZPL to thermal printer');
       await printZPL(zplContent, `Shipping Label ${shipmentId}`);
     } else {
-      // Fallback to PDF for regular printers
+      // Regular printers can handle PDF/PNG
       const proxyUrl = getProxyUrl(labelUrl);
       await printPDF(proxyUrl, `Shipping Label ${shipmentId}`);
     }
@@ -242,8 +247,9 @@ export const ShippingLabelDialog = ({
                       </Select>
                       <Button 
                         onClick={handlePrintNode}
-                        disabled={!selectedPrinter || printLoading}
+                        disabled={!selectedPrinter || printLoading || (isZplPrinter && !zplContent)}
                         size="sm"
+                        title={isZplPrinter && !zplContent ? 'ZPL format not available for this label' : ''}
                       >
                         <Send className="h-4 w-4 mr-2" />
                         Send to Printer
@@ -258,11 +264,13 @@ export const ShippingLabelDialog = ({
                           </p>
                         </div>
                       ) : (
-                        <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
-                          <p className="font-medium mb-1">⚠️ ZPL Format Not Available</p>
-                          <p className="text-xs">
-                            This label doesn't have ZPL data. It may be an older label created before ZPL support, or the ZPL data failed to save.
-                            Check the console logs for details, or use "Browser Print" or "Download" instead.
+                        <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">
+                          <p className="font-medium mb-1">❌ Cannot Print to ZPL Printer</p>
+                          <p className="text-xs mb-2">
+                            This label is only available as a PNG image. ZPL thermal printers require raw ZPL code and cannot process image files.
+                          </p>
+                          <p className="text-xs font-medium">
+                            Use "Download" or "Browser Print" instead, or select a non-thermal printer.
                           </p>
                         </div>
                       )
