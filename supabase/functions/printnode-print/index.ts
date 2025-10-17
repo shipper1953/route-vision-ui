@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    throw new Error('Invalid action. Use ?action=list-printers, ?action=print, or ?action=print-zpl');
+    throw new Error('Invalid action. Use ?action=list-printers, ?action=print, ?action=print-uri, or ?action=print-zpl');
 
   } catch (error) {
     console.error('PrintNode function error:', error);
