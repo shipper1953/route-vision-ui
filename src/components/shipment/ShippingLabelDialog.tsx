@@ -152,16 +152,12 @@ export const ShippingLabelDialog = ({
   const handlePrintNode = async () => {
     if (!labelUrl) return;
     
-    // ZPL printers REQUIRE ZPL format - cannot print PNG/PDF images
-    if (isZplPrinter) {
-      if (!zplContent) {
-        toast.error('ZPL printer requires ZPL format label. This label is only available as an image. Use Download or Browser Print instead.');
-        return;
-      }
-      console.log('🖨️ Printing ZPL to thermal printer');
+    // ZPL printers prefer ZPL format, but can also print images via PrintNode conversion
+    if (isZplPrinter && zplContent) {
+      console.log('🖨️ Printing native ZPL to thermal printer');
       await printZPL(zplContent, `Shipping Label ${shipmentId}`);
     } else {
-      // Regular printers can handle PDF/PNG
+      // PrintNode can convert images for ZPL printers
       const proxyUrl = getProxyUrl(labelUrl);
       await printPDF(proxyUrl, `Shipping Label ${shipmentId}`);
     }
@@ -247,9 +243,8 @@ export const ShippingLabelDialog = ({
                       </Select>
                       <Button 
                         onClick={handlePrintNode}
-                        disabled={!selectedPrinter || printLoading || (isZplPrinter && !zplContent)}
+                        disabled={!selectedPrinter || printLoading}
                         size="sm"
-                        title={isZplPrinter && !zplContent ? 'ZPL format not available for this label' : ''}
                       >
                         <Send className="h-4 w-4 mr-2" />
                         Send to Printer
@@ -258,19 +253,16 @@ export const ShippingLabelDialog = ({
                     {isZplPrinter && selectedPrinter && (
                       zplContent ? (
                         <div className="text-sm text-green-600 bg-green-50 p-3 rounded border border-green-200">
-                          <p className="font-medium mb-1">✅ ZPL Format Ready</p>
+                          <p className="font-medium mb-1">✅ Native ZPL Format</p>
                           <p className="text-xs">
-                            This label has ZPL data ({Math.round(zplContent.length / 1024)}KB) and will print directly to your thermal printer.
+                            This label has raw ZPL data ({Math.round(zplContent.length / 1024)}KB) for optimal thermal printing.
                           </p>
                         </div>
                       ) : (
-                        <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">
-                          <p className="font-medium mb-1">❌ Cannot Print to ZPL Printer</p>
-                          <p className="text-xs mb-2">
-                            This label is only available as a PNG image. ZPL thermal printers require raw ZPL code and cannot process image files.
-                          </p>
-                          <p className="text-xs font-medium">
-                            Use "Download" or "Browser Print" instead, or select a non-thermal printer.
+                        <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded border border-blue-200">
+                          <p className="font-medium mb-1">ℹ️ Image Conversion Mode</p>
+                          <p className="text-xs">
+                            This label will be converted to ZPL format by PrintNode. For best results, native ZPL labels are recommended, but image conversion usually works well.
                           </p>
                         </div>
                       )
