@@ -68,15 +68,30 @@ export const usePrintNode = () => {
     try {
       setLoading(true);
 
-      // Use pdf_uri to let PrintNode fetch and convert the image
-      // This works better than base64 for image-to-ZPL conversion
+      // Fetch the label and convert to base64
+      const response = await fetch(pdfUrl);
+      const blob = await response.blob();
+      const base64 = await blobToBase64(blob);
+      
+      // Remove data URL prefix if present
+      const content = base64.split(',')[1] || base64;
+
+      // Check if this is an image or PDF
+      const isImage = blob.type.includes('png') || blob.type.includes('image');
+      
+      // For images, use raw_base64 to let PrintNode handle conversion
+      // For PDFs, use pdf_base64
+      const contentType = isImage ? 'raw_base64' : 'pdf_base64';
+
+      console.log('PrintNode - File type:', blob.type, '| Using contentType:', contentType);
+
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
-          action: 'print-uri',
+          action: 'print',
           printerId: selectedPrinter,
           title,
-          contentType: 'pdf_uri',
-          content: pdfUrl,
+          contentType,
+          content,
           source: 'ShipTornado',
         },
       });
