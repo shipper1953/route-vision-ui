@@ -47,6 +47,8 @@ export const ShopifyConnectionDialog = ({
       if (error) throw error;
 
       if (data.authUrl) {
+        console.log('Opening Shopify OAuth URL:', data.authUrl);
+        
         // Open OAuth in popup window
         const width = 600;
         const height = 700;
@@ -58,6 +60,8 @@ export const ShopifyConnectionDialog = ({
           'shopify-oauth',
           `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
         );
+        
+        console.log('Popup opened:', !!popup);
 
         // Listen for message from popup
         const handleMessage = (event: MessageEvent) => {
