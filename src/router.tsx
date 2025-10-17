@@ -5,13 +5,13 @@ import {
 } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
-// Eager load critical pages (landing, auth)
+// Eager load critical pages (landing, auth, orders)
 import Index from "@/pages/Index";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import Orders from "@/pages/Orders";
 
 // Lazy load all other pages for code splitting
-const Orders = lazy(() => import("@/pages/Orders"));
 const CreateOrder = lazy(() => import("@/pages/CreateOrder"));
 const EditOrder = lazy(() => import("@/pages/EditOrder"));
 const OrderDetails = lazy(() => import("@/pages/OrderDetails"));
@@ -58,7 +58,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/orders",
-    element: <LazyRoute Component={Orders} />,
+    element: <Orders />,
   },
   {
     path: "/orders/create",
