@@ -44,7 +44,9 @@ export const ShippingLabelDialog = ({
   const selectedPrinterInfo = printers.find(p => p.id === selectedPrinter);
   const isZplPrinter = selectedPrinterInfo?.name.toLowerCase().includes('zpl') || 
                        selectedPrinterInfo?.name.toLowerCase().includes('zebra') ||
-                       selectedPrinterInfo?.name.toLowerCase().includes('zdesigner');
+                       selectedPrinterInfo?.name.toLowerCase().includes('zdesigner') ||
+                       selectedPrinterInfo?.description?.toLowerCase().includes('zpl') ||
+                       selectedPrinterInfo?.description?.toLowerCase().includes('zdesigner');
   
   // Fetch ZPL content when dialog opens or printer selection changes
   useEffect(() => {

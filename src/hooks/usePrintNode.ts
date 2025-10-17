@@ -76,9 +76,11 @@ export const usePrintNode = () => {
       // Remove data URL prefix if present
       const content = base64.split(',')[1] || base64;
 
-      // PrintNode only supports pdf_base64, pdf_uri, raw_base64, raw_uri
-      // Use pdf_base64 for both PDF and PNG files
-      const contentType = 'pdf_base64';
+      // Detect actual file type and use appropriate content type
+      // For PNG/image files, PrintNode needs raw_base64 format for ZPL printers
+      const contentType = blob.type.includes('png') || blob.type.includes('image') 
+        ? 'raw_base64' 
+        : 'pdf_base64';
 
       console.log('PrintNode contentType:', contentType, 'blob type:', blob.type);
 
