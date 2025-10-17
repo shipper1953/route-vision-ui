@@ -87,6 +87,9 @@ serve(async (req) => {
       `state=${state}`;
 
     console.log('Generated OAuth URL for store:', cleanUrl);
+    console.log('Full OAuth URL:', authUrl);
+    console.log('Redirect URI:', redirectUri);
+    console.log('API Key:', apiKey);
 
     return new Response(
       JSON.stringify({ 
