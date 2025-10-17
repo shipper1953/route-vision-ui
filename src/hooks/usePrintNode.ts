@@ -89,11 +89,18 @@ export const usePrintNode = () => {
 
       if (error) throw error;
 
-      toast.success('Print job sent successfully');
-      return true;
+      if (data?.success) {
+        toast.success(`Print job sent successfully (ID: ${data.jobId})`);
+        return true;
+      } else {
+        console.error('PrintNode error:', data);
+        toast.error(data?.message || 'Print job failed');
+        return false;
+      }
     } catch (error) {
       console.error('Error printing PDF:', error);
-      toast.error('Failed to print PDF');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to print PDF';
+      toast.error(`Print error: ${errorMessage}`);
       return false;
     } finally {
       setLoading(false);
@@ -120,11 +127,18 @@ export const usePrintNode = () => {
 
       if (error) throw error;
 
-      toast.success('ZPL label sent to printer');
-      return true;
+      if (data?.success) {
+        toast.success(`ZPL label sent successfully (ID: ${data.jobId})`);
+        return true;
+      } else {
+        console.error('PrintNode ZPL error:', data);
+        toast.error(data?.message || 'ZPL print job failed');
+        return false;
+      }
     } catch (error) {
       console.error('Error printing ZPL:', error);
-      toast.error('Failed to print ZPL label');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to print ZPL label';
+      toast.error(`ZPL print error: ${errorMessage}`);
       return false;
     } finally {
       setLoading(false);

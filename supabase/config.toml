@@ -76,6 +76,9 @@ url = ""
 # SECURITY: JWT verification ENABLED for financial functions
 # label-proxy, create-shipment, purchase-label, get-smartrates now require authentication
 
+[functions.label-proxy]
+verify_jwt = false  # Public proxy for label URLs from trusted sources (EasyPost/Shippo S3)
+
 [functions.debug-env]
 verify_jwt = false  # Keep disabled for debugging (restrict access via code)
 
