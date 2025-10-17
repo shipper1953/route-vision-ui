@@ -46,29 +46,45 @@ export const ShippingLabelDialog = ({
                        selectedPrinterInfo?.name.toLowerCase().includes('zebra') ||
                        selectedPrinterInfo?.name.toLowerCase().includes('zdesigner');
   
-  // Fetch ZPL content when dialog opens if ZPL printer is selected
+  // Fetch ZPL content when dialog opens or printer selection changes
   useEffect(() => {
-    if (isOpen && shipmentId && isZplPrinter) {
+    if (isOpen && shipmentId) {
+      console.log('🔄 Dialog opened, fetching ZPL content. isZplPrinter:', isZplPrinter);
       fetchZplContent();
     }
-  }, [isOpen, shipmentId, isZplPrinter]);
+  }, [isOpen, shipmentId, selectedPrinter]);
 
   const fetchZplContent = async () => {
     try {
+      console.log('🔍 Fetching ZPL content for shipment ID:', shipmentId);
+      const numericId = parseInt(shipmentId);
+      
+      if (isNaN(numericId)) {
+        console.error('❌ Invalid shipment ID:', shipmentId);
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('shipments')
-        .select('label_zpl')
-        .eq('id', parseInt(shipmentId))
+        .select('label_zpl, easypost_id')
+        .eq('id', numericId)
         .single();
       
-      if (!error && data?.label_zpl) {
+      console.log('📦 Shipment query result:', { data, error });
+      
+      if (error) {
+        console.error('❌ Error fetching ZPL:', error);
+        return;
+      }
+      
+      if (data?.label_zpl) {
         setZplContent(data.label_zpl);
-        console.log('✅ ZPL content loaded for thermal printing');
+        console.log('✅ ZPL content loaded for thermal printing (length:', data.label_zpl.length, ')');
       } else {
-        console.warn('⚠️ No ZPL content available for this label');
+        console.warn('⚠️ No ZPL content available for this label (easypost_id:', data?.easypost_id, ')');
       }
     } catch (err) {
-      console.error('Failed to fetch ZPL content:', err);
+      console.error('💥 Exception while fetching ZPL content:', err);
     }
   };
   
@@ -219,7 +235,7 @@ export const ShippingLabelDialog = ({
                       </Select>
                       <Button 
                         onClick={handlePrintNode}
-                        disabled={!selectedPrinter || printLoading || isZplPrinter}
+                        disabled={!selectedPrinter || printLoading || (isZplPrinter && !zplContent)}
                         size="sm"
                       >
                         <Send className="h-4 w-4 mr-2" />
@@ -227,14 +243,22 @@ export const ShippingLabelDialog = ({
                       </Button>
                     </div>
                     {isZplPrinter && selectedPrinter && (
-                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">
-                        <p className="font-medium mb-1">⚠️ Incompatible Printer Format</p>
-                        <p className="text-xs">
-                          This label is in PDF/PNG format, but you've selected a ZPL thermal printer. 
-                          ZPL printers require raw ZPL code format. Please use "Browser Print" or "Download" instead, 
-                          or select a standard office printer.
-                        </p>
-                      </div>
+                      zplContent ? (
+                        <div className="text-sm text-green-600 bg-green-50 p-3 rounded border border-green-200">
+                          <p className="font-medium mb-1">✅ ZPL Format Ready</p>
+                          <p className="text-xs">
+                            This label has ZPL data ({Math.round(zplContent.length / 1024)}KB) and will print directly to your thermal printer.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+                          <p className="font-medium mb-1">⚠️ ZPL Format Not Available</p>
+                          <p className="text-xs">
+                            This label doesn't have ZPL data. It may be an older label created before ZPL support, or the ZPL data failed to save.
+                            Check the console logs for details, or use "Browser Print" or "Download" instead.
+                          </p>
+                        </div>
+                      )
                     )}
                   </>
                 )}

@@ -67,7 +67,7 @@ export async function purchaseShippingLabel(shipmentId: string, rateId: string, 
   
   console.log('Purchasing label for shipment:', shipmentId, 'with rate:', rateId);
   
-  // Purchase label with ZPL format for thermal printers
+  // Purchase label with default format first (PDF/PNG works for all carriers)
   const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
     method: 'POST',
     headers: {
@@ -75,8 +75,8 @@ export async function purchaseShippingLabel(shipmentId: string, rateId: string, 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ 
-      rate: { id: rateId },
-      label_format: 'ZPL' // Request ZPL format for thermal printers
+      rate: { id: rateId }
+      // Don't specify format - let EasyPost return the best format for the carrier
     }),
   });
   
@@ -112,4 +112,39 @@ export async function purchaseShippingLabel(shipmentId: string, rateId: string, 
   }
   
   return responseData;
+}
+
+// Try to get ZPL format label if supported by carrier
+export async function tryGetZplLabel(shipmentId: string, apiKey: string): Promise<string | null> {
+  try {
+    console.log('🏷️  Attempting to retrieve ZPL format for shipment:', shipmentId);
+    
+    // Convert the label to ZPL format
+    const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/label`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/zpl', // Request ZPL format
+      },
+    });
+    
+    if (!response.ok) {
+      console.warn('⚠️  ZPL format not available for this carrier:', response.status);
+      return null;
+    }
+    
+    const zplContent = await response.text();
+    
+    // Verify it's actually ZPL (should start with ^XA)
+    if (zplContent.trim().startsWith('^XA')) {
+      console.log('✅ Successfully retrieved ZPL format (length:', zplContent.length, ')');
+      return zplContent;
+    } else {
+      console.warn('⚠️  Response is not valid ZPL format');
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Error retrieving ZPL format:', error);
+    return null;
+  }
 }

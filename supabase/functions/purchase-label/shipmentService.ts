@@ -159,7 +159,12 @@ export async function saveShipmentToDatabase(
       finalMarkedUpCost = apiCost;
     }
     
-    // EasyPost response structure (default)
+    //  EasyPost response structure (default)
+    console.log('📋 EasyPost postage_label info:', {
+      label_url: purchaseResponse.postage_label?.label_url,
+      has_zpl: !!purchaseResponse.label_zpl
+    });
+    
     shipmentData = {
       easypost_id: purchaseResponse.id,
       tracking_number: purchaseResponse.tracking_code,
@@ -167,7 +172,7 @@ export async function saveShipmentToDatabase(
       service: purchaseResponse.selected_rate?.service,
       status: 'purchased',
       label_url: purchaseResponse.postage_label?.label_url,
-      label_zpl: purchaseResponse.postage_label?.label_zpl_url ? await fetchZplContent(purchaseResponse.postage_label.label_zpl_url, apiKey) : null,
+      label_zpl: purchaseResponse.label_zpl || null,
       tracking_url: purchaseResponse.tracker?.public_url,
       original_cost: finalOriginalCost,
       cost: finalMarkedUpCost,

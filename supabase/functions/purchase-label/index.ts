@@ -5,6 +5,7 @@ import { linkShipmentToOrder } from './orderService.ts'
 import { processWalletPayment } from './walletService.ts'
 import { PurchaseLabelSchema, sanitizeString } from './validation.ts'
 import { authenticateUser, getUserCompany } from './authService.ts'
+import { purchaseShippingLabel, tryGetZplLabel } from './easypostService.ts'
 
 console.log('=== PURCHASE-LABEL v9.0 WITH AUTH & VALIDATION ===')
 
@@ -327,6 +328,17 @@ serve(async (req) => {
         console.log('📡 Calling EasyPost API...')
         purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
         console.log('✅ Label purchased successfully from EasyPost:', purchaseResponse.id)
+        
+        // Try to get ZPL format for thermal printer support
+        console.log('🏷️  Attempting to fetch ZPL format...')
+        const zplContent = await tryGetZplLabel(shipmentId, apiKey)
+        if (zplContent) {
+          // Store ZPL in the purchase response for database storage
+          purchaseResponse.label_zpl = zplContent
+          console.log('✅ ZPL format retrieved successfully')
+        } else {
+          console.log('ℹ️  ZPL format not available for this carrier')
+        }
       }
     } catch (labelError) {
       console.error('❌ Label purchase failed:', labelError)
