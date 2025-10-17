@@ -843,6 +843,7 @@ export type Database = {
           user_id: string
           warehouse_id: string | null
           weight: string | null
+          zpl_label: string | null
         }
         Insert: {
           actual_delivery_date?: string | null
@@ -873,6 +874,7 @@ export type Database = {
           user_id: string
           warehouse_id?: string | null
           weight?: string | null
+          zpl_label?: string | null
         }
         Update: {
           actual_delivery_date?: string | null
@@ -903,6 +905,7 @@ export type Database = {
           user_id?: string
           warehouse_id?: string | null
           weight?: string | null
+          zpl_label?: string | null
         }
         Relationships: [
           {

@@ -80,6 +80,7 @@ export const usePrintNode = () => {
       const contentType = isPdf ? 'pdf_uri' : 'raw_uri';
       
       console.log('PrintNode - File type:', blob.type, '| Using contentType:', contentType);
+      console.log('⚠️ Using image conversion (not native ZPL). For best results, use printZPL() with native ZPL content.');
 
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {

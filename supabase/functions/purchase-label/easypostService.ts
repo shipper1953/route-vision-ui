@@ -67,7 +67,8 @@ export async function purchaseShippingLabel(shipmentId: string, rateId: string, 
   
   console.log('Purchasing label for shipment:', shipmentId, 'with rate:', rateId);
   
-  // Purchase label with default format first (PDF/PNG works for all carriers)
+  // Request ZPL format for thermal printer compatibility
+  // EasyPost will provide PNG as fallback if ZPL is not supported by the carrier
   const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
     method: 'POST',
     headers: {
@@ -75,8 +76,8 @@ export async function purchaseShippingLabel(shipmentId: string, rateId: string, 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ 
-      rate: { id: rateId }
-      // Don't specify format - let EasyPost return the best format for the carrier
+      rate: { id: rateId },
+      label_format: 'ZPL' // Request ZPL format for thermal printers
     }),
   });
   
