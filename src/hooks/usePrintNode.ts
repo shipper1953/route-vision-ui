@@ -68,7 +68,7 @@ export const usePrintNode = () => {
     try {
       setLoading(true);
 
-      // Fetch the PDF and convert to base64
+      // Fetch the label and convert to base64
       const response = await fetch(pdfUrl);
       const blob = await response.blob();
       const base64 = await blobToBase64(blob);
@@ -76,12 +76,19 @@ export const usePrintNode = () => {
       // Remove data URL prefix if present
       const content = base64.split(',')[1] || base64;
 
+      // Determine content type based on blob MIME type
+      const contentType = blob.type.includes('png') || blob.type.includes('image') 
+        ? 'png_base64' 
+        : 'pdf_base64';
+
+      console.log('PrintNode contentType:', contentType, 'blob type:', blob.type);
+
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
           action: 'print',
           printerId: selectedPrinter,
           title,
-          contentType: 'pdf_base64',
+          contentType,
           content,
           source: 'ShipTornado',
         },

@@ -65,15 +65,22 @@ serve(async (req) => {
       );
     }
 
-    // Get the PDF content
-    const pdfContent = await response.arrayBuffer();
+    // Get the label content
+    const labelContent = await response.arrayBuffer();
     
-    // Return the PDF with proper headers for iframe embedding
-    return new Response(pdfContent, {
+    // Determine content type from response
+    const contentType = response.headers.get('content-type') || 'application/pdf';
+    const isImage = contentType.includes('image') || contentType.includes('png');
+    const fileExtension = isImage ? 'png' : 'pdf';
+    
+    console.log('Label content type:', contentType, 'isImage:', isImage);
+    
+    // Return the label with proper headers for iframe embedding
+    return new Response(labelContent, {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': 'inline; filename="shipping-label.pdf"',
+        'Content-Type': contentType,
+        'Content-Disposition': `inline; filename="shipping-label.${fileExtension}"`,
         'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
         'Cross-Origin-Embedder-Policy': 'unsafe-none',
         'Cross-Origin-Opener-Policy': 'unsafe-none'
