@@ -60,18 +60,25 @@ export const ShippingLabelDialog = ({
   const fetchZplContent = async () => {
     try {
       console.log('🔍 Fetching ZPL content for shipment ID:', shipmentId);
-      const numericId = parseInt(shipmentId);
       
-      if (isNaN(numericId)) {
-        console.error('❌ Invalid shipment ID:', shipmentId);
-        return;
+      // ShipmentId could be either numeric (database ID) or string (EasyPost ID)
+      // Try to fetch using easypost_id if it's a string starting with 'shp_'
+      const isEasyPostId = typeof shipmentId === 'string' && shipmentId.startsWith('shp_');
+      
+      let query = supabase.from('shipments').select('label_zpl, easypost_id, id');
+      
+      if (isEasyPostId) {
+        query = query.eq('easypost_id', shipmentId);
+      } else {
+        const numericId = parseInt(shipmentId);
+        if (isNaN(numericId)) {
+          console.error('❌ Invalid shipment ID:', shipmentId);
+          return;
+        }
+        query = query.eq('id', numericId);
       }
       
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('label_zpl, easypost_id')
-        .eq('id', numericId)
-        .single();
+      const { data, error } = await query.single();
       
       console.log('📦 Shipment query result:', { data, error });
       
@@ -258,11 +265,14 @@ export const ShippingLabelDialog = ({
                             This label has raw ZPL data ({Math.round(zplContent.length / 1024)}KB) for optimal thermal printing.
                           </p>
                         </div>
-                      ) : (
-                        <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded border border-blue-200">
-                          <p className="font-medium mb-1">ℹ️ Image Conversion Mode</p>
-                          <p className="text-xs">
-                            This label will be converted to ZPL format by PrintNode. For best results, native ZPL labels are recommended, but image conversion usually works well.
+                       ) : (
+                        <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+                          <p className="font-medium mb-1">⚠️ No Native ZPL Available</p>
+                          <p className="text-xs mb-2">
+                            This carrier (likely USPS) doesn't support native ZPL format. Image conversion may not work reliably with thermal printers.
+                          </p>
+                          <p className="text-xs font-medium">
+                            💡 Tip: Use FedEx or UPS for best thermal printer compatibility.
                           </p>
                         </div>
                       )
