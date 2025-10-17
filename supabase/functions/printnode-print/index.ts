@@ -74,6 +74,56 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === 'print-uri') {
+      const { printerId, title, contentType, content, source } = body;
+
+      if (!printerId || !content) {
+        throw new Error('Missing required fields: printerId, content');
+      }
+
+      // Submit print job with URI
+      const printJob = {
+        printerId,
+        title: title || 'Print Job',
+        contentType: contentType || 'pdf_uri',
+        content, // This is a URL, not base64
+        source: source || 'ShipTornado',
+      };
+
+      const response = await fetch('https://api.printnode.com/printjobs', {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(printJob),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('PrintNode print-uri error:', response.status, errorText);
+        return new Response(JSON.stringify({ 
+          error: `PrintNode rejected the print job: ${response.statusText}`,
+          details: errorText,
+          status: response.status
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const result = await response.json();
+      console.log('Print job (URI) submitted:', result);
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        jobId: result,
+        message: 'Print job submitted successfully' 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (action === 'print') {
       const { printerId, title, contentType, content, source } = body as PrintJob;
 
