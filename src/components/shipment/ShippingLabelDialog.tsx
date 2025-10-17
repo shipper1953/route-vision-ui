@@ -242,7 +242,7 @@ export const ShippingLabelDialog = ({
                       </Select>
                       <Button 
                         onClick={handlePrintNode}
-                        disabled={!selectedPrinter || printLoading || (isZplPrinter && !zplContent)}
+                        disabled={!selectedPrinter || printLoading}
                         size="sm"
                       >
                         <Send className="h-4 w-4 mr-2" />
