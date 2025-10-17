@@ -140,8 +140,8 @@ serve(async (req) => {
 
     console.log('Shopify OAuth connection successful for company:', companyId);
 
-    // Get the frontend URL from environment or use default
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://f60d16ad-630c-47ed-bfa7-82586b1ceebb.lovableproject.com';
+    // Get the frontend URL from environment or use production URL
+    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://ship-tornado.com';
 
     // Return HTML that redirects back to the app
     const successHtml = `
@@ -167,8 +167,8 @@ serve(async (req) => {
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    // Get the frontend URL from environment or use default
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://f60d16ad-630c-47ed-bfa7-82586b1ceebb.lovableproject.com';
+    // Get the frontend URL from environment or use production URL
+    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://ship-tornado.com';
     
     // Return HTML that redirects back to the app with error
     const errorHtml = `
