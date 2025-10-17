@@ -101,8 +101,15 @@ Deno.serve(async (req) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('PrintNode print error:', errorText);
-        throw new Error(`PrintNode print error: ${response.statusText}`);
+        console.error('PrintNode print error:', response.status, errorText);
+        return new Response(JSON.stringify({ 
+          error: `PrintNode rejected the print job: ${response.statusText}`,
+          details: errorText,
+          status: response.status
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       const result = await response.json();

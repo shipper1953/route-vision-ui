@@ -94,14 +94,26 @@ export const usePrintNode = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const errorMsg = error.message || 'Unknown error';
+        console.error('Edge function error:', error);
+        toast.error(`Print failed: ${errorMsg}`);
+        throw error;
+      }
+
+      if (data?.error) {
+        console.error('PrintNode API error:', data);
+        const details = data.details ? `\n${data.details}` : '';
+        toast.error(`PrintNode error: ${data.error}${details}`);
+        return false;
+      }
 
       if (data?.success) {
         toast.success(`Print job sent successfully (ID: ${data.jobId})`);
         return true;
       } else {
-        console.error('PrintNode error:', data);
-        toast.error(data?.message || 'Print job failed');
+        console.error('PrintNode unexpected response:', data);
+        toast.error('Print job failed - unexpected response');
         return false;
       }
     } catch (error) {

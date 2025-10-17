@@ -117,7 +117,12 @@ export const ShippingLabelDialog = ({
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `shipping-label-${shipmentId}.pdf`;
+        
+        // Determine file extension based on content type
+        const contentType = response.headers.get('content-type') || '';
+        const extension = contentType.includes('png') || contentType.includes('image') ? 'png' : 'pdf';
+        link.download = `shipping-label-${shipmentId}.${extension}`;
+        
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
