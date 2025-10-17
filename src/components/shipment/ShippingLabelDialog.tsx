@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Printer, PackageCheck, Send } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,14 +36,41 @@ export const ShippingLabelDialog = ({
 }: ShippingLabelDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [iframeError, setIframeError] = useState(false);
+  const [zplContent, setZplContent] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { printers, selectedPrinter, setSelectedPrinter, loading: printLoading, printPDF } = usePrintNode();
+  const { printers, selectedPrinter, setSelectedPrinter, loading: printLoading, printPDF, printZPL } = usePrintNode();
   
   // Detect if selected printer is a ZPL/thermal printer
   const selectedPrinterInfo = printers.find(p => p.id === selectedPrinter);
   const isZplPrinter = selectedPrinterInfo?.name.toLowerCase().includes('zpl') || 
                        selectedPrinterInfo?.name.toLowerCase().includes('zebra') ||
                        selectedPrinterInfo?.name.toLowerCase().includes('zdesigner');
+  
+  // Fetch ZPL content when dialog opens if ZPL printer is selected
+  useEffect(() => {
+    if (isOpen && shipmentId && isZplPrinter) {
+      fetchZplContent();
+    }
+  }, [isOpen, shipmentId, isZplPrinter]);
+
+  const fetchZplContent = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('label_zpl')
+        .eq('id', parseInt(shipmentId))
+        .single();
+      
+      if (!error && data?.label_zpl) {
+        setZplContent(data.label_zpl);
+        console.log('✅ ZPL content loaded for thermal printing');
+      } else {
+        console.warn('⚠️ No ZPL content available for this label');
+      }
+    } catch (err) {
+      console.error('Failed to fetch ZPL content:', err);
+    }
+  };
   
   const getProxyUrl = (originalUrl: string) => {
     // Use environment variable to construct the Supabase URL to avoid Chrome blocking issues  
@@ -100,8 +127,16 @@ export const ShippingLabelDialog = ({
 
   const handlePrintNode = async () => {
     if (!labelUrl) return;
-    const proxyUrl = getProxyUrl(labelUrl);
-    await printPDF(proxyUrl, `Shipping Label ${shipmentId}`);
+    
+    // Use ZPL for thermal printers if available
+    if (isZplPrinter && zplContent) {
+      console.log('🖨️ Printing ZPL to thermal printer');
+      await printZPL(zplContent, `Shipping Label ${shipmentId}`);
+    } else {
+      // Fallback to PDF for regular printers
+      const proxyUrl = getProxyUrl(labelUrl);
+      await printPDF(proxyUrl, `Shipping Label ${shipmentId}`);
+    }
   };
 
   return (

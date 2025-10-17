@@ -1,6 +1,30 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
+// Helper function to fetch ZPL content from EasyPost URL
+async function fetchZplContent(zplUrl: string, apiKey: string): Promise<string | null> {
+  try {
+    console.log('Fetching ZPL content from:', zplUrl);
+    const response = await fetch(zplUrl, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    });
+    
+    if (response.ok) {
+      const zplContent = await response.text();
+      console.log('✅ Successfully fetched ZPL content');
+      return zplContent;
+    } else {
+      console.warn('⚠️ Failed to fetch ZPL content:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error fetching ZPL content:', error);
+    return null;
+  }
+}
+
 export async function saveShipmentToDatabase(
   purchaseResponse: any,
   orderId: string | null,
@@ -8,7 +32,8 @@ export async function saveShipmentToDatabase(
   provider: string = 'easypost',
   selectedBox?: any,
   originalCost?: number | null,
-  markedUpCost?: number | null
+  markedUpCost?: number | null,
+  apiKey?: string
 ) {
   console.log("Saving shipment to database with user_id:", userId);
   
@@ -142,6 +167,7 @@ export async function saveShipmentToDatabase(
       service: purchaseResponse.selected_rate?.service,
       status: 'purchased',
       label_url: purchaseResponse.postage_label?.label_url,
+      label_zpl: purchaseResponse.postage_label?.label_zpl_url ? await fetchZplContent(purchaseResponse.postage_label.label_zpl_url, apiKey) : null,
       tracking_url: purchaseResponse.tracker?.public_url,
       original_cost: finalOriginalCost,
       cost: finalMarkedUpCost,

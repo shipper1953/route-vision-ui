@@ -408,7 +408,8 @@ serve(async (req) => {
         provider || 'easypost', 
         selectedBox,
         originalCost,
-        markedUpCost
+        markedUpCost,
+        provider === 'shippo' ? shippoApiKey : apiKey
       )
       finalShipmentId = result.finalShipmentId;
       console.log('✅ Shipment saved to database with ID:', finalShipmentId)

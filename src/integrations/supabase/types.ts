@@ -827,6 +827,7 @@ export type Database = {
           from_address: Json | null
           id: number
           label_url: string | null
+          label_zpl: string | null
           original_cost: number | null
           package_count: number | null
           package_dimensions: Json | null
@@ -856,6 +857,7 @@ export type Database = {
           from_address?: Json | null
           id?: number
           label_url?: string | null
+          label_zpl?: string | null
           original_cost?: number | null
           package_count?: number | null
           package_dimensions?: Json | null
@@ -885,6 +887,7 @@ export type Database = {
           from_address?: Json | null
           id?: number
           label_url?: string | null
+          label_zpl?: string | null
           original_cost?: number | null
           package_count?: number | null
           package_dimensions?: Json | null

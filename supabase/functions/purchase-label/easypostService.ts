@@ -67,6 +67,7 @@ export async function purchaseShippingLabel(shipmentId: string, rateId: string, 
   
   console.log('Purchasing label for shipment:', shipmentId, 'with rate:', rateId);
   
+  // Purchase label with ZPL format for thermal printers
   const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
     method: 'POST',
     headers: {
@@ -74,7 +75,8 @@ export async function purchaseShippingLabel(shipmentId: string, rateId: string, 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ 
-      rate: { id: rateId }
+      rate: { id: rateId },
+      label_format: 'ZPL' // Request ZPL format for thermal printers
     }),
   });
   
