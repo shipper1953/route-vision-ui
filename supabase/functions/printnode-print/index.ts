@@ -44,8 +44,13 @@ Deno.serve(async (req) => {
       throw new Error('PrintNode API key not configured');
     }
 
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action');
+    // Parse request body to get action
+    const body = await req.json();
+    const action = body.action;
+
+    if (!action) {
+      throw new Error('Missing action parameter');
+    }
 
     // Base64 encode the API key for basic auth
     const authHeader = `Basic ${btoa(apiKey)}`;
@@ -70,7 +75,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'print') {
-      const body = await req.json();
       const { printerId, title, contentType, content, source } = body as PrintJob;
 
       if (!printerId || !content) {
@@ -114,7 +118,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'print-zpl') {
-      const body = await req.json();
       const { printerId, title, zplCode } = body;
 
       if (!printerId || !zplCode) {

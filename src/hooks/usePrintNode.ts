@@ -29,7 +29,9 @@ export const usePrintNode = () => {
   const loadPrinters = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('printnode-print?action=list-printers');
+      const { data, error } = await supabase.functions.invoke('printnode-print', {
+        body: { action: 'list-printers' }
+      });
 
       if (error) throw error;
 
@@ -74,8 +76,9 @@ export const usePrintNode = () => {
       // Remove data URL prefix if present
       const content = base64.split(',')[1] || base64;
 
-      const { data, error } = await supabase.functions.invoke('printnode-print?action=print', {
+      const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
+          action: 'print',
           printerId: selectedPrinter,
           title,
           contentType: 'pdf_base64',
@@ -106,8 +109,9 @@ export const usePrintNode = () => {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase.functions.invoke('printnode-print?action=print-zpl', {
+      const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
+          action: 'print-zpl',
           printerId: selectedPrinter,
           title,
           zplCode,
