@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Store, CheckCircle2 } from "lucide-react";
 import { ShopifyConnectionDialog } from "./ShopifyConnectionDialog";
@@ -9,6 +9,11 @@ export const ShopifyConnectionButton = () => {
   const { userProfile } = useAuth();
   const { isConnected, loading, refetch } = useShopifyConnection();
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Refetch connection status when component mounts or becomes visible
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
 
   if (loading || !userProfile?.company_id) {
     return null;

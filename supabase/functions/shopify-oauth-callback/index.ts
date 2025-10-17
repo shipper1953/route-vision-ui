@@ -140,24 +140,19 @@ serve(async (req) => {
 
     console.log('Shopify OAuth connection successful for company:', companyId);
 
-    // Return HTML that sends postMessage and closes popup
+    // Get the frontend URL from environment or use default
+    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://f60d16ad-630c-47ed-bfa7-82586b1ceebb.lovableproject.com';
+
+    // Return HTML that redirects back to the app
     const successHtml = `
       <!DOCTYPE html>
       <html>
         <head><title>Shopify Connected</title></head>
         <body>
           <script>
-            if (window.opener) {
-              window.opener.postMessage({ 
-                type: 'shopify-oauth-success',
-                message: 'Shopify store connected successfully'
-              }, '*');
-              window.close();
-            } else {
-              window.location.href = '${supabaseUrl.replace('https://gidrlosmhpvdcogrkidj.supabase.co', 'https://gidrlosmhpvdcogrkidj.lovable.app')}/company-admin?shopify=connected';
-            }
+            window.location.href = '${frontendUrl}/company-admin?tab=integrations&shopify=connected';
           </script>
-          <p>Shopify connected successfully! This window will close automatically...</p>
+          <p>Shopify connected successfully! Redirecting...</p>
         </body>
       </html>
     `;
@@ -172,27 +167,20 @@ serve(async (req) => {
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    // Get the frontend URL from environment or use default
+    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://f60d16ad-630c-47ed-bfa7-82586b1ceebb.lovableproject.com';
     
-    // Return HTML that sends error postMessage and closes popup
+    // Return HTML that redirects back to the app with error
     const errorHtml = `
       <!DOCTYPE html>
       <html>
         <head><title>Connection Failed</title></head>
         <body>
           <script>
-            if (window.opener) {
-              window.opener.postMessage({ 
-                type: 'shopify-oauth-error',
-                message: '${error.message.replace(/'/g, "\\'")}'
-              }, '*');
-              setTimeout(() => window.close(), 2000);
-            } else {
-              window.location.href = '${supabaseUrl.replace('https://gidrlosmhpvdcogrkidj.supabase.co', 'https://gidrlosmhpvdcogrkidj.lovable.app')}/company-admin?shopify=error&message=${encodeURIComponent(error.message)}';
-            }
+            window.location.href = '${frontendUrl}/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}';
           </script>
           <p>Connection failed: ${error.message}</p>
-          <p>This window will close automatically...</p>
+          <p>Redirecting...</p>
         </body>
       </html>
     `;

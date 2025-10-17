@@ -22,12 +22,31 @@ const CompanyAdminPanel = () => {
   const [activeTab, setActiveTab] = useState("profile");
   const { company } = useCompanyInfo(userProfile?.company_id);
 
-  // Handle tab from URL parameter
+  // Handle tab from URL parameter and Shopify OAuth return
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
+    const shopifyStatus = params.get('shopify');
+    const shopifyMessage = params.get('message');
+    
     if (tab) {
       setActiveTab(tab);
+    }
+
+    // Handle Shopify OAuth return
+    if (shopifyStatus === 'connected') {
+      toast.success('Shopify store connected successfully!');
+      // Clean up URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('shopify');
+      window.history.replaceState({}, '', url.toString());
+    } else if (shopifyStatus === 'error') {
+      toast.error(`Shopify connection failed: ${shopifyMessage || 'Unknown error'}`);
+      // Clean up URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('shopify');
+      url.searchParams.delete('message');
+      window.history.replaceState({}, '', url.toString());
     }
   }, []);
 

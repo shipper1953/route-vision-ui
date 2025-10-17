@@ -47,52 +47,12 @@ export const ShopifyConnectionDialog = ({
       if (error) throw error;
 
       if (data.authUrl) {
-        // Open OAuth in popup window
-        const popup = window.open(
-          data.authUrl,
-          'shopify-oauth',
-          'width=600,height=700,scrollbars=yes'
-        );
-
-        if (!popup) {
-          throw new Error('Popup blocked. Please allow popups for this site.');
-        }
-
-        // Listen for OAuth callback message
-        const messageHandler = (event: MessageEvent) => {
-          // Verify origin for security
-          if (!event.origin.includes('supabase.co')) return;
-
-          if (event.data.type === 'shopify-oauth-success') {
-            window.removeEventListener('message', messageHandler);
-            toast({
-              title: "Connected!",
-              description: "Your Shopify store has been connected successfully",
-            });
-            setLoading(false);
-            onOpenChange(false);
-            onSuccess();
-          } else if (event.data.type === 'shopify-oauth-error') {
-            window.removeEventListener('message', messageHandler);
-            toast({
-              title: "Connection Failed",
-              description: event.data.message || "Failed to connect Shopify store",
-              variant: "destructive",
-            });
-            setLoading(false);
-          }
-        };
-
-        window.addEventListener('message', messageHandler);
-
-        // Cleanup if popup is closed manually
-        const checkPopup = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(checkPopup);
-            window.removeEventListener('message', messageHandler);
-            setLoading(false);
-          }
-        }, 500);
+        // Store connection state before redirecting
+        sessionStorage.setItem('shopify-connecting', 'true');
+        sessionStorage.setItem('shopify-return-url', window.location.href);
+        
+        // Use full window redirect instead of popup to avoid blocking
+        window.location.href = data.authUrl;
       } else {
         throw new Error('No authorization URL received');
       }
