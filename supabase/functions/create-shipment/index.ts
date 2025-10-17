@@ -129,7 +129,6 @@ serve(async (req) => {
     }
     
     // Save to database
-    const authHeader = req.headers.get('Authorization')
     if (authHeader) {
       try {
         const supabaseClient = createClient(supabaseUrl!, supabaseAnonKey!, {
