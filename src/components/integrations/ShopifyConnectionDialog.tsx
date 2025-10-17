@@ -47,12 +47,57 @@ export const ShopifyConnectionDialog = ({
       if (error) throw error;
 
       if (data.authUrl) {
-        // Store connection state before redirecting
-        sessionStorage.setItem('shopify-connecting', 'true');
-        sessionStorage.setItem('shopify-return-url', window.location.href);
+        // Open OAuth in popup window
+        const width = 600;
+        const height = 700;
+        const left = (window.screen.width - width) / 2;
+        const top = (window.screen.height - height) / 2;
         
-        // Use full window redirect instead of popup to avoid blocking
-        window.location.href = data.authUrl;
+        const popup = window.open(
+          data.authUrl,
+          'shopify-oauth',
+          `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
+        );
+
+        // Listen for message from popup
+        const handleMessage = (event: MessageEvent) => {
+          if (event.data.type === 'shopify-oauth-success') {
+            window.removeEventListener('message', handleMessage);
+            setLoading(false);
+            onOpenChange(false);
+            toast({
+              title: "Shopify Connected",
+              description: "Your store has been connected successfully",
+            });
+            onSuccess();
+          } else if (event.data.type === 'shopify-oauth-error') {
+            window.removeEventListener('message', handleMessage);
+            setLoading(false);
+            toast({
+              title: "Connection Failed",
+              description: event.data.error || "Failed to connect Shopify",
+              variant: "destructive",
+            });
+          }
+        };
+
+        window.addEventListener('message', handleMessage);
+
+        // Check if popup was blocked
+        if (!popup || popup.closed) {
+          window.removeEventListener('message', handleMessage);
+          throw new Error('Popup was blocked. Please allow popups for this site.');
+        }
+
+        // Fallback: Check if popup closed without message
+        const checkPopup = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(checkPopup);
+            window.removeEventListener('message', handleMessage);
+            setLoading(false);
+            // onSuccess will be called if message was received
+          }
+        }, 500);
       } else {
         throw new Error('No authorization URL received');
       }
@@ -98,7 +143,7 @@ export const ShopifyConnectionDialog = ({
           <div className="bg-muted/50 p-4 rounded-lg space-y-2">
             <h4 className="font-medium text-sm">What happens next?</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• You'll be redirected to Shopify to authorize the connection</li>
+              <li>• A popup will open for Shopify authorization</li>
               <li>• No need to manually create API keys or tokens</li>
               <li>• Secure OAuth authentication</li>
               <li>• Automatic webhook setup for order syncing</li>
@@ -111,7 +156,7 @@ export const ShopifyConnectionDialog = ({
             className="w-full"
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {loading ? "Redirecting to Shopify..." : "Connect with Shopify"}
+            {loading ? "Waiting for authorization..." : "Connect with Shopify"}
           </Button>
         </div>
       </DialogContent>

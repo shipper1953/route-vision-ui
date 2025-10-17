@@ -140,19 +140,59 @@ serve(async (req) => {
 
     console.log('Shopify OAuth connection successful for company:', companyId);
 
-    // Get the frontend URL from environment or use production URL
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://ship-tornado.com';
-
-    // Return HTML that redirects back to the app
+    // Return HTML that communicates with popup opener or redirects
     const successHtml = `
       <!DOCTYPE html>
       <html>
-        <head><title>Shopify Connected</title></head>
+        <head>
+          <title>Shopify Connected</title>
+          <style>
+            body {
+              font-family: system-ui, -apple-system, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              margin: 0;
+              background: #f3f4f6;
+            }
+            .container {
+              text-align: center;
+              padding: 2rem;
+              background: white;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .success { color: #10b981; }
+          </style>
+        </head>
         <body>
+          <div class="container">
+            <h1 class="success">✓ Shopify Connected!</h1>
+            <p>Returning to Ship Tornado...</p>
+          </div>
           <script>
-            window.location.href = '${frontendUrl}/company-admin?tab=integrations&shopify=connected';
+            try {
+              // Try to communicate with popup opener
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({
+                  type: 'shopify-oauth-success',
+                  connected: true
+                }, '*');
+                window.close();
+              } else {
+                // Fallback to redirect if not in popup
+                setTimeout(() => {
+                  window.location.href = 'https://ship-tornado.com/company-admin?tab=integrations&shopify=connected';
+                }, 1500);
+              }
+            } catch (e) {
+              // Fallback to redirect on error
+              setTimeout(() => {
+                window.location.href = 'https://ship-tornado.com/company-admin?tab=integrations&shopify=connected';
+              }, 1500);
+            }
           </script>
-          <p>Shopify connected successfully! Redirecting...</p>
         </body>
       </html>
     `;
@@ -167,20 +207,57 @@ serve(async (req) => {
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    // Get the frontend URL from environment or use production URL
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://ship-tornado.com';
-    
-    // Return HTML that redirects back to the app with error
+    // Return HTML that communicates error to popup opener or redirects
     const errorHtml = `
       <!DOCTYPE html>
       <html>
-        <head><title>Connection Failed</title></head>
+        <head>
+          <title>Connection Failed</title>
+          <style>
+            body {
+              font-family: system-ui, -apple-system, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              margin: 0;
+              background: #f3f4f6;
+            }
+            .container {
+              text-align: center;
+              padding: 2rem;
+              background: white;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .error { color: #ef4444; }
+          </style>
+        </head>
         <body>
+          <div class="container">
+            <h1 class="error">✗ Connection Failed</h1>
+            <p>${error.message}</p>
+            <p>Returning to Ship Tornado...</p>
+          </div>
           <script>
-            window.location.href = '${frontendUrl}/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}';
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({
+                  type: 'shopify-oauth-error',
+                  error: '${error.message.replace(/'/g, "\\'")}'
+                }, '*');
+                window.close();
+              } else {
+                setTimeout(() => {
+                  window.location.href = 'https://ship-tornado.com/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}';
+                }, 2000);
+              }
+            } catch (e) {
+              setTimeout(() => {
+                window.location.href = 'https://ship-tornado.com/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}';
+              }, 2000);
+            }
           </script>
-          <p>Connection failed: ${error.message}</p>
-          <p>Redirecting...</p>
         </body>
       </html>
     `;
