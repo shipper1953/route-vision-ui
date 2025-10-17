@@ -39,6 +39,12 @@ export const ShippingLabelDialog = ({
   const navigate = useNavigate();
   const { printers, selectedPrinter, setSelectedPrinter, loading: printLoading, printPDF } = usePrintNode();
   
+  // Detect if selected printer is a ZPL/thermal printer
+  const selectedPrinterInfo = printers.find(p => p.id === selectedPrinter);
+  const isZplPrinter = selectedPrinterInfo?.name.toLowerCase().includes('zpl') || 
+                       selectedPrinterInfo?.name.toLowerCase().includes('zebra') ||
+                       selectedPrinterInfo?.name.toLowerCase().includes('zdesigner');
+  
   const getProxyUrl = (originalUrl: string) => {
     // Use environment variable to construct the Supabase URL to avoid Chrome blocking issues  
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://gidrlosmhpvdcogrkidj.supabase.co';
@@ -158,32 +164,44 @@ export const ShippingLabelDialog = ({
                     No printers found. Configure printers in Settings → Printer tab.
                   </div>
                 ) : (
-                  <div className="flex gap-2">
-                    <Select
-                      value={selectedPrinter?.toString()}
-                      onValueChange={(value) => setSelectedPrinter(Number(value))}
-                      disabled={printLoading}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={printLoading ? "Loading printers..." : "Select printer"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {printers.map((printer) => (
-                          <SelectItem key={printer.id} value={printer.id.toString()}>
-                            {printer.name} {printer.default ? '(Default)' : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button 
-                      onClick={handlePrintNode}
-                      disabled={!selectedPrinter || printLoading}
-                      size="sm"
-                    >
-                      <Send className="h-4 w-4 mr-2" />
-                      Send to Printer
-                    </Button>
-                  </div>
+                  <>
+                    <div className="flex gap-2">
+                      <Select
+                        value={selectedPrinter?.toString()}
+                        onValueChange={(value) => setSelectedPrinter(Number(value))}
+                        disabled={printLoading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={printLoading ? "Loading printers..." : "Select printer"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {printers.map((printer) => (
+                            <SelectItem key={printer.id} value={printer.id.toString()}>
+                              {printer.name} {printer.default ? '(Default)' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        onClick={handlePrintNode}
+                        disabled={!selectedPrinter || printLoading || isZplPrinter}
+                        size="sm"
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        Send to Printer
+                      </Button>
+                    </div>
+                    {isZplPrinter && selectedPrinter && (
+                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">
+                        <p className="font-medium mb-1">⚠️ Incompatible Printer Format</p>
+                        <p className="text-xs">
+                          This label is in PDF/PNG format, but you've selected a ZPL thermal printer. 
+                          ZPL printers require raw ZPL code format. Please use "Browser Print" or "Download" instead, 
+                          or select a standard office printer.
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

@@ -25,6 +25,12 @@ export const MultiPackageLabelDialog = ({
   const [iframeErrors, setIframeErrors] = useState<Record<number, boolean>>({});
   const { printers, selectedPrinter, setSelectedPrinter, printPDF } = usePrintNode();
 
+  // Detect if selected printer is a ZPL/thermal printer
+  const selectedPrinterInfo = printers.find(p => p.id === selectedPrinter);
+  const isZplPrinter = selectedPrinterInfo?.name.toLowerCase().includes('zpl') || 
+                       selectedPrinterInfo?.name.toLowerCase().includes('zebra') ||
+                       selectedPrinterInfo?.name.toLowerCase().includes('zdesigner');
+
   const getProxyUrl = (originalUrl: string) => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://gidrlosmhpvdcogrkidj.supabase.co';
     return `${supabaseUrl}/functions/v1/label-proxy?url=${encodeURIComponent(originalUrl)}`;
@@ -168,12 +174,21 @@ export const MultiPackageLabelDialog = ({
                   ))}
                 </SelectContent>
               </Select>
+              {isZplPrinter && selectedPrinter && (
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">
+                  <p className="font-medium mb-1">⚠️ Incompatible Printer Format</p>
+                  <p className="text-xs">
+                    These labels are in PDF/PNG format, but you've selected a ZPL thermal printer. 
+                    ZPL printers require raw ZPL code. Please use "Browser Print All" or "Download All" instead.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
           {/* Action buttons */}
           <div className="flex gap-2 p-4 bg-muted/20 rounded-lg">
-            {selectedPrinter ? (
+            {selectedPrinter && !isZplPrinter ? (
               <Button
                 onClick={handlePrintNodeAll}
                 disabled={isPrinting}
