@@ -13,53 +13,31 @@ export async function processWalletPayment(companyId: string, labelCost: number,
     { auth: { persistSession: false } }
   );
 
-  // Get wallet
-  const { data: wallet, error: walletError } = await supabaseService
-    .from('wallets')
-    .select('id, balance')
-    .eq('company_id', companyId)
-    .single();
+  // Use atomic wallet deduction function to prevent race conditions
+  const { data, error } = await supabaseService.rpc('deduct_from_wallet', {
+    p_wallet_id: null, // Will find by company_id
+    p_company_id: companyId,
+    p_amount: labelCost,
+    p_user_id: userId,
+    p_reference_id: purchaseResponseId,
+    p_description: 'Shipping label purchase'
+  });
 
-  if (walletError || !wallet) {
-    throw new Error('Wallet not found');
+  if (error) {
+    console.error('Wallet deduction error:', error);
+    throw new Error(`Failed to process wallet payment: ${error.message}`);
   }
 
-  // Check sufficient funds
-  if (wallet.balance < labelCost) {
-    throw new Error(`Insufficient funds. Required: $${labelCost.toFixed(2)}, Available: $${wallet.balance.toFixed(2)}`);
+  if (!data || data.length === 0) {
+    throw new Error('Wallet deduction failed - no response');
   }
 
-  // Deduct funds
-  const newBalance = wallet.balance - labelCost;
-  const { error: updateError } = await supabaseService
-    .from('wallets')
-    .update({ balance: newBalance })
-    .eq('id', wallet.id);
-
-  if (updateError) {
-    throw new Error('Failed to update wallet');
+  const result = data[0];
+  
+  if (!result.success) {
+    console.error('Wallet deduction failed:', result.message);
+    throw new Error(result.message);
   }
 
-  // Record transaction
-  const { error: transactionError } = await supabaseService
-    .from('transactions')
-    .insert([{
-      wallet_id: wallet.id,
-      company_id: companyId,
-      amount: -labelCost,
-      type: 'debit',
-      description: 'Shipping label purchase',
-      reference_id: purchaseResponseId,
-      reference_type: 'shipping_label',
-      created_by: userId
-    }]);
-
-  if (transactionError) {
-    console.error('Failed to record transaction:', transactionError);
-    // Don't fail the whole operation for transaction recording failure
-  } else {
-    console.log('Transaction recorded successfully');
-  }
-
-  console.log(`Deducted $${labelCost} from wallet. New balance: $${newBalance}`);
+  console.log(`✅ Deducted $${labelCost.toFixed(2)} from wallet. New balance: $${result.new_balance.toFixed(2)}`);
 }

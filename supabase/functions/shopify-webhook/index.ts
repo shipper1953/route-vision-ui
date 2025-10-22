@@ -42,19 +42,20 @@ serve(async (req) => {
       }
     }
 
-    // Find company by shop domain
-    const { data: companies, error: companyError } = await supabase
-      .from('companies')
-      .select('id, settings')
-      .ilike('settings->shopify->>store_url', `%${shopDomain}%`);
+    // Find company by shop domain using shopify_credentials table
+    const { data: credentials, error: credError } = await supabase
+      .from('shopify_credentials')
+      .select('company_id, webhook_secret, access_token')
+      .eq('store_url', shopDomain)
+      .eq('is_active', true)
+      .single();
 
-    if (companyError || !companies || companies.length === 0) {
-      console.error('Company not found for shop:', shopDomain);
-      throw new Error('Company not found');
+    if (credError || !credentials) {
+      console.error('Shopify credentials not found for shop:', shopDomain);
+      throw new Error('Company not found or Shopify not connected');
     }
 
-    const company = companies[0];
-    const shopifySettings = company.settings?.shopify;
+    const companyId = credentials.company_id;
 
     // SECURITY: HMAC validation is MANDATORY
     if (!hmacHeader) {
@@ -62,8 +63,8 @@ serve(async (req) => {
       throw new Error('Missing webhook signature - HMAC header required');
     }
 
-    if (!shopifySettings?.webhook_secret) {
-      console.error('Webhook secret not configured for company:', company.id);
+    if (!credentials.webhook_secret) {
+      console.error('Webhook secret not configured for company:', companyId);
       throw new Error('Webhook secret not configured');
     }
 
@@ -71,7 +72,7 @@ serve(async (req) => {
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
-      encoder.encode(shopifySettings.webhook_secret),
+      encoder.encode(credentials.webhook_secret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['sign']
@@ -94,7 +95,7 @@ serve(async (req) => {
       const { data: existingMapping } = await supabase
         .from('shopify_order_mappings')
         .select('id')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .eq('shopify_order_id', shopifyOrder.id.toString())
         .single();
 
@@ -110,7 +111,7 @@ serve(async (req) => {
       const { data: warehouse } = await supabase
         .from('warehouses')
         .select('id')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .eq('is_default', true)
         .single();
 
@@ -141,7 +142,7 @@ serve(async (req) => {
         value: parseFloat(shopifyOrder.total_price || '0'),
         order_date: shopifyOrder.created_at,
         status: 'processing',
-        company_id: company.id,
+        company_id: companyId,
         warehouse_id: warehouse?.id || null,
         user_id: null, // Will be set by trigger
       };
@@ -164,7 +165,7 @@ serve(async (req) => {
       await supabase
         .from('shopify_order_mappings')
         .insert({
-          company_id: company.id,
+          company_id: companyId,
           ship_tornado_order_id: newOrder.id,
           shopify_order_id: shopifyOrder.id.toString(),
           shopify_order_number: shopifyOrder.order_number.toString(),
@@ -175,7 +176,7 @@ serve(async (req) => {
       await supabase
         .from('shopify_sync_logs')
         .insert({
-          company_id: company.id,
+          company_id: companyId,
           sync_type: 'order_import',
           direction: 'inbound',
           status: 'success',

@@ -106,15 +106,32 @@ serve(async (req) => {
     await registerWebhook('orders/create');
     await registerWebhook('orders/updated');
 
-    // Update company settings
+    // Store credentials securely in shopify_credentials table
+    const { error: credError } = await supabase
+      .from('shopify_credentials')
+      .upsert({
+        company_id: companyId,
+        store_url: shop,
+        access_token: accessToken,
+        webhook_secret: webhookSecret,
+        scopes: ['read_orders', 'write_orders', 'read_products', 'write_products', 'read_inventory', 'write_inventory'],
+        connected_at: new Date().toISOString(),
+        is_active: true
+      }, {
+        onConflict: 'company_id'
+      });
+
+    if (credError) {
+      console.error('Failed to store Shopify credentials:', credError);
+      throw new Error('Failed to store credentials securely');
+    }
+
+    // Update company settings (remove plaintext credentials)
     const existingSettings = company.settings || {};
-    
     const updatedSettings = {
       ...existingSettings,
       shopify: {
         store_url: shop,
-        access_token: accessToken,
-        webhook_secret: webhookSecret,
         connected: true,
         connected_at: new Date().toISOString(),
         last_sync: new Date().toISOString(),

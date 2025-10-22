@@ -6,7 +6,7 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
   console.log('Fetching user profile for userId:', userId);
   
   try {
-    // Use the security definer function to avoid RLS recursion
+    // Use the security definer function which now fetches roles from user_roles table
     const { data, error } = await supabase
       .rpc('get_user_profile', { user_id: userId });
 
@@ -21,6 +21,8 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
     }
 
     const profileData = data[0];
+    
+    console.log('Fetched profile with role from user_roles:', profileData.role);
     
     // Convert warehouse_ids from Json to string[] with proper type casting
     return {
@@ -71,7 +73,6 @@ export const createUserProfile = async (user: any): Promise<UserProfile | null> 
         name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
         email: user.email,
         password: '',
-        role: 'company_admin',
         company_id: demoCompany.id,
         warehouse_ids: demoWarehouse ? [demoWarehouse.id] : []
       }])
@@ -83,15 +84,17 @@ export const createUserProfile = async (user: any): Promise<UserProfile | null> 
       return null;
     }
 
-    console.log('User profile created successfully:', data);
+    // Assign company_admin role in user_roles table
+    await (supabase as any)
+      .from('user_roles')
+      .insert({
+        user_id: user.id,
+        role: 'company_admin'
+      });
+
+    console.log('User profile created with company_admin role');
     
-    // Convert warehouse_ids from Json to string[] with proper type casting
-    return {
-      ...data,
-      warehouse_ids: Array.isArray(data.warehouse_ids) 
-        ? (data.warehouse_ids as string[])
-        : []
-    };
+    return fetchUserProfile(user.id);
   } catch (error) {
     console.error('Error in createUserProfile:', error);
     return null;
