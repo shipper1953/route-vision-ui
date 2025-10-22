@@ -1364,6 +1364,21 @@ export type Database = {
           items_total: number
         }[]
       }
+      deduct_from_wallet: {
+        Args: {
+          p_amount: number
+          p_company_id: string
+          p_description: string
+          p_reference_id: string
+          p_user_id: string
+          p_wallet_id: string
+        }
+        Returns: {
+          message: string
+          new_balance: number
+          success: boolean
+        }[]
+      }
       get_company_boxes_for_cartonization: {
         Args: { p_company_id: string }
         Returns: {
