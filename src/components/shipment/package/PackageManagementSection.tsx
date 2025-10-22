@@ -377,6 +377,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
           width: pkg.box.width,
           height: pkg.box.height,
           weight: Math.max(1, Math.round((pkg as any).packageWeight || 1)),
+          items: pkg.assignedItems || [], // Include assigned items in each package
         }));
         (form as any).setValue('multiParcels', parcels);
         

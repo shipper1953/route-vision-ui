@@ -284,6 +284,26 @@ const CreateShipment = () => {
                       };
                       
                       console.log(`Package ${i + 1} box data:`, boxData);
+                      
+                      // Get items for this package
+                      const packageItems = (pkgRate.packageDimensions as any)?.items || [];
+                      console.log(`Package ${i + 1} items:`, packageItems);
+                      
+                      // Convert items to selectedItems format if needed
+                      const selectedItems = packageItems.map((item: any) => ({
+                        itemId: item.id || item.itemId,
+                        name: item.name,
+                        sku: item.sku,
+                        quantity: item.quantity,
+                        dimensions: item.dimensions || {
+                          length: item.length,
+                          width: item.width,
+                          height: item.height,
+                          weight: item.weight
+                        }
+                      }));
+                      
+                      console.log(`Package ${i + 1} selected items:`, selectedItems);
                       console.log(`🔄 Calling labelService.purchaseLabel for package ${i + 1}...`);
                       
                       const result = await labelService.purchaseLabel(
@@ -291,7 +311,8 @@ const CreateShipment = () => {
                         rate.id,
                         orderId,
                         rate.provider,
-                        boxData
+                        boxData,
+                        selectedItems // Pass items to label purchase
                       );
                       
                       console.log(`✅ Package ${i + 1} label purchased successfully:`, {
