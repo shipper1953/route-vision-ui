@@ -443,6 +443,28 @@ serve(async (req) => {
         console.log('📦 Selected items:', selectedItems);
         console.log('📦 Selected box:', selectedBox);
         
+        // VALIDATION: Ensure we have item data for order shipments
+        if (!enhancedMetadata?.items?.length && (!selectedItems || selectedItems.length === 0)) {
+          console.error('❌ VALIDATION FAILED: Order shipment missing item data');
+          console.error('   Order ID:', orderId);
+          console.error('   Enhanced Metadata:', enhancedMetadata);
+          console.error('   Selected Items:', selectedItems);
+          
+          return createErrorResponse(
+            'Cannot link shipment to order without item data. This is required for fulfillment tracking.',
+            {
+              orderId,
+              shipmentId: finalShipmentId,
+              hasMetadata: !!enhancedMetadata,
+              hasItems: !!(enhancedMetadata?.items),
+              hasSelectedItems: !!(selectedItems?.length)
+            },
+            400
+          )
+        }
+        
+        console.log('✅ Validation passed: Order shipment has item data');
+        
         // If no metadata provided OR if items array is empty, build it from selectedItems
         if ((!enhancedMetadata || !enhancedMetadata.items || enhancedMetadata.items.length === 0) 
             && selectedItems && selectedItems.length > 0) {

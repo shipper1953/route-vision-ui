@@ -24,6 +24,13 @@ export class LabelService {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} using ${provider || 'easypost'}`);
       
+      // VALIDATION: If this shipment is for an order, we MUST have item data
+      if (orderId && (!selectedItems || selectedItems.length === 0)) {
+        const errorMsg = 'Cannot purchase label for order shipment without item selection. Please select which items are in this package.';
+        console.error('❌ VALIDATION FAILED:', errorMsg);
+        throw new Error(errorMsg);
+      }
+      
       if (this.useEdgeFunctions) {
         return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData, selectedItems, originalCost, markedUpCost);
       }

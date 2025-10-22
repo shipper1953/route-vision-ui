@@ -271,6 +271,17 @@ export const OrderShipmentsDetailCard = ({ order }: OrderShipmentsDetailCardProp
         {/* Shipments List */}
         {shipments.map((shipment) => (
           <div key={`${shipment.id}-${shipment.packageIndex}`} className="border rounded-lg p-4 space-y-3">
+            {/* Warning for missing package_info */}
+            {(!shipment.items || shipment.items.length === 0) && (
+              <Alert variant="destructive" className="mb-3">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  <strong>Missing Fulfillment Data:</strong> This shipment was created without item tracking. 
+                  Fulfillment status may be inaccurate. Contact support to backfill this information.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             {/* Package header */}
             {shipments.length > 1 && (
               <div className="font-semibold text-primary mb-2">

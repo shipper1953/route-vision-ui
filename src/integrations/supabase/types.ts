@@ -1347,12 +1347,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      auth_user_company_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      auth_user_company_id: { Args: never; Returns: string }
       auth_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
       calculate_order_fulfillment: {
@@ -1393,7 +1390,7 @@ export type Database = {
         }[]
       }
       get_current_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
       get_user_profile: {
