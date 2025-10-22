@@ -98,29 +98,56 @@ export async function linkShipmentToOrder(
     console.log(`🔗 Creating order_shipments link record for package ${packageMetadata?.packageIndex || 0}...`);
     console.log(`📦 Package metadata items:`, packageMetadata?.items);
     
-    const { error: linkError } = await supabaseClient
-      .from('order_shipments')
-      .insert({
-        order_id: foundOrder.id,
-        shipment_id: finalShipmentId,
-        package_index: packageMetadata?.packageIndex || 0,
-        package_info: packageMetadata ? {
-          boxName: packageMetadata.boxData?.name,
-          boxDimensions: packageMetadata.boxData ? {
-            length: packageMetadata.boxData.length,
-            width: packageMetadata.boxData.width,
-            height: packageMetadata.boxData.height
-          } : null,
-          items: packageMetadata.items || [],
-          weight: packageMetadata.weight
-        } : null
+    let insertAttempts = 0;
+    const maxAttempts = 3;
+    let linkError = null;
+
+    while (insertAttempts < maxAttempts) {
+      insertAttempts++;
+      console.log(`📝 Insert attempt ${insertAttempts} of ${maxAttempts}`);
+      
+      const { error } = await supabaseClient
+        .from('order_shipments')
+        .insert({
+          order_id: foundOrder.id,
+          shipment_id: finalShipmentId,
+          package_index: packageMetadata?.packageIndex || 0,
+          package_info: packageMetadata ? {
+            boxName: packageMetadata.boxData?.name,
+            boxDimensions: packageMetadata.boxData ? {
+              length: packageMetadata.boxData.length,
+              width: packageMetadata.boxData.width,
+              height: packageMetadata.boxData.height
+            } : null,
+            items: packageMetadata.items || [],
+            weight: packageMetadata.weight
+          } : null
+        });
+      
+      if (!error) {
+        console.log(`✅ Created order_shipments link record on attempt ${insertAttempts}`);
+        break;
+      }
+      
+      linkError = error;
+      console.error(`❌ Attempt ${insertAttempts} failed:`, {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
       });
-    
+      
+      if (insertAttempts < maxAttempts) {
+        console.log(`⏳ Waiting 500ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
     if (linkError) {
-      console.error(`❌ Failed to create order_shipments record:`, linkError);
+      console.error(`❌ All ${maxAttempts} attempts failed to create order_shipments record`);
+      console.error(`❌ Final error:`, linkError);
       orderUpdateSuccess = false;
-    } else {
-      console.log(`✅ Created order_shipments link record`);
+      throw new Error(`Failed to create order_shipments record after ${maxAttempts} attempts: ${linkError.message}`);
     }
   } else {
     console.error(`❌ Order ${orderId} not found in database using any strategy`);

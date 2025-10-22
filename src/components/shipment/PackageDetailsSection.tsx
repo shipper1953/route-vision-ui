@@ -6,13 +6,15 @@ interface PackageDetailsSectionProps {
   selectedItems?: any[];
   onItemsSelected?: (items: any[]) => void;
   itemsAlreadyShipped?: Array<{ itemId: string; quantityShipped: number }>;
+  orderId?: string;
 }
 
 export const PackageDetailsSection = ({ 
   orderItems = [],
   selectedItems = [],
   onItemsSelected,
-  itemsAlreadyShipped = []
+  itemsAlreadyShipped = [],
+  orderId
 }: PackageDetailsSectionProps) => {
   return (
     <div className="space-y-6">
@@ -22,6 +24,7 @@ export const PackageDetailsSection = ({
         selectedItems={selectedItems}
         onItemsSelected={onItemsSelected}
         itemsAlreadyShipped={itemsAlreadyShipped}
+        orderId={orderId}
       />
     </div>
   );

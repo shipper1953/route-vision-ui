@@ -9,13 +9,15 @@ interface ShipmentFormTabsProps {
   selectedItems?: any[];
   onItemsSelected?: (items: any[]) => void;
   itemsAlreadyShipped?: Array<{ itemId: string; quantityShipped: number }>;
+  orderId?: string;
 }
 
 export const ShipmentFormTabs = ({ 
-  orderItems = [],
-  selectedItems = [],
-  onItemsSelected,
-  itemsAlreadyShipped = []
+  orderItems = [], 
+  selectedItems = [], 
+  onItemsSelected, 
+  itemsAlreadyShipped = [],
+  orderId 
 }: ShipmentFormTabsProps) => {
   return (
     <Tabs defaultValue="addresses" className="w-full">
@@ -44,6 +46,7 @@ export const ShipmentFormTabs = ({
           selectedItems={selectedItems}
           onItemsSelected={onItemsSelected}
           itemsAlreadyShipped={itemsAlreadyShipped}
+          orderId={orderId}
         />
       </TabsContent>
       

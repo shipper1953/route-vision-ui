@@ -145,6 +145,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
             itemId,
             quantityShipped
           }))}
+          orderId={form.watch('orderId')}
         />
         
         <ShipmentFormSubmission 

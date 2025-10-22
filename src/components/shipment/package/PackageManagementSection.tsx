@@ -31,6 +31,20 @@ interface PackageManagementSectionProps {
   selectedItems?: any[];
   onItemsSelected?: (items: any[]) => void;
   itemsAlreadyShipped?: Array<{ itemId: string; quantityShipped: number }>;
+  orderId?: string;
+}
+
+interface PackageRectangleProps {
+  package: PackageRecommendation;
+  packageIndex: number;
+  totalPackages: number;
+  availableBoxes: any[];
+  orderItems: any[];
+  onBoxChange: (packageIndex: number, boxId: string) => void;
+  onAddItem: (packageIndex: number, item: any) => void;
+  onRemoveItem: (packageIndex: number, itemIndex: number) => void;
+  onDeletePackage: (packageIndex: number) => void;
+  onMoveItem: (fromPackage: number, toPackage: number, itemIndex: number) => void;
 }
 
 interface PackageRectangleProps {
@@ -320,7 +334,8 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   orderItems = [],
   selectedItems = [],
   onItemsSelected,
-  itemsAlreadyShipped = []
+  itemsAlreadyShipped = [],
+  orderId
 }) => {
   const [selectedOrderItems, setSelectedOrderItems] = useState<any[]>([]);
   const form = useFormContext<ShipmentForm>();
@@ -451,6 +466,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
             orderItems={orderItems}
             onItemsSelected={onItemsSelected}
             itemsAlreadyShipped={itemsAlreadyShipped}
+            orderId={orderId}
           />
         )}
         <Card className="border-dashed">
@@ -485,6 +501,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
           orderItems={orderItems}
           onItemsSelected={onItemsSelected}
           itemsAlreadyShipped={itemsAlreadyShipped}
+          orderId={orderId}
         />
       )}
 

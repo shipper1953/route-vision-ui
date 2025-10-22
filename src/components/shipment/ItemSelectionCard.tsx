@@ -7,24 +7,59 @@ import { Label } from "@/components/ui/label";
 import { ShoppingCart, Package, Weight } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SelectedItem } from "@/types/fulfillment";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ItemSelectionCardProps {
   orderItems: any[];
   onItemsSelected: (selectedItems: SelectedItem[]) => void;
   itemsAlreadyShipped?: Array<{ itemId: string; quantityShipped: number }>;
+  orderId?: string | number;
 }
 
 export const ItemSelectionCard = ({ 
   orderItems, 
   onItemsSelected,
-  itemsAlreadyShipped = []
+  itemsAlreadyShipped = [],
+  orderId
 }: ItemSelectionCardProps) => {
   const [localSelection, setLocalSelection] = useState<Map<string, number>>(new Map());
+  const [shippedItemsFromDB, setShippedItemsFromDB] = useState<Map<string, number>>(new Map());
+
+  // Fetch already shipped items from database
+  useEffect(() => {
+    if (!orderId) return;
+    
+    const fetchShippedItems = async () => {
+      const orderIdNum = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
+      const { data: orderShipments } = await supabase
+        .from('order_shipments')
+        .select('package_info')
+        .eq('order_id', orderIdNum);
+      
+      if (orderShipments) {
+        const shippedMap = new Map<string, number>();
+        
+        orderShipments.forEach(os => {
+          const packageInfo = os.package_info as any;
+          if (packageInfo?.items && Array.isArray(packageInfo.items)) {
+            packageInfo.items.forEach((item: any) => {
+              const existing = shippedMap.get(item.itemId) || 0;
+              shippedMap.set(item.itemId, existing + (item.quantity || 0));
+            });
+          }
+        });
+        
+        setShippedItemsFromDB(shippedMap);
+      }
+    };
+    
+    fetchShippedItems();
+  }, [orderId]);
 
   // Calculate remaining quantity for each item
   const getRemainingQuantity = (item: any) => {
-    const shipped = itemsAlreadyShipped.find(s => s.itemId === item.itemId || s.itemId === item.id);
-    const alreadyShipped = shipped?.quantityShipped || 0;
+    const itemKey = item.itemId || item.id;
+    const alreadyShipped = shippedItemsFromDB.get(itemKey) || 0;
     return item.quantity - alreadyShipped;
   };
 
@@ -116,8 +151,7 @@ export const ItemSelectionCard = ({
                 const remaining = getRemainingQuantity(item);
                 const isSelected = localSelection.has(itemKey);
                 const selectedQty = localSelection.get(itemKey) || 0;
-                const shipped = itemsAlreadyShipped.find(s => s.itemId === itemKey);
-                const alreadyShipped = shipped?.quantityShipped || 0;
+                const alreadyShipped = shippedItemsFromDB.get(itemKey) || 0;
 
                 if (remaining <= 0) {
                   return (
