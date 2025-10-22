@@ -34,6 +34,14 @@ export const useShipmentSubmission = ({
       console.log("Form submitted with data:", data);
       console.log("User profile during submission:", userProfile);
       
+      // Validate that items are selected when order is linked
+      if (data.orderId && (!selectedItems || selectedItems.length === 0)) {
+        toast.error("Please select at least one item to ship from the order");
+        return;
+      }
+      
+      console.log("Selected items for shipment:", selectedItems);
+      
       // Validate package dimensions and weight
       if (!validatePackageDimensions(data)) {
         return;

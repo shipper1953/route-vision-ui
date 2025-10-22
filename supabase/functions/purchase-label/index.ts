@@ -436,14 +436,31 @@ serve(async (req) => {
         console.log('🔗 Linking order to shipment...')
         console.log('📦 Selected items for this shipment:', selectedItems)
         
-        // Build packageMetadata properly
+        // Build packageMetadata properly - CRITICAL for fulfillment tracking
         let enhancedMetadata = packageMetadata;
         
-        // If no metadata provided, build it from selectedItems and selectedBox
-        if (!enhancedMetadata && selectedItems && selectedItems.length > 0) {
+        console.log('📦 Initial packageMetadata:', packageMetadata);
+        console.log('📦 Selected items:', selectedItems);
+        console.log('📦 Selected box:', selectedBox);
+        
+        // If no metadata provided OR if items array is empty, build it from selectedItems
+        if ((!enhancedMetadata || !enhancedMetadata.items || enhancedMetadata.items.length === 0) 
+            && selectedItems && selectedItems.length > 0) {
+          
+          console.log('🔧 Building packageMetadata from selectedItems...');
+          
+          // Ensure selectedItems has proper structure
+          const formattedItems = selectedItems.map(item => ({
+            itemId: item.itemId || item.id,
+            name: item.name,
+            sku: item.sku,
+            quantity: item.quantity || 1,
+            dimensions: item.dimensions
+          }));
+          
           enhancedMetadata = {
             packageIndex: 0,
-            items: selectedItems,
+            items: formattedItems,
             boxData: selectedBox ? {
               name: selectedBox.selectedBoxName || selectedBox.boxName || 'Unknown',
               length: parseFloat(selectedBox.length) || 0,
@@ -452,7 +469,8 @@ serve(async (req) => {
             } : null,
             weight: parseFloat(selectedBox?.weight) || 0
           };
-          console.log('📦 Built package metadata from selectedItems:', enhancedMetadata);
+          
+          console.log('✅ Built enhanced metadata:', JSON.stringify(enhancedMetadata, null, 2));
         } else if (enhancedMetadata && selectedItems) {
           // Enhance existing metadata with selectedItems
           enhancedMetadata = {

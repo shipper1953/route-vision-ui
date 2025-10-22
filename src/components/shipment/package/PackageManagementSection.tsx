@@ -462,12 +462,32 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
     return (
       <div className="space-y-6">
         {orderItems.length > 0 && onItemsSelected && (
-          <ItemSelectionCard
-            orderItems={orderItems}
-            onItemsSelected={onItemsSelected}
-            itemsAlreadyShipped={itemsAlreadyShipped}
-            orderId={orderId}
-          />
+          <>
+            {selectedOrderItems.length === 0 && (
+              <Card className="border-primary/50 bg-primary/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <ShoppingCart className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-1">Select Items to Ship</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Please select which items from this order you want to ship below. 
+                        You can select individual items and quantities for partial fulfillment.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            <ItemSelectionCard
+              orderItems={orderItems}
+              onItemsSelected={onItemsSelected}
+              itemsAlreadyShipped={itemsAlreadyShipped}
+              orderId={orderId}
+            />
+          </>
         )}
         <Card className="border-dashed">
           <CardContent className="py-8">

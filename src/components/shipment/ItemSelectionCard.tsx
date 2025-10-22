@@ -31,24 +31,42 @@ export const ItemSelectionCard = ({
     
     const fetchShippedItems = async () => {
       const orderIdNum = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
-      const { data: orderShipments } = await supabase
+      console.log('🔍 Fetching shipped items for order:', orderIdNum);
+      
+      const { data: orderShipments, error } = await supabase
         .from('order_shipments')
         .select('package_info')
         .eq('order_id', orderIdNum);
       
+      if (error) {
+        console.error('❌ Error fetching shipped items:', error);
+        return;
+      }
+      
       if (orderShipments) {
+        console.log('📦 Fetched order_shipments records:', orderShipments.length);
         const shippedMap = new Map<string, number>();
         
         orderShipments.forEach(os => {
+          // Handle NULL package_info gracefully
+          if (!os.package_info) {
+            console.warn('⚠️ order_shipment record has NULL package_info - skipping');
+            return;
+          }
+          
           const packageInfo = os.package_info as any;
           if (packageInfo?.items && Array.isArray(packageInfo.items)) {
+            console.log('📦 Processing items from package_info:', packageInfo.items);
             packageInfo.items.forEach((item: any) => {
               const existing = shippedMap.get(item.itemId) || 0;
               shippedMap.set(item.itemId, existing + (item.quantity || 0));
             });
+          } else {
+            console.warn('⚠️ package_info missing items array:', packageInfo);
           }
         });
         
+        console.log('✅ Shipped items map:', Object.fromEntries(shippedMap));
         setShippedItemsFromDB(shippedMap);
       }
     };

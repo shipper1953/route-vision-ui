@@ -90,6 +90,31 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
     console.log("ShipmentForm - orderItems updated:", orderItems);
   }, [orderItems]);
 
+  // Auto-select all available items when order is loaded
+  useEffect(() => {
+    if (orderItems.length > 0 && selectedItems.length === 0 && orderLookupComplete) {
+      const autoSelectedItems = orderItems
+        .filter(item => {
+          const itemId = item.itemId || item.id;
+          const alreadyShipped = itemsAlreadyShipped[itemId] || 0;
+          const remaining = (item.quantity || 0) - alreadyShipped;
+          return remaining > 0;
+        })
+        .map(item => ({
+          itemId: item.itemId || item.id,
+          name: item.name,
+          sku: item.sku,
+          quantity: (item.quantity || 0) - (itemsAlreadyShipped[item.itemId || item.id] || 0),
+          dimensions: item.dimensions
+        }));
+      
+      if (autoSelectedItems.length > 0) {
+        console.log('Auto-selecting available items:', autoSelectedItems);
+        setSelectedItems(autoSelectedItems);
+      }
+    }
+  }, [orderItems, itemsAlreadyShipped, orderLookupComplete]);
+
   // Fetch items already shipped when orderId changes
   useEffect(() => {
     const fetchShippedItems = async () => {
