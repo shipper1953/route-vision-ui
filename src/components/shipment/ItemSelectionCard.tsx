@@ -27,11 +27,14 @@ export const ItemSelectionCard = ({
 
   // Fetch already shipped items from database
   useEffect(() => {
-    if (!orderId) return;
-    
     const fetchShippedItems = async () => {
+      if (!orderId) {
+        console.log('⏭️ No orderId provided, skipping shipped items fetch');
+        return;
+      }
+      
       const orderIdNum = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
-      console.log('🔍 Fetching shipped items for order:', orderIdNum);
+      console.log('📦 Fetching shipped items for order:', orderIdNum);
       
       const { data: orderShipments, error } = await supabase
         .from('order_shipments')
@@ -43,32 +46,41 @@ export const ItemSelectionCard = ({
         return;
       }
       
-      if (orderShipments) {
-        console.log('📦 Fetched order_shipments records:', orderShipments.length);
-        const shippedMap = new Map<string, number>();
-        
-        orderShipments.forEach(os => {
-          // Handle NULL package_info gracefully
-          if (!os.package_info) {
-            console.warn('⚠️ order_shipment record has NULL package_info - skipping');
-            return;
-          }
-          
-          const packageInfo = os.package_info as any;
-          if (packageInfo?.items && Array.isArray(packageInfo.items)) {
-            console.log('📦 Processing items from package_info:', packageInfo.items);
-            packageInfo.items.forEach((item: any) => {
-              const existing = shippedMap.get(item.itemId) || 0;
-              shippedMap.set(item.itemId, existing + (item.quantity || 0));
-            });
-          } else {
-            console.warn('⚠️ package_info missing items array:', packageInfo);
-          }
-        });
-        
-        console.log('✅ Shipped items map:', Object.fromEntries(shippedMap));
-        setShippedItemsFromDB(shippedMap);
+      if (!orderShipments || orderShipments.length === 0) {
+        console.log('ℹ️ No previous shipments found for order', orderIdNum);
+        return;
       }
+      
+      console.log('📦 Fetched', orderShipments.length, 'order_shipments for order', orderIdNum);
+      const shippedMap = new Map<string, number>();
+      let nullPackageInfoCount = 0;
+      
+      orderShipments.forEach((os, index) => {
+        // Handle NULL package_info gracefully
+        if (!os.package_info) {
+          nullPackageInfoCount++;
+          console.warn(`⚠️ order_shipment record ${index + 1} has NULL package_info - cannot track these items`);
+          return;
+        }
+        
+        const packageInfo = os.package_info as any;
+        if (packageInfo?.items && Array.isArray(packageInfo.items)) {
+          console.log(`✅ Processing package_info from shipment ${index + 1}:`, packageInfo.items.length, 'items');
+          packageInfo.items.forEach((item: any) => {
+            const existing = shippedMap.get(item.itemId) || 0;
+            shippedMap.set(item.itemId, existing + (item.quantity || 0));
+          });
+        } else {
+          console.warn(`⚠️ order_shipment record ${index + 1} has invalid package_info structure:`, packageInfo);
+        }
+      });
+      
+      if (nullPackageInfoCount > 0) {
+        console.warn(`⚠️ ${nullPackageInfoCount} shipment(s) have NULL package_info - partial fulfillment tracking may be inaccurate`);
+      }
+      
+      console.log('📊 Final shipped items map:', Object.fromEntries(shippedMap));
+      setShippedItemsFromDB(shippedMap);
     };
     
     fetchShippedItems();
@@ -153,7 +165,15 @@ export const ItemSelectionCard = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {allItemsShipped && (
+        {orderItems.length === 0 && (
+          <Alert>
+            <AlertDescription>
+              This order has no items available to ship.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {orderItems.length > 0 && allItemsShipped && (
           <Alert>
             <AlertDescription>
               All items in this order have already been shipped.

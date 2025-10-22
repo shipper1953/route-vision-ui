@@ -90,27 +90,45 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
     console.log("ShipmentForm - orderItems updated:", orderItems);
   }, [orderItems]);
 
-  // Auto-select all available items when order is loaded
+  // Auto-select items when order is loaded - CRITICAL: runs early before user can click Get Rates
   useEffect(() => {
+    // Only auto-select if we have items, nothing is currently selected, and order lookup is complete
     if (orderItems.length > 0 && selectedItems.length === 0 && orderLookupComplete) {
+      console.log('🔄 Starting auto-selection for', orderItems.length, 'order items');
+      
+      // Auto-select all items that haven't been fully shipped
       const autoSelectedItems = orderItems
         .filter(item => {
           const itemId = item.itemId || item.id;
           const alreadyShipped = itemsAlreadyShipped[itemId] || 0;
           const remaining = (item.quantity || 0) - alreadyShipped;
-          return remaining > 0;
+          const hasRemaining = remaining > 0;
+          
+          if (!hasRemaining) {
+            console.log(`⏭️ Skipping item ${item.name} (${itemId}): ${alreadyShipped} already shipped`);
+          }
+          
+          return hasRemaining;
         })
-        .map(item => ({
-          itemId: item.itemId || item.id,
-          name: item.name,
-          sku: item.sku,
-          quantity: (item.quantity || 0) - (itemsAlreadyShipped[item.itemId || item.id] || 0),
-          dimensions: item.dimensions
-        }));
+        .map(item => {
+          const itemId = item.itemId || item.id;
+          const alreadyShipped = itemsAlreadyShipped[itemId] || 0;
+          const remainingQty = (item.quantity || 0) - alreadyShipped;
+          
+          return {
+            itemId,
+            name: item.name,
+            sku: item.sku,
+            quantity: remainingQty,
+            dimensions: item.dimensions
+          };
+        });
       
       if (autoSelectedItems.length > 0) {
-        console.log('Auto-selecting available items:', autoSelectedItems);
+        console.log('✅ Auto-selected', autoSelectedItems.length, 'available items:', autoSelectedItems);
         setSelectedItems(autoSelectedItems);
+      } else {
+        console.warn('⚠️ No items available to auto-select - all items may be fully shipped');
       }
     }
   }, [orderItems, itemsAlreadyShipped, orderLookupComplete]);

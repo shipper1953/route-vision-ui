@@ -225,7 +225,29 @@ export class LabelService {
       console.log('Including package metadata in edge function request:', finalPackageMetadata);
     }
 
-    console.log('Calling purchase-label edge function with:', requestBody);
+    // DIAGNOSTIC LOGGING: Log the full request body being sent to edge function
+    console.log('📤 Full request body being sent to edge function:', JSON.stringify(requestBody, null, 2));
+    console.log('📊 Request body summary:', {
+      has_shipmentId: !!requestBody.shipmentId,
+      has_rateId: !!requestBody.rateId,
+      has_orderId: !!requestBody.orderId,
+      has_provider: !!requestBody.provider,
+      has_selectedBox: !!requestBody.selectedBox,
+      has_selectedItems: !!requestBody.selectedItems,
+      selectedItems_length: requestBody.selectedItems?.length || 0,
+      selectedItems_preview: requestBody.selectedItems?.map((item: any) => ({
+        itemId: item.itemId,
+        name: item.name,
+        quantity: item.quantity
+      })) || [],
+      has_packageMetadata: !!requestBody.packageMetadata,
+      packageMetadata_items_length: requestBody.packageMetadata?.items?.length || 0,
+      packageMetadata_items_preview: requestBody.packageMetadata?.items?.map((item: any) => ({
+        itemId: item.itemId,
+        name: item.name,
+        quantity: item.quantity
+      })) || []
+    });
 
     // Always use Supabase functions client to avoid URL/env issues
     const { data, error } = await supabase.functions.invoke('purchase-label', {

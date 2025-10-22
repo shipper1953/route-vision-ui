@@ -31,16 +31,22 @@ export const useShipmentSubmission = ({
   const handleFormSubmit = async () => {
     try {
       const data = form.getValues();
-      console.log("Form submitted with data:", data);
-      console.log("User profile during submission:", userProfile);
+      console.log("📋 Form submitted with data:", data);
+      console.log("👤 User profile during submission:", userProfile);
       
-      // Validate that items are selected when order is linked
-      if (data.orderId && (!selectedItems || selectedItems.length === 0)) {
-        toast.error("Please select at least one item to ship from the order");
-        return;
+      // CRITICAL VALIDATION: Ensure items are selected when order is linked
+      if (data.orderId) {
+        if (!selectedItems || selectedItems.length === 0) {
+          console.error("❌ No items selected for order:", data.orderId);
+          toast.error("Please wait for items to load or select at least one item to ship");
+          setLoading(false);
+          return;
+        }
+        
+        console.log("✅ Selected items validation passed:", selectedItems.length, "items");
       }
       
-      console.log("Selected items for shipment:", selectedItems);
+      console.log("📦 Selected items for shipment:", selectedItems);
       
       // Validate package dimensions and weight
       if (!validatePackageDimensions(data)) {
@@ -122,16 +128,25 @@ export const useShipmentSubmission = ({
         } : null,
       });
 
-      // Store selected box information from form context and build package metadata
+      // CRITICAL: Build selectedBoxData with selectedItems - this is required for partial fulfillment tracking
+      if (!selectedItems || selectedItems.length === 0) {
+        console.error("❌ CRITICAL: selectedItems is empty when building selectedBoxData!");
+        toast.error("Unable to process shipment: items not selected");
+        setLoading(false);
+        return;
+      }
+
+      console.log("📦 Building selectedBoxData with", selectedItems.length, "items");
+
       const selectedBoxData = {
         selectedBoxId: data.selectedBoxId,
         selectedBoxSku: data.selectedBoxSku || data.selectedBoxName,
         selectedBoxName: data.selectedBoxName,
         selectedBoxes: data.selectedBoxes,
-        selectedItems: selectedItems,
+        selectedItems: selectedItems, // CRITICAL: This must be populated
         packageMetadata: {
           packageIndex: 0,
-          items: selectedItems || [],
+          items: selectedItems, // CRITICAL: This must be populated
           boxData: {
             name: data.selectedBoxName || 'Unknown',
             length: data.length || 0,
@@ -141,6 +156,13 @@ export const useShipmentSubmission = ({
           weight: data.weight || 0
         }
       };
+
+      console.log("✅ Built selectedBoxData successfully:", {
+        hasSelectedItems: !!selectedBoxData.selectedItems,
+        selectedItemsCount: selectedBoxData.selectedItems?.length || 0,
+        hasPackageMetadata: !!selectedBoxData.packageMetadata,
+        packageMetadataItemsCount: selectedBoxData.packageMetadata?.items?.length || 0
+      });
 
       toast.success(`Found ${totalRates} rates from multiple providers (EasyPost: ${easyPostCount}, Shippo: ${shippoCount})`);
       onShipmentCreated(response, recommendedRate as any, selectedBoxData);
