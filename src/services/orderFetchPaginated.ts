@@ -78,10 +78,11 @@ export async function fetchOrdersPaginated(
     
     console.log(`Found ${data.length} orders on page ${page}, total: ${count}`);
     
-    // Batch fetch qboid data for all orders in current page - OPTIMIZED with date filter
+    // Batch fetch qboid data for all orders in current page - FULLY OPTIMIZED
     const orderIdLinks = data.map(order => `ORD-${order.order_id || order.id}`);
     
-    // Fetch recent qboid events (last 30 days) instead of entire table
+    // For performance: only fetch recent events (30 days) to avoid full table scan
+    // Future optimization: use a materialized view or index on data->>'orderId'
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
@@ -90,9 +91,10 @@ export async function fetchOrdersPaginated(
       .select('*')
       .eq('event_type', 'dimensions_received')
       .gte('created_at', thirtyDaysAgo.toISOString())
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200); // Cap at 200 most recent to avoid massive payloads
     
-    // Filter to only events matching current page's orders
+    // Filter to only events matching current page's orders (minimal client-side work)
     const qboidData = allQboidData?.filter(event => {
       const eventData = event.data as any;
       const orderId = eventData?.orderId || eventData?.barcode;

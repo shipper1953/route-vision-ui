@@ -30,79 +30,67 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
     throw new Error("User must be authenticated to create orders");
   }
 
-  // Parallelize user profile and warehouse queries
-  const [
-    { data: userProfile, error: profileError },
-    { data: defaultWarehouse, error: warehouseError }
-  ] = await Promise.all([
-    supabase
-      .from('users')
-      .select('company_id, warehouse_ids')
-      .eq('id', user.id)
-      .single(),
-    // Fetch default warehouse in parallel (will use company_id once we have it)
-    Promise.resolve({ data: null, error: null }) // Placeholder, will fetch after getting company_id
-  ]);
+  // Fetch user profile
+  const { data: userProfile, error: profileError } = await supabase
+    .from('users')
+    .select('company_id, warehouse_ids')
+    .eq('id', user.id)
+    .single();
 
   if (profileError || !userProfile?.company_id) {
     throw new Error("User profile not found or not assigned to a company");
   }
 
-  // Use the provided warehouse ID or fall back to user's assigned warehouse or company default
+  // Determine warehouse ID (use provided, user's first, or company default in parallel)
   let finalWarehouseId: string | null = orderData.warehouseId || null;
   
   if (!finalWarehouseId) {
-    // Get warehouse from user's warehouse_ids array - properly handle Json type
     const warehouseIds = Array.isArray(userProfile.warehouse_ids) ? userProfile.warehouse_ids : [];
     finalWarehouseId = warehouseIds.length > 0 ? String(warehouseIds[0]) : null;
   }
 
-  // If still no warehouse, get the default warehouse for the company
-  if (!finalWarehouseId) {
-    const { data: defaultWarehouseData, error: defaultWarehouseError } = await supabase
-      .from('warehouses')
-      .select('id')
-      .eq('company_id', userProfile.company_id)
-      .eq('is_default', true)
-      .maybeSingle();
-    
-    if (!defaultWarehouseError && defaultWarehouseData) {
-      finalWarehouseId = defaultWarehouseData.id;
-      console.log("Using company default warehouse:", finalWarehouseId);
-    }
+  // Parallelize warehouse lookup and order ID generation
+  const [warehouseResult, orderIdResult] = await Promise.all([
+    // Fetch default warehouse only if needed
+    !finalWarehouseId
+      ? supabase
+          .from('warehouses')
+          .select('id')
+          .eq('company_id', userProfile.company_id)
+          .eq('is_default', true)
+          .maybeSingle()
+      : Promise.resolve({ data: { id: finalWarehouseId }, error: null }),
+    // Generate unique order ID in parallel
+    (async () => {
+      let orderId: string;
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      while (attempts < maxAttempts) {
+        orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+        const { data: existingOrder } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('order_id', orderId)
+          .maybeSingle();
+        
+        if (!existingOrder) return orderId;
+        attempts++;
+      }
+      throw new Error("Failed to generate unique order ID after multiple attempts");
+    })()
+  ]);
+
+  if (!warehouseResult.error && warehouseResult.data) {
+    finalWarehouseId = warehouseResult.data.id;
   }
 
   if (!finalWarehouseId) {
     throw new Error("No warehouse available for this user or company. Please contact your administrator to set up a warehouse.");
   }
 
-  // Generate a unique order ID with retry logic
-  let orderId: string;
-  let attempts = 0;
-  const maxAttempts = 10;
-  
-  while (attempts < maxAttempts) {
-    orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
-    
-    // Check if this ID already exists
-    const { data: existingOrder } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('order_id', orderId)
-      .maybeSingle();
-    
-    if (!existingOrder) {
-      // ID is unique, we can use it
-      break;
-    }
-    
-    attempts++;
-    console.log(`Order ID ${orderId} already exists, trying again... (attempt ${attempts}/${maxAttempts})`);
-  }
-  
-  if (attempts >= maxAttempts) {
-    throw new Error("Failed to generate unique order ID after multiple attempts");
-  }
+  const orderId = orderIdResult;
+
 
   // Prepare items data - include both legacy format and detailed items
   const itemsData = orderData.orderItems && orderData.orderItems.length > 0 
@@ -149,10 +137,11 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
 
   console.log("Order created successfully with warehouse:", data.warehouse_id);
 
-  // Calculate and store cartonization data for the new order
-  if (orderData.orderItems && orderData.orderItems.length > 0) {
+  // Calculate and store cartonization data for the new order (only if items have dimensions)
+  if (orderData.orderItems && orderData.orderItems.length > 0 && 
+      orderData.orderItems.some(item => item.dimensions)) {
     try {
-      // Get company boxes for cartonization
+      // Fetch boxes only for cartonization (narrower projection for performance)
       const { data: boxes, error: boxError } = await supabase
         .from('boxes')
         .select('id, name, sku, length, width, height, max_weight, cost, in_stock, min_stock, max_stock, box_type')
@@ -166,26 +155,18 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
         
         // Convert order items to cartonization items
         const items = orderData.orderItems
-          .filter(item => {
-            console.log("Checking item for dimensions:", item);
-            return item.dimensions;
-          })
-          .map(item => {
-            console.log("Converting item to cartonization format:", item);
-            return {
-              id: item.itemId,
-              name: item.name,
-              sku: item.sku,
-              length: item.dimensions!.length,
-              width: item.dimensions!.width,
-              height: item.dimensions!.height,
-              weight: item.dimensions!.weight,
-              quantity: item.quantity,
-              category: 'order_item' as const
-            };
-          });
-
-        console.log("Cartonization items:", items);
+          .filter(item => item.dimensions)
+          .map(item => ({
+            id: item.itemId,
+            name: item.name,
+            sku: item.sku,
+            length: item.dimensions!.length,
+            width: item.dimensions!.width,
+            height: item.dimensions!.height,
+            weight: item.dimensions!.weight,
+            quantity: item.quantity,
+            category: 'order_item' as const
+          }));
 
         if (items.length > 0) {
           const engine = new CartonizationEngine(boxes.map(box => ({
