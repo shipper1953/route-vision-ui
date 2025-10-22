@@ -191,16 +191,38 @@ export class LabelService {
       console.log('Including marked-up cost in edge function request:', markedUpCost);
     }
 
+    // Build package metadata from selectedBoxData if available
+    let finalPackageMetadata = packageMetadata;
+    
+    if (!finalPackageMetadata && selectedBoxData?.packageMetadata) {
+      finalPackageMetadata = selectedBoxData.packageMetadata;
+      console.log('Using package metadata from selectedBoxData:', finalPackageMetadata);
+    } else if (!finalPackageMetadata && selectedItems && selectedItems.length > 0) {
+      // Build it from selectedItems and box data
+      finalPackageMetadata = {
+        packageIndex: 0,
+        items: selectedItems,
+        boxData: selectedBoxData ? {
+          name: selectedBoxData.selectedBoxName || 'Unknown',
+          length: parseFloat(selectedBoxData.length) || 0,
+          width: parseFloat(selectedBoxData.width) || 0,
+          height: parseFloat(selectedBoxData.height) || 0
+        } : null,
+        weight: selectedBoxData?.weight || 0
+      };
+      console.log('Built package metadata from selectedItems:', finalPackageMetadata);
+    }
+
     // Include selected items if provided
     if (selectedItems && selectedItems.length > 0) {
       requestBody.selectedItems = selectedItems;
       console.log('Including selected items in edge function request:', selectedItems);
     }
 
-    // Include package metadata if provided
-    if (packageMetadata) {
-      requestBody.packageMetadata = packageMetadata;
-      console.log('Including package metadata in edge function request:', packageMetadata);
+    // Include package metadata if we have it
+    if (finalPackageMetadata) {
+      requestBody.packageMetadata = finalPackageMetadata;
+      console.log('Including package metadata in edge function request:', finalPackageMetadata);
     }
 
     console.log('Calling purchase-label edge function with:', requestBody);

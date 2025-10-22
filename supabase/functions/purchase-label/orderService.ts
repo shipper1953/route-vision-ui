@@ -78,8 +78,8 @@ export async function linkShipmentToOrder(
       const { error: updateError } = await supabaseClient
         .from('orders')
         .update({ 
-          shipment_id: finalShipmentId,
-          status: 'shipped'
+          shipment_id: finalShipmentId
+          // Don't set status here - let the trigger handle fulfillment status
         })
         .eq('id', foundOrder.id);
       
@@ -91,14 +91,6 @@ export async function linkShipmentToOrder(
       }
     } else {
       console.log(`ℹ️ Order already has shipment_id ${foundOrder.shipment_id}, keeping it`);
-      
-      // Just update status if needed
-      if (foundOrder.status !== 'shipped') {
-        await supabaseClient
-          .from('orders')
-          .update({ status: 'shipped' })
-          .eq('id', foundOrder.id);
-      }
       orderUpdateSuccess = true;
     }
     

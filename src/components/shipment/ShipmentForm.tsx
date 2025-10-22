@@ -9,7 +9,6 @@ import { shipmentSchema, ShipmentForm as ShipmentFormType } from "@/types/shipme
 import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
 import { OrderLookupSection } from "./form/OrderLookupSection";
 import { ShipmentFormSubmission } from "./form/ShipmentFormSubmission";
-import { ShipmentItemSelector } from "./ShipmentItemSelector";
 import { SelectedItem } from "@/types/fulfillment";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -136,17 +135,17 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       />
       
       <form onSubmit={form.handleSubmit(() => {})} className="space-y-8">
-        {/* Show item selector if order has items */}
-        {orderLookupComplete && orderItems.length > 0 && (
-          <ShipmentItemSelector
-            orderItems={orderItems}
-            onItemsSelected={setSelectedItems}
-            selectedItems={selectedItems}
-            itemsAlreadyShipped={itemsAlreadyShipped}
-          />
-        )}
+        {/* Item selection now integrated into Package Details tab */}
         
-        <ShipmentFormTabs orderItems={orderItems} />
+        <ShipmentFormTabs 
+          orderItems={orderItems}
+          selectedItems={selectedItems}
+          onItemsSelected={setSelectedItems}
+          itemsAlreadyShipped={Object.entries(itemsAlreadyShipped).map(([itemId, quantityShipped]) => ({
+            itemId,
+            quantityShipped
+          }))}
+        />
         
         <ShipmentFormSubmission 
           loading={loading}

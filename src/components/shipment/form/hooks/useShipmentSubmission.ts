@@ -114,13 +114,24 @@ export const useShipmentSubmission = ({
         } : null,
       });
 
-      // Store selected box information from form context  
+      // Store selected box information from form context and build package metadata
       const selectedBoxData = {
         selectedBoxId: data.selectedBoxId,
-        selectedBoxSku: data.selectedBoxSku || data.selectedBoxName, // Use name as fallback for SKU
+        selectedBoxSku: data.selectedBoxSku || data.selectedBoxName,
         selectedBoxName: data.selectedBoxName,
         selectedBoxes: data.selectedBoxes,
-        selectedItems: selectedItems // Include selected items
+        selectedItems: selectedItems,
+        packageMetadata: {
+          packageIndex: 0,
+          items: selectedItems || [],
+          boxData: {
+            name: data.selectedBoxName || 'Unknown',
+            length: data.length || 0,
+            width: data.width || 0,
+            height: data.height || 0
+          },
+          weight: data.weight || 0
+        }
       };
 
       toast.success(`Found ${totalRates} rates from multiple providers (EasyPost: ${easyPostCount}, Shippo: ${shippoCount})`);

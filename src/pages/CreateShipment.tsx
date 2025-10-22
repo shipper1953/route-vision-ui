@@ -369,17 +369,29 @@ const CreateShipment = () => {
                 const selectedItems = selectedBoxData?.selectedItems;
                 const result = await purchaseLabel(shipmentId, rateId, selectedBoxData, selectedItems);
                 if (result) {
-                  // Client-side fallback: mark order shipped and link shipment if provided
-                  try {
-                    if (orderId && !isNaN(Number(orderId))) {
-                      const update: any = { status: 'shipped' };
-                      if ((result as any).shipment_id) update.shipment_id = (result as any).shipment_id;
-                      await supabase.from('orders').update(update).eq('id', Number(orderId));
-                    }
-                  } catch (e) {
-                    console.warn('Failed to update order after purchase (client fallback):', e);
-                  }
+                  // Check fulfillment status after label purchase
                   await handleLabelPurchased(result);
+                  
+                  // Show fulfillment feedback
+                  if (orderId) {
+                    try {
+                      const { data: orderData } = await supabase
+                        .from('orders')
+                        .select('fulfillment_status, fulfillment_percentage, items_shipped, items_total')
+                        .eq('id', Number(orderId))
+                        .single();
+                      
+                      if (orderData) {
+                        if (orderData.fulfillment_status === 'fulfilled') {
+                          toast.success(`Order fully fulfilled! All ${orderData.items_total} items shipped.`);
+                        } else if (orderData.fulfillment_status === 'partially_fulfilled') {
+                          toast.info(`Order partially fulfilled: ${orderData.items_shipped}/${orderData.items_total} items shipped (${orderData.fulfillment_percentage?.toFixed(0)}%)`);
+                        }
+                      }
+                    } catch (err) {
+                      console.warn('Failed to fetch fulfillment status:', err);
+                    }
+                  }
                 }
                 return result;
               }}

@@ -436,21 +436,31 @@ serve(async (req) => {
         console.log('🔗 Linking order to shipment...')
         console.log('📦 Selected items for this shipment:', selectedItems)
         
-        // Enhance packageMetadata with selected items if provided
-        const enhancedMetadata = packageMetadata ? {
-          ...packageMetadata,
-          items: selectedItems || packageMetadata.items
-        } : (selectedItems ? {
-          packageIndex: 0,
-          items: selectedItems,
-          boxData: selectedBox ? {
-            name: selectedBox.selectedBoxName,
-            length: selectedBox.length || 0,
-            width: selectedBox.width || 0,
-            height: selectedBox.height || 0
-          } : null,
-          weight: 0
-        } : null);
+        // Build packageMetadata properly
+        let enhancedMetadata = packageMetadata;
+        
+        // If no metadata provided, build it from selectedItems and selectedBox
+        if (!enhancedMetadata && selectedItems && selectedItems.length > 0) {
+          enhancedMetadata = {
+            packageIndex: 0,
+            items: selectedItems,
+            boxData: selectedBox ? {
+              name: selectedBox.selectedBoxName || selectedBox.boxName || 'Unknown',
+              length: parseFloat(selectedBox.length) || 0,
+              width: parseFloat(selectedBox.width) || 0,
+              height: parseFloat(selectedBox.height) || 0
+            } : null,
+            weight: parseFloat(selectedBox?.weight) || 0
+          };
+          console.log('📦 Built package metadata from selectedItems:', enhancedMetadata);
+        } else if (enhancedMetadata && selectedItems) {
+          // Enhance existing metadata with selectedItems
+          enhancedMetadata = {
+            ...enhancedMetadata,
+            items: selectedItems
+          };
+          console.log('📦 Enhanced existing metadata with selectedItems:', enhancedMetadata);
+        }
         
         const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId, enhancedMetadata)
         if (linkSuccess) {

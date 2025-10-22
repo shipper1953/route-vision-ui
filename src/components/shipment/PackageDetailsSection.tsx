@@ -1,27 +1,28 @@
 
-import { useEffect } from "react";
-import { OrderItemsBox } from "./package/OrderItemsBox";
-import { useFormContext } from "react-hook-form";
-import { ShipmentForm } from "@/types/shipment";
 import { PackageManagementSection } from "./package/PackageManagementSection";
 
 interface PackageDetailsSectionProps {
   orderItems?: any[];
+  selectedItems?: any[];
+  onItemsSelected?: (items: any[]) => void;
+  itemsAlreadyShipped?: Array<{ itemId: string; quantityShipped: number }>;
 }
 
-export const PackageDetailsSection = ({ orderItems = [] }: PackageDetailsSectionProps) => {
+export const PackageDetailsSection = ({ 
+  orderItems = [],
+  selectedItems = [],
+  onItemsSelected,
+  itemsAlreadyShipped = []
+}: PackageDetailsSectionProps) => {
   return (
     <div className="space-y-6">
-      {/* Order Items Box */}
-      {orderItems.length > 0 && (
-        <OrderItemsBox 
-          orderItems={orderItems} 
-          onItemsScanned={() => {}} // Scanning is now handled within PackageManagementSection
-        />
-      )}
-
-      {/* New Package Management Section */}
-      <PackageManagementSection orderItems={orderItems} />
+      {/* Package Management Section with integrated item selection */}
+      <PackageManagementSection 
+        orderItems={orderItems}
+        selectedItems={selectedItems}
+        onItemsSelected={onItemsSelected}
+        itemsAlreadyShipped={itemsAlreadyShipped}
+      />
     </div>
   );
 };

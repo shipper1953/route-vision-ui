@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ItemSelectionCard } from '../ItemSelectionCard';
 import { 
   Package, 
   Plus, 
@@ -27,6 +28,9 @@ import { ShipmentForm } from '@/types/shipment';
 
 interface PackageManagementSectionProps {
   orderItems?: any[];
+  selectedItems?: any[];
+  onItemsSelected?: (items: any[]) => void;
+  itemsAlreadyShipped?: Array<{ itemId: string; quantityShipped: number }>;
 }
 
 interface PackageRectangleProps {
@@ -313,8 +317,12 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
 };
 
 export const PackageManagementSection: React.FC<PackageManagementSectionProps> = ({
-  orderItems = []
+  orderItems = [],
+  selectedItems = [],
+  onItemsSelected,
+  itemsAlreadyShipped = []
 }) => {
+  const [selectedOrderItems, setSelectedOrderItems] = useState<any[]>([]);
   const form = useFormContext<ShipmentForm>();
   const { createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
@@ -328,15 +336,22 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
     removePackage,
   } = useMultiPackageCartonization();
 
-  // Initialize cartonization when order items are available
+  // Update selected order items when selection changes
   useEffect(() => {
-    if (orderItems && orderItems.length > 0) {
-      const items = createItemsFromOrderData(orderItems, masterItems);
+    if (selectedItems && selectedItems.length > 0) {
+      setSelectedOrderItems(selectedItems);
+    }
+  }, [selectedItems]);
+
+  // Initialize cartonization when selected items change
+  useEffect(() => {
+    if (selectedOrderItems && selectedOrderItems.length > 0) {
+      const items = createItemsFromOrderData(selectedOrderItems, masterItems);
       if (items.length > 0) {
         calculateMultiPackage(items, 'balanced');
       }
     }
-  }, [orderItems, masterItems, createItemsFromOrderData, calculateMultiPackage]);
+  }, [selectedOrderItems, masterItems, createItemsFromOrderData, calculateMultiPackage]);
 
   // Expose multi-package parcels and selected boxes to the form
   useEffect(() => {
@@ -430,29 +445,49 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
 
   if (!multiPackageResult) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="py-8">
-          <div className="text-center space-y-4">
-            <div className="p-4 bg-muted/20 rounded-full w-fit mx-auto">
-              <Package className="h-8 w-8 text-muted-foreground" />
+      <div className="space-y-6">
+        {orderItems.length > 0 && onItemsSelected && (
+          <ItemSelectionCard
+            orderItems={orderItems}
+            onItemsSelected={onItemsSelected}
+            itemsAlreadyShipped={itemsAlreadyShipped}
+          />
+        )}
+        <Card className="border-dashed">
+          <CardContent className="py-8">
+            <div className="text-center space-y-4">
+              <div className="p-4 bg-muted/20 rounded-full w-fit mx-auto">
+                <Package className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium">Package Management</h3>
+                <p className="text-muted-foreground">
+                  {selectedOrderItems.length > 0 
+                    ? 'Analyzing your items for optimal packaging...' 
+                    : orderItems.length > 0
+                      ? 'Select items above to see packaging recommendations'
+                      : 'Add items to see packaging recommendations'
+                  }
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-medium">Package Management</h3>
-              <p className="text-muted-foreground">
-                {orderItems.length > 0 
-                  ? 'Analyzing your items for optimal packaging...' 
-                  : 'Add items to see packaging recommendations'
-                }
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Item Selection */}
+      {orderItems.length > 0 && onItemsSelected && (
+        <ItemSelectionCard
+          orderItems={orderItems}
+          onItemsSelected={onItemsSelected}
+          itemsAlreadyShipped={itemsAlreadyShipped}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

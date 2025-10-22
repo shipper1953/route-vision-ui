@@ -6,9 +6,17 @@ import { ShippingOptionsSection } from "@/components/shipment/ShippingOptionsSec
 
 interface ShipmentFormTabsProps {
   orderItems?: any[];
+  selectedItems?: any[];
+  onItemsSelected?: (items: any[]) => void;
+  itemsAlreadyShipped?: Array<{ itemId: string; quantityShipped: number }>;
 }
 
-export const ShipmentFormTabs = ({ orderItems = [] }: ShipmentFormTabsProps) => {
+export const ShipmentFormTabs = ({ 
+  orderItems = [],
+  selectedItems = [],
+  onItemsSelected,
+  itemsAlreadyShipped = []
+}: ShipmentFormTabsProps) => {
   return (
     <Tabs defaultValue="addresses" className="w-full">
       <TabsList className="grid w-full grid-cols-3">
@@ -31,7 +39,12 @@ export const ShipmentFormTabs = ({ orderItems = [] }: ShipmentFormTabsProps) => 
       </TabsContent>
       
       <TabsContent value="package" className="space-y-6">
-        <PackageDetailsSection orderItems={orderItems} />
+        <PackageDetailsSection 
+          orderItems={orderItems}
+          selectedItems={selectedItems}
+          onItemsSelected={onItemsSelected}
+          itemsAlreadyShipped={itemsAlreadyShipped}
+        />
       </TabsContent>
       
       <TabsContent value="options" className="space-y-6">
