@@ -9,6 +9,8 @@ interface ShipmentFormSubmissionProps {
   loading: boolean;
   setLoading: (loading: boolean) => void;
   selectedItems?: SelectedItem[];
+  itemsLoading?: boolean;
+  hasOrderId?: boolean;
   onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
 }
 
@@ -16,6 +18,8 @@ export const ShipmentFormSubmission = ({
   loading, 
   setLoading,
   selectedItems,
+  itemsLoading = false,
+  hasOrderId = false,
   onShipmentCreated 
 }: ShipmentFormSubmissionProps) => {
   const { handleFormSubmit } = useShipmentSubmission({
@@ -25,9 +29,16 @@ export const ShipmentFormSubmission = ({
     onShipmentCreated
   });
   
+  const isLoading = loading || (hasOrderId && itemsLoading);
+  
   return (
     <div className="flex justify-end">
-      <RatesActionButton loading={loading} onClick={handleFormSubmit} />
+      <RatesActionButton 
+        loading={isLoading} 
+        onClick={handleFormSubmit}
+      >
+        {itemsLoading && hasOrderId ? "Loading items..." : undefined}
+      </RatesActionButton>
     </div>
   );
 };

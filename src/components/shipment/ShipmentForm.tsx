@@ -23,6 +23,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   const [selectedBoxData, setSelectedBoxData] = useState<any>(null);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [itemsAlreadyShipped, setItemsAlreadyShipped] = useState<{ [itemId: string]: number }>({});
+  const [itemsLoading, setItemsLoading] = useState(false);
   const { getDefaultShippingAddress, warehouseAddress } = useDefaultAddressValues();
   
   const form = useForm<ShipmentFormType>({
@@ -94,6 +95,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   useEffect(() => {
     // Only auto-select if we have items, nothing is currently selected, and order lookup is complete
     if (orderItems.length > 0 && selectedItems.length === 0 && orderLookupComplete) {
+      setItemsLoading(true);
       console.log('🔄 Starting auto-selection for', orderItems.length, 'order items');
       
       // Auto-select all items that haven't been fully shipped
@@ -130,6 +132,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
       } else {
         console.warn('⚠️ No items available to auto-select - all items may be fully shipped');
       }
+      setItemsLoading(false);
     }
   }, [orderItems, itemsAlreadyShipped, orderLookupComplete]);
 
@@ -195,6 +198,8 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
           loading={loading}
           setLoading={setLoading}
           selectedItems={selectedItems}
+          itemsLoading={itemsLoading}
+          hasOrderId={!!form.watch('orderId')}
           onShipmentCreated={(response, selectedRate, boxData) => {
             if (boxData) {
               setSelectedBoxData(boxData);

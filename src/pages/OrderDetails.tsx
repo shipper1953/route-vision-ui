@@ -74,7 +74,7 @@ const OrderDetails = () => {
           <CustomerInfoCard order={order} />
           <OrderInfoCard order={order} />
           <ShippingAddressCard order={order} />
-          {(order.status === 'shipped' || order.status === 'delivered') ? (
+          {(order.status === 'shipped' || order.status === 'delivered' || order.status === 'partially_fulfilled') ? (
             <OrderShipmentsDetailCard order={order} />
           ) : (
             <ShipmentInfoCard order={order} />
