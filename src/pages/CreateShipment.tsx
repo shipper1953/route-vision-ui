@@ -291,7 +291,7 @@ const CreateShipment = () => {
                       
                       // Convert items to selectedItems format if needed
                       const selectedItems = packageItems.map((item: any) => ({
-                        itemId: item.id || item.itemId,
+                        itemId: item.itemId || item.id, // Prioritize real itemId
                         name: item.name,
                         sku: item.sku,
                         quantity: item.quantity,

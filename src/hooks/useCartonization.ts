@@ -142,7 +142,9 @@ export const useCartonization = () => {
         if (masterItem) {
           itemData = {
             id: `order-item-${index}`,
+            itemId: orderItem.itemId, // Preserve real itemId
             name: masterItem.name,
+            sku: orderItem.sku || masterItem.sku, // Preserve SKU
             length: masterItem.length,
             width: masterItem.width,
             height: masterItem.height,
@@ -171,6 +173,8 @@ export const useCartonization = () => {
           
           itemData = {
             id: `order-item-${index}`,
+            itemId: orderItem.itemId, // Preserve real itemId
+            sku: orderItem.sku, // Preserve SKU
             name: itemName,
             length: Number(dimensions.length),
             width: Number(dimensions.width),
@@ -190,6 +194,8 @@ export const useCartonization = () => {
           
           itemData = {
             id: `order-item-${index}`,
+            itemId: orderItem.itemId, // Preserve real itemId
+            sku: orderItem.sku, // Preserve SKU
             name: itemName,
             length: Number(orderItem.length),
             width: Number(orderItem.width),
@@ -256,6 +262,8 @@ export const useCartonization = () => {
           
           itemData = {
             id: `order-item-${index}`,
+            itemId: orderItem.itemId || `synthetic-${index}`, // Preserve real itemId with fallback
+            sku: orderItem.sku || `SKU-${index}`, // Preserve SKU with fallback
             name: itemName,
             length: Math.round(selectedScenario.length * (1 + variation)),
             width: Math.round(selectedScenario.width * (1 + variation)),
