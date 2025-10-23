@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Video, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useShopifySettings } from "@/hooks/useShopifySettings";
 import { ShopifyConnectionCard } from "./ShopifyConnectionCard";
 import { ShopifyOrderSyncSettings } from "./ShopifyOrderSyncSettings";
@@ -18,6 +19,7 @@ interface ShopifyIntegrationSettingsProps {
 }
 
 export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSettingsProps) => {
+  const navigate = useNavigate();
   const { settings, loading, saving, updateSettings, refetch } = useShopifySettings(companyId);
   const [activeTab, setActiveTab] = useState("connection");
   const [hasChanges, setHasChanges] = useState(false);
@@ -61,6 +63,51 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
               settings={settings}
               onRefresh={refetch}
             />
+            
+            <Card className="border-blue-200 bg-blue-50/50">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                      <Video className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Demo & Onboarding Guide</CardTitle>
+                      <CardDescription>
+                        Interactive walkthrough for demonstrations and training
+                      </CardDescription>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Access the step-by-step onboarding page to create screencasts, demos, or train new team members on the Shopify integration workflow.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => navigate('/onboarding')}
+                      className="gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      View Onboarding Guide
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => window.open(`${window.location.origin}/onboarding`, '_blank')}
+                      className="gap-2"
+                    >
+                      Open in New Tab
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    URL for screencasts: <code className="px-1 py-0.5 bg-muted rounded text-xs">{window.location.origin}/onboarding</code>
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
             <PrivacyPolicyCard />
           </div>
         </TabsContent>
