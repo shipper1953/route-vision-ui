@@ -10,6 +10,7 @@ import Index from "@/pages/Index";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import Orders from "@/pages/Orders";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
 
 // Lazy load all other pages for code splitting
 const CreateOrder = lazy(() => import("@/pages/CreateOrder"));
@@ -52,14 +53,18 @@ const router = createBrowserRouter([
     path: "/login",
     element: <Login />,
   },
-  {
-    path: "/signup", 
-    element: <Signup />,
-  },
-  {
-    path: "/orders",
-    element: <Orders />,
-  },
+    {
+      path: "/signup",
+      element: <Signup />,
+    },
+    {
+      path: "/privacy",
+      element: <PrivacyPolicy />,
+    },
+    {
+      path: "/orders",
+      element: <Orders />,
+    },
   {
     path: "/orders/create",
     element: <LazyRoute Component={CreateOrder} />,

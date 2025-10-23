@@ -102,3 +102,12 @@ verify_jwt = false  # Called directly by Shopify redirect
 
 [functions.shopify-webhook]
 verify_jwt = false  # Called directly by Shopify webhooks
+
+[functions.shopify-gdpr-customer-data]
+verify_jwt = false  # Called by Shopify for GDPR compliance
+
+[functions.shopify-gdpr-customer-redact]
+verify_jwt = false  # Called by Shopify for GDPR compliance
+
+[functions.shopify-gdpr-shop-redact]
+verify_jwt = false  # Called by Shopify for GDPR compliance
