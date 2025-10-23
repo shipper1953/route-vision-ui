@@ -28,6 +28,7 @@ const AdminPanel = lazy(() => import("@/pages/AdminPanel"));
 const SuperAdminPanel = lazy(() => import("@/pages/SuperAdminPanel"));
 const CompanyAdminPanel = lazy(() => import("@/pages/CompanyAdminPanel"));
 const GenerateDemoOrders = lazy(() => import("@/pages/GenerateDemoOrders"));
+const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 // Loading component for Suspense fallback
@@ -128,6 +129,10 @@ const router = createBrowserRouter([
   {
     path: "/generate-demo-orders",
     element: <LazyRoute Component={GenerateDemoOrders} />,
+  },
+  {
+    path: "/onboarding",
+    element: <LazyRoute Component={Onboarding} />,
   },
   {
     path: "*",
