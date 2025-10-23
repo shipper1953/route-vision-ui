@@ -74,10 +74,21 @@ serve(async (req) => {
     // Generate webhook secret
     const webhookSecret = crypto.randomUUID();
 
-    // Register webhooks
-    const webhookUrl = `${supabaseUrl}/functions/v1/shopify-webhook`;
-    
+    // Register webhooks with topic-specific routing
     const registerWebhook = async (topic: string) => {
+      // Determine webhook URL based on topic
+      let webhookUrl;
+      if (topic === 'customers/data_request') {
+        webhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-customer-data`;
+      } else if (topic === 'customers/redact') {
+        webhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-customer-redact`;
+      } else if (topic === 'shop/redact') {
+        webhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-shop-redact`;
+      } else {
+        // Default to main webhook handler for order events
+        webhookUrl = `${supabaseUrl}/functions/v1/shopify-webhook`;
+      }
+
       const response = await fetch(
         `https://${shop}/admin/api/2024-01/webhooks.json`,
         {
@@ -97,14 +108,46 @@ serve(async (req) => {
       );
 
       if (!response.ok) {
-        console.error(`Failed to register ${topic} webhook:`, await response.text());
+        const errorText = await response.text();
+        console.error(`Failed to register ${topic} webhook:`, errorText);
+        // Log failure to sync logs
+        await supabase
+          .from('shopify_sync_logs')
+          .insert({
+            company_id: companyId,
+            sync_type: 'webhook_registration',
+            direction: 'outbound',
+            status: 'error',
+            metadata: { topic, error: errorText, webhook_url: webhookUrl },
+          });
       } else {
-        console.log(`Registered ${topic} webhook successfully`);
+        const webhookData = await response.json();
+        console.log(`Registered ${topic} webhook successfully`, webhookData);
+        // Log success to sync logs
+        await supabase
+          .from('shopify_sync_logs')
+          .insert({
+            company_id: companyId,
+            sync_type: 'webhook_registration',
+            direction: 'outbound',
+            status: 'success',
+            metadata: { 
+              topic, 
+              webhook_id: webhookData.webhook?.id,
+              webhook_url: webhookUrl 
+            },
+          });
       }
     };
 
+    // Register order webhooks
     await registerWebhook('orders/create');
     await registerWebhook('orders/updated');
+
+    // Register GDPR compliance webhooks (required for Shopify app approval)
+    await registerWebhook('customers/data_request');
+    await registerWebhook('customers/redact');
+    await registerWebhook('shop/redact');
 
     // Store credentials securely in shopify_credentials table
     const { error: credError } = await supabase
