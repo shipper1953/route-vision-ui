@@ -6,6 +6,43 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+async function verifyShopifyWebhook(body: string, hmacHeader: string | null, shopDomain: string, supabase: any): Promise<boolean> {
+  if (!hmacHeader || !shopDomain) {
+    console.error('Missing HMAC header or shop domain');
+    return false;
+  }
+
+  try {
+    const { data: credentials, error } = await supabase
+      .from('shopify_credentials')
+      .select('webhook_secret')
+      .eq('shop_domain', shopDomain)
+      .single();
+
+    if (error || !credentials?.webhook_secret) {
+      console.error('Could not fetch webhook secret:', error);
+      return false;
+    }
+
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(credentials.webhook_secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+    const base64Hash = btoa(String.fromCharCode(...new Uint8Array(signature)));
+
+    return base64Hash === hmacHeader;
+  } catch (error) {
+    console.error('HMAC verification error:', error);
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -18,7 +55,23 @@ Deno.serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const payload = await req.json();
+    const hmacHeader = req.headers.get('x-shopify-hmac-sha256');
+    const shopDomain = req.headers.get('x-shopify-shop-domain');
+    const rawBody = await req.text();
+
+    // Verify HMAC signature
+    if (shopDomain) {
+      const isValid = await verifyShopifyWebhook(rawBody, hmacHeader, shopDomain, supabase);
+      if (!isValid) {
+        console.error('HMAC verification failed for customer redaction');
+        return new Response(
+          JSON.stringify({ error: 'Invalid webhook signature' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    const payload = JSON.parse(rawBody);
     console.log('Received customer redaction request:', { 
       shop_domain: payload.shop_domain,
       customer_id: payload.customer?.id,
