@@ -6,38 +6,29 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-async function verifyShopifyWebhook(body: string, hmacHeader: string | null, shopDomain: string, supabase: any): Promise<boolean> {
-  if (!hmacHeader || !shopDomain) {
-    console.error('Missing HMAC header or shop domain');
+async function verifyShopifyWebhook(body: string, hmacHeader: string | null): Promise<boolean> {
+  if (!hmacHeader) {
+    console.error('Missing HMAC header');
     return false;
   }
 
   try {
-    const { data: credentials, error } = await supabase
-      .from('shopify_credentials')
-      .select('webhook_secret')
-      .eq('shop_domain', shopDomain)
-      .single();
-
-    if (error || !credentials?.webhook_secret) {
-      console.error('Could not fetch webhook secret:', error);
+    const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
+    if (!apiSecret) {
+      console.error('SHOPIFY_API_SECRET not configured');
       return false;
     }
 
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
-      encoder.encode(credentials.webhook_secret),
+      encoder.encode(apiSecret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['sign']
     );
 
     const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-    const hash = Array.from(new Uint8Array(signature))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-
     const base64Hash = btoa(String.fromCharCode(...new Uint8Array(signature)));
 
     return base64Hash === hmacHeader;
@@ -64,15 +55,13 @@ Deno.serve(async (req) => {
     const rawBody = await req.text();
 
     // Verify HMAC signature
-    if (shopDomain) {
-      const isValid = await verifyShopifyWebhook(rawBody, hmacHeader, shopDomain, supabase);
-      if (!isValid) {
-        console.error('HMAC verification failed for shop redaction');
-        return new Response(
-          JSON.stringify({ error: 'Invalid webhook signature' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    const isValid = await verifyShopifyWebhook(rawBody, hmacHeader);
+    if (!isValid) {
+      console.error('HMAC verification failed for shop redaction');
+      return new Response(
+        JSON.stringify({ error: 'Invalid webhook signature' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const payload = JSON.parse(rawBody);
@@ -91,10 +80,27 @@ Deno.serve(async (req) => {
     }
 
     // Find the company associated with this Shopify domain
+    const { data: credentials, error: credError } = await supabase
+      .from('shopify_credentials')
+      .select('company_id')
+      .eq('store_url', shop_domain)
+      .single();
+
+    if (credError || !credentials) {
+      console.warn('Shopify credentials not found for shop:', shop_domain);
+      return new Response(
+        JSON.stringify({ 
+          message: 'No data found to redact for this shop',
+          shop_domain 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { data: company, error: companyError } = await supabase
       .from('companies')
       .select('id, name')
-      .eq('settings->>shopify_domain', shop_domain)
+      .eq('id', credentials.company_id)
       .single();
 
     if (companyError || !company) {

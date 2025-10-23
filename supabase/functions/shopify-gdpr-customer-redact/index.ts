@@ -6,28 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-async function verifyShopifyWebhook(body: string, hmacHeader: string | null, shopDomain: string, supabase: any): Promise<boolean> {
-  if (!hmacHeader || !shopDomain) {
-    console.error('Missing HMAC header or shop domain');
+async function verifyShopifyWebhook(body: string, hmacHeader: string | null): Promise<boolean> {
+  if (!hmacHeader) {
+    console.error('Missing HMAC header');
     return false;
   }
 
   try {
-    const { data: credentials, error } = await supabase
-      .from('shopify_credentials')
-      .select('webhook_secret')
-      .eq('shop_domain', shopDomain)
-      .single();
-
-    if (error || !credentials?.webhook_secret) {
-      console.error('Could not fetch webhook secret:', error);
+    const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
+    if (!apiSecret) {
+      console.error('SHOPIFY_API_SECRET not configured');
       return false;
     }
 
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
-      encoder.encode(credentials.webhook_secret),
+      encoder.encode(apiSecret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['sign']
@@ -60,15 +55,13 @@ Deno.serve(async (req) => {
     const rawBody = await req.text();
 
     // Verify HMAC signature
-    if (shopDomain) {
-      const isValid = await verifyShopifyWebhook(rawBody, hmacHeader, shopDomain, supabase);
-      if (!isValid) {
-        console.error('HMAC verification failed for customer redaction');
-        return new Response(
-          JSON.stringify({ error: 'Invalid webhook signature' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    const isValid = await verifyShopifyWebhook(rawBody, hmacHeader);
+    if (!isValid) {
+      console.error('HMAC verification failed for customer redaction');
+      return new Response(
+        JSON.stringify({ error: 'Invalid webhook signature' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const payload = JSON.parse(rawBody);
@@ -88,28 +81,30 @@ Deno.serve(async (req) => {
     }
 
     // Find the company associated with this Shopify domain
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('id')
-      .eq('settings->>shopify_domain', shop_domain)
+    const { data: credentials, error: credError } = await supabase
+      .from('shopify_credentials')
+      .select('company_id')
+      .eq('store_url', shop_domain)
       .single();
 
-    if (companyError || !company) {
-      console.warn('Company not found for shop:', shop_domain);
+    if (credError || !credentials) {
+      console.warn('Shopify credentials not found for shop:', shop_domain);
       return new Response(
         JSON.stringify({ 
           message: 'No data found to redact for this customer',
-          customer_email: customer.email 
+          shop_domain 
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const companyId = credentials.company_id;
+
     // Find orders associated with this customer
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('id')
-      .eq('company_id', company.id)
+      .eq('company_id', companyId)
       .or(`customer_email.eq.${customer.email},customer_phone.eq.${customer.phone}`);
 
     if (ordersError) {
@@ -195,7 +190,7 @@ Deno.serve(async (req) => {
 
     // Log the redaction for compliance tracking
     await supabase.from('analytics_events').insert({
-      company_id: company.id,
+      company_id: companyId,
       event_type: 'gdpr_customer_redaction',
       payload: {
         customer_email: customer.email,

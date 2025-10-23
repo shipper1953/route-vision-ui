@@ -45,7 +45,7 @@ serve(async (req) => {
     // Find company by shop domain using shopify_credentials table
     const { data: credentials, error: credError } = await supabase
       .from('shopify_credentials')
-      .select('company_id, webhook_secret, access_token')
+      .select('company_id, access_token')
       .eq('store_url', shopDomain)
       .eq('is_active', true)
       .single();
@@ -63,16 +63,17 @@ serve(async (req) => {
       throw new Error('Missing webhook signature - HMAC header required');
     }
 
-    if (!credentials.webhook_secret) {
-      console.error('Webhook secret not configured for company:', companyId);
+    const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
+    if (!apiSecret) {
+      console.error('SHOPIFY_API_SECRET not configured');
       throw new Error('Webhook secret not configured');
     }
 
-    // Verify HMAC signature
+    // Verify HMAC signature using Shopify API Secret
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
-      encoder.encode(credentials.webhook_secret),
+      encoder.encode(apiSecret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['sign']

@@ -71,9 +71,6 @@ serve(async (req) => {
 
     console.log('Successfully obtained access token');
 
-    // Generate webhook secret
-    const webhookSecret = crypto.randomUUID();
-
     // Register webhooks with topic-specific routing
     const registerWebhook = async (topic: string) => {
       // Determine webhook URL based on topic
@@ -156,7 +153,6 @@ serve(async (req) => {
         company_id: companyId,
         store_url: shop,
         access_token: accessToken,
-        webhook_secret: webhookSecret,
         scopes: ['read_orders', 'write_orders', 'read_products', 'write_products', 'read_inventory', 'write_inventory'],
         connected_at: new Date().toISOString(),
         is_active: true
