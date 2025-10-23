@@ -11,6 +11,7 @@ import { ShopifyInventorySettings } from "./ShopifyInventorySettings";
 import { ShopifyProductSettings } from "./ShopifyProductSettings";
 import { ShopifyAdvancedSettings } from "./ShopifyAdvancedSettings";
 import { ShopifySyncLogViewer } from "./ShopifySyncLogViewer";
+import { PrivacyPolicyCard } from "./PrivacyPolicyCard";
 
 interface ShopifyIntegrationSettingsProps {
   companyId?: string;
@@ -54,11 +55,14 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
         </TabsList>
 
         <TabsContent value="connection">
-          <ShopifyConnectionCard 
-            companyId={companyId} 
-            settings={settings}
-            onRefresh={refetch}
-          />
+          <div className="space-y-6">
+            <ShopifyConnectionCard 
+              companyId={companyId} 
+              settings={settings}
+              onRefresh={refetch}
+            />
+            <PrivacyPolicyCard />
+          </div>
         </TabsContent>
 
         <TabsContent value="orders">
