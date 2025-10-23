@@ -148,7 +148,12 @@ export const useShopifySettings = (companyId?: string) => {
       if (shopifySettings) {
         setSettings({
           ...DEFAULT_SETTINGS,
-          ...shopifySettings,
+          connection: {
+            store_url: shopifySettings.store_url || '',
+            connected: shopifySettings.connected || false,
+            connected_at: shopifySettings.connected_at,
+            last_sync: shopifySettings.last_sync,
+          },
           sync_config: {
             ...DEFAULT_SETTINGS.sync_config,
             ...shopifySettings.sync_config,
