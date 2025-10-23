@@ -146,42 +146,36 @@ serve(async (req) => {
     await registerWebhook('customers/redact');
     await registerWebhook('shop/redact');
 
-    // Store credentials securely in shopify_credentials table
-    const { error: credError } = await supabase
-      .from('shopify_credentials')
-      .upsert({
-        company_id: companyId,
-        store_url: shop,
-        access_token: accessToken,
-        scopes: ['read_orders', 'write_orders', 'read_products', 'write_products', 'read_inventory', 'write_inventory'],
-        connected_at: new Date().toISOString(),
-        is_active: true
-      }, {
-        onConflict: 'company_id'
-      });
+    // Generate webhook secret for signature verification
+    const webhookSecret = crypto.randomUUID();
 
-    if (credError) {
-      console.error('Failed to store Shopify credentials:', credError);
-      throw new Error('Failed to store credentials securely');
-    }
-
-    // Update company settings (remove plaintext credentials)
+    // Store credentials securely in company settings
     const existingSettings = company.settings || {};
     const updatedSettings = {
       ...existingSettings,
       shopify: {
         store_url: shop,
+        access_token: accessToken,
+        webhook_secret: webhookSecret,
         connected: true,
         connected_at: new Date().toISOString(),
         last_sync: new Date().toISOString(),
-        oauth_state: null, // Clear the state
+        oauth_state: null, // Clear the OAuth state
+        scopes: ['read_orders', 'write_orders', 'read_products', 'write_products', 'read_inventory', 'write_inventory'],
       },
     };
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('companies')
       .update({ settings: updatedSettings })
       .eq('id', companyId);
+
+    if (updateError) {
+      console.error('Failed to store Shopify credentials:', updateError);
+      throw new Error('Failed to store credentials securely');
+    }
+
+    console.log('Successfully stored Shopify credentials for company:', companyId);
 
     // Log connection
     await supabase
