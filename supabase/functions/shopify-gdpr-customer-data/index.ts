@@ -73,10 +73,15 @@ Deno.serve(async (req) => {
 
     const { shop_domain, customer, orders_requested } = payload;
 
+    // Handle Shopify webhook verification/test requests
     if (!shop_domain || !customer) {
+      console.log('Received webhook verification or test request');
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: shop_domain or customer' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          message: 'Webhook endpoint is active and ready to receive GDPR requests',
+          status: 'ok'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
