@@ -114,3 +114,6 @@ verify_jwt = false  # Called by Shopify for GDPR compliance
 
 [functions.manual-shopify-sync]
 verify_jwt = false  # Manual admin tool for syncing shipments to Shopify
+
+[functions.shopify-save-credentials]
+verify_jwt = true  # Requires authentication to save Shopify credentials
