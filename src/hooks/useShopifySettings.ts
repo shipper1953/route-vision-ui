@@ -9,6 +9,13 @@ export interface ShopifySettings {
     connected_at?: string;
     last_sync?: string;
   };
+  fulfillment_service?: {
+    id: string;
+    location_id: string;
+    location_name: string;
+    registered_at: string;
+    enabled: boolean;
+  };
   sync_config: {
     orders: {
       enabled: boolean;
@@ -154,6 +161,7 @@ export const useShopifySettings = (companyId?: string) => {
             connected_at: shopifySettings.connected_at,
             last_sync: shopifySettings.last_sync,
           },
+          fulfillment_service: shopifySettings.fulfillment_service,
           sync_config: {
             ...DEFAULT_SETTINGS.sync_config,
             ...shopifySettings.sync_config,

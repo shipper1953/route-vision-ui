@@ -2,7 +2,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { ShopifySettings } from "@/hooks/useShopifySettings";
+import { CheckCircle, AlertCircle } from "lucide-react";
 
 interface ShopifyFulfillmentSettingsProps {
   settings: ShopifySettings;
@@ -30,6 +32,9 @@ export const ShopifyFulfillmentSettings = ({
     });
   };
 
+  const fulfillmentService = settings.fulfillment_service;
+  const isRegistered = !!fulfillmentService?.id;
+
   return (
     <Card>
       <CardHeader>
@@ -39,6 +44,36 @@ export const ShopifyFulfillmentSettings = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Fulfillment Service Status */}
+        <div className="flex items-start justify-between p-4 rounded-lg border bg-muted/50">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Label className="text-base">Fulfillment Service Status</Label>
+              {isRegistered ? (
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle className="h-3 w-3" />
+                  Registered
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Not Registered
+                </Badge>
+              )}
+            </div>
+            {isRegistered ? (
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>Ship Tornado is registered as a fulfillment service in your Shopify store</p>
+                <p className="font-medium">Location: {fulfillmentService.location_name}</p>
+                <p className="text-xs">Registered: {new Date(fulfillmentService.registered_at).toLocaleDateString()}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Fulfillment service registration enables advanced fulfillment features and better partial fulfillment support
+              </p>
+            )}
+          </div>
+        </div>
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Enable Fulfillment Sync</Label>

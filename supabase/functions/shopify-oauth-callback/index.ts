@@ -177,6 +177,30 @@ serve(async (req) => {
 
     console.log('Successfully stored Shopify credentials for company:', companyId);
 
+    // Register Ship Tornado as a fulfillment service
+    console.log('Registering fulfillment service...');
+    try {
+      const fsResponse = await supabase.functions.invoke('shopify-register-fulfillment-service', {
+        body: {
+          companyId,
+          shopifySettings: {
+            store_url: shop,
+            access_token: accessToken,
+          },
+        },
+      });
+
+      if (fsResponse.error) {
+        console.error('Failed to register fulfillment service:', fsResponse.error);
+        // Continue anyway - they can register later
+      } else {
+        console.log('Fulfillment service registered successfully:', fsResponse.data);
+      }
+    } catch (fsError) {
+      console.error('Error registering fulfillment service:', fsError);
+      // Continue anyway - they can register later
+    }
+
     // Log connection
     await supabase
       .from('shopify_sync_logs')

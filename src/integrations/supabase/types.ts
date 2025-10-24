@@ -1023,6 +1023,81 @@ export type Database = {
         }
         Relationships: []
       }
+      shopify_fulfillment_orders: {
+        Row: {
+          assigned_at: string | null
+          assigned_location_id: string | null
+          company_id: string
+          created_at: string | null
+          destination: Json | null
+          fulfilled_at: string | null
+          fulfillment_id: string | null
+          fulfillment_order_id: string
+          fulfillment_order_number: string | null
+          id: string
+          line_items: Json
+          metadata: Json | null
+          request_status: string | null
+          ship_tornado_order_id: number | null
+          shopify_order_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_location_id?: string | null
+          company_id: string
+          created_at?: string | null
+          destination?: Json | null
+          fulfilled_at?: string | null
+          fulfillment_id?: string | null
+          fulfillment_order_id: string
+          fulfillment_order_number?: string | null
+          id?: string
+          line_items?: Json
+          metadata?: Json | null
+          request_status?: string | null
+          ship_tornado_order_id?: number | null
+          shopify_order_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_location_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          destination?: Json | null
+          fulfilled_at?: string | null
+          fulfillment_id?: string | null
+          fulfillment_order_id?: string
+          fulfillment_order_number?: string | null
+          id?: string
+          line_items?: Json
+          metadata?: Json | null
+          request_status?: string | null
+          ship_tornado_order_id?: number | null
+          shopify_order_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_fulfillment_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_fulfillment_orders_ship_tornado_order_id_fkey"
+            columns: ["ship_tornado_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shopify_order_mappings: {
         Row: {
           company_id: string

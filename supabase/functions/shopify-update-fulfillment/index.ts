@@ -12,7 +12,7 @@ async function shopifyGraphQL(
   query: string,
   variables: any = {}
 ) {
-  const apiVersion = '2024-10';
+  const apiVersion = '2025-01';
   const response = await fetch(
     `https://${shopifySettings.store_url}/admin/api/${apiVersion}/graphql.json`,
     {
@@ -44,7 +44,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Parse request body once and store it
   const requestBody = await req.json();
   const { shipmentId, status, trackingNumber, trackingUrl, carrier } = requestBody;
 
@@ -55,7 +54,7 @@ serve(async (req) => {
 
     console.log('Updating Shopify fulfillment:', { shipmentId, status });
 
-    // Find order linked to this shipment with package info
+    // Find order linked to this shipment
     const { data: orderShipment, error: osError } = await supabase
       .from('order_shipments')
       .select('order_id, package_info, package_index')
@@ -75,9 +74,7 @@ serve(async (req) => {
       });
     }
 
-    console.log('Found order_shipment:', orderShipment);
-
-    // Get order details separately
+    // Get order details
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('items, company_id')
@@ -85,474 +82,434 @@ serve(async (req) => {
       .single();
 
     if (orderError) {
-      console.error('Error querying order:', orderError);
       throw new Error(`Failed to query order: ${orderError.message}`);
     }
 
-    console.log('Found order with items:', { orderId: orderShipment.order_id, itemCount: order.items?.length });
-
-    // Enrich order items with Shopify IDs from items table
-    const itemIds = order.items?.map((item: any) => item.itemId).filter(Boolean) || [];
-    let enrichedOrderItems = order.items || [];
-    
-    if (itemIds.length > 0) {
-      const { data: itemDetails } = await supabase
-        .from('items')
-        .select('id, sku, name, shopify_product_id, shopify_variant_id, shopify_product_gid, shopify_variant_gid')
-        .in('id', itemIds);
-
-      if (itemDetails && itemDetails.length > 0) {
-        const itemDetailsMap = new Map(itemDetails.map(item => [item.id, item]));
-        
-        enrichedOrderItems = order.items.map((item: any) => {
-          const details = itemDetailsMap.get(item.itemId);
-          return {
-            ...item,
-            shopify_product_id: details?.shopify_product_id,
-            shopify_variant_id: details?.shopify_variant_id,
-            shopify_product_gid: details?.shopify_product_gid,
-            shopify_variant_gid: details?.shopify_variant_gid
-          };
-        });
-        
-        console.log('Enriched order items with Shopify IDs:', enrichedOrderItems.map((item: any) => ({
-          sku: item.sku,
-          shopify_variant_id: item.shopify_variant_id,
-          shopify_product_id: item.shopify_product_id
-        })));
-      }
-    }
-
-    // Get Shopify mapping
+    // Get Shopify order mapping
     const { data: mapping, error: mappingError } = await supabase
       .from('shopify_order_mappings')
-      .select('*')
+      .select('shopify_order_id')
       .eq('ship_tornado_order_id', orderShipment.order_id)
       .maybeSingle();
 
-    if (mappingError) {
-      console.error('Error querying shopify mapping:', mappingError);
-      throw new Error(`Failed to query shopify mapping: ${mappingError.message}`);
-    }
+    if (mappingError) throw mappingError;
 
     if (!mapping) {
-      console.log('No Shopify mapping found for order - skipping');
-      
-      // Log as skipped
-      await supabase
-        .from('shopify_sync_logs')
-        .insert({
-          company_id: order.company_id,
-          sync_type: 'fulfillment_update',
-          direction: 'outbound',
-          status: 'skipped',
-          ship_tornado_order_id: orderShipment.order_id,
-          error_message: 'Order not imported from Shopify',
-        });
-      
-      return new Response(JSON.stringify({ message: 'No Shopify mapping', skipped: true }), {
+      console.log('No Shopify mapping found for order');
+      return new Response(JSON.stringify({ message: 'Not a Shopify order' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
-    console.log('Found Shopify mapping:', { shopifyOrderId: mapping.shopify_order_id });
-
-    // Get company settings separately
-    const { data: company, error: companyError } = await supabase
+    // Get company Shopify settings
+    const { data: company } = await supabase
       .from('companies')
       .select('settings')
       .eq('id', order.company_id)
       .single();
 
-    if (companyError) {
-      console.error('Error querying company:', companyError);
-      throw new Error(`Failed to query company: ${companyError.message}`);
-    }
-
     const shopifySettings = company?.settings?.shopify;
 
-    if (!shopifySettings || !shopifySettings.connected) {
-      console.log('Shopify not connected');
-      return new Response(JSON.stringify({ message: 'Shopify not connected' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
+    if (!shopifySettings?.access_token) {
+      throw new Error('Shopify not connected');
     }
 
-    // Fetch order line items directly via GraphQL (no fulfillment service required)
-    const orderLineItemsQuery = `
-      query getOrderLineItems($orderId: ID!) {
-        order(id: $orderId) {
-          id
-          name
-          displayFulfillmentStatus
-          displayFinancialStatus
-          fulfillable
-          lineItems(first: 100) {
-            edges {
-              node {
-                id
-                name
-                sku
-                quantity
-                fulfillableQuantity
-                variant {
-                  id
-                }
-                product {
-                  id
-                }
-              }
-            }
-          }
-        }
-      }
-    `;
+    // Extract Shopify order ID (numeric)
+    const shopifyOrderId = mapping.shopify_order_id.split('/').pop();
 
-    console.log('📋 Fetching order line items via GraphQL...');
+    console.log('Processing fulfillment for Shopify order:', shopifyOrderId);
 
-    const orderData = await shopifyGraphQL(shopifySettings, orderLineItemsQuery, {
-      orderId: `gid://shopify/Order/${mapping.shopify_order_id}`
-    });
+    // Check if fulfillment service is registered
+    const hasFulfillmentService = !!shopifySettings.fulfillment_service?.id;
 
-    if (!orderData.order) {
-      throw new Error('Order not found in Shopify');
-    }
-
-    const shopifyOrder = orderData.order;
-    const lineItems = shopifyOrder.lineItems.edges.map(e => e.node);
-
-    console.log('Fetched Shopify order line items:', {
-      orderId: shopifyOrder.id,
-      orderName: shopifyOrder.name,
-      fulfillmentStatus: shopifyOrder.displayFulfillmentStatus,
-      fulfillable: shopifyOrder.fulfillable,
-      lineItemsCount: lineItems.length,
-      totalFulfillableQuantity: lineItems.reduce((sum, li) => sum + li.fulfillableQuantity, 0)
-    });
-
-    // Check if order can be fulfilled
-    if (!shopifyOrder.fulfillable) {
-      console.warn('⚠️ Order is not fulfillable');
-      
-      await supabase.from('shopify_sync_logs').insert({
-        company_id: order.company_id,
-        sync_type: 'fulfillment',
-        direction: 'outbound',
-        status: 'skipped',
-        shopify_order_id: mapping.shopify_order_id,
-        ship_tornado_order_id: orderShipment.order_id,
-        error_message: `Order not fulfillable. Status: ${shopifyOrder.displayFulfillmentStatus}`,
-        metadata: { 
-          fulfillmentStatus: shopifyOrder.displayFulfillmentStatus,
-          reason: 'order_not_fulfillable'
-        }
-      });
-      
-      return new Response(
-        JSON.stringify({ 
-          message: 'Order not fulfillable',
-          orderStatus: shopifyOrder.displayFulfillmentStatus
-        }), 
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
-    }
-
-    if (lineItems.length === 0) {
-      throw new Error('No line items found on order');
-    }
-
-    // Build line items array for fulfillment using direct line items
-    const lineItemsForFulfillment: Array<{ 
-      id: string;  // LineItem GID
-      quantity: number 
-    }> = [];
-
-    if (orderShipment.package_info?.items && Array.isArray(orderShipment.package_info.items)) {
-      // We have item-level tracking - only fulfill items in THIS specific package
-      const shippedItems = orderShipment.package_info.items;
-      
-      // Enrich shipped items with Shopify IDs
-      const enrichedShippedItems = shippedItems.map((si: any) => {
-        const enrichedItem = enrichedOrderItems.find((oi: any) => 
-          oi.sku === si.sku || oi.name === si.name
-        );
-        return {
-          ...si,
-          shopify_variant_id: enrichedItem?.shopify_variant_id,
-          shopify_product_id: enrichedItem?.shopify_product_id,
-          shopify_variant_gid: enrichedItem?.shopify_variant_gid
-        };
-      });
-      
-      console.log('Items in this package:', enrichedShippedItems.map((si: any) => ({
-        sku: si.sku,
-        name: si.name,
-        quantity: si.quantity,
-        shopify_variant_gid: si.shopify_variant_gid
-      })));
-      
-      // Match shipped items to Shopify line items
-      for (const lineItem of lineItems) {
-        // Skip if nothing left to fulfill
-        if (lineItem.fulfillableQuantity === 0) {
-          console.log(`⏭️ Skipping ${lineItem.sku} - already fully fulfilled`);
-          continue;
-        }
-        
-        // Match by variant GID or SKU
-        const variantGid = lineItem.variant?.id;
-        const variantId = variantGid?.split('/').pop();
-        
-        const shippedItem = enrichedShippedItems.find((si: any) => 
-          (si.shopify_variant_gid && si.shopify_variant_gid === variantGid) ||
-          (si.shopify_variant_id && si.shopify_variant_id === variantId) ||
-          (si.sku && si.sku === lineItem.sku)
-        );
-        
-        if (shippedItem) {
-          const qtyToFulfill = Math.min(shippedItem.quantity, lineItem.fulfillableQuantity);
-          
-          lineItemsForFulfillment.push({
-            id: lineItem.id,  // LineItem GID (not FulfillmentOrderLineItem)
-            quantity: qtyToFulfill
-          });
-          
-          console.log(`✅ Matched: ${lineItem.sku} - fulfilling ${qtyToFulfill}/${lineItem.fulfillableQuantity}`);
-        } else {
-          console.log(`⚠️ No match for Shopify item: ${lineItem.sku} (variant ${variantId})`);
-        }
-      }
-    } else {
-      // No item tracking - fulfill all remaining items (legacy)
-      for (const lineItem of lineItems) {
-        if (lineItem.fulfillableQuantity > 0) {
-          lineItemsForFulfillment.push({
-            id: lineItem.id,
-            quantity: lineItem.fulfillableQuantity
-          });
-        }
-      }
-      
-      console.log('No item tracking - fulfilling all remaining line items');
-    }
-
-    // Validate we have items to fulfill
-    if (lineItemsForFulfillment.length === 0) {
-      console.warn('⚠️ No items to fulfill');
-      
-      await supabase.from('shopify_sync_logs').insert({
-        company_id: order.company_id,
-        sync_type: 'fulfillment',
-        direction: 'outbound',
-        status: 'skipped',
-        shopify_order_id: mapping.shopify_order_id,
-        ship_tornado_order_id: orderShipment.order_id,
-        error_message: 'All items already fulfilled or no matching items',
-        metadata: { 
-          shippedItems: orderShipment.package_info?.items?.map((si: any) => ({ sku: si.sku, name: si.name }))
-        }
-      });
-      
-      return new Response(
-        JSON.stringify({ 
-          message: 'No items to fulfill',
-          reason: 'All items already fulfilled or SKUs do not match'
-        }), 
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
-    }
-
-    console.log(`📦 Prepared ${lineItemsForFulfillment.length} line items for fulfillment`);
-
-    // Create fulfillment using legacy mutation (works without fulfillment service)
-    console.log('📤 Creating fulfillment via GraphQL (legacy mutation)');
-
-    const createFulfillmentMutation = `
-      mutation fulfillmentCreate($input: FulfillmentInput!) {
-        fulfillmentCreate(input: $input) {
-          fulfillment {
-            id
-            status
-            createdAt
-            trackingInfo {
-              number
-              url
-              company
-            }
-            fulfillmentLineItems(first: 100) {
-              edges {
-                node {
-                  id
-                  lineItem {
-                    id
-                    sku
-                    name
-                  }
-                  quantity
-                }
-              }
-            }
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
-
-    const fulfillmentInput = {
-      orderId: shopifyOrder.id,
-      lineItems: lineItemsForFulfillment,
-      notifyCustomer: shopifySettings?.fulfillment?.notify_customers ?? true,
-      trackingInfo: {
-        number: trackingNumber || '',
-        url: trackingUrl || '',
-        company: carrier || 'Unknown'
-      }
-    };
-
-    console.log('📦 Fulfillment input:', JSON.stringify(fulfillmentInput, null, 2));
-
-    const fulfillmentResult = await shopifyGraphQL(shopifySettings, createFulfillmentMutation, {
-      input: fulfillmentInput
-    });
-
-    const userErrors = fulfillmentResult.fulfillmentCreate.userErrors;
-    if (userErrors && userErrors.length > 0) {
-      console.error('❌ Shopify validation errors:', userErrors);
-      
-      await supabase.from('shopify_sync_logs').insert({
-        company_id: order.company_id,
-        sync_type: 'fulfillment',
-        direction: 'outbound',
-        status: 'error',
-        shopify_order_id: mapping.shopify_order_id,
-        ship_tornado_order_id: orderShipment.order_id,
-        error_message: `Fulfillment validation failed: ${userErrors.map(e => `${e.field}: ${e.message}`).join(', ')}`,
-        metadata: { trackingNumber, userErrors }
-      });
-      
-      throw new Error(`Fulfillment validation failed: ${userErrors.map(e => `${e.field}: ${e.message}`).join(', ')}`);
-    }
-
-    const fulfillment = fulfillmentResult.fulfillmentCreate.fulfillment;
-    if (!fulfillment) {
-      throw new Error('Fulfillment creation returned no fulfillment object');
-    }
-
-    const fulfillmentId = fulfillment.id.split('/').pop();
-
-    console.log('📥 Shopify fulfillment created:', {
-      fulfillmentId,
-      status: fulfillment.status,
-      createdAt: fulfillment.createdAt,
-      line_items_count: fulfillment.fulfillmentLineItems.edges.length,
-      line_items: fulfillment.fulfillmentLineItems.edges.map(e => ({
-        sku: e.node.lineItem.sku,
-        name: e.node.lineItem.name,
-        quantity: e.node.quantity
-      }))
-    });
-
-    console.log('✅ Successfully created fulfillment:', {
-      fulfillmentId,
-      trackingNumber: fulfillment.trackingInfo?.number,
-      itemsRequested: lineItemsForFulfillment.length,
-      itemsActuallyFulfilled: fulfillment.fulfillmentLineItems.edges.length
-    });
-
-    // Update mapping
-    await supabase
-      .from('shopify_order_mappings')
-      .update({ 
-        last_synced_at: new Date().toISOString(),
-        sync_status: 'synced',
-      })
-      .eq('id', mapping.id);
-
-    // Log success
-    await supabase
-      .from('shopify_sync_logs')
-      .insert({
-        company_id: order.company_id,
-        sync_type: 'fulfillment',
-        direction: 'outbound',
-        status: 'success',
-        shopify_order_id: mapping.shopify_order_id,
-        ship_tornado_order_id: orderShipment.order_id,
-        metadata: { 
-          fulfillmentId,
-          trackingNumber,
-          packageIndex: orderShipment.package_index || 0,
-          itemsFulfilled: lineItemsForFulfillment.length,
-          carrier,
-          service: requestBody.service
-        },
-      });
-
-    console.log('✅ Shopify fulfillment update completed successfully');
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        fulfillmentId,
+    if (hasFulfillmentService) {
+      console.log('✅ Using fulfillment service flow');
+      return await handleFulfillmentServiceFlow(
+        supabase,
+        shopifySettings,
+        orderShipment,
+        order,
+        mapping,
         trackingNumber,
-        itemsFulfilled: lineItemsForFulfillment.length,
-        message: 'Fulfillment created successfully'
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-        status: 200 
-      }
-    );
-
-  } catch (error) {
-    console.error('Fulfillment update error:', error);
-    
-    // Log error using stored request body
-    try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-      const { data: orderShipment } = await supabase
-        .from('order_shipments')
-        .select('order_id')
-        .eq('shipment_id', requestBody.shipmentId)
-        .maybeSingle();
-
-      if (orderShipment) {
-        const { data: order } = await supabase
-          .from('orders')
-          .select('company_id')
-          .eq('id', orderShipment.order_id)
-          .single();
-
-        if (order) {
-          await supabase
-            .from('shopify_sync_logs')
-            .insert({
-              company_id: order.company_id,
-              sync_type: 'fulfillment',
-              direction: 'outbound',
-              status: 'error',
-              ship_tornado_order_id: orderShipment.order_id,
-              error_message: error.message,
-            });
-        }
-      }
-    } catch (logError) {
-      console.error('Error logging failure:', logError);
+        trackingUrl,
+        carrier,
+        shopifyOrderId
+      );
+    } else {
+      console.log('⚠️ Fulfillment service not registered - using legacy flow');
+      return await handleLegacyFlow(
+        supabase,
+        shopifySettings,
+        orderShipment,
+        order,
+        mapping,
+        trackingNumber,
+        trackingUrl,
+        carrier,
+        shopifyOrderId
+      );
     }
 
+  } catch (error: any) {
+    console.error('Error updating Shopify fulfillment:', error);
+    
     return new Response(
       JSON.stringify({ error: error.message }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
+
+// Fulfillment Service Flow - Uses fulfillment orders
+async function handleFulfillmentServiceFlow(
+  supabase: any,
+  shopifySettings: any,
+  orderShipment: any,
+  order: any,
+  mapping: any,
+  trackingNumber: string,
+  trackingUrl: string,
+  carrier: string,
+  shopifyOrderId: string
+) {
+  console.log('Fetching fulfillment order for order:', orderShipment.order_id);
+
+  // Get fulfillment order for this Ship Tornado order
+  const { data: fulfillmentOrders, error: foError } = await supabase
+    .from('shopify_fulfillment_orders')
+    .select('*')
+    .eq('ship_tornado_order_id', orderShipment.order_id)
+    .eq('status', 'open');
+
+  if (foError) {
+    console.error('Error fetching fulfillment orders:', foError);
+    throw new Error(`Failed to fetch fulfillment orders: ${foError.message}`);
+  }
+
+  if (!fulfillmentOrders || fulfillmentOrders.length === 0) {
+    console.warn('No open fulfillment orders found - order may not be assigned yet');
+    
+    await supabase.from('shopify_sync_logs').insert({
+      company_id: order.company_id,
+      sync_type: 'fulfillment',
+      direction: 'outbound',
+      status: 'skipped',
+      shopify_order_id: mapping.shopify_order_id,
+      ship_tornado_order_id: orderShipment.order_id,
+      error_message: 'No open fulfillment orders found',
+      metadata: { reason: 'no_fulfillment_order' }
+    });
+
+    return new Response(
+      JSON.stringify({ message: 'No fulfillment order assigned yet' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
+  }
+
+  const fulfillmentOrder = fulfillmentOrders[0];
+  console.log('Found fulfillment order:', fulfillmentOrder.fulfillment_order_id);
+
+  // Build line items for fulfillment
+  const fulfillmentOrderLineItems: Array<{ id: string; quantity: number }> = [];
+
+  if (orderShipment.package_info?.items && Array.isArray(orderShipment.package_info.items)) {
+    const shippedItems = orderShipment.package_info.items;
+    
+    console.log('Items in this shipment:', shippedItems.map((si: any) => ({
+      sku: si.sku,
+      name: si.name,
+      quantity: si.quantity
+    })));
+
+    // Match shipped items to fulfillment order line items
+    for (const foLineItem of fulfillmentOrder.line_items) {
+      const shippedItem = shippedItems.find((si: any) => 
+        si.itemId === foLineItem.line_item_id?.toString() ||
+        si.sku === foLineItem.sku
+      );
+
+      if (shippedItem) {
+        const qtyToFulfill = Math.min(
+          shippedItem.quantity,
+          foLineItem.fulfillable_quantity || foLineItem.quantity
+        );
+
+        fulfillmentOrderLineItems.push({
+          id: `gid://shopify/FulfillmentOrderLineItem/${foLineItem.id}`,
+          quantity: qtyToFulfill
+        });
+
+        console.log(`✅ Matched: ${foLineItem.sku} - fulfilling ${qtyToFulfill} units`);
+      }
+    }
+  } else {
+    // No item tracking - fulfill all line items
+    for (const foLineItem of fulfillmentOrder.line_items) {
+      fulfillmentOrderLineItems.push({
+        id: `gid://shopify/FulfillmentOrderLineItem/${foLineItem.id}`,
+        quantity: foLineItem.fulfillable_quantity || foLineItem.quantity
+      });
+    }
+  }
+
+  if (fulfillmentOrderLineItems.length === 0) {
+    console.warn('No items to fulfill');
+    return new Response(
+      JSON.stringify({ message: 'No matching items to fulfill' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
+  }
+
+  // Create fulfillment using modern GraphQL mutation
+  const mutation = `
+    mutation fulfillmentCreate($fulfillment: FulfillmentInput!) {
+      fulfillmentCreate(fulfillment: $fulfillment) {
+        fulfillment {
+          id
+          status
+          createdAt
+          trackingInfo {
+            number
+            url
+            company
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    fulfillment: {
+      lineItemsByFulfillmentOrder: [
+        {
+          fulfillmentOrderId: fulfillmentOrder.fulfillment_order_id,
+          fulfillmentOrderLineItems: fulfillmentOrderLineItems
+        }
+      ],
+      trackingInfo: {
+        number: trackingNumber,
+        url: trackingUrl,
+        company: carrier
+      },
+      notifyCustomer: shopifySettings.sync_config?.fulfillment?.notify_customer !== false
+    }
+  };
+
+  console.log('Creating fulfillment with variables:', JSON.stringify(variables, null, 2));
+
+  const result = await shopifyGraphQL(shopifySettings, mutation, variables);
+
+  if (result.fulfillmentCreate.userErrors?.length > 0) {
+    const errors = result.fulfillmentCreate.userErrors;
+    console.error('Fulfillment creation errors:', errors);
+
+    await supabase.from('shopify_sync_logs').insert({
+      company_id: order.company_id,
+      sync_type: 'fulfillment',
+      direction: 'outbound',
+      status: 'error',
+      shopify_order_id: mapping.shopify_order_id,
+      ship_tornado_order_id: orderShipment.order_id,
+      error_message: errors.map((e: any) => e.message).join(', '),
+      metadata: { userErrors: errors }
+    });
+
+    throw new Error(`Fulfillment errors: ${errors.map((e: any) => e.message).join(', ')}`);
+  }
+
+  const fulfillment = result.fulfillmentCreate.fulfillment;
+  console.log('✅ Fulfillment created:', fulfillment.id);
+
+  // Update fulfillment order record
+  await supabase
+    .from('shopify_fulfillment_orders')
+    .update({
+      status: 'in_progress',
+      fulfillment_id: fulfillment.id,
+      fulfilled_at: new Date().toISOString()
+    })
+    .eq('id', fulfillmentOrder.id);
+
+  // Update mapping
+  await supabase
+    .from('shopify_order_mappings')
+    .update({
+      last_synced_at: new Date().toISOString(),
+      sync_status: 'synced',
+      metadata: {
+        last_fulfillment_id: fulfillment.id,
+        last_tracking_number: trackingNumber
+      }
+    })
+    .eq('shopify_order_id', mapping.shopify_order_id);
+
+  // Log success
+  await supabase.from('shopify_sync_logs').insert({
+    company_id: order.company_id,
+    sync_type: 'fulfillment',
+    direction: 'outbound',
+    status: 'success',
+    shopify_order_id: mapping.shopify_order_id,
+    ship_tornado_order_id: orderShipment.order_id,
+    metadata: {
+      fulfillment_id: fulfillment.id,
+      tracking_number: trackingNumber,
+      items_fulfilled: fulfillmentOrderLineItems.length
+    }
+  });
+
+  return new Response(
+    JSON.stringify({ 
+      success: true,
+      fulfillmentId: fulfillment.id,
+      status: fulfillment.status
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+// Legacy Flow - Direct line item fulfillment (fallback)
+async function handleLegacyFlow(
+  supabase: any,
+  shopifySettings: any,
+  orderShipment: any,
+  order: any,
+  mapping: any,
+  trackingNumber: string,
+  trackingUrl: string,
+  carrier: string,
+  shopifyOrderId: string
+) {
+  console.log('Using REST API for fulfillment (legacy)');
+
+  // Fetch order from Shopify REST API
+  const orderResponse = await fetch(
+    `https://${shopifySettings.store_url}/admin/api/2025-01/orders/${shopifyOrderId}.json`,
+    {
+      method: 'GET',
+      headers: {
+        'X-Shopify-Access-Token': shopifySettings.access_token,
+        'Content-Type': 'application/json',
+      }
+    }
+  );
+
+  if (!orderResponse.ok) {
+    throw new Error(`Failed to fetch order: ${orderResponse.status}`);
+  }
+
+  const orderData = await orderResponse.json();
+  const lineItems = orderData.order.line_items;
+
+  console.log('Fetched order line items:', lineItems.length);
+
+  // Build line items for fulfillment
+  const lineItemsForFulfillment: Array<{ id: number; quantity: number }> = [];
+
+  if (orderShipment.package_info?.items && Array.isArray(orderShipment.package_info.items)) {
+    const shippedItems = orderShipment.package_info.items;
+
+    for (const lineItem of lineItems) {
+      const shippedItem = shippedItems.find((si: any) =>
+        si.sku === lineItem.sku || si.name === lineItem.name
+      );
+
+      if (shippedItem) {
+        const remainingQty = lineItem.quantity - (lineItem.fulfilled_quantity || 0);
+        const qtyToFulfill = Math.min(shippedItem.quantity, remainingQty);
+
+        if (qtyToFulfill > 0) {
+          lineItemsForFulfillment.push({
+            id: lineItem.id,
+            quantity: qtyToFulfill
+          });
+        }
+      }
+    }
+  } else {
+    // No item tracking - fulfill all remaining items
+    for (const lineItem of lineItems) {
+      const remainingQty = lineItem.quantity - (lineItem.fulfilled_quantity || 0);
+      if (remainingQty > 0) {
+        lineItemsForFulfillment.push({
+          id: lineItem.id,
+          quantity: remainingQty
+        });
+      }
+    }
+  }
+
+  if (lineItemsForFulfillment.length === 0) {
+    console.warn('No items to fulfill');
+    return new Response(
+      JSON.stringify({ message: 'No items to fulfill' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
+  }
+
+  // Create fulfillment via REST API
+  const fulfillmentPayload = {
+    fulfillment: {
+      line_items: lineItemsForFulfillment,
+      tracking_number: trackingNumber,
+      tracking_url: trackingUrl,
+      tracking_company: carrier,
+      notify_customer: shopifySettings.sync_config?.fulfillment?.notify_customer !== false
+    }
+  };
+
+  console.log('Creating fulfillment (REST):', fulfillmentPayload);
+
+  const fulfillmentResponse = await fetch(
+    `https://${shopifySettings.store_url}/admin/api/2025-01/orders/${shopifyOrderId}/fulfillments.json`,
+    {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': shopifySettings.access_token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(fulfillmentPayload)
+    }
+  );
+
+  if (!fulfillmentResponse.ok) {
+    const errorText = await fulfillmentResponse.text();
+    console.error('Fulfillment creation failed:', errorText);
+    throw new Error(`Failed to create fulfillment: ${errorText}`);
+  }
+
+  const fulfillmentData = await fulfillmentResponse.json();
+  const fulfillment = fulfillmentData.fulfillment;
+
+  console.log('✅ Fulfillment created (REST):', fulfillment.id);
+
+  // Log success
+  await supabase.from('shopify_sync_logs').insert({
+    company_id: order.company_id,
+    sync_type: 'fulfillment',
+    direction: 'outbound',
+    status: 'success',
+    shopify_order_id: mapping.shopify_order_id,
+    ship_tornado_order_id: orderShipment.order_id,
+    metadata: {
+      fulfillment_id: fulfillment.id,
+      tracking_number: trackingNumber,
+      items_fulfilled: lineItemsForFulfillment.length,
+      method: 'rest_api_legacy'
+    }
+  });
+
+  return new Response(
+    JSON.stringify({ 
+      success: true,
+      fulfillmentId: fulfillment.id,
+      method: 'legacy'
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
