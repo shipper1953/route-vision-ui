@@ -10,14 +10,13 @@ interface FulfillmentServiceCallback {
 }
 
 async function fetchAssignedFulfillmentOrders(
-  shopifySettings: { store_url: string; access_token: string },
-  locationId?: string
+  shopifySettings: { store_url: string; access_token: string }
 ) {
   const query = `
     query {
-      fulfillmentOrders(
+      assignedFulfillmentOrders(
         first: 50
-        query: "status:OPEN OR status:IN_PROGRESS"
+        assignmentStatus: FULFILLMENT_REQUESTED
       ) {
         edges {
           node {
@@ -25,18 +24,11 @@ async function fetchAssignedFulfillmentOrders(
             orderId
             status
             requestStatus
-            assignedLocation {
-              location {
-                id
-              }
-            }
             order {
               id
               name
               email
               createdAt
-              displayFinancialStatus
-              displayFulfillmentStatus
               totalPriceSet {
                 shopMoney {
                   amount
@@ -99,9 +91,17 @@ async function fetchAssignedFulfillmentOrders(
                   id
                   lineItem {
                     id
+                    title
+                    sku
+                    name
+                    variant {
+                      id
+                      sku
+                      weight
+                      weightUnit
+                    }
                   }
                   remainingQuantity
-                  inventoryItemId
                 }
               }
             }
@@ -125,7 +125,7 @@ async function fetchAssignedFulfillmentOrders(
   `;
 
   const response = await fetch(
-    `https://${shopifySettings.store_url}/admin/api/2024-01/graphql.json`,
+    `https://${shopifySettings.store_url}/admin/api/2025-01/graphql.json`,
     {
       method: 'POST',
       headers: {
@@ -147,19 +147,54 @@ async function fetchAssignedFulfillmentOrders(
     throw new Error('GraphQL query returned errors');
   }
 
-  const allFulfillmentOrders = result.data.fulfillmentOrders.edges.map((e: any) => e.node);
+  return result.data.assignedFulfillmentOrders.edges.map((e: any) => e.node);
+}
+
+async function acceptFulfillmentOrder(
+  shopifySettings: { store_url: string; access_token: string },
+  fulfillmentOrderId: string,
+  message?: string
+) {
+  const mutation = `
+    mutation fulfillmentOrderAcceptFulfillmentRequest($id: ID!, $message: String) {
+      fulfillmentOrderAcceptFulfillmentRequest(id: $id, message: $message) {
+        fulfillmentOrder {
+          id
+          status
+          requestStatus
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
   
-  // If locationId provided, filter to only those assigned to our location
-  if (locationId) {
-    const targetLocationGid = locationId.includes('gid://') 
-      ? locationId 
-      : `gid://shopify/Location/${locationId}`;
-    return allFulfillmentOrders.filter((fo: any) => 
-      fo.assignedLocation?.location?.id === targetLocationGid
-    );
+  const variables = {
+    id: fulfillmentOrderId,
+    message: message || "Order accepted by Ship Tornado"
+  };
+  
+  const response = await fetch(
+    `https://${shopifySettings.store_url}/admin/api/2025-01/graphql.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifySettings.access_token,
+      },
+      body: JSON.stringify({ query: mutation, variables }),
+    }
+  );
+  
+  const result = await response.json();
+  
+  if (result.errors || result.data?.fulfillmentOrderAcceptFulfillmentRequest?.userErrors?.length > 0) {
+    throw new Error(`Failed to accept fulfillment order: ${JSON.stringify(result.errors || result.data.fulfillmentOrderAcceptFulfillmentRequest.userErrors)}`);
   }
   
-  return allFulfillmentOrders;
+  return result.data.fulfillmentOrderAcceptFulfillmentRequest.fulfillmentOrder;
 }
 
 Deno.serve(async (req) => {
@@ -252,14 +287,11 @@ Deno.serve(async (req) => {
     console.log('🔐 Using query-based authentication (OAuth token validated)');
 
     // Import shared utilities
-    const { ensureItemExists, sanitizeString, addBusinessDays } = await import('../_shared/shopify-item-matcher.ts');
+    const { ensureItemExists, sanitizeString, addBusinessDays } = await import('../../_shared/shopify-item-matcher.ts');
 
     // Query Shopify for fulfillment orders
     console.log('🔍 Querying Shopify for fulfillment orders...');
-    const fulfillmentOrders = await fetchAssignedFulfillmentOrders(
-      shopifySettings,
-      shopifySettings.fulfillment_service_location_id
-    );
+    const fulfillmentOrders = await fetchAssignedFulfillmentOrders(shopifySettings);
 
     console.log(`📦 Found ${fulfillmentOrders.length} fulfillment orders`);
 
@@ -441,9 +473,44 @@ Deno.serve(async (req) => {
         status: fo.status,
         request_status: fo.requestStatus,
         line_items: fo.lineItems.edges.map((e: any) => e.node),
-        assigned_location_id: fo.assignedLocation?.location?.id,
+        assigned_location_id: shopifySettings.fulfillment_service_location_id,
         destination: fo.destination,
       });
+
+      // Accept the fulfillment order in Shopify
+      try {
+        const acceptedFO = await acceptFulfillmentOrder(
+          shopifySettings,
+          fulfillmentOrderId,
+          `Accepted by Ship Tornado - Order ${newOrder.order_id}`
+        );
+        
+        console.log(`✅ Accepted fulfillment order ${fulfillmentOrderId} in Shopify`);
+        console.log(`   Status: ${acceptedFO.status}, Request Status: ${acceptedFO.requestStatus}`);
+        
+        // Update our tracking with the new status
+        await supabase
+          .from('shopify_fulfillment_orders')
+          .update({
+            status: acceptedFO.status,
+            request_status: acceptedFO.requestStatus,
+          })
+          .eq('fulfillment_order_id', fulfillmentOrderId);
+          
+      } catch (acceptError) {
+        console.error(`⚠️  Failed to accept fulfillment order ${fulfillmentOrderId}:`, acceptError);
+        // Log but don't fail - the order was created successfully
+        await supabase.from('shopify_sync_logs').insert({
+          company_id: company.id,
+          sync_type: 'fulfillment_order_acceptance',
+          direction: 'outbound',
+          status: 'error',
+          shopify_order_id: shopifyOrderId,
+          ship_tornado_order_id: newOrder.id,
+          error_message: acceptError.message,
+          metadata: { fulfillment_order_id: fulfillmentOrderId },
+        });
+      }
 
       // Log success
       await supabase.from('shopify_sync_logs').insert({
@@ -465,7 +532,7 @@ Deno.serve(async (req) => {
 
       processedFulfillmentOrderIds.push({
         id: fulfillmentOrderId,
-        status: 'open'
+        status: 'in_progress'
       });
 
       // Check timeout (must respond within 5 seconds)
