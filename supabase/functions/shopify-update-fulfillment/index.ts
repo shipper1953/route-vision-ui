@@ -58,6 +58,36 @@ serve(async (req) => {
 
     console.log('Found order with items:', { orderId: orderShipment.order_id, itemCount: order.items?.length });
 
+    // Enrich order items with Shopify IDs from items table
+    const itemIds = order.items?.map((item: any) => item.itemId).filter(Boolean) || [];
+    let enrichedOrderItems = order.items || [];
+    
+    if (itemIds.length > 0) {
+      const { data: itemDetails } = await supabase
+        .from('items')
+        .select('id, sku, name, shopify_product_id, shopify_variant_id')
+        .in('id', itemIds);
+
+      if (itemDetails && itemDetails.length > 0) {
+        const itemDetailsMap = new Map(itemDetails.map(item => [item.id, item]));
+        
+        enrichedOrderItems = order.items.map((item: any) => {
+          const details = itemDetailsMap.get(item.itemId);
+          return {
+            ...item,
+            shopify_product_id: details?.shopify_product_id,
+            shopify_variant_id: details?.shopify_variant_id
+          };
+        });
+        
+        console.log('Enriched order items with Shopify IDs:', enrichedOrderItems.map((item: any) => ({
+          sku: item.sku,
+          shopify_variant_id: item.shopify_variant_id,
+          shopify_product_id: item.shopify_product_id
+        })));
+      }
+    }
+
     // Get Shopify mapping
     const { data: mapping, error: mappingError } = await supabase
       .from('shopify_order_mappings')
@@ -218,50 +248,78 @@ serve(async (req) => {
     if (orderShipment.package_info?.items && Array.isArray(orderShipment.package_info.items)) {
       // We have item-level tracking - only fulfill items in THIS specific package
       const shippedItems = orderShipment.package_info.items;
-      console.log('Items in this package:', shippedItems.map((si: any) => ({
+      
+      // Enrich shipped items with Shopify IDs
+      const enrichedShippedItems = shippedItems.map((si: any) => {
+        const enrichedItem = enrichedOrderItems.find((oi: any) => 
+          oi.sku === si.sku || oi.name === si.name
+        );
+        return {
+          ...si,
+          shopify_variant_id: enrichedItem?.shopify_variant_id,
+          shopify_product_id: enrichedItem?.shopify_product_id
+        };
+      });
+      
+      console.log('Items in this package with Shopify IDs:', enrichedShippedItems.map((si: any) => ({
         sku: si.sku,
         name: si.name,
-        quantity: si.quantity
+        quantity: si.quantity,
+        shopify_variant_id: si.shopify_variant_id,
+        shopify_product_id: si.shopify_product_id
       })));
       
-      // Match shipped items to fulfillment order line items
+      // Match shipped items to fulfillment order line items using Shopify variant IDs
       lineItemsToFulfill = fulfillmentOrderLineItems
         .filter((foLineItem: any) => {
           // Check if this line item has any quantity left to fulfill
           if (foLineItem.fulfillable_quantity === 0) {
-            console.log(`Skipping line item ${foLineItem.sku} - already fully fulfilled`);
+            console.log(`Skipping line item ${foLineItem.line_item_id} - already fully fulfilled`);
             return false;
           }
           
-          // Match by SKU or name
-          const shippedItem = shippedItems.find((si: any) => 
-            si.sku === foLineItem.sku || 
-            // Fallback: match by comparing with original Shopify line item name
-            shopifyOrder.line_items.some((li: any) => 
-              li.id === foLineItem.line_item_id && 
-              (si.name === li.name || si.name === li.title)
-            )
+          // Find the corresponding Shopify order line item
+          const shopifyLineItem = shopifyOrder.line_items.find((li: any) => li.id === foLineItem.line_item_id);
+          
+          if (!shopifyLineItem) {
+            console.log(`⚠️ Could not find Shopify line item for fulfillment order line item ${foLineItem.line_item_id}`);
+            return false;
+          }
+          
+          // Match by Shopify variant_id (most reliable) or product_id, with SKU fallback
+          const shippedItem = enrichedShippedItems.find((si: any) => 
+            (si.shopify_variant_id && shopifyLineItem.variant_id && 
+             si.shopify_variant_id.toString() === shopifyLineItem.variant_id.toString()) ||
+            (si.shopify_product_id && shopifyLineItem.product_id && 
+             si.shopify_product_id.toString() === shopifyLineItem.product_id.toString()) ||
+            (si.sku && shopifyLineItem.sku && si.sku === shopifyLineItem.sku)
           );
+          
+          if (shippedItem) {
+            console.log(`✅ Matched item by Shopify variant_id: ${shopifyLineItem.variant_id} (${shopifyLineItem.name})`);
+          }
           
           return shippedItem !== undefined;
         })
         .map((foLineItem: any) => {
-          const shippedItem = shippedItems.find((si: any) => 
-            si.sku === foLineItem.sku ||
-            shopifyOrder.line_items.some((li: any) => 
-              li.id === foLineItem.line_item_id && 
-              (si.name === li.name || si.name === li.title)
-            )
+          const shopifyLineItem = shopifyOrder.line_items.find((li: any) => li.id === foLineItem.line_item_id);
+          
+          const shippedItem = enrichedShippedItems.find((si: any) => 
+            (si.shopify_variant_id && shopifyLineItem?.variant_id && 
+             si.shopify_variant_id.toString() === shopifyLineItem.variant_id.toString()) ||
+            (si.shopify_product_id && shopifyLineItem?.product_id && 
+             si.shopify_product_id.toString() === shopifyLineItem.product_id.toString()) ||
+            (si.sku && shopifyLineItem?.sku && si.sku === shopifyLineItem.sku)
           );
           
           // Fulfill the lesser of: shipped quantity OR remaining fulfillable quantity
-          const quantityToFulfill = Math.min(
+          const quantityToFulfill = shippedItem ? Math.min(
             shippedItem.quantity, 
             foLineItem.fulfillable_quantity
-          );
+          ) : foLineItem.fulfillable_quantity;
           
           return {
-            id: foLineItem.id, // This is the fulfillment_order_line_item_id - CORRECT!
+            id: foLineItem.id,
             quantity: quantityToFulfill
           };
         })
