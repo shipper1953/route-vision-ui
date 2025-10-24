@@ -1353,6 +1353,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_business_days: {
+        Args: { days_to_add: number; start_date: string }
+        Returns: string
+      }
       auth_user_company_id: { Args: never; Returns: string }
       auth_user_role: {
         Args: never

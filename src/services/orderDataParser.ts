@@ -26,7 +26,17 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
       unitPrice: item.unitPrice || item.price,
       name: item.name || item.description,
       sku: item.sku,
-      dimensions: item.dimensions
+      // Handle both nested dimensions object and flat dimensions
+      dimensions: item.dimensions || (
+        item.length && item.width && item.height && item.weight
+          ? {
+              length: Number(item.length),
+              width: Number(item.width),
+              height: Number(item.height),
+              weight: Number(item.weight)
+            }
+          : undefined
+      )
     }));
   }
 

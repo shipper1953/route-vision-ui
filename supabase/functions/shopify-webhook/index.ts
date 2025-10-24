@@ -3,6 +3,22 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { ShopifyOrderSchema, sanitizeString } from './validation.ts';
 import { ZodError } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
+// Utility function to add business days (skip weekends)
+function addBusinessDays(startDate: Date, daysToAdd: number): Date {
+  const result = new Date(startDate);
+  let addedDays = 0;
+  
+  while (addedDays < daysToAdd) {
+    result.setDate(result.getDate() + 1);
+    // Skip weekends (0 = Sunday, 6 = Saturday)
+    if (result.getDay() !== 0 && result.getDay() !== 6) {
+      addedDays++;
+    }
+  }
+  
+  return result;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-hmac-sha256, x-shopify-shop-domain, x-shopify-topic',
@@ -316,6 +332,7 @@ serve(async (req) => {
         items: mappedItems,
         value: parseFloat(shopifyOrder.total_price || '0'),
         order_date: shopifyOrder.created_at,
+        required_delivery_date: addBusinessDays(new Date(shopifyOrder.created_at), 5).toISOString().split('T')[0],
         status: 'ready_to_ship',
         company_id: companyId,
         warehouse_id: warehouse?.id || null,
