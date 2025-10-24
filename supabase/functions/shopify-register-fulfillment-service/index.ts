@@ -45,15 +45,20 @@ Deno.serve(async (req) => {
     // Get callback URL for fulfillment order notifications
     const callbackUrl = `${supabaseUrl}/functions/v1/shopify-fulfillment-order-notification`;
 
+    // Generate a secure shared secret for callback verification
+    const sharedSecret = crypto.randomUUID() + crypto.randomUUID();
+    console.log('Generated shared secret for fulfillment service');
+
     // GraphQL mutation to create fulfillment service
     const mutation = `
-      mutation CreateFulfillmentService($callbackUrl: URL!) {
+      mutation CreateFulfillmentService($callbackUrl: URL!, $sharedSecret: String!) {
         fulfillmentServiceCreate(
           name: "Ship Tornado"
           callbackUrl: $callbackUrl
           trackingSupport: true
           inventoryManagement: false
           fulfillmentOrdersOptIn: true
+          sharedSecret: $sharedSecret
         ) {
           fulfillmentService {
             id
@@ -80,7 +85,10 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           query: mutation,
-          variables: { callbackUrl }
+          variables: { 
+            callbackUrl,
+            sharedSecret 
+          }
         }),
       }
     );
@@ -127,6 +135,7 @@ Deno.serve(async (req) => {
           id: fulfillmentService.id,
           location_id: fulfillmentService.location.id,
           location_name: fulfillmentService.location.name,
+          shared_secret: sharedSecret,
           registered_at: new Date().toISOString(),
           enabled: true,
         },

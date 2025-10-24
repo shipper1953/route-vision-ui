@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
     const company = companies[0];
     const shopifySettings = company.settings?.shopify;
 
-    if (!shopifySettings?.access_token || !shopifySettings?.webhook_secret) {
+    if (!shopifySettings?.access_token) {
       console.error('Missing Shopify credentials');
       return new Response(
         JSON.stringify({ error: 'Shopify credentials not configured' }),
@@ -256,9 +256,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify webhook signature
-    if (!verifyShopifyWebhook(body, hmacHeader, shopifySettings.webhook_secret)) {
-      console.error('Invalid webhook signature');
+    // Use fulfillment service shared secret if available, fallback to webhook secret
+    const secretToUse = shopifySettings.fulfillment_service?.shared_secret || shopifySettings.webhook_secret;
+    
+    if (!secretToUse) {
+      console.error('No verification secret configured');
+      return new Response(
+        JSON.stringify({ error: 'Verification secret not configured' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('🔑 Using secret type:', shopifySettings.fulfillment_service?.shared_secret ? 'fulfillment_service' : 'webhook');
+
+    // Verify callback signature
+    if (!verifyShopifyWebhook(body, hmacHeader, secretToUse)) {
+      console.error('Invalid callback signature');
       return new Response(
         JSON.stringify({ error: 'Invalid signature' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
