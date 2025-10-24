@@ -229,26 +229,36 @@ async function handleFulfillmentServiceFlow(
     for (const foLineItem of fulfillmentOrder.line_items) {
       // Try multiple matching strategies
       const shippedItem = shippedItems.find((si: any) => {
-        // Strategy 1: Match by itemId (UUID from items table)
-        if (si.itemId && foLineItem.line_item_id) {
-          if (si.itemId === foLineItem.line_item_id?.toString()) {
-            console.log(`Matched by itemId: ${si.itemId}`);
+        // Strategy 1: Match by Shopify variant ID (most reliable)
+        if (si.shopifyVariantId && foLineItem.variant_id) {
+          const siVariantId = si.shopifyVariantId.toString().replace('gid://shopify/ProductVariant/', '');
+          const foVariantId = foLineItem.variant_id.toString().replace('gid://shopify/ProductVariant/', '');
+          if (siVariantId === foVariantId) {
+            console.log(`✅ Matched by Shopify variant ID: ${siVariantId}`);
             return true;
           }
         }
         
-        // Strategy 2: Match by SKU (most reliable for Shopify)
+        // Strategy 2: Match by SKU
         if (si.sku && foLineItem.sku) {
           if (si.sku === foLineItem.sku) {
-            console.log(`Matched by SKU: ${si.sku}`);
+            console.log(`✅ Matched by SKU: ${si.sku}`);
             return true;
           }
         }
         
-        // Strategy 3: Match by name (fallback)
+        // Strategy 3: Match by itemId (UUID from items table)
+        if (si.itemId && foLineItem.line_item_id) {
+          if (si.itemId === foLineItem.line_item_id?.toString()) {
+            console.log(`✅ Matched by itemId: ${si.itemId}`);
+            return true;
+          }
+        }
+        
+        // Strategy 4: Match by name (fallback)
         if (si.name && foLineItem.name) {
           if (si.name.toLowerCase().trim() === foLineItem.name.toLowerCase().trim()) {
-            console.log(`Matched by name: ${si.name}`);
+            console.log(`✅ Matched by name: ${si.name}`);
             return true;
           }
         }
@@ -267,14 +277,21 @@ async function handleFulfillmentServiceFlow(
           quantity: qtyToFulfill
         });
 
-        console.log(`✅ Matched: ${foLineItem.sku || foLineItem.name} - fulfilling ${qtyToFulfill} units`);
+        console.log(`✅ Will fulfill: ${foLineItem.sku || foLineItem.name} - ${qtyToFulfill} units`);
       } else {
         console.warn(`⚠️ No match found for FO line item:`, {
           id: foLineItem.id,
           sku: foLineItem.sku,
           name: foLineItem.name,
+          variant_id: foLineItem.variant_id,
           line_item_id: foLineItem.line_item_id
         });
+        console.warn(`Available shipped items:`, shippedItems.map((si: any) => ({
+          sku: si.sku,
+          name: si.name,
+          itemId: si.itemId,
+          shopifyVariantId: si.shopifyVariantId
+        })));
       }
     }
   } else {

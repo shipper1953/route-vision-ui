@@ -620,6 +620,38 @@ async function linkShipmentToOrder(
     
     console.log(`🔗 Creating order_shipments link record for package ${packageMetadata?.packageIndex || 0}...`);
     
+    // Enrich items with Shopify variant IDs from items table
+    let enrichedItems = packageMetadata?.items || [];
+    if (enrichedItems.length > 0) {
+      try {
+        console.log('🔍 Fetching Shopify variant IDs for items...');
+        const itemIds = enrichedItems
+          .map((item: any) => item.itemId)
+          .filter((id: any) => id);
+        
+        if (itemIds.length > 0) {
+          const { data: itemsData } = await supabaseClient
+            .from('items')
+            .select('id, shopify_variant_id, shopify_variant_gid')
+            .in('id', itemIds);
+          
+          if (itemsData) {
+            enrichedItems = enrichedItems.map((item: any) => {
+              const itemData = itemsData.find((i: any) => i.id === item.itemId);
+              return {
+                ...item,
+                shopifyVariantId: itemData?.shopify_variant_gid || itemData?.shopify_variant_id || item.shopifyVariantId
+              };
+            });
+            console.log('✅ Enriched items with Shopify variant IDs');
+          }
+        }
+      } catch (enrichError) {
+        console.warn('⚠️ Failed to enrich items with Shopify data:', enrichError);
+        // Continue without enrichment
+      }
+    }
+    
     let insertAttempts = 0;
     const maxAttempts = 3;
     let linkError = null;
@@ -641,7 +673,7 @@ async function linkShipmentToOrder(
               width: packageMetadata.boxData.width,
               height: packageMetadata.boxData.height
             } : null,
-            items: packageMetadata.items || [],
+            items: enrichedItems,
             weight: packageMetadata.weight
           } : null
         });
