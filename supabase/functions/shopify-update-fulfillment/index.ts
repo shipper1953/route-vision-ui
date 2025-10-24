@@ -186,7 +186,7 @@ serve(async (req) => {
         order(id: $orderId) {
           id
           name
-          fulfillmentStatus
+          displayFulfillmentStatus
           displayFinancialStatus
           fulfillmentOrders(first: 10, query: "status:open OR status:in_progress") {
             edges {
@@ -236,7 +236,7 @@ serve(async (req) => {
     });
 
     if (!fulfillment_orders || fulfillment_orders.length === 0) {
-      const fulfillmentStatus = shopifyOrder.fulfillmentStatus;
+      const fulfillmentStatus = shopifyOrder.displayFulfillmentStatus;
       const financialStatus = shopifyOrder.displayFinancialStatus;
       
       console.warn('⚠️ No fulfillment orders found:', {
