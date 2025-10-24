@@ -15,49 +15,167 @@ function verifyShopifyWebhook(body: string, hmacHeader: string, secret: string):
 
 interface FulfillmentServiceCallback {
   kind: 'FULFILLMENT_REQUEST' | 'CANCELLATION_REQUEST' | 'FULFILLMENT_REQUEST_HOLD' | 'FULFILLMENT_REQUEST_RELEASE_HOLD';
-  // Fulfillment order fields are at root level
-  id: number;
-  shop_id: number;
-  order_id: number;
-  assigned_location_id: number;
-  request_status: string;
-  status: string;
-  destination: {
-    id: number;
-    address1: string;
-    address2: string | null;
-    city: string;
-    company: string | null;
-    country: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-    phone: string | null;
-    province: string;
-    zip: string;
-  };
-  line_items: Array<{
-    id: number;
-    shop_id: number;
-    fulfillment_order_id: number;
-    quantity: number;
-    line_item_id: number;
-    inventory_item_id: number;
-    fulfillable_quantity: number;
-    variant_id: number;
-  }>;
-  fulfill_at: string;
-  fulfill_by: string | null;
-  international_duties: any;
-  fulfillment_holds: any[];
-  created_at: string;
-  updated_at: string;
+}
+
+async function fetchAssignedFulfillmentOrders(
+  shopifySettings: { store_url: string; access_token: string },
+  locationId?: string
+) {
+  const query = `
+    query {
+      fulfillmentOrders(
+        first: 50
+        query: "status:OPEN OR status:IN_PROGRESS"
+      ) {
+        edges {
+          node {
+            id
+            orderId
+            status
+            requestStatus
+            assignedLocation {
+              location {
+                id
+              }
+            }
+            order {
+              id
+              name
+              email
+              createdAt
+              displayFinancialStatus
+              displayFulfillmentStatus
+              totalPriceSet {
+                shopMoney {
+                  amount
+                  currencyCode
+                }
+              }
+              customer {
+                id
+                email
+                firstName
+                lastName
+                phone
+              }
+              shippingAddress {
+                firstName
+                lastName
+                company
+                address1
+                address2
+                city
+                provinceCode
+                countryCodeV2
+                zip
+                phone
+              }
+              lineItems(first: 100) {
+                edges {
+                  node {
+                    id
+                    title
+                    quantity
+                    sku
+                    name
+                    vendor
+                    product {
+                      id
+                    }
+                    variant {
+                      id
+                      sku
+                      weight
+                      weightUnit
+                      image {
+                        url
+                      }
+                    }
+                    originalUnitPriceSet {
+                      shopMoney {
+                        amount
+                        currencyCode
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            lineItems(first: 100) {
+              edges {
+                node {
+                  id
+                  lineItem {
+                    id
+                  }
+                  remainingQuantity
+                  inventoryItemId
+                }
+              }
+            }
+            destination {
+              address1
+              address2
+              city
+              province
+              zip
+              countryCode
+              company
+              firstName
+              lastName
+              phone
+              email
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const response = await fetch(
+    `https://${shopifySettings.store_url}/admin/api/2024-01/graphql.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifySettings.access_token,
+      },
+      body: JSON.stringify({ query }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Shopify GraphQL query failed: ${response.status}`);
+  }
+
+  const result = await response.json();
+  
+  if (result.errors) {
+    console.error('GraphQL errors:', result.errors);
+    throw new Error('GraphQL query returned errors');
+  }
+
+  const allFulfillmentOrders = result.data.fulfillmentOrders.edges.map((e: any) => e.node);
+  
+  // If locationId provided, filter to only those assigned to our location
+  if (locationId) {
+    const targetLocationGid = locationId.includes('gid://') 
+      ? locationId 
+      : `gid://shopify/Location/${locationId}`;
+    return allFulfillmentOrders.filter((fo: any) => 
+      fo.assignedLocation?.location?.id === targetLocationGid
+    );
+  }
+  
+  return allFulfillmentOrders;
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const startTime = Date.now();
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -76,30 +194,23 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.text();
-    console.log('Raw webhook body received (first 500 chars):', body.substring(0, 500));
+    console.log('📥 Callback received from:', shopDomain);
+    console.log('Raw body:', body);
+    
     let webhook: FulfillmentServiceCallback;
 
-    // Parse and validate webhook body
+    // Parse callback body
     try {
       webhook = JSON.parse(body);
     } catch (parseError) {
-      console.error('Failed to parse webhook body:', parseError);
+      console.error('Failed to parse callback body:', parseError);
       return new Response(
         JSON.stringify({ error: 'Invalid JSON payload' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Log the parsed structure for debugging
-    console.log('Parsed webhook structure:', {
-      hasKind: !!webhook.kind,
-      kind: webhook.kind,
-      hasId: !!webhook.id,
-      hasOrderId: !!webhook.order_id,
-      topLevelKeys: Object.keys(webhook),
-    });
-
-    // Validate required fields
+    // Validate kind field
     if (!webhook.kind) {
       console.error('Missing "kind" field in callback payload');
       return new Response(
@@ -108,33 +219,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!webhook.id || !webhook.order_id) {
-      console.error('Missing required fields in callback payload');
-      console.log('Full parsed webhook:', JSON.stringify(webhook, null, 2));
-      return new Response(
-        JSON.stringify({ error: 'Missing required fulfillment order fields' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Only handle fulfillment_request kind (case-insensitive)
+    // Only handle fulfillment_request kind
     const normalizedKind = webhook.kind?.toLowerCase();
     if (normalizedKind !== 'fulfillment_request') {
       console.log(`Received callback kind: ${webhook.kind} - not processing`);
       return new Response(
-        JSON.stringify({ message: `Callback kind ${webhook.kind} acknowledged but not processed` }),
+        JSON.stringify({ message: `Callback kind ${webhook.kind} acknowledged` }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Received fulfillment request callback:', {
-      kind: webhook.kind,
-      shop: shopDomain,
-      fulfillmentOrderId: webhook.id,
-      orderId: webhook.order_id,
-      status: webhook.status,
-      requestStatus: webhook.request_status,
-    });
+    console.log('✅ Fulfillment request callback validated');
 
     // Find company by shop domain
     const { data: companies } = await supabase
@@ -153,10 +248,10 @@ Deno.serve(async (req) => {
     const company = companies[0];
     const shopifySettings = company.settings?.shopify;
 
-    if (!shopifySettings?.webhook_secret) {
-      console.error('No webhook secret configured');
+    if (!shopifySettings?.access_token || !shopifySettings?.webhook_secret) {
+      console.error('Missing Shopify credentials');
       return new Response(
-        JSON.stringify({ error: 'Webhook secret not configured' }),
+        JSON.stringify({ error: 'Shopify credentials not configured' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -170,99 +265,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    const shopifyOrderId = `gid://shopify/Order/${webhook.order_id}`;
-    
-    // Check if order already exists
-    const { data: existingMapping } = await supabase
-      .from('shopify_order_mappings')
-      .select('ship_tornado_order_id')
-      .eq('shopify_order_id', shopifyOrderId)
-      .eq('company_id', company.id)
-      .single();
-
-    if (existingMapping) {
-      console.log('Order already synced:', shopifyOrderId);
-      return new Response(
-        JSON.stringify({ message: 'Order already synced' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    console.log('🔐 Signature verified');
 
     // Import shared utilities
-    const { shopifyGraphQL, ensureItemExists, sanitizeString, addBusinessDays } = await import('../_shared/shopify-item-matcher.ts');
+    const { ensureItemExists, sanitizeString, addBusinessDays } = await import('../_shared/shopify-item-matcher.ts');
 
-    // Fetch full order from Shopify GraphQL API
-    const orderQuery = `
-      query getOrder($id: ID!) {
-        order(id: $id) {
-          id
-          name
-          email
-          createdAt
-          totalPriceSet {
-            shopMoney {
-              amount
-              currencyCode
-            }
-          }
-          customer {
-            firstName
-            lastName
-            email
-            phone
-          }
-          lineItems(first: 100) {
-            edges {
-              node {
-                id
-                name
-                quantity
-                sku
-                variant {
-                  id
-                  sku
-                  weight
-                  weightUnit
-                }
-                product {
-                  id
-                  title
-                }
-                originalUnitPriceSet {
-                  shopMoney {
-                    amount
-                  }
-                }
-              }
-            }
-          }
-          shippingAddress {
-            address1
-            address2
-            city
-            province
-            zip
-            country
-            countryCodeV2
-            phone
-            company
-          }
-        }
-      }
-    `;
+    // Query Shopify for fulfillment orders
+    console.log('🔍 Querying Shopify for fulfillment orders...');
+    const fulfillmentOrders = await fetchAssignedFulfillmentOrders(
+      shopifySettings,
+      shopifySettings.fulfillment_service_location_id
+    );
 
-    const orderGid = `gid://shopify/Order/${webhook.order_id}`;
-    const orderResult = await shopifyGraphQL(shopifySettings, orderQuery, { id: orderGid });
+    console.log(`📦 Found ${fulfillmentOrders.length} fulfillment orders`);
 
-    if (!orderResult.data?.order) {
-      console.error('No order data returned from GraphQL');
-      throw new Error('Failed to fetch order from Shopify GraphQL');
-    }
+    const processedFulfillmentOrderIds = [];
 
-    const shopifyOrder = orderResult.data.order;
-    console.log('Fetched order via GraphQL:', shopifyOrder.name);
-
-    // Get default warehouse for company
+    // Get default warehouse
     const { data: warehouse } = await supabase
       .from('warehouses')
       .select('id')
@@ -270,186 +289,218 @@ Deno.serve(async (req) => {
       .eq('is_default', true)
       .single();
 
-    // Match fulfillment line items with GraphQL order line items
-    const fulfillmentLineItemIds = webhook.line_items.map(li => 
-      `gid://shopify/LineItem/${li.line_item_id}`
-    );
-    
-    const orderLineItems = shopifyOrder.lineItems.edges
-      .filter((edge: any) => fulfillmentLineItemIds.includes(edge.node.id))
-      .map((edge: any) => {
-        const node = edge.node;
-        const variantIdNum = node.variant?.id ? parseInt(node.variant.id.split('/').pop()) : null;
-        const productIdNum = node.product?.id ? parseInt(node.product.id.split('/').pop()) : null;
-        
-        return {
-          id: parseInt(node.id.split('/').pop()),
-          name: node.name,
-          sku: node.sku || node.variant?.sku,
-          quantity: node.quantity,
-          price: node.originalUnitPriceSet?.shopMoney?.amount || '0',
+    for (const fo of fulfillmentOrders) {
+      // Check if we've already processed this fulfillment order
+      const fulfillmentOrderId = fo.id;
+      const { data: existing } = await supabase
+        .from('shopify_fulfillment_orders')
+        .select('id')
+        .eq('fulfillment_order_id', fulfillmentOrderId)
+        .eq('company_id', company.id)
+        .single();
+
+      if (existing) {
+        console.log(`⏭️  Fulfillment order ${fulfillmentOrderId} already processed, skipping`);
+        processedFulfillmentOrderIds.push({
+          id: fulfillmentOrderId,
+          status: 'open'
+        });
+        continue;
+      }
+
+      // Extract IDs from GIDs
+      const shopifyOrderId = fo.orderId;
+      const shopifyOrderNumber = fo.order.name;
+      const fulfillmentOrderNumber = fulfillmentOrderId.replace('gid://shopify/FulfillmentOrder/', '');
+
+      console.log(`🔨 Processing fulfillment order ${fulfillmentOrderNumber} for order ${shopifyOrderNumber}`);
+
+      // Process line items using ensureItemExists
+      const processedItems = [];
+      let itemsMatched = 0;
+      let itemsCreated = 0;
+
+      for (const lineItemEdge of fo.order.lineItems.edges) {
+        const lineItem = lineItemEdge.node;
+        const foLineItem = fo.lineItems.edges.find(
+          (fli: any) => fli.node.lineItem.id === lineItem.id
+        )?.node;
+
+        if (!foLineItem || foLineItem.remainingQuantity === 0) {
+          continue;
+        }
+
+        const variantIdNum = lineItem.variant?.id ? 
+          parseInt(lineItem.variant.id.replace('gid://shopify/ProductVariant/', '')) : null;
+        const productIdNum = lineItem.product?.id ? 
+          parseInt(lineItem.product.id.replace('gid://shopify/Product/', '')) : null;
+
+        const lineItemData = {
           variant_id: variantIdNum,
           product_id: productIdNum,
-          grams: node.variant?.weight && node.variant?.weightUnit === 'GRAMS' 
-            ? node.variant.weight 
-            : node.variant?.weight && node.variant?.weightUnit === 'KILOGRAMS'
-            ? node.variant.weight * 1000
+          sku: lineItem.sku || lineItem.variant?.sku,
+          title: lineItem.title,
+          name: lineItem.name,
+          price: lineItem.originalUnitPriceSet?.shopMoney?.amount || '0',
+          quantity: foLineItem.remainingQuantity,
+          grams: lineItem.variant?.weight && lineItem.variant?.weightUnit === 'GRAMS' 
+            ? lineItem.variant.weight 
+            : lineItem.variant?.weight && lineItem.variant?.weightUnit === 'KILOGRAMS'
+            ? lineItem.variant.weight * 1000
             : 0,
         };
-      });
 
-    // Process all line items
-    const mappedItems = [];
-    let itemsMatched = 0;
-    let itemsCreated = 0;
-
-    for (const lineItem of orderLineItems) {
-      const fulfillmentItem = webhook.line_items.find(
-        (fli: any) => fli.line_item_id === lineItem.id
-      );
-
-      try {
-        const { id: itemId, details } = await ensureItemExists(supabase, company.id, lineItem);
-        
-        if (details.shopify_variant_id === lineItem.variant_id?.toString() || 
-            details.shopify_product_id === lineItem.product_id?.toString() ||
-            details.sku === lineItem.sku) {
-          itemsMatched++;
-        } else {
-          itemsCreated++;
+        try {
+          const { id: itemId, details } = await ensureItemExists(supabase, company.id, lineItemData);
+          
+          if (details.shopify_variant_id === variantIdNum?.toString() || 
+              details.shopify_product_id === productIdNum?.toString() ||
+              details.sku === lineItemData.sku) {
+            itemsMatched++;
+          } else {
+            itemsCreated++;
+          }
+          
+          processedItems.push({
+            itemId: itemId,
+            sku: details.sku,
+            name: sanitizeString(lineItem.name, 255),
+            quantity: foLineItem.remainingQuantity,
+            unitPrice: parseFloat(lineItemData.price),
+            length: details.length,
+            width: details.width,
+            height: details.height,
+            weight: details.weight
+          });
+        } catch (error) {
+          console.error(`Failed to process line item:`, error);
+          processedItems.push({
+            sku: sanitizeString(lineItemData.sku || lineItem.name, 100),
+            name: sanitizeString(lineItem.name, 255),
+            quantity: foLineItem.remainingQuantity,
+            unitPrice: parseFloat(lineItemData.price)
+          });
         }
-        
-        mappedItems.push({
-          itemId: itemId,
-          sku: details.sku,
-          name: sanitizeString(lineItem.name, 255),
-          quantity: fulfillmentItem.quantity,
-          unitPrice: parseFloat(lineItem.price),
-          length: details.length,
-          width: details.width,
-          height: details.height,
-          weight: details.weight
-        });
-      } catch (error) {
-        console.error(`Failed to process line item:`, error);
-        mappedItems.push({
-          sku: sanitizeString(lineItem.sku || lineItem.name, 100),
-          name: sanitizeString(lineItem.name, 255),
-          quantity: fulfillmentItem.quantity,
-          unitPrice: parseFloat(lineItem.price)
-        });
       }
-    }
 
-    console.log(`📊 Item processing: ${itemsMatched} matched, ${itemsCreated} created`);
+      console.log(`📊 Item processing: ${itemsMatched} matched, ${itemsCreated} created`);
 
-    // Create Ship Tornado order
-    const orderData = {
-      order_id: sanitizeString(`SHOP-${shopifyOrder.name}`, 50) || 'UNKNOWN',
-      customer_name: sanitizeString(
-        `${shopifyOrder.customer?.firstName || ''} ${shopifyOrder.customer?.lastName || ''}`.trim(),
-        255
-      ) || 'Unknown',
-      customer_email: sanitizeString(shopifyOrder.customer?.email, 255),
-      customer_phone: sanitizeString(shopifyOrder.customer?.phone, 20),
-      customer_company: sanitizeString(shopifyOrder.shippingAddress?.company, 255),
-      shipping_address: {
-        street1: sanitizeString(webhook.destination.address1, 255) || '',
-        street2: sanitizeString(webhook.destination.address2, 255) || '',
-        city: sanitizeString(webhook.destination.city, 100) || '',
-        state: sanitizeString(webhook.destination.province, 10) || '',
-        zip: sanitizeString(webhook.destination.zip, 20) || '',
-        country: sanitizeString(webhook.destination.country, 2) || 'US'
-      },
-      items: mappedItems,
-      value: parseFloat(shopifyOrder.totalPriceSet?.shopMoney?.amount || '0'),
-      order_date: shopifyOrder.createdAt,
-      required_delivery_date: addBusinessDays(new Date(shopifyOrder.createdAt), 5).toISOString().split('T')[0],
-      status: 'ready_to_ship',
-      company_id: company.id,
-      warehouse_id: warehouse?.id || null,
-      user_id: null,
-    };
+      // Create Ship Tornado order
+      const orderData = {
+        order_id: sanitizeString(`SHOP-${shopifyOrderNumber}`, 50) || 'UNKNOWN',
+        customer_name: sanitizeString(
+          `${fo.order.customer?.firstName || ''} ${fo.order.customer?.lastName || ''}`.trim(),
+          255
+        ) || sanitizeString(
+          `${fo.destination.firstName || ''} ${fo.destination.lastName || ''}`.trim(),
+          255
+        ) || 'Unknown',
+        customer_email: sanitizeString(fo.destination.email || fo.order.customer?.email, 255),
+        customer_phone: sanitizeString(fo.destination.phone || fo.order.customer?.phone, 20),
+        customer_company: sanitizeString(fo.destination.company || fo.order.shippingAddress?.company, 255),
+        shipping_address: {
+          street1: sanitizeString(fo.destination.address1, 255) || '',
+          street2: sanitizeString(fo.destination.address2, 255) || '',
+          city: sanitizeString(fo.destination.city, 100) || '',
+          state: sanitizeString(fo.destination.province, 10) || '',
+          zip: sanitizeString(fo.destination.zip, 20) || '',
+          country: sanitizeString(fo.destination.countryCode, 2) || 'US'
+        },
+        items: processedItems,
+        value: parseFloat(fo.order.totalPriceSet?.shopMoney?.amount || '0'),
+        order_date: fo.order.createdAt,
+        required_delivery_date: addBusinessDays(new Date(fo.order.createdAt), 5).toISOString().split('T')[0],
+        status: 'ready_to_ship',
+        company_id: company.id,
+        warehouse_id: warehouse?.id || null,
+        user_id: null,
+      };
 
-    const { data: newOrder, error: orderError } = await supabase
-      .from('orders')
-      .insert(orderData)
-      .select()
-      .single();
+      const { data: newOrder, error: orderError } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single();
 
-    if (orderError) {
-      console.error('Error creating order:', orderError);
-      throw orderError;
-    }
+      if (orderError) {
+        console.error('Error creating order:', orderError);
+        // Log error but continue processing other orders
+        await supabase.from('shopify_sync_logs').insert({
+          company_id: company.id,
+          sync_type: 'fulfillment_order_notification',
+          direction: 'inbound',
+          status: 'error',
+          shopify_order_id: shopifyOrderId,
+          error_message: orderError.message,
+          metadata: { fulfillment_order_id: fulfillmentOrderId },
+        });
+        continue;
+      }
 
-    console.log('Created order:', newOrder.id);
+      console.log(`✅ Created Ship Tornado order ${newOrder.id}`);
 
-    // Create mapping
-    await supabase
-      .from('shopify_order_mappings')
-      .insert({
+      // Create mappings
+      await supabase.from('shopify_order_mappings').insert({
         company_id: company.id,
         ship_tornado_order_id: newOrder.id,
         shopify_order_id: shopifyOrderId,
-        shopify_order_number: shopifyOrder.name,
+        shopify_order_number: shopifyOrderNumber,
         sync_status: 'synced',
       });
 
-    // Store fulfillment order
-    const { error: insertError } = await supabase
-      .from('shopify_fulfillment_orders')
-      .insert({
+      await supabase.from('shopify_fulfillment_orders').insert({
         company_id: company.id,
         ship_tornado_order_id: newOrder.id,
         shopify_order_id: shopifyOrderId,
-        fulfillment_order_id: `gid://shopify/FulfillmentOrder/${webhook.id}`,
-        fulfillment_order_number: webhook.id.toString(),
-        status: webhook.status,
-        request_status: webhook.request_status,
-        line_items: webhook.line_items,
-        assigned_location_id: `gid://shopify/Location/${webhook.assigned_location_id}`,
-        destination: webhook.destination,
+        fulfillment_order_id: fulfillmentOrderId,
+        fulfillment_order_number: fulfillmentOrderNumber,
+        status: fo.status,
+        request_status: fo.requestStatus,
+        line_items: fo.lineItems.edges.map((e: any) => e.node),
+        assigned_location_id: fo.assignedLocation?.location?.id,
+        destination: fo.destination,
+      });
+
+      // Log success
+      await supabase.from('shopify_sync_logs').insert({
+        company_id: company.id,
+        sync_type: 'fulfillment_order_notification',
+        direction: 'inbound',
+        status: 'success',
+        shopify_order_id: shopifyOrderId,
+        ship_tornado_order_id: newOrder.id,
         metadata: {
-          fulfill_at: webhook.fulfill_at,
-          fulfill_by: webhook.fulfill_by,
+          fulfillment_order_id: fulfillmentOrderId,
+          request_status: fo.requestStatus,
+          status: fo.status,
+          line_item_count: fo.lineItems.edges.length,
+          items_matched: itemsMatched,
+          items_created: itemsCreated,
         },
       });
 
-    if (insertError) {
-      console.error('Error inserting fulfillment order:', insertError);
+      processedFulfillmentOrderIds.push({
+        id: fulfillmentOrderId,
+        status: 'open'
+      });
+
+      // Check timeout (must respond within 5 seconds)
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 4000) {
+        console.warn(`⏱️  Timeout approaching (${elapsed}ms), stopping processing`);
+        break;
+      }
     }
 
-    // Log success
-    await supabase.from('shopify_sync_logs').insert({
-      company_id: company.id,
-      sync_type: 'fulfillment_order_notification',
-      direction: 'inbound',
-      status: 'success',
-      shopify_order_id: shopifyOrderId,
-      ship_tornado_order_id: newOrder.id,
-      metadata: {
-        fulfillment_order_id: webhook.id,
-        request_status: webhook.request_status,
-        status: webhook.status,
-        line_item_count: webhook.line_items.length,
-        items_matched: itemsMatched,
-        items_created: itemsCreated,
-      },
-    });
+    const elapsed = Date.now() - startTime;
+    console.log(`✅ Processed ${processedFulfillmentOrderIds.length} fulfillment orders in ${elapsed}ms`);
 
-    // Respond to Shopify with acceptance (MUST respond within 5 seconds)
-    const response = {
-      fulfillment_order: {
-        id: `gid://shopify/FulfillmentOrder/${webhook.id}`,
-        status: 'open'
-      },
-      message: 'Accepted - Ship Tornado will fulfill this order'
-    };
-
-    console.log('Fulfillment order accepted:', webhook.id);
-
+    // Respond to Shopify with acceptance
     return new Response(
-      JSON.stringify(response),
+      JSON.stringify({
+        fulfillment_orders: processedFulfillmentOrderIds,
+        message: `Accepted ${processedFulfillmentOrderIds.length} fulfillment order(s)`
+      }),
       { 
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -457,7 +508,7 @@ Deno.serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('Error processing fulfillment order notification:', error);
+    console.error('❌ Error processing fulfillment order notification:', error);
     
     // Still return 200 to Shopify to avoid retries
     return new Response(
