@@ -399,20 +399,24 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
               </TooltipContent>
             </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate(`/orders/${order.id}/edit`)}
-                >
-                  <Package className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Edit order</p>
-              </TooltipContent>
-            </Tooltip>
+            {order.status !== 'shipped' && 
+             order.status !== 'delivered' && 
+             order.status !== 'partially_fulfilled' && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/orders/${order.id}/edit`)}
+                  >
+                    <Package className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Edit order</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
 
             <Tooltip>
               <TooltipTrigger asChild>

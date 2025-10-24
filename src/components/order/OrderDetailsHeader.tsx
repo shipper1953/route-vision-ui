@@ -47,10 +47,14 @@ export const OrderDetailsHeader = ({ order }: OrderDetailsHeaderProps) => {
         <Badge variant={getStatusBadgeVariant(order.status)}>
           {order.status.replace('_', ' ')}
         </Badge>
-        <Button onClick={() => navigate(`/orders/${order.id}/edit`)}>
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Order
-        </Button>
+        {order.status !== 'shipped' && 
+         order.status !== 'delivered' && 
+         order.status !== 'partially_fulfilled' && (
+          <Button onClick={() => navigate(`/orders/${order.id}/edit`)}>
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Order
+          </Button>
+        )}
       </div>
     </div>
   );
