@@ -384,13 +384,33 @@ async function handleFulfillmentServiceFlow(
   const fulfillment = result.fulfillmentCreate.fulfillment;
   console.log('✅ Fulfillment created:', fulfillment.id);
 
-  // Update fulfillment order record
+  // Check if all items have been fulfilled
+  const allItemsFulfilled = fulfillmentOrder.line_items.every((li: any) => {
+    const shippedItem = orderShipment.package_info?.items?.find((si: any) => {
+      if (si.shopifyVariantId && li.variant_id) {
+        const siVariantId = si.shopifyVariantId.toString().replace('gid://shopify/ProductVariant/', '');
+        const foVariantId = li.variant_id.toString().replace('gid://shopify/ProductVariant/', '');
+        return siVariantId === foVariantId;
+      }
+      if (si.sku && li.sku) return si.sku === li.sku;
+      return false;
+    });
+    
+    if (!shippedItem) return (li.remainingQuantity || li.fulfillable_quantity || 0) === 0;
+    
+    const remainingAfterShipment = (li.remainingQuantity || li.fulfillable_quantity || 0) - shippedItem.quantity;
+    return remainingAfterShipment <= 0;
+  });
+
+  // Update fulfillment order record - only close if all items fulfilled
+  const newStatus = allItemsFulfilled ? 'closed' : 'in_progress';
+  
   await supabase
     .from('shopify_fulfillment_orders')
     .update({
-      status: 'closed',
+      status: newStatus,
       fulfillment_id: fulfillment.id,
-      fulfilled_at: new Date().toISOString()
+      fulfilled_at: allItemsFulfilled ? new Date().toISOString() : null
     })
     .eq('id', fulfillmentOrder.id);
 
