@@ -1,11 +1,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, RefreshCw, Store } from "lucide-react";
+import { CheckCircle2, XCircle, RefreshCw, Store, Truck } from "lucide-react";
 import { ShopifyConnectionDialog } from "@/components/integrations/ShopifyConnectionDialog";
 import { useState } from "react";
 import { useShopifyConnection } from "@/hooks/useShopifyConnection";
 import { ShopifySettings } from "@/hooks/useShopifySettings";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface ShopifyConnectionCardProps {
   companyId?: string;
@@ -17,11 +19,89 @@ export const ShopifyConnectionCard = ({ companyId, settings, onRefresh }: Shopif
   const [dialogOpen, setDialogOpen] = useState(false);
   const { disconnect, loading: disconnecting } = useShopifyConnection();
   const { connection } = settings;
+  const { toast } = useToast();
+  const [syncing, setSyncing] = useState(false);
 
   const handleDisconnect = async () => {
     if (confirm('Are you sure you want to disconnect from Shopify? This will stop all sync operations.')) {
       await disconnect();
       onRefresh();
+    }
+  };
+
+  const handleSyncFulfillments = async () => {
+    setSyncing(true);
+    try {
+      // Find all shipped orders from Shopify that have tracking but aren't synced
+      const { data: orderShipments, error } = await supabase
+        .from('order_shipments')
+        .select(`
+          order_id,
+          shipment_id,
+          package_info,
+          shipments!inner(tracking_number, carrier, service, tracking_url),
+          orders!inner(company_id)
+        `)
+        .eq('orders.company_id', companyId)
+        .not('shipments.tracking_number', 'is', null);
+
+      if (error) throw error;
+
+      if (!orderShipments || orderShipments.length === 0) {
+        toast({
+          title: "No shipments to sync",
+          description: "No shipped orders with tracking found",
+        });
+        setSyncing(false);
+        return;
+      }
+
+      console.log(`Found ${orderShipments.length} shipments to sync with Shopify`);
+      
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Sync each shipment
+      for (const orderShipment of orderShipments) {
+        try {
+          const { error: syncError } = await supabase.functions.invoke('shopify-update-fulfillment', {
+            body: {
+              shipmentId: orderShipment.shipment_id,
+              status: 'purchased',
+              trackingNumber: orderShipment.shipments.tracking_number,
+              trackingUrl: orderShipment.shipments.tracking_url || '',
+              carrier: orderShipment.shipments.carrier || 'Unknown',
+              service: orderShipment.shipments.service || '',
+            }
+          });
+
+          if (syncError) {
+            console.error(`Failed to sync shipment ${orderShipment.shipment_id}:`, syncError);
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (err) {
+          console.error(`Error syncing shipment ${orderShipment.shipment_id}:`, err);
+          errorCount++;
+        }
+      }
+
+      toast({
+        title: "Fulfillment sync complete",
+        description: `Successfully synced ${successCount} shipments. ${errorCount} errors.`,
+        variant: errorCount > 0 ? "destructive" : "default",
+      });
+
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast({
+        title: "Sync failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -82,6 +162,15 @@ export const ShopifyConnectionCard = ({ companyId, settings, onRefresh }: Shopif
                 <Button variant="outline" size="sm" onClick={onRefresh}>
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Refresh
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleSyncFulfillments}
+                  disabled={syncing}
+                >
+                  <Truck className="mr-2 h-4 w-4" />
+                  {syncing ? 'Syncing...' : 'Sync Fulfillments'}
                 </Button>
                 <Button 
                   variant="destructive" 
