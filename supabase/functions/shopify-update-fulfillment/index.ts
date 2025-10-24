@@ -21,11 +21,16 @@ serve(async (req) => {
     console.log('Updating Shopify fulfillment:', { shipmentId, status });
 
     // Find order linked to this shipment with package info
-    const { data: orderShipment } = await supabase
+    const { data: orderShipment, error: osError } = await supabase
       .from('order_shipments')
-      .select('order_id, package_info, orders!inner(items)')
+      .select('order_id, package_info')
       .eq('shipment_id', shipmentId)
-      .single();
+      .maybeSingle();
+
+    if (osError) {
+      console.error('Error querying order_shipments:', osError);
+      throw new Error(`Failed to query order_shipments: ${osError.message}`);
+    }
 
     if (!orderShipment) {
       console.log('No order linked to shipment');
@@ -35,12 +40,33 @@ serve(async (req) => {
       });
     }
 
-    // Get Shopify mapping
-    const { data: mapping } = await supabase
-      .from('shopify_order_mappings')
-      .select('*, companies(settings)')
-      .eq('ship_tornado_order_id', orderShipment.order_id)
+    console.log('Found order_shipment:', orderShipment);
+
+    // Get order details separately
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('items, company_id')
+      .eq('id', orderShipment.order_id)
       .single();
+
+    if (orderError) {
+      console.error('Error querying order:', orderError);
+      throw new Error(`Failed to query order: ${orderError.message}`);
+    }
+
+    console.log('Found order with items:', { orderId: orderShipment.order_id, itemCount: order.items?.length });
+
+    // Get Shopify mapping
+    const { data: mapping, error: mappingError } = await supabase
+      .from('shopify_order_mappings')
+      .select('*')
+      .eq('ship_tornado_order_id', orderShipment.order_id)
+      .maybeSingle();
+
+    if (mappingError) {
+      console.error('Error querying shopify mapping:', mappingError);
+      throw new Error(`Failed to query shopify mapping: ${mappingError.message}`);
+    }
 
     if (!mapping) {
       console.log('No Shopify mapping found for order');
@@ -50,7 +76,21 @@ serve(async (req) => {
       });
     }
 
-    const shopifySettings = mapping.companies?.settings?.shopify;
+    console.log('Found Shopify mapping:', { shopifyOrderId: mapping.shopify_order_id });
+
+    // Get company settings separately
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('settings')
+      .eq('id', order.company_id)
+      .single();
+
+    if (companyError) {
+      console.error('Error querying company:', companyError);
+      throw new Error(`Failed to query company: ${companyError.message}`);
+    }
+
+    const shopifySettings = company?.settings?.shopify;
 
     if (!shopifySettings || !shopifySettings.connected) {
       console.log('Shopify not connected');
@@ -75,7 +115,9 @@ serve(async (req) => {
       throw new Error('Failed to fetch Shopify order');
     }
 
-    const { order } = await orderResponse.json();
+    const { order: shopifyOrder } = await orderResponse.json();
+
+    console.log('Fetched Shopify order:', { orderId: shopifyOrder.id, lineItemCount: shopifyOrder.line_items?.length });
 
     // Extract shipped items from package_info for partial fulfillment
     let lineItemsToFulfill: any[] = [];
@@ -86,7 +128,7 @@ serve(async (req) => {
       console.log('Shipped items in this package:', shippedItems);
       
       // Match shipped items to Shopify line items by SKU
-      lineItemsToFulfill = order.line_items.filter((lineItem: any) => {
+      lineItemsToFulfill = shopifyOrder.line_items.filter((lineItem: any) => {
         const shippedItem = shippedItems.find((si: any) => 
           si.sku === lineItem.sku || si.name === lineItem.name
         );
@@ -104,7 +146,7 @@ serve(async (req) => {
       console.log(`Fulfilling ${lineItemsToFulfill.length} line items (partial fulfillment)`);
     } else {
       // No item tracking - fulfill all items (legacy behavior)
-      lineItemsToFulfill = order.line_items.map((item: any) => ({ id: item.id }));
+      lineItemsToFulfill = shopifyOrder.line_items.map((item: any) => ({ id: item.id }));
       console.log('No item tracking - fulfilling all line items');
     }
 
@@ -118,9 +160,10 @@ serve(async (req) => {
 
     let fulfillmentResponse;
 
-    if (order.fulfillments && order.fulfillments.length > 0) {
+    if (shopifyOrder.fulfillments && shopifyOrder.fulfillments.length > 0) {
       // Update existing fulfillment
-      const fulfillmentId = order.fulfillments[0].id;
+      const fulfillmentId = shopifyOrder.fulfillments[0].id;
+      console.log('Updating existing fulfillment:', fulfillmentId);
       fulfillmentResponse = await fetch(
         `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments/${fulfillmentId}.json`,
         {
@@ -134,6 +177,7 @@ serve(async (req) => {
       );
     } else {
       // Create new fulfillment with specific line items
+      console.log('Creating new fulfillment with line items:', lineItemsToFulfill);
       fulfillmentResponse = await fetch(
         `https://${shopifySettings.store_url}/admin/api/2024-01/orders/${mapping.shopify_order_id}/fulfillments.json`,
         {
@@ -202,20 +246,28 @@ serve(async (req) => {
       const { shipmentId } = await req.json();
       const { data: orderShipment } = await supabase
         .from('order_shipments')
-        .select('order_id, orders(company_id)')
+        .select('order_id')
         .eq('shipment_id', shipmentId)
-        .single();
+        .maybeSingle();
 
       if (orderShipment) {
-        await supabase
-          .from('shopify_sync_logs')
-          .insert({
-            company_id: orderShipment.orders.company_id,
-            sync_type: 'fulfillment_update',
-            direction: 'outbound',
-            status: 'failed',
-            error_message: error.message,
-          });
+        const { data: order } = await supabase
+          .from('orders')
+          .select('company_id')
+          .eq('id', orderShipment.order_id)
+          .single();
+
+        if (order) {
+          await supabase
+            .from('shopify_sync_logs')
+            .insert({
+              company_id: order.company_id,
+              sync_type: 'fulfillment_update',
+              direction: 'outbound',
+              status: 'failed',
+              error_message: error.message,
+            });
+        }
       }
     } catch (logError) {
       console.error('Error logging failure:', logError);
