@@ -74,7 +74,7 @@ serve(async (req) => {
       throw new Error('Missing webhook signature - HMAC header required');
     }
 
-    const apiSecret = shopifySettings.webhook_secret || Deno.env.get('SHOPIFY_API_SECRET');
+    const apiSecret = Deno.env.get('SHOPIFY_API_SECRET') || shopifySettings.webhook_secret;
     if (!apiSecret) {
       console.error('SHOPIFY_API_SECRET not configured');
       throw new Error('Webhook secret not configured');
