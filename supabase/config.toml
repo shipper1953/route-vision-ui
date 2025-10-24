@@ -111,3 +111,6 @@ verify_jwt = false  # Called by Shopify for GDPR compliance
 
 [functions.shopify-gdpr-shop-redact]
 verify_jwt = false  # Called by Shopify for GDPR compliance
+
+[functions.manual-shopify-sync]
+verify_jwt = false  # Manual admin tool for syncing shipments to Shopify

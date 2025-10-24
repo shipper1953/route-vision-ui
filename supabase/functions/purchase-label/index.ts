@@ -513,7 +513,7 @@ serve(async (req) => {
             // Query shopify_order_mappings to see if this order is from Shopify
             const { data: shopifyMapping, error: mappingError } = await supabase
               .from('shopify_order_mappings')
-              .select('shopify_order_id, shop_domain, company_id')
+              .select('shopify_order_id, company_id')
               .eq('ship_tornado_order_id', orderId)
               .maybeSingle()
             
