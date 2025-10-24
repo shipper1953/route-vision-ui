@@ -76,7 +76,27 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.text();
-    const webhook: FulfillmentOrderWebhook = JSON.parse(body);
+    let webhook: FulfillmentOrderWebhook;
+
+    // Parse and validate webhook body
+    try {
+      webhook = JSON.parse(body);
+    } catch (parseError) {
+      console.error('Failed to parse webhook body:', parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON payload' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate required fields
+    if (!webhook.fulfillment_order) {
+      console.error('Missing fulfillment_order in webhook payload');
+      return new Response(
+        JSON.stringify({ error: 'Invalid webhook payload: missing fulfillment_order' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log('Received fulfillment order notification:', {
       shop: shopDomain,

@@ -45,6 +45,7 @@ serve(async (req) => {
 
     // Delete webhooks from Shopify
     try {
+      // Delete REST webhooks
       const webhooksResponse = await fetch(
         `https://${shopifySettings.store_url}/admin/api/2024-01/webhooks.json`,
         {
@@ -71,6 +72,44 @@ serve(async (req) => {
                 },
               }
             );
+          }
+        }
+      }
+
+      // Delete GraphQL webhook subscriptions for fulfillment orders
+      if (shopifySettings.webhooks) {
+        for (const webhookId of Object.values(shopifySettings.webhooks)) {
+          try {
+            const deleteWebhookMutation = `
+              mutation webhookSubscriptionDelete($id: ID!) {
+                webhookSubscriptionDelete(id: $id) {
+                  deletedWebhookSubscriptionId
+                  userErrors {
+                    field
+                    message
+                  }
+                }
+              }
+            `;
+
+            await fetch(
+              `https://${shopifySettings.store_url}/admin/api/2025-01/graphql.json`,
+              {
+                method: 'POST',
+                headers: {
+                  'X-Shopify-Access-Token': shopifySettings.access_token,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  query: deleteWebhookMutation,
+                  variables: { id: webhookId }
+                }),
+              }
+            );
+
+            console.log(`Deleted webhook subscription: ${webhookId}`);
+          } catch (webhookError) {
+            console.error(`Failed to delete webhook ${webhookId}:`, webhookError);
           }
         }
       }

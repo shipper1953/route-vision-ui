@@ -155,6 +155,85 @@ Deno.serve(async (req) => {
 
     console.log('Fulfillment service registered successfully:', fulfillmentService);
 
+    // Subscribe to fulfillment order webhooks
+    const webhookTopics = [
+      'FULFILLMENT_ORDERS_FULFILLMENT_REQUEST',
+      'FULFILLMENT_ORDERS_CANCELLATION_REQUEST',
+      'FULFILLMENT_ORDERS_HOLD',
+      'FULFILLMENT_ORDERS_RELEASE_HOLD'
+    ];
+
+    const webhookIds: Record<string, string> = {};
+
+    for (const topic of webhookTopics) {
+      try {
+        const webhookMutation = `
+          mutation webhookSubscriptionCreate($topic: WebhookSubscriptionTopic!, $webhookSubscription: WebhookSubscriptionInput!) {
+            webhookSubscriptionCreate(topic: $topic, webhookSubscription: $webhookSubscription) {
+              webhookSubscription {
+                id
+                topic
+              }
+              userErrors {
+                field
+                message
+              }
+            }
+          }
+        `;
+
+        const webhookResponse = await fetch(
+          `https://${shopifySettings.store_url}/admin/api/2025-01/graphql.json`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Shopify-Access-Token': shopifySettings.access_token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              query: webhookMutation,
+              variables: {
+                topic,
+                webhookSubscription: {
+                  callbackUrl: callbackUrl,
+                  format: 'JSON'
+                }
+              }
+            }),
+          }
+        );
+
+        const webhookResult = await webhookResponse.json();
+
+        if (webhookResult.data?.webhookSubscriptionCreate?.userErrors?.length > 0) {
+          console.error(`Webhook subscription error for ${topic}:`, webhookResult.data.webhookSubscriptionCreate.userErrors);
+        } else if (webhookResult.data?.webhookSubscriptionCreate?.webhookSubscription) {
+          const webhookId = webhookResult.data.webhookSubscriptionCreate.webhookSubscription.id;
+          webhookIds[topic.toLowerCase()] = webhookId;
+          console.log(`✅ Subscribed to webhook: ${topic} (${webhookId})`);
+        }
+      } catch (webhookError) {
+        console.error(`Failed to subscribe to ${topic}:`, webhookError);
+        // Continue with other webhooks even if one fails
+      }
+    }
+
+    // Update company settings with webhook IDs
+    const finalSettings = {
+      ...updatedSettings,
+      shopify: {
+        ...updatedSettings.shopify,
+        webhooks: webhookIds,
+      },
+    };
+
+    await supabase
+      .from('companies')
+      .update({ settings: finalSettings })
+      .eq('id', companyId);
+
+    console.log('Webhook subscriptions completed:', Object.keys(webhookIds).length);
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -163,6 +242,7 @@ Deno.serve(async (req) => {
           locationId: fulfillmentService.location.id,
           locationName: fulfillmentService.location.name,
         },
+        webhooks: webhookIds,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
