@@ -11,12 +11,14 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Parse request body once and store it
+  const requestBody = await req.json();
+  const { shipmentId, status, trackingNumber, trackingUrl, carrier } = requestBody;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    const { shipmentId, status, trackingNumber, trackingUrl, carrier } = await req.json();
 
     console.log('Updating Shopify fulfillment:', { shipmentId, status });
 
@@ -119,6 +121,32 @@ serve(async (req) => {
 
     console.log('Fetched Shopify order:', { orderId: shopifyOrder.id, lineItemCount: shopifyOrder.line_items?.length });
 
+    // Fetch fulfillment orders (required for 2024-01 API)
+    const fulfillmentOrdersResponse = await fetch(
+      `https://${shopifySettings.store_url}/admin/api/2024-01/orders/${mapping.shopify_order_id}/fulfillment_orders.json`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': shopifySettings.access_token,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!fulfillmentOrdersResponse.ok) {
+      const errorText = await fulfillmentOrdersResponse.text();
+      console.error('Failed to fetch fulfillment orders:', errorText);
+      throw new Error(`Failed to fetch fulfillment orders: ${errorText}`);
+    }
+
+    const { fulfillment_orders } = await fulfillmentOrdersResponse.json();
+    
+    if (!fulfillment_orders || fulfillment_orders.length === 0) {
+      throw new Error('No fulfillment orders found for Shopify order');
+    }
+
+    const fulfillmentOrderId = fulfillment_orders[0].id;
+    console.log('Found fulfillment order ID:', fulfillmentOrderId);
+
     // Extract shipped items from package_info for partial fulfillment
     let lineItemsToFulfill: any[] = [];
     
@@ -176,10 +204,10 @@ serve(async (req) => {
         }
       );
     } else {
-      // Create new fulfillment with specific line items
+      // Create new fulfillment using modern API format (2024-01)
       console.log('Creating new fulfillment with line items:', lineItemsToFulfill);
       fulfillmentResponse = await fetch(
-        `https://${shopifySettings.store_url}/admin/api/2024-01/orders/${mapping.shopify_order_id}/fulfillments.json`,
+        `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments.json`,
         {
           method: 'POST',
           headers: {
@@ -189,7 +217,13 @@ serve(async (req) => {
           body: JSON.stringify({
             fulfillment: {
               ...fulfillmentData,
-              line_items: lineItemsToFulfill,
+              line_items_by_fulfillment_order: [{
+                fulfillment_order_id: fulfillmentOrderId,
+                fulfillment_request_order_line_items: lineItemsToFulfill.map(item => ({
+                  id: item.id,
+                  quantity: item.quantity || 1
+                }))
+              }]
             },
           }),
         }
@@ -199,7 +233,7 @@ serve(async (req) => {
     if (!fulfillmentResponse.ok) {
       const errorText = await fulfillmentResponse.text();
       console.error('Shopify fulfillment error:', errorText);
-      throw new Error('Failed to update Shopify fulfillment');
+      throw new Error(`Failed to update Shopify fulfillment: ${errorText}`);
     }
 
     console.log('Successfully updated Shopify fulfillment');
@@ -237,17 +271,15 @@ serve(async (req) => {
   } catch (error) {
     console.error('Fulfillment update error:', error);
     
-    // Log error
+    // Log error using stored request body
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
-      
-      const { shipmentId } = await req.json();
       const { data: orderShipment } = await supabase
         .from('order_shipments')
         .select('order_id')
-        .eq('shipment_id', shipmentId)
+        .eq('shipment_id', requestBody.shipmentId)
         .maybeSingle();
 
       if (orderShipment) {
