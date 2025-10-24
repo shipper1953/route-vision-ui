@@ -319,7 +319,7 @@ serve(async (req) => {
           ) : foLineItem.fulfillable_quantity;
           
           return {
-            id: foLineItem.id,
+            fulfillment_order_line_item_id: foLineItem.id,
             quantity: quantityToFulfill
           };
         })
@@ -367,7 +367,7 @@ serve(async (req) => {
       lineItemsToFulfill = fulfillmentOrderLineItems
         .filter((foLineItem: any) => foLineItem.fulfillable_quantity > 0)
         .map((foLineItem: any) => ({ 
-          id: foLineItem.id,
+          fulfillment_order_line_item_id: foLineItem.id,
           quantity: foLineItem.fulfillable_quantity
         }));
       console.log('No item tracking - fulfilling all remaining line items');
@@ -376,6 +376,13 @@ serve(async (req) => {
     // Always create a NEW fulfillment for each package/shipment
     // This enables multi-package fulfillment and partial fulfillment over time
     console.log('Creating new fulfillment for this package with tracking:', trackingNumber);
+
+    console.log('📤 Sending fulfillment request to Shopify:', {
+      fulfillment_order_id: fulfillmentOrderId,
+      line_items_count: lineItemsToFulfill.length,
+      line_items: lineItemsToFulfill,
+      tracking_number: trackingNumber
+    });
 
     const fulfillmentResponse = await fetch(
       `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments.json`,
@@ -441,10 +448,25 @@ serve(async (req) => {
 
     const fulfillmentResult = await fulfillmentResponse.json();
     const fulfillmentId = fulfillmentResult.fulfillment?.id;
+    
+    // Log what Shopify actually created
+    console.log('📥 Shopify fulfillment response:', {
+      fulfillmentId,
+      line_items_created: fulfillmentResult.fulfillment?.line_items?.length || 0,
+      line_items_details: fulfillmentResult.fulfillment?.line_items?.map((li: any) => ({
+        id: li.id,
+        variant_id: li.variant_id,
+        sku: li.sku,
+        name: li.name,
+        quantity: li.quantity
+      })) || []
+    });
+    
     console.log('✅ Successfully created fulfillment:', {
       fulfillmentId,
       trackingNumber,
-      itemCount: lineItemsToFulfill.length
+      itemsRequested: lineItemsToFulfill.length,
+      itemsActuallyFulfilled: fulfillmentResult.fulfillment?.line_items?.length || 0
     });
 
     // Update mapping
