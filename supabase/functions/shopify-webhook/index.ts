@@ -42,20 +42,32 @@ serve(async (req) => {
       }
     }
 
-    // Find company by shop domain using shopify_credentials table
-    const { data: credentials, error: credError } = await supabase
-      .from('shopify_credentials')
-      .select('company_id, access_token')
-      .eq('store_url', shopDomain)
+    // Find company with matching Shopify store domain
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('id, settings')
       .eq('is_active', true)
       .single();
 
-    if (credError || !credentials) {
-      console.error('Shopify credentials not found for shop:', shopDomain);
-      throw new Error('Company not found or Shopify not connected');
+    if (companyError || !company) {
+      console.error('Company not found');
+      throw new Error('Company not found');
     }
 
-    const companyId = credentials.company_id;
+    const shopifySettings = (company.settings as any)?.shopify;
+    if (!shopifySettings?.connected) {
+      console.error('Shopify not connected for company:', company.id);
+      throw new Error('Shopify not connected for this company');
+    }
+
+    // Verify the shop domain matches
+    if (shopifySettings.store_url !== shopDomain) {
+      console.error('Shop domain mismatch. Expected:', shopifySettings.store_url, 'Got:', shopDomain);
+      throw new Error('Shop domain does not match connected store');
+    }
+
+    const companyId = company.id;
+    console.log('✅ Found company:', companyId, 'for shop:', shopDomain);
 
     // SECURITY: HMAC validation is MANDATORY
     if (!hmacHeader) {
@@ -63,7 +75,7 @@ serve(async (req) => {
       throw new Error('Missing webhook signature - HMAC header required');
     }
 
-    const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
+    const apiSecret = shopifySettings.webhook_secret || Deno.env.get('SHOPIFY_API_SECRET');
     if (!apiSecret) {
       console.error('SHOPIFY_API_SECRET not configured');
       throw new Error('Webhook secret not configured');
