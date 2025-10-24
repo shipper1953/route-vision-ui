@@ -69,8 +69,6 @@ async function fetchAssignedFulfillmentOrders(
                     variant {
                       id
                       sku
-                      weight
-                      weightUnit
                       image {
                         url
                       }
@@ -97,8 +95,6 @@ async function fetchAssignedFulfillmentOrders(
                     variant {
                       id
                       sku
-                      weight
-                      weightUnit
                     }
                   }
                   remainingQuantity
@@ -511,11 +507,7 @@ Deno.serve(async (req) => {
           name: lineItem.name,
           price: lineItem.originalUnitPriceSet?.shopMoney?.amount || '0',
           quantity: foLineItem.remainingQuantity,
-          grams: lineItem.variant?.weight && lineItem.variant?.weightUnit === 'GRAMS' 
-            ? lineItem.variant.weight 
-            : lineItem.variant?.weight && lineItem.variant?.weightUnit === 'KILOGRAMS'
-            ? lineItem.variant.weight * 1000
-            : 0,
+          grams: 0, // Weight not available in API, will use default
         };
 
         try {
