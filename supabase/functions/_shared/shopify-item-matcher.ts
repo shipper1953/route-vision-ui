@@ -1,5 +1,37 @@
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// GraphQL helper for Shopify API calls
+export async function shopifyGraphQL(
+  shopifySettings: { store_url: string; access_token: string },
+  query: string,
+  variables: Record<string, any> = {}
+) {
+  const response = await fetch(
+    `https://${shopifySettings.store_url}/admin/api/2025-01/graphql.json`,
+    {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': shopifySettings.access_token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Shopify GraphQL API error: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  
+  if (result.errors) {
+    throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
+  }
+  
+  return result;
+}
+
 // Sanitization helper to prevent injection attacks
 export function sanitizeString(str: string | null | undefined, maxLength: number = 255): string | null {
   if (!str) return null;

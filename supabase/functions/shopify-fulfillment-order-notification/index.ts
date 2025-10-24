@@ -13,7 +13,8 @@ function verifyShopifyWebhook(body: string, hmacHeader: string, secret: string):
   return hash === hmacHeader;
 }
 
-interface FulfillmentOrderWebhook {
+interface FulfillmentServiceCallback {
+  kind: 'fulfillment_request' | 'cancellation_request' | 'fulfillment_request_hold' | 'fulfillment_request_release_hold';
   fulfillment_order: {
     id: number;
     shop_id: number;
@@ -76,7 +77,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.text();
-    let webhook: FulfillmentOrderWebhook;
+    let webhook: FulfillmentServiceCallback;
 
     // Parse and validate webhook body
     try {
@@ -90,15 +91,25 @@ Deno.serve(async (req) => {
     }
 
     // Validate required fields
-    if (!webhook.fulfillment_order) {
-      console.error('Missing fulfillment_order in webhook payload');
+    if (!webhook.kind || !webhook.fulfillment_order) {
+      console.error('Invalid callback payload:', { kind: webhook.kind, hasFulfillmentOrder: !!webhook.fulfillment_order });
       return new Response(
-        JSON.stringify({ error: 'Invalid webhook payload: missing fulfillment_order' }),
+        JSON.stringify({ error: 'Invalid callback payload structure' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Received fulfillment order notification:', {
+    // Only handle fulfillment_request kind
+    if (webhook.kind !== 'fulfillment_request') {
+      console.log(`Received callback kind: ${webhook.kind} - not processing`);
+      return new Response(
+        JSON.stringify({ message: `Callback kind ${webhook.kind} not handled` }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Received fulfillment request callback:', {
+      kind: webhook.kind,
       shop: shopDomain,
       fulfillmentOrderId: webhook.fulfillment_order.id,
       orderId: webhook.fulfillment_order.order_id,
@@ -158,23 +169,79 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch full order from Shopify REST API
-    const orderResponse = await fetch(
-      `https://${shopDomain}/admin/api/2025-01/orders/${webhook.fulfillment_order.order_id}.json`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': shopifySettings.access_token
+    // Import shared utilities
+    const { shopifyGraphQL, ensureItemExists, sanitizeString, addBusinessDays } = await import('../_shared/shopify-item-matcher.ts');
+
+    // Fetch full order from Shopify GraphQL API
+    const orderQuery = `
+      query getOrder($id: ID!) {
+        order(id: $id) {
+          id
+          name
+          email
+          createdAt
+          totalPriceSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+          }
+          customer {
+            firstName
+            lastName
+            email
+            phone
+          }
+          lineItems(first: 100) {
+            edges {
+              node {
+                id
+                name
+                quantity
+                sku
+                variant {
+                  id
+                  sku
+                  weight
+                  weightUnit
+                }
+                product {
+                  id
+                  title
+                }
+                originalUnitPriceSet {
+                  shopMoney {
+                    amount
+                  }
+                }
+              }
+            }
+          }
+          shippingAddress {
+            address1
+            address2
+            city
+            province
+            zip
+            country
+            countryCodeV2
+            phone
+            company
+          }
         }
       }
-    );
+    `;
 
-    if (!orderResponse.ok) {
-      console.error('Failed to fetch order from Shopify:', await orderResponse.text());
-      throw new Error('Failed to fetch order details from Shopify');
+    const orderGid = `gid://shopify/Order/${webhook.fulfillment_order.order_id}`;
+    const orderResult = await shopifyGraphQL(shopifySettings, orderQuery, { id: orderGid });
+
+    if (!orderResult.data?.order) {
+      console.error('No order data returned from GraphQL');
+      throw new Error('Failed to fetch order from Shopify GraphQL');
     }
 
-    const { order: shopifyOrder } = await orderResponse.json();
-    console.log('Fetched order from Shopify:', shopifyOrder.order_number);
+    const shopifyOrder = orderResult.data.order;
+    console.log('Fetched order via GraphQL:', shopifyOrder.name);
 
     // Get default warehouse for company
     const { data: warehouse } = await supabase
@@ -184,14 +251,33 @@ Deno.serve(async (req) => {
       .eq('is_default', true)
       .single();
 
-    // Import shared utilities
-    const { ensureItemExists, sanitizeString, addBusinessDays } = await import('../_shared/shopify-item-matcher.ts');
-
-    // Match fulfillment line items with order line items
-    const fulfillmentLineItemIds = webhook.fulfillment_order.line_items.map(li => li.line_item_id);
-    const orderLineItems = shopifyOrder.line_items.filter((li: any) => 
-      fulfillmentLineItemIds.includes(li.id)
+    // Match fulfillment line items with GraphQL order line items
+    const fulfillmentLineItemIds = webhook.fulfillment_order.line_items.map(li => 
+      `gid://shopify/LineItem/${li.line_item_id}`
     );
+    
+    const orderLineItems = shopifyOrder.lineItems.edges
+      .filter((edge: any) => fulfillmentLineItemIds.includes(edge.node.id))
+      .map((edge: any) => {
+        const node = edge.node;
+        const variantIdNum = node.variant?.id ? parseInt(node.variant.id.split('/').pop()) : null;
+        const productIdNum = node.product?.id ? parseInt(node.product.id.split('/').pop()) : null;
+        
+        return {
+          id: parseInt(node.id.split('/').pop()),
+          name: node.name,
+          sku: node.sku || node.variant?.sku,
+          quantity: node.quantity,
+          price: node.originalUnitPriceSet?.shopMoney?.amount || '0',
+          variant_id: variantIdNum,
+          product_id: productIdNum,
+          grams: node.variant?.weight && node.variant?.weightUnit === 'GRAMS' 
+            ? node.variant.weight 
+            : node.variant?.weight && node.variant?.weightUnit === 'KILOGRAMS'
+            ? node.variant.weight * 1000
+            : 0,
+        };
+      });
 
     // Process all line items
     const mappedItems = [];
@@ -240,14 +326,14 @@ Deno.serve(async (req) => {
 
     // Create Ship Tornado order
     const orderData = {
-      order_id: sanitizeString(`SHOP-${shopifyOrder.order_number}`, 50) || 'UNKNOWN',
+      order_id: sanitizeString(`SHOP-${shopifyOrder.name}`, 50) || 'UNKNOWN',
       customer_name: sanitizeString(
-        `${shopifyOrder.customer?.first_name || ''} ${shopifyOrder.customer?.last_name || ''}`.trim(),
+        `${shopifyOrder.customer?.firstName || ''} ${shopifyOrder.customer?.lastName || ''}`.trim(),
         255
       ) || 'Unknown',
       customer_email: sanitizeString(shopifyOrder.customer?.email, 255),
       customer_phone: sanitizeString(shopifyOrder.customer?.phone, 20),
-      customer_company: sanitizeString(shopifyOrder.customer?.company, 255),
+      customer_company: sanitizeString(shopifyOrder.shippingAddress?.company, 255),
       shipping_address: {
         street1: sanitizeString(webhook.fulfillment_order.destination.address1, 255) || '',
         street2: sanitizeString(webhook.fulfillment_order.destination.address2, 255) || '',
@@ -257,9 +343,9 @@ Deno.serve(async (req) => {
         country: sanitizeString(webhook.fulfillment_order.destination.country, 2) || 'US'
       },
       items: mappedItems,
-      value: parseFloat(shopifyOrder.total_price || '0'),
-      order_date: shopifyOrder.created_at,
-      required_delivery_date: addBusinessDays(new Date(shopifyOrder.created_at), 5).toISOString().split('T')[0],
+      value: parseFloat(shopifyOrder.totalPriceSet?.shopMoney?.amount || '0'),
+      order_date: shopifyOrder.createdAt,
+      required_delivery_date: addBusinessDays(new Date(shopifyOrder.createdAt), 5).toISOString().split('T')[0],
       status: 'ready_to_ship',
       company_id: company.id,
       warehouse_id: warehouse?.id || null,
@@ -286,7 +372,7 @@ Deno.serve(async (req) => {
         company_id: company.id,
         ship_tornado_order_id: newOrder.id,
         shopify_order_id: shopifyOrderId,
-        shopify_order_number: shopifyOrder.order_number.toString(),
+        shopify_order_number: shopifyOrder.name,
         sync_status: 'synced',
       });
 
