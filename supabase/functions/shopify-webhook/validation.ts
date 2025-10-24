@@ -1,12 +1,12 @@
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
-// Sanitization helper
+// Sanitization helper to prevent injection attacks
 export function sanitizeString(str: string | null | undefined, maxLength: number = 255): string | null {
   if (!str) return null;
   return str.trim().slice(0, maxLength);
 }
 
-// Shopify webhook order validation
+// Shopify webhook order validation schema
 export const ShopifyOrderSchema = z.object({
   id: z.union([z.number(), z.string()]).transform(String),
   order_number: z.union([z.number(), z.string()]).transform(String),
@@ -23,7 +23,8 @@ export const ShopifyOrderSchema = z.object({
     email: z.string().email().max(255).optional().nullable(),
     first_name: z.string().max(100).optional().nullable(),
     last_name: z.string().max(100).optional().nullable(),
-    phone: z.string().max(20).optional().nullable()
+    phone: z.string().max(20).optional().nullable(),
+    company: z.string().max(255).optional().nullable()
   }).optional().nullable(),
   shipping_address: z.object({
     first_name: z.string().max(100).optional().nullable(),
@@ -46,6 +47,7 @@ export const ShopifyOrderSchema = z.object({
       title: z.string().max(255),
       quantity: z.number().int().positive().max(10000),
       sku: z.string().max(100).optional().nullable(),
+      name: z.string().max(255).optional().nullable(),
       vendor: z.string().max(255).optional().nullable(),
       price: z.union([z.string(), z.number()]).transform(val => 
         typeof val === 'string' ? parseFloat(val) : val
