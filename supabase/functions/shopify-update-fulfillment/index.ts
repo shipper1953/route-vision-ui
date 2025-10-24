@@ -204,7 +204,7 @@ serve(async (req) => {
         }
       );
     } else {
-      // Create new fulfillment using modern API format (2024-01)
+      // Create new fulfillment using modern API format (2024-01) - without tracking
       console.log('Creating new fulfillment with line items:', lineItemsToFulfill);
       fulfillmentResponse = await fetch(
         `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments.json`,
@@ -216,7 +216,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             fulfillment: {
-              ...fulfillmentData,
+              notify_customer: true,
               line_items_by_fulfillment_order: [{
                 fulfillment_order_id: fulfillmentOrderId,
                 fulfillment_request_order_line_items: lineItemsToFulfill.map(item => ({
@@ -234,6 +234,43 @@ serve(async (req) => {
       const errorText = await fulfillmentResponse.text();
       console.error('Shopify fulfillment error:', errorText);
       throw new Error(`Failed to update Shopify fulfillment: ${errorText}`);
+    }
+
+    const fulfillmentResult = await fulfillmentResponse.json();
+    const createdFulfillment = fulfillmentResult.fulfillment;
+    console.log('Successfully created/updated fulfillment:', createdFulfillment.id);
+
+    // Add tracking information separately (required for 2024-01 API)
+    if (trackingNumber && createdFulfillment.id) {
+      console.log('Adding tracking info:', { trackingNumber, carrier, trackingUrl });
+      const trackingResponse = await fetch(
+        `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments/${createdFulfillment.id}/update_tracking.json`,
+        {
+          method: 'POST',
+          headers: {
+            'X-Shopify-Access-Token': shopifySettings.access_token,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fulfillment: {
+              notify_customer: true,
+              tracking_info: {
+                number: trackingNumber,
+                url: trackingUrl,
+                company: carrier
+              }
+            }
+          }),
+        }
+      );
+
+      if (!trackingResponse.ok) {
+        const errorText = await trackingResponse.text();
+        console.error('Failed to add tracking:', errorText);
+        // Don't throw - fulfillment was created, just tracking failed
+      } else {
+        console.log('Successfully added tracking information');
+      }
     }
 
     console.log('Successfully updated Shopify fulfillment');
