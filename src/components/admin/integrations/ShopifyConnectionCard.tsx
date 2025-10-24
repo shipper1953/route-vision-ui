@@ -38,16 +38,33 @@ export const ShopifyConnectionCard = ({ companyId, settings, onRefresh }: Shopif
         .select(`
           order_id,
           shipment_id,
-          package_info,
-          shipments!inner(tracking_number, carrier, service, tracking_url),
-          orders!inner(company_id)
+          package_info
         `)
-        .eq('orders.company_id', companyId)
-        .not('shipments.tracking_number', 'is', null);
 
       if (error) throw error;
 
-      if (!orderShipments || orderShipments.length === 0) {
+      // Get full shipment and order details
+      const enrichedShipments = await Promise.all(
+        (orderShipments || []).map(async (os) => {
+          const [shipmentRes, orderRes] = await Promise.all([
+            supabase.from('shipments').select('tracking_number, carrier, service, tracking_url').eq('id', os.shipment_id).single(),
+            supabase.from('orders').select('company_id').eq('id', os.order_id).single()
+          ]);
+          
+          return {
+            ...os,
+            shipments: shipmentRes.data,
+            orders: orderRes.data
+          };
+        })
+      );
+
+      // Filter to only this company's orders with tracking
+      const filteredShipments = enrichedShipments.filter(
+        os => os.orders?.company_id === companyId && os.shipments?.tracking_number
+      );
+
+      if (!filteredShipments || filteredShipments.length === 0) {
         toast({
           title: "No shipments to sync",
           description: "No shipped orders with tracking found",
@@ -56,13 +73,13 @@ export const ShopifyConnectionCard = ({ companyId, settings, onRefresh }: Shopif
         return;
       }
 
-      console.log(`Found ${orderShipments.length} shipments to sync with Shopify`);
+      console.log(`Found ${filteredShipments.length} shipments to sync with Shopify`);
       
       let successCount = 0;
       let errorCount = 0;
 
       // Sync each shipment
-      for (const orderShipment of orderShipments) {
+      for (const orderShipment of filteredShipments) {
         try {
           const { error: syncError } = await supabase.functions.invoke('shopify-update-fulfillment', {
             body: {
