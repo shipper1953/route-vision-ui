@@ -634,6 +634,25 @@ Deno.serve(async (req) => {
         sync_status: 'synced',
       });
 
+      // Enrich fulfillment order line items with product data for matching
+      const enrichedFulfillmentLineItems = fo.lineItems.edges.map((fliEdge: any) => {
+        const fli = fliEdge.node;
+        const orderLineItem = fo.order.lineItems.edges.find(
+          (oli: any) => oli.node.id === fli.lineItem.id
+        )?.node;
+        
+        return {
+          id: fli.id.replace('gid://shopify/FulfillmentOrderLineItem/', ''),
+          line_item_id: fli.lineItem.id.replace('gid://shopify/LineItem/', ''),
+          variant_id: orderLineItem?.variant?.id || null,
+          sku: orderLineItem?.sku || orderLineItem?.variant?.sku || null,
+          name: orderLineItem?.name || orderLineItem?.title || null,
+          quantity: fli.totalQuantity,
+          fulfillable_quantity: fli.remainingQuantity,
+          remainingQuantity: fli.remainingQuantity
+        };
+      });
+
       await supabase.from('shopify_fulfillment_orders').insert({
         company_id: company.id,
         ship_tornado_order_id: newOrder.id,
@@ -642,7 +661,7 @@ Deno.serve(async (req) => {
         fulfillment_order_number: fulfillmentOrderNumber,
         status: fo.status,
         request_status: fo.requestStatus,
-        line_items: fo.lineItems.edges.map((e: any) => e.node),
+        line_items: enrichedFulfillmentLineItems,
         assigned_location_id: shopifySettings.fulfillment_service_location_id,
         destination: fo.destination,
       });
