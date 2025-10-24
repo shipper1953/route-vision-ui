@@ -385,7 +385,7 @@ serve(async (req) => {
     });
 
     const fulfillmentResponse = await fetch(
-      `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments.json`,
+      `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillment_orders/${fulfillmentOrderId}/fulfillments.json`,
       {
         method: 'POST',
         headers: {
