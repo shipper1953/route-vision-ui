@@ -142,7 +142,7 @@ serve(async (req) => {
         })) || [],
         value: parseFloat(shopifyOrder.total_price || '0'),
         order_date: shopifyOrder.created_at,
-        status: 'processing',
+        status: 'ready_to_ship',
         company_id: companyId,
         warehouse_id: warehouse?.id || null,
         user_id: null, // Will be set by trigger
