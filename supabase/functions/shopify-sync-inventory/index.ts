@@ -128,75 +128,127 @@ async function syncToShopify(
 
     console.log(`Found ${items.length} items to sync`);
 
-    // For each item, we need to find its Shopify inventory item and location
-    // This requires first fetching the product by SKU, then getting inventory levels
+    // For each item, find its Shopify variant and update inventory using GraphQL
     for (const item of items) {
       try {
-        // Search for product by SKU
-        const productResponse = await fetch(
-          `https://${shopifySettings.store_url}/admin/api/2024-01/products.json?fields=id,variants&limit=1`,
+        // Search for product variant by SKU using GraphQL
+        const searchQuery = `
+          query searchProductVariants($query: String!) {
+            productVariants(first: 1, query: $query) {
+              edges {
+                node {
+                  id
+                  sku
+                  inventoryItem {
+                    id
+                    inventoryLevels(first: 10) {
+                      edges {
+                        node {
+                          id
+                          location {
+                            id
+                            name
+                          }
+                          available
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `;
+
+        const searchResponse = await fetch(
+          `https://${shopifySettings.store_url}/admin/api/2024-10/graphql.json`,
           {
+            method: 'POST',
             headers: {
               'X-Shopify-Access-Token': shopifySettings.access_token,
+              'Content-Type': 'application/json',
             },
+            body: JSON.stringify({
+              query: searchQuery,
+              variables: { query: `sku:${item.sku}` }
+            })
           }
         );
 
-        if (!productResponse.ok) continue;
+        if (!searchResponse.ok) {
+          errors++;
+          continue;
+        }
 
-        const { products } = await productResponse.json();
+        const searchResult = await searchResponse.json();
         
-        // Find variant with matching SKU
-        for (const product of products) {
-          const variant = product.variants?.find((v: any) => v.sku === item.sku);
+        if (searchResult.errors || !searchResult.data?.productVariants?.edges?.length) {
+          continue;
+        }
+
+        const variant = searchResult.data.productVariants.edges[0].node;
+        const inventoryItem = variant.inventoryItem;
+        
+        if (!inventoryItem?.inventoryLevels?.edges?.length) continue;
+
+        // Update each location
+        for (const levelEdge of inventoryItem.inventoryLevels.edges) {
+          const level = levelEdge.node;
           
-          if (variant && variant.inventory_item_id) {
-            // Get current inventory levels
-            const invResponse = await fetch(
-              `https://${shopifySettings.store_url}/admin/api/2024-01/inventory_levels.json?inventory_item_ids=${variant.inventory_item_id}`,
+          // TODO: Get actual inventory count from boxes or warehouse management system
+          const shipTornadoQty = 100; // Replace with actual inventory count
+          
+          if (Math.abs(level.available - shipTornadoQty) >= threshold) {
+            // Update inventory using GraphQL mutation
+            const updateMutation = `
+              mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
+                inventorySetQuantities(input: $input) {
+                  inventoryAdjustmentGroup {
+                    id
+                  }
+                  userErrors {
+                    field
+                    message
+                  }
+                }
+              }
+            `;
+
+            const updateResponse = await fetch(
+              `https://${shopifySettings.store_url}/admin/api/2024-10/graphql.json`,
               {
+                method: 'POST',
                 headers: {
                   'X-Shopify-Access-Token': shopifySettings.access_token,
+                  'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({
+                  query: updateMutation,
+                  variables: {
+                    input: {
+                      reason: "correction",
+                      name: "available",
+                      quantities: [
+                        {
+                          inventoryItemId: inventoryItem.id,
+                          locationId: level.location.id,
+                          quantity: shipTornadoQty
+                        }
+                      ]
+                    }
+                  }
+                })
               }
             );
 
-            if (!invResponse.ok) continue;
-
-            const { inventory_levels } = await invResponse.json();
+            const updateResult = await updateResponse.json();
             
-            // Update each location (typically one primary location)
-            for (const level of inventory_levels) {
-              // TODO: Get actual inventory count from boxes or warehouse management system
-              // For now, this is a placeholder - you'd integrate with your inventory tracking
-              const shipTornadoQty = 100; // Replace with actual inventory count
-              
-              if (Math.abs(level.available - shipTornadoQty) >= threshold) {
-                // Update inventory in Shopify
-                const updateResponse = await fetch(
-                  `https://${shopifySettings.store_url}/admin/api/2024-01/inventory_levels/set.json`,
-                  {
-                    method: 'POST',
-                    headers: {
-                      'X-Shopify-Access-Token': shopifySettings.access_token,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      location_id: level.location_id,
-                      inventory_item_id: variant.inventory_item_id,
-                      available: shipTornadoQty
-                    }),
-                  }
-                );
-
-                if (updateResponse.ok) {
-                  updated++;
-                  console.log(`✅ Updated inventory for ${item.sku}: ${shipTornadoQty}`);
-                } else {
-                  errors++;
-                  console.error(`Failed to update ${item.sku}`);
-                }
-              }
+            if (updateResult.data?.inventorySetQuantities?.userErrors?.length === 0) {
+              updated++;
+              console.log(`✅ Updated inventory for ${item.sku}: ${shipTornadoQty}`);
+            } else {
+              errors++;
+              console.error(`Failed to update ${item.sku}:`, updateResult.data?.inventorySetQuantities?.userErrors);
             }
           }
         }
@@ -227,25 +279,79 @@ async function syncFromShopify(
   let errors = 0;
 
   try {
-    // Fetch all products with inventory
-    const productsResponse = await fetch(
-      `https://${shopifySettings.store_url}/admin/api/2024-01/products.json?fields=id,variants&limit=250`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': shopifySettings.access_token,
-        },
+    // Fetch all product variants with inventory using GraphQL
+    const productsQuery = `
+      query getProductsWithInventory($first: Int!, $after: String) {
+        productVariants(first: $first, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          edges {
+            node {
+              id
+              sku
+              inventoryItem {
+                id
+                inventoryLevels(first: 10) {
+                  edges {
+                    node {
+                      id
+                      available
+                      location {
+                        id
+                        name
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
-    );
+    `;
 
-    if (!productsResponse.ok) {
-      throw new Error('Failed to fetch products from Shopify');
-    }
+    let hasNextPage = true;
+    let afterCursor = null;
+    let totalVariants = 0;
 
-    const { products } = await productsResponse.json();
-    console.log(`Fetched ${products.length} products from Shopify`);
+    while (hasNextPage) {
+      const productsResponse = await fetch(
+        `https://${shopifySettings.store_url}/admin/api/2024-10/graphql.json`,
+        {
+          method: 'POST',
+          headers: {
+            'X-Shopify-Access-Token': shopifySettings.access_token,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: productsQuery,
+            variables: { 
+              first: 250,
+              after: afterCursor
+            }
+          })
+        }
+      );
 
-    for (const product of products) {
-      for (const variant of product.variants || []) {
+      if (!productsResponse.ok) {
+        throw new Error('Failed to fetch products from Shopify');
+      }
+
+      const result = await productsResponse.json();
+
+      if (result.errors) {
+        console.error('GraphQL errors:', result.errors);
+        throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
+      }
+
+      const variants = result.data.productVariants.edges.map((e: any) => e.node);
+      totalVariants += variants.length;
+      
+      console.log(`Processing ${variants.length} variants (total: ${totalVariants})...`);
+
+      for (const variant of variants) {
         if (!variant.sku) continue;
 
         try {
@@ -259,27 +365,15 @@ async function syncFromShopify(
 
           if (itemError || !item) continue;
 
-          // Get inventory level from Shopify
-          if (variant.inventory_item_id) {
-            const invResponse = await fetch(
-              `https://${shopifySettings.store_url}/admin/api/2024-01/inventory_levels.json?inventory_item_ids=${variant.inventory_item_id}`,
-              {
-                headers: {
-                  'X-Shopify-Access-Token': shopifySettings.access_token,
-                },
-              }
-            );
-
-            if (!invResponse.ok) continue;
-
-            const { inventory_levels } = await invResponse.json();
-            const totalAvailable = inventory_levels.reduce((sum: number, level: any) => sum + (level.available || 0), 0);
+          // Get inventory levels
+          if (variant.inventoryItem?.inventoryLevels?.edges?.length) {
+            const totalAvailable = variant.inventoryItem.inventoryLevels.edges
+              .reduce((sum: number, edge: any) => sum + (edge.node.available || 0), 0);
 
             // TODO: Update Ship Tornado inventory system
             // For now, just log it - you'd integrate with boxes or warehouse inventory
             console.log(`Shopify inventory for ${variant.sku}: ${totalAvailable}`);
             updated++;
-
           }
 
         } catch (variantError) {
@@ -287,7 +381,13 @@ async function syncFromShopify(
           console.error(`Error processing variant ${variant.sku}:`, variantError);
         }
       }
+
+      // Check for next page
+      hasNextPage = result.data.productVariants.pageInfo.hasNextPage;
+      afterCursor = result.data.productVariants.pageInfo.endCursor;
     }
+
+    console.log(`Fetched ${totalVariants} total variants from Shopify`);
 
   } catch (error) {
     console.error('Error in syncFromShopify:', error);
