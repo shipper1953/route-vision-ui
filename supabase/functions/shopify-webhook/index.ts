@@ -43,29 +43,28 @@ serve(async (req) => {
     }
 
     // Find company with matching Shopify store domain
-    const { data: company, error: companyError } = await supabase
+    const { data: companies, error: companyError } = await supabase
       .from('companies')
       .select('id, settings')
-      .eq('is_active', true)
-      .single();
+      .eq('is_active', true);
 
-    if (companyError || !company) {
-      console.error('Company not found');
-      throw new Error('Company not found');
+    if (companyError) {
+      console.error('Error querying companies:', companyError);
+      throw new Error('Database error');
+    }
+
+    // Find the company that has this Shopify store connected
+    const company = companies?.find(c => {
+      const shopifySettings = (c.settings as any)?.shopify;
+      return shopifySettings?.connected && shopifySettings?.store_url === shopDomain;
+    });
+
+    if (!company) {
+      console.error('No company found with Shopify store:', shopDomain);
+      throw new Error(`No company connected to Shopify store: ${shopDomain}`);
     }
 
     const shopifySettings = (company.settings as any)?.shopify;
-    if (!shopifySettings?.connected) {
-      console.error('Shopify not connected for company:', company.id);
-      throw new Error('Shopify not connected for this company');
-    }
-
-    // Verify the shop domain matches
-    if (shopifySettings.store_url !== shopDomain) {
-      console.error('Shop domain mismatch. Expected:', shopifySettings.store_url, 'Got:', shopDomain);
-      throw new Error('Shop domain does not match connected store');
-    }
-
     const companyId = company.id;
     console.log('✅ Found company:', companyId, 'for shop:', shopDomain);
 
