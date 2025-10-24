@@ -55,14 +55,49 @@ serve(async (req) => {
 
     console.log('Fetching products from Shopify store:', shopifySettings.store_url);
 
-    // Fetch products from Shopify
+    // Fetch products from Shopify using GraphQL
+    const productsQuery = `
+      query getProducts($first: Int!) {
+        products(first: $first) {
+          edges {
+            node {
+              id
+              legacyResourceId
+              title
+              productType
+              status
+              variants(first: 100) {
+                edges {
+                  node {
+                    id
+                    legacyResourceId
+                    sku
+                    title
+                    price
+                    inventoryQuantity
+                    weight
+                    weightUnit
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
     const productsResponse = await fetch(
-      `https://${shopifySettings.store_url}/admin/api/2024-01/products.json?limit=250`,
+      `https://${shopifySettings.store_url}/admin/api/2024-10/graphql.json`,
       {
+        method: 'POST',
         headers: {
           'X-Shopify-Access-Token': shopifySettings.access_token,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          query: productsQuery,
+          variables: { first: 250 }
+        })
       }
     );
 
@@ -72,7 +107,14 @@ serve(async (req) => {
       throw new Error('Failed to fetch products from Shopify');
     }
 
-    const { products } = await productsResponse.json();
+    const result = await productsResponse.json();
+    
+    if (result.errors) {
+      console.error('GraphQL errors:', result.errors);
+      throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
+    }
+
+    const products = result.data.products.edges.map((e: any) => e.node);
     console.log(`Fetched ${products.length} products from Shopify`);
 
     let imported = 0;
@@ -85,19 +127,20 @@ serve(async (req) => {
         console.log(`Processing product: ${product.title} (ID: ${product.id})`);
 
         // Process variants if enabled, otherwise use main product
-        const itemsToProcess = importVariants && product.variants?.length > 0
-          ? product.variants
-          : [{ 
-              id: product.id, 
-              sku: product.variants?.[0]?.sku || `SHOP-${product.id}`,
+        const itemsToProcess = importVariants && product.variants?.edges?.length > 0
+          ? product.variants.edges.map((e: any) => e.node)
+          : [{
+              id: product.id,
+              legacyResourceId: product.legacyResourceId,
+              sku: product.variants?.edges?.[0]?.node?.sku || `SHOP-${product.legacyResourceId}`,
               title: product.title,
-              price: product.variants?.[0]?.price || '0',
-              weight: product.variants?.[0]?.weight,
-              weight_unit: product.variants?.[0]?.weight_unit
+              price: product.variants?.edges?.[0]?.node?.price || '0',
+              weight: product.variants?.edges?.[0]?.node?.weight,
+              weightUnit: product.variants?.edges?.[0]?.node?.weightUnit
             }];
 
         for (const variant of itemsToProcess) {
-          const sku = variant.sku || `SHOP-${variant.id}`;
+          const sku = variant.sku || `SHOP-${variant.legacyResourceId}`;
           
           // Check if item exists
           const { data: existingItem } = await supabase
@@ -114,10 +157,14 @@ serve(async (req) => {
             name: importVariants && itemsToProcess.length > 1 
               ? `${product.title} - ${variant.title || ''}`
               : product.title,
-            category: product.product_type || 'General',
-            is_active: product.status === 'active',
-            shopify_product_id: product.id.toString(),
-            shopify_variant_id: variant.id.toString(),
+            category: product.productType || 'General',
+            is_active: product.status === 'ACTIVE',
+            
+            // Store both numeric IDs (legacy) and GIDs (new)
+            shopify_product_id: product.legacyResourceId,
+            shopify_variant_id: variant.legacyResourceId,
+            shopify_product_gid: product.id,
+            shopify_variant_gid: variant.id,
           };
 
           // Add dimensions if syncing
@@ -130,15 +177,15 @@ serve(async (req) => {
 
           // Add weight if syncing
           if (syncWeight && variant.weight) {
-            // Convert weight to lbs (Shopify can be in grams, ounces, lbs, kg)
+            // Convert weight to lbs (Shopify can be in GRAMS, OUNCES, POUNDS, KILOGRAMS)
             let weightInLbs = parseFloat(variant.weight);
-            const weightUnit = variant.weight_unit?.toLowerCase();
+            const weightUnit = variant.weightUnit?.toLowerCase();
             
-            if (weightUnit === 'g' || weightUnit === 'grams') {
+            if (weightUnit === 'grams') {
               weightInLbs = weightInLbs / 453.592; // grams to lbs
-            } else if (weightUnit === 'oz' || weightUnit === 'ounces') {
+            } else if (weightUnit === 'ounces') {
               weightInLbs = weightInLbs / 16; // ounces to lbs
-            } else if (weightUnit === 'kg' || weightUnit === 'kilograms') {
+            } else if (weightUnit === 'kilograms') {
               weightInLbs = weightInLbs * 2.20462; // kg to lbs
             }
             

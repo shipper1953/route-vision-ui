@@ -67,8 +67,14 @@ export const useItemMaster = () => {
         category: item.category,
         isActive: item.is_active,
         dimensionsUpdatedAt: item.dimensions_updated_at,
+        
+        // Legacy numeric IDs
         shopifyProductId: item.shopify_product_id,
-        shopifyVariantId: item.shopify_variant_id
+        shopifyVariantId: item.shopify_variant_id,
+        
+        // Global IDs
+        shopifyProductGid: item.shopify_product_gid,
+        shopifyVariantGid: item.shopify_variant_gid
       }));
       
       setItems(mappedItems);

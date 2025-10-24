@@ -65,7 +65,7 @@ serve(async (req) => {
     if (itemIds.length > 0) {
       const { data: itemDetails } = await supabase
         .from('items')
-        .select('id, sku, name, shopify_product_id, shopify_variant_id')
+        .select('id, sku, name, shopify_product_id, shopify_variant_id, shopify_product_gid, shopify_variant_gid')
         .in('id', itemIds);
 
       if (itemDetails && itemDetails.length > 0) {
@@ -76,7 +76,9 @@ serve(async (req) => {
           return {
             ...item,
             shopify_product_id: details?.shopify_product_id,
-            shopify_variant_id: details?.shopify_variant_id
+            shopify_variant_id: details?.shopify_variant_id,
+            shopify_product_gid: details?.shopify_product_gid,
+            shopify_variant_gid: details?.shopify_variant_gid
           };
         });
         
@@ -249,7 +251,7 @@ serve(async (req) => {
       // We have item-level tracking - only fulfill items in THIS specific package
       const shippedItems = orderShipment.package_info.items;
       
-      // Enrich shipped items with Shopify IDs
+      // Enrich shipped items with Shopify IDs and GIDs
       const enrichedShippedItems = shippedItems.map((si: any) => {
         const enrichedItem = enrichedOrderItems.find((oi: any) => 
           oi.sku === si.sku || oi.name === si.name
@@ -257,7 +259,9 @@ serve(async (req) => {
         return {
           ...si,
           shopify_variant_id: enrichedItem?.shopify_variant_id,
-          shopify_product_id: enrichedItem?.shopify_product_id
+          shopify_product_id: enrichedItem?.shopify_product_id,
+          shopify_variant_gid: enrichedItem?.shopify_variant_gid,
+          shopify_product_gid: enrichedItem?.shopify_product_gid
         };
       });
       

@@ -204,7 +204,9 @@ export type Database = {
           is_active: boolean
           length: number
           name: string
+          shopify_product_gid: string | null
           shopify_product_id: string | null
+          shopify_variant_gid: string | null
           shopify_variant_id: string | null
           sku: string
           updated_at: string
@@ -221,7 +223,9 @@ export type Database = {
           is_active?: boolean
           length: number
           name: string
+          shopify_product_gid?: string | null
           shopify_product_id?: string | null
+          shopify_variant_gid?: string | null
           shopify_variant_id?: string | null
           sku: string
           updated_at?: string
@@ -238,7 +242,9 @@ export type Database = {
           is_active?: boolean
           length?: number
           name?: string
+          shopify_product_gid?: string | null
           shopify_product_id?: string | null
+          shopify_variant_gid?: string | null
           shopify_variant_id?: string | null
           sku?: string
           updated_at?: string

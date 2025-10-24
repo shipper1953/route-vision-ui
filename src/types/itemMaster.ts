@@ -10,6 +10,12 @@ export interface Item {
   category: string;
   isActive: boolean;
   dimensionsUpdatedAt?: string;
+  
+  // Legacy numeric IDs (for REST API compatibility)
   shopifyProductId?: string;
   shopifyVariantId?: string;
+  
+  // Global IDs (for GraphQL)
+  shopifyProductGid?: string;
+  shopifyVariantGid?: string;
 }
