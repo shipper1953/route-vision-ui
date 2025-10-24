@@ -1,7 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, RefreshCw, Store, Truck } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CheckCircle2, XCircle, RefreshCw, Store, Truck, Info } from "lucide-react";
 import { ShopifyConnectionDialog } from "@/components/integrations/ShopifyConnectionDialog";
 import { useState } from "react";
 import { useShopifyConnection } from "@/hooks/useShopifyConnection";
@@ -161,6 +162,15 @@ export const ShopifyConnectionCard = ({ companyId, settings, onRefresh }: Shopif
         <CardContent className="space-y-4">
           {connection.connected ? (
             <>
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>How Orders Sync</AlertTitle>
+                <AlertDescription>
+                  Orders appear in Ship Tornado after you click "Request fulfillment" in Shopify. 
+                  This ensures you control which orders to fulfill through Ship Tornado.
+                </AlertDescription>
+              </Alert>
+
               <div className="grid gap-4">
                 <div>
                   <p className="text-sm font-medium">Store URL</p>

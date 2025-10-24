@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
 
     console.log('Fulfillment service registered successfully:', fulfillmentService);
 
-    // Subscribe to fulfillment order webhooks
+    // Subscribe to fulfillment order webhooks only (not orders/create)
     const webhookTopics = [
       'FULFILLMENT_ORDERS_FULFILLMENT_REQUEST',
       'FULFILLMENT_ORDERS_CANCELLATION_REQUEST',

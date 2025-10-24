@@ -140,21 +140,162 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Find matching Ship Tornado order
     const shopifyOrderId = `gid://shopify/Order/${webhook.fulfillment_order.order_id}`;
-    const { data: mapping } = await supabase
+    
+    // Check if order already exists
+    const { data: existingMapping } = await supabase
       .from('shopify_order_mappings')
       .select('ship_tornado_order_id')
       .eq('shopify_order_id', shopifyOrderId)
       .eq('company_id', company.id)
       .single();
 
+    if (existingMapping) {
+      console.log('Order already synced:', shopifyOrderId);
+      return new Response(
+        JSON.stringify({ message: 'Order already synced' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Fetch full order from Shopify REST API
+    const orderResponse = await fetch(
+      `https://${shopDomain}/admin/api/2025-01/orders/${webhook.fulfillment_order.order_id}.json`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': shopifySettings.access_token
+        }
+      }
+    );
+
+    if (!orderResponse.ok) {
+      console.error('Failed to fetch order from Shopify:', await orderResponse.text());
+      throw new Error('Failed to fetch order details from Shopify');
+    }
+
+    const { order: shopifyOrder } = await orderResponse.json();
+    console.log('Fetched order from Shopify:', shopifyOrder.order_number);
+
+    // Get default warehouse for company
+    const { data: warehouse } = await supabase
+      .from('warehouses')
+      .select('id')
+      .eq('company_id', company.id)
+      .eq('is_default', true)
+      .single();
+
+    // Import shared utilities
+    const { ensureItemExists, sanitizeString, addBusinessDays } = await import('../_shared/shopify-item-matcher.ts');
+
+    // Match fulfillment line items with order line items
+    const fulfillmentLineItemIds = webhook.fulfillment_order.line_items.map(li => li.line_item_id);
+    const orderLineItems = shopifyOrder.line_items.filter((li: any) => 
+      fulfillmentLineItemIds.includes(li.id)
+    );
+
+    // Process all line items
+    const mappedItems = [];
+    let itemsMatched = 0;
+    let itemsCreated = 0;
+
+    for (const lineItem of orderLineItems) {
+      const fulfillmentItem = webhook.fulfillment_order.line_items.find(
+        (fli: any) => fli.line_item_id === lineItem.id
+      );
+
+      try {
+        const { id: itemId, details } = await ensureItemExists(supabase, company.id, lineItem);
+        
+        if (details.shopify_variant_id === lineItem.variant_id?.toString() || 
+            details.shopify_product_id === lineItem.product_id?.toString() ||
+            details.sku === lineItem.sku) {
+          itemsMatched++;
+        } else {
+          itemsCreated++;
+        }
+        
+        mappedItems.push({
+          itemId: itemId,
+          sku: details.sku,
+          name: sanitizeString(lineItem.name, 255),
+          quantity: fulfillmentItem.quantity,
+          unitPrice: parseFloat(lineItem.price),
+          length: details.length,
+          width: details.width,
+          height: details.height,
+          weight: details.weight
+        });
+      } catch (error) {
+        console.error(`Failed to process line item:`, error);
+        mappedItems.push({
+          sku: sanitizeString(lineItem.sku || lineItem.name, 100),
+          name: sanitizeString(lineItem.name, 255),
+          quantity: fulfillmentItem.quantity,
+          unitPrice: parseFloat(lineItem.price)
+        });
+      }
+    }
+
+    console.log(`📊 Item processing: ${itemsMatched} matched, ${itemsCreated} created`);
+
+    // Create Ship Tornado order
+    const orderData = {
+      order_id: sanitizeString(`SHOP-${shopifyOrder.order_number}`, 50) || 'UNKNOWN',
+      customer_name: sanitizeString(
+        `${shopifyOrder.customer?.first_name || ''} ${shopifyOrder.customer?.last_name || ''}`.trim(),
+        255
+      ) || 'Unknown',
+      customer_email: sanitizeString(shopifyOrder.customer?.email, 255),
+      customer_phone: sanitizeString(shopifyOrder.customer?.phone, 20),
+      customer_company: sanitizeString(shopifyOrder.customer?.company, 255),
+      shipping_address: {
+        street1: sanitizeString(webhook.fulfillment_order.destination.address1, 255) || '',
+        street2: sanitizeString(webhook.fulfillment_order.destination.address2, 255) || '',
+        city: sanitizeString(webhook.fulfillment_order.destination.city, 100) || '',
+        state: sanitizeString(webhook.fulfillment_order.destination.province, 10) || '',
+        zip: sanitizeString(webhook.fulfillment_order.destination.zip, 20) || '',
+        country: sanitizeString(webhook.fulfillment_order.destination.country, 2) || 'US'
+      },
+      items: mappedItems,
+      value: parseFloat(shopifyOrder.total_price || '0'),
+      order_date: shopifyOrder.created_at,
+      required_delivery_date: addBusinessDays(new Date(shopifyOrder.created_at), 5).toISOString().split('T')[0],
+      status: 'ready_to_ship',
+      company_id: company.id,
+      warehouse_id: warehouse?.id || null,
+      user_id: null,
+    };
+
+    const { data: newOrder, error: orderError } = await supabase
+      .from('orders')
+      .insert(orderData)
+      .select()
+      .single();
+
+    if (orderError) {
+      console.error('Error creating order:', orderError);
+      throw orderError;
+    }
+
+    console.log('Created order:', newOrder.id);
+
+    // Create mapping
+    await supabase
+      .from('shopify_order_mappings')
+      .insert({
+        company_id: company.id,
+        ship_tornado_order_id: newOrder.id,
+        shopify_order_id: shopifyOrderId,
+        shopify_order_number: shopifyOrder.order_number.toString(),
+        sync_status: 'synced',
+      });
+
     // Store fulfillment order
     const { error: insertError } = await supabase
       .from('shopify_fulfillment_orders')
       .insert({
         company_id: company.id,
-        ship_tornado_order_id: mapping?.ship_tornado_order_id || null,
+        ship_tornado_order_id: newOrder.id,
         shopify_order_id: shopifyOrderId,
         fulfillment_order_id: `gid://shopify/FulfillmentOrder/${webhook.fulfillment_order.id}`,
         fulfillment_order_number: webhook.fulfillment_order.id.toString(),
@@ -171,22 +312,23 @@ Deno.serve(async (req) => {
 
     if (insertError) {
       console.error('Error inserting fulfillment order:', insertError);
-      // Continue anyway - don't fail the webhook
     }
 
-    // Log the event
+    // Log success
     await supabase.from('shopify_sync_logs').insert({
       company_id: company.id,
       sync_type: 'fulfillment_order_notification',
       direction: 'inbound',
       status: 'success',
       shopify_order_id: shopifyOrderId,
-      ship_tornado_order_id: mapping?.ship_tornado_order_id || null,
+      ship_tornado_order_id: newOrder.id,
       metadata: {
         fulfillment_order_id: webhook.fulfillment_order.id,
         request_status: webhook.fulfillment_order.request_status,
         status: webhook.fulfillment_order.status,
         line_item_count: webhook.fulfillment_order.line_items.length,
+        items_matched: itemsMatched,
+        items_created: itemsCreated,
       },
     });
 
