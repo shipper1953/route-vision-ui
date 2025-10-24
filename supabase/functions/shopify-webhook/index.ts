@@ -140,6 +140,19 @@ serve(async (req) => {
           
           if (variantMatch) {
             console.log(`✅ Matched by variant_id: ${lineItem.variant_id}`);
+            
+            // Backfill Shopify IDs if missing
+            if (!variantMatch.shopify_variant_id || !variantMatch.shopify_product_id) {
+              await supabase
+                .from('items')
+                .update({
+                  shopify_product_id: lineItem.product_id?.toString() || null,
+                  shopify_variant_id: lineItem.variant_id?.toString() || null
+                })
+                .eq('id', variantMatch.id);
+              console.log(`🔄 Backfilled Shopify IDs for item ${variantMatch.sku}`);
+            }
+            
             return { id: variantMatch.id, details: variantMatch };
           }
         }
@@ -155,6 +168,19 @@ serve(async (req) => {
           
           if (productMatch) {
             console.log(`✅ Matched by product_id: ${lineItem.product_id}`);
+            
+            // Backfill Shopify IDs if missing
+            if (!productMatch.shopify_variant_id || !productMatch.shopify_product_id) {
+              await supabase
+                .from('items')
+                .update({
+                  shopify_product_id: lineItem.product_id?.toString() || null,
+                  shopify_variant_id: lineItem.variant_id?.toString() || null
+                })
+                .eq('id', productMatch.id);
+              console.log(`🔄 Backfilled Shopify IDs for item ${productMatch.sku}`);
+            }
+            
             return { id: productMatch.id, details: productMatch };
           }
         }
@@ -170,6 +196,19 @@ serve(async (req) => {
           
           if (skuMatch) {
             console.log(`✅ Matched by SKU: ${lineItem.sku}`);
+            
+            // Backfill Shopify IDs if missing
+            if (!skuMatch.shopify_variant_id || !skuMatch.shopify_product_id) {
+              await supabase
+                .from('items')
+                .update({
+                  shopify_product_id: lineItem.product_id?.toString() || null,
+                  shopify_variant_id: lineItem.variant_id?.toString() || null
+                })
+                .eq('id', skuMatch.id);
+              console.log(`🔄 Backfilled Shopify IDs for item ${skuMatch.sku}`);
+            }
+            
             return { id: skuMatch.id, details: skuMatch };
           }
         }

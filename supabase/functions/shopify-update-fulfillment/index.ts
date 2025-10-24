@@ -154,7 +154,44 @@ serve(async (req) => {
     const { fulfillment_orders } = await fulfillmentOrdersResponse.json();
     
     if (!fulfillment_orders || fulfillment_orders.length === 0) {
-      throw new Error('No fulfillment orders found for Shopify order');
+      const fulfillmentStatus = shopifyOrder.fulfillment_status;
+      const financialStatus = shopifyOrder.financial_status;
+      
+      console.warn('⚠️ No fulfillment orders found:', {
+        shopifyOrderId: mapping.shopify_order_id,
+        fulfillmentStatus,
+        financialStatus,
+        orderStatus: shopifyOrder.status
+      });
+      
+      // Log detailed diagnostic
+      await supabase.from('shopify_sync_logs').insert({
+        company_id: order.company_id,
+        sync_type: 'fulfillment',
+        direction: 'outbound',
+        status: 'skipped',
+        shopify_order_id: mapping.shopify_order_id,
+        ship_tornado_order_id: orderShipment.order_id,
+        error_message: `No fulfillment orders found. Order status: ${fulfillmentStatus}, Financial: ${financialStatus}`,
+        metadata: { 
+          fulfillmentStatus, 
+          financialStatus, 
+          orderStatus: shopifyOrder.status,
+          reason: fulfillmentStatus === 'fulfilled' ? 'already_fulfilled' : 
+                  shopifyOrder.status === 'draft' ? 'draft_order' : 'unknown'
+        }
+      });
+      
+      return new Response(
+        JSON.stringify({ 
+          message: 'Shopify order not fulfillable',
+          reason: fulfillmentStatus === 'fulfilled' ? 'Order already fulfilled in Shopify' :
+                  shopifyOrder.status === 'draft' ? 'Draft order cannot be fulfilled' :
+                  'Order does not require shipping or has no fulfillment location configured',
+          orderStatus: { fulfillmentStatus, financialStatus, status: shopifyOrder.status }
+        }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
     const fulfillmentOrderId = fulfillment_orders[0].id;
