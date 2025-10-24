@@ -835,7 +835,7 @@ serve(async (req) => {
           
           const shopifySettings = companyData?.settings?.shopify;
           
-          if (shopifySettings?.connected && shopifySettings?.fulfillment_sync_enabled) {
+          if (shopifySettings?.connected && shopifySettings?.sync_config?.fulfillment?.enabled) {
             console.log('📤 Triggering Shopify fulfillment update...');
             
             const trackingNumber = provider === 'shippo' 
