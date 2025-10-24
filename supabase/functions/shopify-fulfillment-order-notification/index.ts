@@ -106,7 +106,6 @@ async function fetchAssignedFulfillmentOrders(
               address2
               city
               province
-              provinceCode
               zip
               countryCode
               company
@@ -195,6 +194,32 @@ async function acceptFulfillmentOrder(
 }
 
 // ========== INLINED SHARED UTILITIES ==========
+
+// US state name to code mapping
+const STATE_NAME_TO_CODE: { [key: string]: string } = {
+  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+  'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
+  'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA',
+  'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+  'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO',
+  'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
+  'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+  'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY',
+  'district of columbia': 'DC', 'puerto rico': 'PR'
+};
+
+function convertStateToCode(stateName: string | null | undefined): string {
+  if (!stateName) return '';
+  const normalized = stateName.toLowerCase().trim();
+  // If already a 2-letter code, return as-is
+  if (normalized.length === 2 && /^[a-z]{2}$/i.test(normalized)) {
+    return normalized.toUpperCase();
+  }
+  // Look up in mapping
+  return STATE_NAME_TO_CODE[normalized] || stateName.slice(0, 10);
+}
 
 // Sanitization helper to prevent injection attacks
 function sanitizeString(str: string | null | undefined, maxLength: number = 255): string | null {
@@ -563,7 +588,7 @@ Deno.serve(async (req) => {
           street1: sanitizeString(fo.destination.address1, 255) || '',
           street2: sanitizeString(fo.destination.address2, 255) || '',
           city: sanitizeString(fo.destination.city, 100) || '',
-          state: sanitizeString(fo.destination.provinceCode || fo.destination.province, 10) || '',
+          state: convertStateToCode(fo.destination.province) || '',
           zip: sanitizeString(fo.destination.zip, 20) || '',
           country: sanitizeString(fo.destination.countryCode, 2) || 'US'
         },
