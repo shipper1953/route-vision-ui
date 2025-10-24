@@ -180,8 +180,9 @@ async function handleFulfillmentServiceFlow(
     .from('shopify_fulfillment_orders')
     .select('*')
     .eq('ship_tornado_order_id', orderShipment.order_id)
-    .neq('status', 'closed')
-    .neq('status', 'cancelled');
+    .in('status', ['open', 'in_progress', 'scheduled']);
+  
+  console.log(`Found ${fulfillmentOrders?.length || 0} fulfillment orders with status: ${fulfillmentOrders?.map(fo => fo.status).join(', ')}`);
 
   if (foError) {
     console.error('Error fetching fulfillment orders:', foError);
@@ -226,7 +227,14 @@ async function handleFulfillmentServiceFlow(
     // Match shipped items to fulfillment order line items
     console.log('Fulfillment order line items:', JSON.stringify(fulfillmentOrder.line_items, null, 2));
     
-    for (const foLineItem of fulfillmentOrder.line_items) {
+    // Filter to only line items that still have quantity to fulfill
+    const availableLineItems = fulfillmentOrder.line_items.filter((li: any) => 
+      (li.remainingQuantity || li.fulfillable_quantity || 0) > 0
+    );
+    
+    console.log(`Available line items with remaining quantity: ${availableLineItems.length} of ${fulfillmentOrder.line_items.length}`);
+    
+    for (const foLineItem of availableLineItems) {
       // Try multiple matching strategies
       const shippedItem = shippedItems.find((si: any) => {
         // Strategy 1: Match by Shopify variant ID (most reliable)
