@@ -116,6 +116,8 @@ serve(async (req) => {
               : product.title,
             category: product.product_type || 'General',
             is_active: product.status === 'active',
+            shopify_product_id: product.id.toString(),
+            shopify_variant_id: variant.id.toString(),
           };
 
           // Add dimensions if syncing

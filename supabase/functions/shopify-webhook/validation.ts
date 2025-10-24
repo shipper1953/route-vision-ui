@@ -43,6 +43,7 @@ export const ShopifyOrderSchema = z.object({
   line_items: z.array(
     z.object({
       id: z.union([z.number(), z.string()]).optional(),
+      product_id: z.union([z.number(), z.string()]).optional().nullable(),
       variant_id: z.union([z.number(), z.string()]).optional().nullable(),
       title: z.string().max(255),
       quantity: z.number().int().positive().max(10000),

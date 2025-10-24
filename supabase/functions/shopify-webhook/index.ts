@@ -127,6 +127,135 @@ serve(async (req) => {
         .eq('is_default', true)
         .single();
 
+      // Helper function to find/create item with Shopify ID matching
+      async function ensureItemExists(lineItem: any): Promise<{ id: string; details: any }> {
+        // PRIORITY 1: Try to match by variant_id (most specific)
+        if (lineItem.variant_id) {
+          const { data: variantMatch } = await supabase
+            .from('items')
+            .select('id, sku, name, length, width, height, weight')
+            .eq('company_id', companyId)
+            .eq('shopify_variant_id', lineItem.variant_id.toString())
+            .maybeSingle();
+          
+          if (variantMatch) {
+            console.log(`✅ Matched by variant_id: ${lineItem.variant_id}`);
+            return { id: variantMatch.id, details: variantMatch };
+          }
+        }
+        
+        // PRIORITY 2: Try to match by product_id
+        if (lineItem.product_id) {
+          const { data: productMatch } = await supabase
+            .from('items')
+            .select('id, sku, name, length, width, height, weight')
+            .eq('company_id', companyId)
+            .eq('shopify_product_id', lineItem.product_id.toString())
+            .maybeSingle();
+          
+          if (productMatch) {
+            console.log(`✅ Matched by product_id: ${lineItem.product_id}`);
+            return { id: productMatch.id, details: productMatch };
+          }
+        }
+        
+        // PRIORITY 3: Fallback to SKU matching
+        if (lineItem.sku) {
+          const { data: skuMatch } = await supabase
+            .from('items')
+            .select('id, sku, name, length, width, height, weight')
+            .eq('company_id', companyId)
+            .eq('sku', lineItem.sku)
+            .maybeSingle();
+          
+          if (skuMatch) {
+            console.log(`✅ Matched by SKU: ${lineItem.sku}`);
+            return { id: skuMatch.id, details: skuMatch };
+          }
+        }
+        
+        // PRIORITY 4: Create new item
+        console.log(`📦 Creating new item for product_id: ${lineItem.product_id}, variant_id: ${lineItem.variant_id}`);
+        
+        const sku = sanitizeString(lineItem.sku || `SHOP-${lineItem.variant_id || lineItem.product_id}`, 100);
+        
+        let weightInLbs = 0.125;
+        if (lineItem.grams && lineItem.grams > 0) {
+          weightInLbs = lineItem.grams / 453.592;
+        }
+        
+        const itemData = {
+          company_id: companyId,
+          sku: sku,
+          name: sanitizeString(lineItem.name || lineItem.title, 255),
+          category: 'Shopify Product',
+          is_active: true,
+          length: 12,
+          width: 12,
+          height: 12,
+          weight: weightInLbs,
+          shopify_product_id: lineItem.product_id?.toString() || null,
+          shopify_variant_id: lineItem.variant_id?.toString() || null
+        };
+        
+        const { data: newItem, error: itemError } = await supabase
+          .from('items')
+          .insert(itemData)
+          .select('id, sku, name, length, width, height, weight')
+          .single();
+        
+        if (itemError) {
+          console.error('Error creating item:', itemError);
+          throw new Error(`Failed to create item: ${itemError.message}`);
+        }
+        
+        console.log(`✅ Created item: ${sku} with Shopify IDs`);
+        return { id: newItem.id, details: newItem };
+      }
+
+      // Process all line items with enhanced matching
+      const mappedItems = [];
+      let itemsMatched = 0;
+      let itemsCreated = 0;
+
+      for (const lineItem of shopifyOrder.line_items || []) {
+        try {
+          const { id: itemId, details } = await ensureItemExists(lineItem);
+          
+          // Track if we matched vs created
+          if (details.shopify_variant_id === lineItem.variant_id?.toString() || 
+              details.shopify_product_id === lineItem.product_id?.toString() ||
+              details.sku === lineItem.sku) {
+            itemsMatched++;
+          } else {
+            itemsCreated++;
+          }
+          
+          mappedItems.push({
+            itemId: itemId,
+            sku: details.sku,
+            name: sanitizeString(lineItem.name, 255),
+            quantity: lineItem.quantity,
+            unitPrice: parseFloat(lineItem.price),
+            length: details.length,
+            width: details.width,
+            height: details.height,
+            weight: details.weight
+          });
+          
+        } catch (error) {
+          console.error(`Failed to process line item:`, error);
+          mappedItems.push({
+            sku: sanitizeString(lineItem.sku || lineItem.name, 100),
+            name: sanitizeString(lineItem.name, 255),
+            quantity: lineItem.quantity,
+            unitPrice: parseFloat(lineItem.price)
+          });
+        }
+      }
+
+      console.log(`📊 Item processing: ${itemsMatched} matched, ${itemsCreated} created`);
+
       // Transform Shopify order to Ship Tornado format with sanitization
       const orderData = {
         order_id: sanitizeString(`SHOP-${shopifyOrder.order_number}`, 50) || 'UNKNOWN',
@@ -145,12 +274,7 @@ serve(async (req) => {
           zip: sanitizeString(shopifyOrder.shipping_address.zip, 20) || '',
           country: sanitizeString(shopifyOrder.shipping_address.country_code, 2) || 'US'
         } : null,
-        items: shopifyOrder.line_items?.map((item: any) => ({
-          sku: sanitizeString(item.sku || item.name, 100),
-          name: sanitizeString(item.name, 255),
-          quantity: item.quantity,
-          unitPrice: parseFloat(item.price)
-        })) || [],
+        items: mappedItems,
         value: parseFloat(shopifyOrder.total_price || '0'),
         order_date: shopifyOrder.created_at,
         status: 'ready_to_ship',
@@ -194,7 +318,13 @@ serve(async (req) => {
           status: 'success',
           shopify_order_id: shopifyOrder.id.toString(),
           ship_tornado_order_id: newOrder.id,
-          metadata: { order_number: shopifyOrder.order_number },
+          metadata: { 
+            order_number: shopifyOrder.order_number,
+            total_items: mappedItems.length,
+            items_matched: itemsMatched,
+            items_created: itemsCreated,
+            matching_method: 'shopify_ids'
+          },
         });
 
       return new Response(JSON.stringify({ success: true, order_id: newOrder.id }), {

@@ -66,7 +66,9 @@ export const useItemMaster = () => {
         weight: Number(item.weight),
         category: item.category,
         isActive: item.is_active,
-        dimensionsUpdatedAt: item.dimensions_updated_at
+        dimensionsUpdatedAt: item.dimensions_updated_at,
+        shopifyProductId: item.shopify_product_id,
+        shopifyVariantId: item.shopify_variant_id
       }));
       
       setItems(mappedItems);
@@ -115,7 +117,9 @@ export const useItemMaster = () => {
         weight: Number(data.weight),
         category: data.category,
         isActive: data.is_active,
-        dimensionsUpdatedAt: data.dimensions_updated_at
+        dimensionsUpdatedAt: data.dimensions_updated_at,
+        shopifyProductId: data.shopify_product_id,
+        shopifyVariantId: data.shopify_variant_id
       };
 
       setItems(prev => [...prev, newItem]);

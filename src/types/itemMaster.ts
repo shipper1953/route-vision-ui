@@ -10,4 +10,6 @@ export interface Item {
   category: string;
   isActive: boolean;
   dimensionsUpdatedAt?: string;
+  shopifyProductId?: string;
+  shopifyVariantId?: string;
 }
