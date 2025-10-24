@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.text();
+    console.log('Raw webhook body received (first 500 chars):', body.substring(0, 500));
     let webhook: FulfillmentServiceCallback;
 
     // Parse and validate webhook body
@@ -90,20 +91,38 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Log the parsed structure for debugging
+    console.log('Parsed webhook structure:', {
+      hasKind: !!webhook.kind,
+      kind: webhook.kind,
+      hasFulfillmentOrder: !!webhook.fulfillment_order,
+      topLevelKeys: Object.keys(webhook),
+    });
+
     // Validate required fields
-    if (!webhook.kind || !webhook.fulfillment_order) {
-      console.error('Invalid callback payload:', { kind: webhook.kind, hasFulfillmentOrder: !!webhook.fulfillment_order });
+    if (!webhook.kind) {
+      console.error('Missing "kind" field in callback payload');
       return new Response(
-        JSON.stringify({ error: 'Invalid callback payload structure' }),
+        JSON.stringify({ error: 'Missing kind field' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Only handle fulfillment_request kind
-    if (webhook.kind !== 'fulfillment_request') {
+    if (!webhook.fulfillment_order) {
+      console.error('Missing "fulfillment_order" field in callback payload');
+      console.log('Full parsed webhook:', JSON.stringify(webhook, null, 2));
+      return new Response(
+        JSON.stringify({ error: 'Missing fulfillment_order field' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Only handle fulfillment_request kind (case-insensitive)
+    const normalizedKind = webhook.kind?.toLowerCase();
+    if (normalizedKind !== 'fulfillment_request') {
       console.log(`Received callback kind: ${webhook.kind} - not processing`);
       return new Response(
-        JSON.stringify({ message: `Callback kind ${webhook.kind} not handled` }),
+        JSON.stringify({ message: `Callback kind ${webhook.kind} acknowledged but not processed` }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
