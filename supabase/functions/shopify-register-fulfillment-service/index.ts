@@ -31,11 +31,34 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { companyId, shopifySettings } = await req.json();
+    const { companyId } = await req.json();
 
-    if (!companyId || !shopifySettings?.access_token || !shopifySettings?.store_url) {
+    if (!companyId) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
+        JSON.stringify({ error: 'Missing companyId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Fetch shopify settings from company record
+    const { data: companyData, error: companyError } = await supabase
+      .from('companies')
+      .select('settings')
+      .eq('id', companyId)
+      .single();
+
+    if (companyError || !companyData) {
+      console.error('Failed to fetch company:', companyError);
+      return new Response(
+        JSON.stringify({ error: 'Company not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const shopifySettings = companyData.settings?.shopify;
+    if (!shopifySettings?.access_token || !shopifySettings?.store_url) {
+      return new Response(
+        JSON.stringify({ error: 'Shopify not connected. Please connect your Shopify store first.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -119,18 +142,10 @@ Deno.serve(async (req) => {
     }
 
     // Update company settings with fulfillment service info
-    const { data: company, error: fetchError } = await supabase
-      .from('companies')
-      .select('settings')
-      .eq('id', companyId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
     const updatedSettings = {
-      ...(company.settings || {}),
+      ...(companyData.settings || {}),
       shopify: {
-        ...(company.settings?.shopify || {}),
+        ...(companyData.settings?.shopify || {}),
         fulfillment_service: {
           id: fulfillmentService.id,
           location_id: fulfillmentService.location.id,

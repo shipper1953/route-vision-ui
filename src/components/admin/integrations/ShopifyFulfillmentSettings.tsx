@@ -3,8 +3,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ShopifySettings } from "@/hooks/useShopifySettings";
-import { CheckCircle, AlertCircle } from "lucide-react";
+import { CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface ShopifyFulfillmentSettingsProps {
   settings: ShopifySettings;
@@ -16,9 +20,12 @@ interface ShopifyFulfillmentSettingsProps {
 export const ShopifyFulfillmentSettings = ({ 
   settings, 
   onUpdate, 
-  onChange 
+  onChange,
+  companyId 
 }: ShopifyFulfillmentSettingsProps) => {
   const fulfillmentConfig = settings.sync_config.fulfillment;
+  const { toast } = useToast();
+  const [registering, setRegistering] = useState(false);
 
   const updateFulfillmentConfig = (updates: Partial<typeof fulfillmentConfig>) => {
     onUpdate({
@@ -30,6 +37,43 @@ export const ShopifyFulfillmentSettings = ({
         },
       },
     });
+  };
+
+  const handleRegisterFulfillmentService = async () => {
+    if (!companyId) {
+      toast({
+        title: "Error",
+        description: "Company ID is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setRegistering(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('shopify-register-fulfillment-service', {
+        body: { companyId },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Fulfillment Service Registered",
+        description: "Ship Tornado has been registered as a fulfillment service in your Shopify store",
+      });
+
+      // Refresh settings to show updated status
+      onChange();
+    } catch (error: any) {
+      console.error('Failed to register fulfillment service:', error);
+      toast({
+        title: "Registration Failed",
+        description: error.message || "Failed to register fulfillment service",
+        variant: "destructive",
+      });
+    } finally {
+      setRegistering(false);
+    }
   };
 
   const fulfillmentService = settings.fulfillment_service;
@@ -46,7 +90,7 @@ export const ShopifyFulfillmentSettings = ({
       <CardContent className="space-y-6">
         {/* Fulfillment Service Status */}
         <div className="flex items-start justify-between p-4 rounded-lg border bg-muted/50">
-          <div className="space-y-1">
+          <div className="space-y-1 flex-1">
             <div className="flex items-center gap-2">
               <Label className="text-base">Fulfillment Service Status</Label>
               {isRegistered ? (
@@ -73,6 +117,15 @@ export const ShopifyFulfillmentSettings = ({
               </p>
             )}
           </div>
+          <Button
+            variant={isRegistered ? "outline" : "default"}
+            size="sm"
+            onClick={handleRegisterFulfillmentService}
+            disabled={registering || !settings.connection.connected}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${registering ? 'animate-spin' : ''}`} />
+            {registering ? 'Registering...' : isRegistered ? 'Re-register' : 'Register Service'}
+          </Button>
         </div>
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
