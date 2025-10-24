@@ -112,6 +112,7 @@ export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMast
             <TableHead>Dimensions (L×W×H)</TableHead>
             <TableHead>Weight</TableHead>
             <TableHead>Category</TableHead>
+            <TableHead>Shopify Variant</TableHead>
             <TableHead>Dims Updated</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Actions</TableHead>
@@ -137,6 +138,15 @@ export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMast
               </TableCell>
               <TableCell>
                 <Badge variant="outline">{item.category}</Badge>
+              </TableCell>
+              <TableCell>
+                {item.shopifyVariantGid ? (
+                  <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px] block" title={item.shopifyVariantGid}>
+                    {item.shopifyVariantGid.split('/').pop()}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
               </TableCell>
               <TableCell>
                 {item.dimensionsUpdatedAt ? (

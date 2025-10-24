@@ -177,6 +177,36 @@ export const EditItemDialog = ({ item, isOpen, onClose, onUpdate }: EditItemDial
             <Label htmlFor="isActive">Active</Label>
           </div>
 
+          {(item?.shopifyProductGid || item?.shopifyVariantGid) && (
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-sm font-semibold text-muted-foreground">Shopify Integration (Read-Only)</h4>
+              
+              {item?.shopifyProductGid && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Product GID</Label>
+                  <Input
+                    value={item.shopifyProductGid}
+                    readOnly
+                    disabled
+                    className="font-mono text-xs bg-muted"
+                  />
+                </div>
+              )}
+              
+              {item?.shopifyVariantGid && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Variant GID</Label>
+                  <Input
+                    value={item.shopifyVariantGid}
+                    readOnly
+                    disabled
+                    className="font-mono text-xs bg-muted"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
