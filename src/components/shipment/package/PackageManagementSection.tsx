@@ -516,6 +516,16 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
 
   return (
     <div className="space-y-6">
+      {/* Item Selection */}
+      {orderItems.length > 0 && onItemsSelected && (
+        <ItemSelectionCard
+          orderItems={orderItems}
+          onItemsSelected={onItemsSelected}
+          itemsAlreadyShipped={itemsAlreadyShipped}
+          orderId={orderId}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
