@@ -162,6 +162,7 @@ export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
 
   return {
     id: String(supabaseOrder.id), // Always convert to string for consistency
+    orderId: supabaseOrder.order_id || "", // Shopify order number
     customerName: supabaseOrder.customer_name || "",
     customerCompany: supabaseOrder.customer_company || "",
     customerPhone: supabaseOrder.customer_phone || "",

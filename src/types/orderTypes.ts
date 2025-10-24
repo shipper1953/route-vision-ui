@@ -35,6 +35,7 @@ export interface OrderItem {
   unitPrice?: number;
   name?: string;
   sku?: string;
+  description?: string;
   dimensions?: {
     length: number;
     width: number;
@@ -45,6 +46,7 @@ export interface OrderItem {
 
 export interface OrderData {
   id: string;
+  orderId?: string; // Shopify order number or external order ID
   customerName: string;
   customerCompany?: string;
   customerPhone?: string;
