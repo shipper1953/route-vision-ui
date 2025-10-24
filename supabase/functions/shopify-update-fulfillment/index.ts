@@ -191,35 +191,17 @@ serve(async (req) => {
       console.log('No item tracking - fulfilling all line items');
     }
 
-    // Create or update fulfillment
-    const fulfillmentData = {
-      tracking_number: trackingNumber,
-      tracking_url: trackingUrl,
-      tracking_company: carrier,
-      notify_customer: true,
-    };
-
-    let fulfillmentResponse;
+    // Determine if we need to create a new fulfillment or use existing
+    let fulfillmentId;
 
     if (shopifyOrder.fulfillments && shopifyOrder.fulfillments.length > 0) {
-      // Update existing fulfillment
-      const fulfillmentId = shopifyOrder.fulfillments[0].id;
-      console.log('Updating existing fulfillment:', fulfillmentId);
-      fulfillmentResponse = await fetch(
-        `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments/${fulfillmentId}.json`,
-        {
-          method: 'PUT',
-          headers: {
-            'X-Shopify-Access-Token': shopifySettings.access_token,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ fulfillment: fulfillmentData }),
-        }
-      );
+      // Use existing fulfillment
+      fulfillmentId = shopifyOrder.fulfillments[0].id;
+      console.log('Using existing fulfillment:', fulfillmentId);
     } else {
-      // Create new fulfillment using modern API format (2024-01) - without tracking
+      // Create new fulfillment using modern API format (2024-01)
       console.log('Creating new fulfillment with line items:', lineItemsToFulfill);
-      fulfillmentResponse = await fetch(
+      const fulfillmentResponse = await fetch(
         `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments.json`,
         {
           method: 'POST',
@@ -241,27 +223,33 @@ serve(async (req) => {
           }),
         }
       );
+
+      if (!fulfillmentResponse.ok) {
+        const errorStatus = fulfillmentResponse.status;
+        const errorText = await fulfillmentResponse.text();
+        let errorJson;
+        try {
+          errorJson = JSON.parse(errorText);
+        } catch (e) {
+          errorJson = { raw: errorText };
+        }
+        console.error('Shopify fulfillment creation failed:', { status: errorStatus, error: errorJson });
+        throw new Error(`Failed to create Shopify fulfillment (${errorStatus}): ${JSON.stringify(errorJson)}`);
+      }
+
+      const fulfillmentResult = await fulfillmentResponse.json();
+      fulfillmentId = fulfillmentResult.fulfillment?.id;
+      console.log('Successfully created fulfillment:', fulfillmentId);
     }
 
-    if (!fulfillmentResponse.ok) {
-      const errorText = await fulfillmentResponse.text();
-      console.error('Shopify fulfillment error:', errorText);
-      throw new Error(`Failed to update Shopify fulfillment: ${errorText}`);
-    }
-
-    const fulfillmentResult = await fulfillmentResponse.json();
-    const createdFulfillmentId = fulfillmentResult.fulfillment?.id;
-    console.log('Successfully created/updated fulfillment:', createdFulfillmentId);
-
-    // Add tracking information using update endpoint
-    if (trackingNumber && createdFulfillmentId) {
-      console.log('Adding tracking info:', { trackingNumber, carrier, trackingUrl });
+    // Update tracking information using the correct 2024-01 API endpoint
+    if (trackingNumber && fulfillmentId) {
+      console.log('Updating tracking info for fulfillment:', fulfillmentId, { trackingNumber, carrier, trackingUrl });
       
-      // Use the regular fulfillment update endpoint with tracking fields
       const trackingResponse = await fetch(
-        `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments/${createdFulfillmentId}.json`,
+        `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments/${fulfillmentId}/update_tracking.json`,
         {
-          method: 'PUT',
+          method: 'POST',
           headers: {
             'X-Shopify-Access-Token': shopifySettings.access_token,
             'Content-Type': 'application/json',
@@ -269,21 +257,34 @@ serve(async (req) => {
           body: JSON.stringify({
             fulfillment: {
               notify_customer: true,
-              tracking_number: trackingNumber,
-              tracking_url: trackingUrl || null,
-              tracking_company: carrier || null
+              tracking_info: {
+                number: trackingNumber,
+                url: trackingUrl || '',
+                company: carrier || ''
+              }
             }
           }),
         }
       );
 
       if (!trackingResponse.ok) {
+        const errorStatus = trackingResponse.status;
         const errorText = await trackingResponse.text();
-        console.error('Failed to add tracking:', errorText);
-        console.error('Tracking update failed but fulfillment was created');
+        let errorJson;
+        try {
+          errorJson = JSON.parse(errorText);
+        } catch (e) {
+          errorJson = { raw: errorText };
+        }
+        console.error('Failed to update tracking:', { status: errorStatus, error: errorJson, fulfillmentId });
+        // Don't throw - fulfillment was created/exists, just tracking update failed
       } else {
         const trackingResult = await trackingResponse.json();
-        console.log('Successfully added tracking information:', trackingResult.fulfillment?.tracking_number);
+        console.log('Successfully updated tracking information:', {
+          fulfillmentId,
+          trackingNumber: trackingResult.fulfillment?.tracking_number,
+          trackingUrl: trackingResult.fulfillment?.tracking_url
+        });
       }
     }
 
