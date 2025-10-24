@@ -14,45 +14,44 @@ function verifyShopifyWebhook(body: string, hmacHeader: string, secret: string):
 }
 
 interface FulfillmentServiceCallback {
-  kind: 'fulfillment_request' | 'cancellation_request' | 'fulfillment_request_hold' | 'fulfillment_request_release_hold';
-  fulfillment_order: {
+  kind: 'FULFILLMENT_REQUEST' | 'CANCELLATION_REQUEST' | 'FULFILLMENT_REQUEST_HOLD' | 'FULFILLMENT_REQUEST_RELEASE_HOLD';
+  // Fulfillment order fields are at root level
+  id: number;
+  shop_id: number;
+  order_id: number;
+  assigned_location_id: number;
+  request_status: string;
+  status: string;
+  destination: {
+    id: number;
+    address1: string;
+    address2: string | null;
+    city: string;
+    company: string | null;
+    country: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    phone: string | null;
+    province: string;
+    zip: string;
+  };
+  line_items: Array<{
     id: number;
     shop_id: number;
-    order_id: number;
-    assigned_location_id: number;
-    request_status: string;
-    status: string;
-    destination: {
-      id: number;
-      address1: string;
-      address2: string | null;
-      city: string;
-      company: string | null;
-      country: string;
-      email: string;
-      first_name: string;
-      last_name: string;
-      phone: string | null;
-      province: string;
-      zip: string;
-    };
-    line_items: Array<{
-      id: number;
-      shop_id: number;
-      fulfillment_order_id: number;
-      quantity: number;
-      line_item_id: number;
-      inventory_item_id: number;
-      fulfillable_quantity: number;
-      variant_id: number;
-    }>;
-    fulfill_at: string;
-    fulfill_by: string | null;
-    international_duties: any;
-    fulfillment_holds: any[];
-    created_at: string;
-    updated_at: string;
-  };
+    fulfillment_order_id: number;
+    quantity: number;
+    line_item_id: number;
+    inventory_item_id: number;
+    fulfillable_quantity: number;
+    variant_id: number;
+  }>;
+  fulfill_at: string;
+  fulfill_by: string | null;
+  international_duties: any;
+  fulfillment_holds: any[];
+  created_at: string;
+  updated_at: string;
 }
 
 Deno.serve(async (req) => {
@@ -95,7 +94,8 @@ Deno.serve(async (req) => {
     console.log('Parsed webhook structure:', {
       hasKind: !!webhook.kind,
       kind: webhook.kind,
-      hasFulfillmentOrder: !!webhook.fulfillment_order,
+      hasId: !!webhook.id,
+      hasOrderId: !!webhook.order_id,
       topLevelKeys: Object.keys(webhook),
     });
 
@@ -108,11 +108,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!webhook.fulfillment_order) {
-      console.error('Missing "fulfillment_order" field in callback payload');
+    if (!webhook.id || !webhook.order_id) {
+      console.error('Missing required fields in callback payload');
       console.log('Full parsed webhook:', JSON.stringify(webhook, null, 2));
       return new Response(
-        JSON.stringify({ error: 'Missing fulfillment_order field' }),
+        JSON.stringify({ error: 'Missing required fulfillment order fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -130,10 +130,10 @@ Deno.serve(async (req) => {
     console.log('Received fulfillment request callback:', {
       kind: webhook.kind,
       shop: shopDomain,
-      fulfillmentOrderId: webhook.fulfillment_order.id,
-      orderId: webhook.fulfillment_order.order_id,
-      status: webhook.fulfillment_order.status,
-      requestStatus: webhook.fulfillment_order.request_status,
+      fulfillmentOrderId: webhook.id,
+      orderId: webhook.order_id,
+      status: webhook.status,
+      requestStatus: webhook.request_status,
     });
 
     // Find company by shop domain
@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const shopifyOrderId = `gid://shopify/Order/${webhook.fulfillment_order.order_id}`;
+    const shopifyOrderId = `gid://shopify/Order/${webhook.order_id}`;
     
     // Check if order already exists
     const { data: existingMapping } = await supabase
@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
       }
     `;
 
-    const orderGid = `gid://shopify/Order/${webhook.fulfillment_order.order_id}`;
+    const orderGid = `gid://shopify/Order/${webhook.order_id}`;
     const orderResult = await shopifyGraphQL(shopifySettings, orderQuery, { id: orderGid });
 
     if (!orderResult.data?.order) {
@@ -271,7 +271,7 @@ Deno.serve(async (req) => {
       .single();
 
     // Match fulfillment line items with GraphQL order line items
-    const fulfillmentLineItemIds = webhook.fulfillment_order.line_items.map(li => 
+    const fulfillmentLineItemIds = webhook.line_items.map(li => 
       `gid://shopify/LineItem/${li.line_item_id}`
     );
     
@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
     let itemsCreated = 0;
 
     for (const lineItem of orderLineItems) {
-      const fulfillmentItem = webhook.fulfillment_order.line_items.find(
+      const fulfillmentItem = webhook.line_items.find(
         (fli: any) => fli.line_item_id === lineItem.id
       );
 
@@ -354,12 +354,12 @@ Deno.serve(async (req) => {
       customer_phone: sanitizeString(shopifyOrder.customer?.phone, 20),
       customer_company: sanitizeString(shopifyOrder.shippingAddress?.company, 255),
       shipping_address: {
-        street1: sanitizeString(webhook.fulfillment_order.destination.address1, 255) || '',
-        street2: sanitizeString(webhook.fulfillment_order.destination.address2, 255) || '',
-        city: sanitizeString(webhook.fulfillment_order.destination.city, 100) || '',
-        state: sanitizeString(webhook.fulfillment_order.destination.province, 10) || '',
-        zip: sanitizeString(webhook.fulfillment_order.destination.zip, 20) || '',
-        country: sanitizeString(webhook.fulfillment_order.destination.country, 2) || 'US'
+        street1: sanitizeString(webhook.destination.address1, 255) || '',
+        street2: sanitizeString(webhook.destination.address2, 255) || '',
+        city: sanitizeString(webhook.destination.city, 100) || '',
+        state: sanitizeString(webhook.destination.province, 10) || '',
+        zip: sanitizeString(webhook.destination.zip, 20) || '',
+        country: sanitizeString(webhook.destination.country, 2) || 'US'
       },
       items: mappedItems,
       value: parseFloat(shopifyOrder.totalPriceSet?.shopMoney?.amount || '0'),
@@ -402,16 +402,16 @@ Deno.serve(async (req) => {
         company_id: company.id,
         ship_tornado_order_id: newOrder.id,
         shopify_order_id: shopifyOrderId,
-        fulfillment_order_id: `gid://shopify/FulfillmentOrder/${webhook.fulfillment_order.id}`,
-        fulfillment_order_number: webhook.fulfillment_order.id.toString(),
-        status: webhook.fulfillment_order.status,
-        request_status: webhook.fulfillment_order.request_status,
-        line_items: webhook.fulfillment_order.line_items,
-        assigned_location_id: `gid://shopify/Location/${webhook.fulfillment_order.assigned_location_id}`,
-        destination: webhook.fulfillment_order.destination,
+        fulfillment_order_id: `gid://shopify/FulfillmentOrder/${webhook.id}`,
+        fulfillment_order_number: webhook.id.toString(),
+        status: webhook.status,
+        request_status: webhook.request_status,
+        line_items: webhook.line_items,
+        assigned_location_id: `gid://shopify/Location/${webhook.assigned_location_id}`,
+        destination: webhook.destination,
         metadata: {
-          fulfill_at: webhook.fulfillment_order.fulfill_at,
-          fulfill_by: webhook.fulfillment_order.fulfill_by,
+          fulfill_at: webhook.fulfill_at,
+          fulfill_by: webhook.fulfill_by,
         },
       });
 
@@ -428,10 +428,10 @@ Deno.serve(async (req) => {
       shopify_order_id: shopifyOrderId,
       ship_tornado_order_id: newOrder.id,
       metadata: {
-        fulfillment_order_id: webhook.fulfillment_order.id,
-        request_status: webhook.fulfillment_order.request_status,
-        status: webhook.fulfillment_order.status,
-        line_item_count: webhook.fulfillment_order.line_items.length,
+        fulfillment_order_id: webhook.id,
+        request_status: webhook.request_status,
+        status: webhook.status,
+        line_item_count: webhook.line_items.length,
         items_matched: itemsMatched,
         items_created: itemsCreated,
       },
@@ -440,13 +440,13 @@ Deno.serve(async (req) => {
     // Respond to Shopify with acceptance (MUST respond within 5 seconds)
     const response = {
       fulfillment_order: {
-        id: `gid://shopify/FulfillmentOrder/${webhook.fulfillment_order.id}`,
+        id: `gid://shopify/FulfillmentOrder/${webhook.id}`,
         status: 'open'
       },
       message: 'Accepted - Ship Tornado will fulfill this order'
     };
 
-    console.log('Fulfillment order accepted:', webhook.fulfillment_order.id);
+    console.log('Fulfillment order accepted:', webhook.id);
 
     return new Response(
       JSON.stringify(response),
