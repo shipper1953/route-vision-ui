@@ -106,6 +106,7 @@ async function fetchAssignedFulfillmentOrders(
               address2
               city
               province
+              provinceCode
               zip
               countryCode
               company
@@ -562,7 +563,7 @@ Deno.serve(async (req) => {
           street1: sanitizeString(fo.destination.address1, 255) || '',
           street2: sanitizeString(fo.destination.address2, 255) || '',
           city: sanitizeString(fo.destination.city, 100) || '',
-          state: sanitizeString(fo.destination.province, 10) || '',
+          state: sanitizeString(fo.destination.provinceCode || fo.destination.province, 10) || '',
           zip: sanitizeString(fo.destination.zip, 20) || '',
           country: sanitizeString(fo.destination.countryCode, 2) || 'US'
         },
