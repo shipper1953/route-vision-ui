@@ -75,8 +75,10 @@ serve(async (req) => {
                     title
                     price
                     inventoryQuantity
-                    weight
-                    weightUnit
+                    weight {
+                      value
+                      unit
+                    }
                   }
                 }
               }
@@ -135,8 +137,7 @@ serve(async (req) => {
               sku: product.variants?.edges?.[0]?.node?.sku || `SHOP-${product.legacyResourceId}`,
               title: product.title,
               price: product.variants?.edges?.[0]?.node?.price || '0',
-              weight: product.variants?.edges?.[0]?.node?.weight,
-              weightUnit: product.variants?.edges?.[0]?.node?.weightUnit
+              weight: product.variants?.edges?.[0]?.node?.weight
             }];
 
         for (const variant of itemsToProcess) {
@@ -176,10 +177,10 @@ serve(async (req) => {
           }
 
           // Add weight if syncing
-          if (syncWeight && variant.weight) {
+          if (syncWeight && variant.weight?.value) {
             // Convert weight to lbs (Shopify can be in GRAMS, OUNCES, POUNDS, KILOGRAMS)
-            let weightInLbs = parseFloat(variant.weight);
-            const weightUnit = variant.weightUnit?.toLowerCase();
+            let weightInLbs = parseFloat(variant.weight.value);
+            const weightUnit = variant.weight.unit?.toLowerCase();
             
             if (weightUnit === 'grams') {
               weightInLbs = weightInLbs / 453.592; // grams to lbs
