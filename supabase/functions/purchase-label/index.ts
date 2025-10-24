@@ -268,6 +268,7 @@ serve(async (req) => {
     // Check environment variables
     console.log('🔑 Checking environment variables...')
     const apiKey = Deno.env.get('EASYPOST_API_KEY')
+    const shippoApiKey = Deno.env.get('SHIPPO_API_KEY')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -317,7 +318,6 @@ serve(async (req) => {
     try {
       if (provider === 'shippo') {
         console.log('📡 Calling Shippo API...')
-        const shippoApiKey = Deno.env.get('SHIPPO_API_KEY')
         if (!shippoApiKey) {
           console.error('❌ Missing Shippo API key')
           return createErrorResponse('Shippo API key not configured', null, 500)

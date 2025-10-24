@@ -117,3 +117,9 @@ verify_jwt = false  # Manual admin tool for syncing shipments to Shopify
 
 [functions.shopify-save-credentials]
 verify_jwt = true  # Requires authentication to save Shopify credentials
+
+[functions.create-shipment]
+verify_jwt = true  # EasyPost shipment creation requires authentication
+
+[functions.create-shippo-shipment]
+verify_jwt = true  # Shippo shipment creation requires authentication
