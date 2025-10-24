@@ -180,7 +180,8 @@ async function handleFulfillmentServiceFlow(
     .from('shopify_fulfillment_orders')
     .select('*')
     .eq('ship_tornado_order_id', orderShipment.order_id)
-    .eq('status', 'open');
+    .neq('status', 'closed')
+    .neq('status', 'cancelled');
 
   if (foError) {
     console.error('Error fetching fulfillment orders:', foError);
@@ -329,7 +330,7 @@ async function handleFulfillmentServiceFlow(
   await supabase
     .from('shopify_fulfillment_orders')
     .update({
-      status: 'in_progress',
+      status: 'closed',
       fulfillment_id: fulfillment.id,
       fulfilled_at: new Date().toISOString()
     })
