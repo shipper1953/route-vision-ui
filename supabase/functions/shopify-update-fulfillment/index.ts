@@ -71,8 +71,21 @@ serve(async (req) => {
     }
 
     if (!mapping) {
-      console.log('No Shopify mapping found for order');
-      return new Response(JSON.stringify({ message: 'No Shopify mapping' }), {
+      console.log('No Shopify mapping found for order - skipping');
+      
+      // Log as skipped
+      await supabase
+        .from('shopify_sync_logs')
+        .insert({
+          company_id: order.company_id,
+          sync_type: 'fulfillment_update',
+          direction: 'outbound',
+          status: 'skipped',
+          ship_tornado_order_id: orderShipment.order_id,
+          error_message: 'Order not imported from Shopify',
+        });
+      
+      return new Response(JSON.stringify({ message: 'No Shopify mapping', skipped: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
@@ -237,16 +250,18 @@ serve(async (req) => {
     }
 
     const fulfillmentResult = await fulfillmentResponse.json();
-    const createdFulfillment = fulfillmentResult.fulfillment;
-    console.log('Successfully created/updated fulfillment:', createdFulfillment.id);
+    const createdFulfillmentId = fulfillmentResult.fulfillment?.id;
+    console.log('Successfully created/updated fulfillment:', createdFulfillmentId);
 
-    // Add tracking information separately (required for 2024-01 API)
-    if (trackingNumber && createdFulfillment.id) {
+    // Add tracking information using update endpoint
+    if (trackingNumber && createdFulfillmentId) {
       console.log('Adding tracking info:', { trackingNumber, carrier, trackingUrl });
+      
+      // Use the regular fulfillment update endpoint with tracking fields
       const trackingResponse = await fetch(
-        `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments/${createdFulfillment.id}/update_tracking.json`,
+        `https://${shopifySettings.store_url}/admin/api/2024-01/fulfillments/${createdFulfillmentId}.json`,
         {
-          method: 'POST',
+          method: 'PUT',
           headers: {
             'X-Shopify-Access-Token': shopifySettings.access_token,
             'Content-Type': 'application/json',
@@ -254,11 +269,9 @@ serve(async (req) => {
           body: JSON.stringify({
             fulfillment: {
               notify_customer: true,
-              tracking_info: {
-                number: trackingNumber,
-                url: trackingUrl,
-                company: carrier
-              }
+              tracking_number: trackingNumber,
+              tracking_url: trackingUrl || null,
+              tracking_company: carrier || null
             }
           }),
         }
@@ -267,9 +280,10 @@ serve(async (req) => {
       if (!trackingResponse.ok) {
         const errorText = await trackingResponse.text();
         console.error('Failed to add tracking:', errorText);
-        // Don't throw - fulfillment was created, just tracking failed
+        console.error('Tracking update failed but fulfillment was created');
       } else {
-        console.log('Successfully added tracking information');
+        const trackingResult = await trackingResponse.json();
+        console.log('Successfully added tracking information:', trackingResult.fulfillment?.tracking_number);
       }
     }
 

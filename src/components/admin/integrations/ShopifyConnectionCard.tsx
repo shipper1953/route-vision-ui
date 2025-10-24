@@ -79,9 +79,10 @@ export const ShopifyConnectionCard = ({ companyId, settings, onRefresh }: Shopif
       let errorCount = 0;
 
       // Sync each shipment
+      let skippedCount = 0;
       for (const orderShipment of filteredShipments) {
         try {
-          const { error: syncError } = await supabase.functions.invoke('shopify-update-fulfillment', {
+          const { data, error: syncError } = await supabase.functions.invoke('shopify-update-fulfillment', {
             body: {
               shipmentId: orderShipment.shipment_id,
               status: 'purchased',
@@ -95,6 +96,8 @@ export const ShopifyConnectionCard = ({ companyId, settings, onRefresh }: Shopif
           if (syncError) {
             console.error(`Failed to sync shipment ${orderShipment.shipment_id}:`, syncError);
             errorCount++;
+          } else if (data?.skipped) {
+            skippedCount++;
           } else {
             successCount++;
           }
@@ -104,9 +107,15 @@ export const ShopifyConnectionCard = ({ companyId, settings, onRefresh }: Shopif
         }
       }
 
+      const resultMessage = [
+        successCount > 0 ? `${successCount} synced` : null,
+        skippedCount > 0 ? `${skippedCount} skipped (not from Shopify)` : null,
+        errorCount > 0 ? `${errorCount} errors` : null,
+      ].filter(Boolean).join(', ');
+
       toast({
         title: "Fulfillment sync complete",
-        description: `Successfully synced ${successCount} shipments. ${errorCount} errors.`,
+        description: resultMessage,
         variant: errorCount > 0 ? "destructive" : "default",
       });
 
