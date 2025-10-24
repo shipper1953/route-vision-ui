@@ -418,7 +418,7 @@ export type Database = {
           shipment_id: number | null
           shipping_address: Json | null
           status: string | null
-          user_id: string
+          user_id: string | null
           value: number
           warehouse_id: string | null
         }
@@ -444,7 +444,7 @@ export type Database = {
           shipment_id?: number | null
           shipping_address?: Json | null
           status?: string | null
-          user_id: string
+          user_id?: string | null
           value?: number
           warehouse_id?: string | null
         }
@@ -470,7 +470,7 @@ export type Database = {
           shipment_id?: number | null
           shipping_address?: Json | null
           status?: string | null
-          user_id?: string
+          user_id?: string | null
           value?: number
           warehouse_id?: string | null
         }
