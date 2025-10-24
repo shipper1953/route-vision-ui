@@ -180,7 +180,7 @@ async function handleFulfillmentServiceFlow(
     .from('shopify_fulfillment_orders')
     .select('*')
     .eq('ship_tornado_order_id', orderShipment.order_id)
-    .in('status', ['open', 'in_progress', 'scheduled']);
+    .not('status', 'in', '("closed","cancelled")');
   
   console.log(`Found ${fulfillmentOrders?.length || 0} fulfillment orders with status: ${fulfillmentOrders?.map(fo => fo.status).join(', ')}`);
 
