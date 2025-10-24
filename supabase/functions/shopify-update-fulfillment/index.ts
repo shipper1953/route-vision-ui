@@ -180,34 +180,28 @@ serve(async (req) => {
       });
     }
 
-    // Fetch order and fulfillment orders via GraphQL
-    const fulfillmentOrdersQuery = `
-      query getFulfillmentOrders($orderId: ID!) {
+    // Fetch order line items directly via GraphQL (no fulfillment service required)
+    const orderLineItemsQuery = `
+      query getOrderLineItems($orderId: ID!) {
         order(id: $orderId) {
           id
           name
           displayFulfillmentStatus
           displayFinancialStatus
-          fulfillmentOrders(first: 10, query: "status:open OR status:in_progress") {
+          fulfillable
+          lineItems(first: 100) {
             edges {
               node {
                 id
-                status
-                lineItems(first: 100) {
-                  edges {
-                    node {
-                      id
-                      lineItem {
-                        id
-                        sku
-                        name
-                        variant {
-                          id
-                        }
-                      }
-                      remainingQuantity
-                    }
-                  }
+                name
+                sku
+                quantity
+                fulfillableQuantity
+                variant {
+                  id
+                }
+                product {
+                  id
                 }
               }
             }
@@ -216,34 +210,31 @@ serve(async (req) => {
       }
     `;
 
-    console.log('📋 Fetching fulfillment orders via GraphQL...');
+    console.log('📋 Fetching order line items via GraphQL...');
 
-    const fulfillmentOrdersData = await shopifyGraphQL(shopifySettings, fulfillmentOrdersQuery, {
+    const orderData = await shopifyGraphQL(shopifySettings, orderLineItemsQuery, {
       orderId: `gid://shopify/Order/${mapping.shopify_order_id}`
     });
 
-    if (!fulfillmentOrdersData.order) {
+    if (!orderData.order) {
       throw new Error('Order not found in Shopify');
     }
 
-    const shopifyOrder = fulfillmentOrdersData.order;
-    const fulfillment_orders = fulfillmentOrdersData.order.fulfillmentOrders.edges.map(e => e.node);
+    const shopifyOrder = orderData.order;
+    const lineItems = shopifyOrder.lineItems.edges.map(e => e.node);
 
-    console.log('Fetched Shopify order via GraphQL:', {
+    console.log('Fetched Shopify order line items:', {
       orderId: shopifyOrder.id,
       orderName: shopifyOrder.name,
-      fulfillmentOrdersCount: fulfillment_orders.length
+      fulfillmentStatus: shopifyOrder.displayFulfillmentStatus,
+      fulfillable: shopifyOrder.fulfillable,
+      lineItemsCount: lineItems.length,
+      totalFulfillableQuantity: lineItems.reduce((sum, li) => sum + li.fulfillableQuantity, 0)
     });
 
-    if (!fulfillment_orders || fulfillment_orders.length === 0) {
-      const fulfillmentStatus = shopifyOrder.displayFulfillmentStatus;
-      const financialStatus = shopifyOrder.displayFinancialStatus;
-      
-      console.warn('⚠️ No fulfillment orders found:', {
-        shopifyOrderId: mapping.shopify_order_id,
-        fulfillmentStatus,
-        financialStatus
-      });
+    // Check if order can be fulfilled
+    if (!shopifyOrder.fulfillable) {
+      console.warn('⚠️ Order is not fulfillable');
       
       await supabase.from('shopify_sync_logs').insert({
         company_id: order.company_id,
@@ -252,44 +243,37 @@ serve(async (req) => {
         status: 'skipped',
         shopify_order_id: mapping.shopify_order_id,
         ship_tornado_order_id: orderShipment.order_id,
-        error_message: `No fulfillment orders found. Order status: ${fulfillmentStatus}, Financial: ${financialStatus}`,
+        error_message: `Order not fulfillable. Status: ${shopifyOrder.displayFulfillmentStatus}`,
         metadata: { 
-          fulfillmentStatus, 
-          financialStatus,
-          reason: fulfillmentStatus === 'fulfilled' ? 'already_fulfilled' : 'unknown'
+          fulfillmentStatus: shopifyOrder.displayFulfillmentStatus,
+          reason: 'order_not_fulfillable'
         }
       });
       
       return new Response(
         JSON.stringify({ 
-          message: 'Shopify order not fulfillable',
-          reason: fulfillmentStatus === 'fulfilled' ? 'Order already fulfilled in Shopify' : 'Order does not require shipping',
-          orderStatus: { fulfillmentStatus, financialStatus }
+          message: 'Order not fulfillable',
+          orderStatus: shopifyOrder.displayFulfillmentStatus
         }), 
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    console.log('Fulfillment orders found:', {
-      count: fulfillment_orders.length,
-      orderName: shopifyOrder.name,
-      statuses: fulfillment_orders.map(fo => fo.status)
-    });
+    if (lineItems.length === 0) {
+      throw new Error('No line items found on order');
+    }
 
-    // Build line items array for fulfillment
-    const lineItemsToFulfill: Array<{ 
-      fulfillmentOrderLineItemId: string; 
+    // Build line items array for fulfillment using direct line items
+    const lineItemsForFulfillment: Array<{ 
+      id: string;  // LineItem GID
       quantity: number 
     }> = [];
-
-    // Group by fulfillment order
-    const itemsByFulfillmentOrder = new Map<string, typeof lineItemsToFulfill>();
 
     if (orderShipment.package_info?.items && Array.isArray(orderShipment.package_info.items)) {
       // We have item-level tracking - only fulfill items in THIS specific package
       const shippedItems = orderShipment.package_info.items;
       
-      // Enrich shipped items with Shopify IDs and GIDs
+      // Enrich shipped items with Shopify IDs
       const enrichedShippedItems = shippedItems.map((si: any) => {
         const enrichedItem = enrichedOrderItems.find((oi: any) => 
           oi.sku === si.sku || oi.name === si.name
@@ -298,119 +282,96 @@ serve(async (req) => {
           ...si,
           shopify_variant_id: enrichedItem?.shopify_variant_id,
           shopify_product_id: enrichedItem?.shopify_product_id,
-          shopify_variant_gid: enrichedItem?.shopify_variant_gid,
-          shopify_product_gid: enrichedItem?.shopify_product_gid
+          shopify_variant_gid: enrichedItem?.shopify_variant_gid
         };
       });
       
-      console.log('Items in this package with Shopify GIDs:', enrichedShippedItems.map((si: any) => ({
+      console.log('Items in this package:', enrichedShippedItems.map((si: any) => ({
         sku: si.sku,
         name: si.name,
         quantity: si.quantity,
-        shopify_variant_gid: si.shopify_variant_gid,
-        shopify_variant_id: si.shopify_variant_id
+        shopify_variant_gid: si.shopify_variant_gid
       })));
       
-      for (const fulfillmentOrder of fulfillment_orders) {
-        const fulfillmentOrderItems: typeof lineItemsToFulfill = [];
-        
-        for (const lineItemEdge of fulfillmentOrder.lineItems.edges) {
-          const foLineItem = lineItemEdge.node;
-          
-          // Skip if nothing left to fulfill
-          if (foLineItem.remainingQuantity === 0) {
-            console.log(`⏭️ Skipping ${foLineItem.lineItem.sku} - already fully fulfilled`);
-            continue;
-          }
-          
-          // Match by GID first (most accurate), fallback to numeric ID
-          const variantGid = foLineItem.lineItem.variant?.id;
-          const variantId = variantGid?.split('/').pop();
-          
-          const shippedItem = enrichedShippedItems.find((si: any) => 
-            (si.shopify_variant_gid && si.shopify_variant_gid === variantGid) ||
-            (si.shopify_variant_id && si.shopify_variant_id === variantId) ||
-            (si.sku && si.sku === foLineItem.lineItem.sku)
-          );
-          
-          if (shippedItem) {
-            const quantity = Math.min(shippedItem.quantity, foLineItem.remainingQuantity);
-            
-            fulfillmentOrderItems.push({
-              fulfillmentOrderLineItemId: foLineItem.id,
-              quantity
-            });
-            
-            console.log(`✅ Matched item: ${foLineItem.lineItem.sku} (${foLineItem.lineItem.name}) - fulfilling ${quantity}/${foLineItem.remainingQuantity}`);
-          } else {
-            console.log(`⚠️ No match for Shopify item: ${foLineItem.lineItem.sku} (variant ${variantId})`);
-          }
+      // Match shipped items to Shopify line items
+      for (const lineItem of lineItems) {
+        // Skip if nothing left to fulfill
+        if (lineItem.fulfillableQuantity === 0) {
+          console.log(`⏭️ Skipping ${lineItem.sku} - already fully fulfilled`);
+          continue;
         }
         
-        if (fulfillmentOrderItems.length > 0) {
-          itemsByFulfillmentOrder.set(fulfillmentOrder.id, fulfillmentOrderItems);
-        }
-      }
-      
-      // Validate we have items to fulfill
-      if (itemsByFulfillmentOrder.size === 0) {
-        console.warn('⚠️ No items matched for fulfillment');
+        // Match by variant GID or SKU
+        const variantGid = lineItem.variant?.id;
+        const variantId = variantGid?.split('/').pop();
         
-        await supabase.from('shopify_sync_logs').insert({
-          company_id: order.company_id,
-          sync_type: 'fulfillment',
-          direction: 'outbound',
-          status: 'skipped',
-          shopify_order_id: mapping.shopify_order_id,
-          ship_tornado_order_id: orderShipment.order_id,
-          error_message: 'All items already fulfilled in Shopify or no matching items found',
-          metadata: { 
-            shippedItems: shippedItems.map((si: any) => ({ sku: si.sku, name: si.name }))
-          }
-        });
-        
-        return new Response(
-          JSON.stringify({ 
-            message: 'No items to fulfill',
-            reason: 'Items may already be fulfilled or SKUs do not match'
-          }), 
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        const shippedItem = enrichedShippedItems.find((si: any) => 
+          (si.shopify_variant_gid && si.shopify_variant_gid === variantGid) ||
+          (si.shopify_variant_id && si.shopify_variant_id === variantId) ||
+          (si.sku && si.sku === lineItem.sku)
         );
+        
+        if (shippedItem) {
+          const qtyToFulfill = Math.min(shippedItem.quantity, lineItem.fulfillableQuantity);
+          
+          lineItemsForFulfillment.push({
+            id: lineItem.id,  // LineItem GID (not FulfillmentOrderLineItem)
+            quantity: qtyToFulfill
+          });
+          
+          console.log(`✅ Matched: ${lineItem.sku} - fulfilling ${qtyToFulfill}/${lineItem.fulfillableQuantity}`);
+        } else {
+          console.log(`⚠️ No match for Shopify item: ${lineItem.sku} (variant ${variantId})`);
+        }
       }
     } else {
-      // No item tracking - fulfill all remaining items (legacy behavior)
-      for (const fulfillmentOrder of fulfillment_orders) {
-        const fulfillmentOrderItems: typeof lineItemsToFulfill = [];
-        
-        for (const lineItemEdge of fulfillmentOrder.lineItems.edges) {
-          const foLineItem = lineItemEdge.node;
-          
-          if (foLineItem.remainingQuantity > 0) {
-            fulfillmentOrderItems.push({
-              fulfillmentOrderLineItemId: foLineItem.id,
-              quantity: foLineItem.remainingQuantity
-            });
-          }
-        }
-        
-        if (fulfillmentOrderItems.length > 0) {
-          itemsByFulfillmentOrder.set(fulfillmentOrder.id, fulfillmentOrderItems);
+      // No item tracking - fulfill all remaining items (legacy)
+      for (const lineItem of lineItems) {
+        if (lineItem.fulfillableQuantity > 0) {
+          lineItemsForFulfillment.push({
+            id: lineItem.id,
+            quantity: lineItem.fulfillableQuantity
+          });
         }
       }
       
       console.log('No item tracking - fulfilling all remaining line items');
     }
 
-    // Create fulfillment via GraphQL
-    console.log('📤 Creating fulfillment via GraphQL:', {
-      fulfillmentOrdersCount: itemsByFulfillmentOrder.size,
-      totalItems: Array.from(itemsByFulfillmentOrder.values()).reduce((sum, items) => sum + items.length, 0),
-      tracking_number: trackingNumber
-    });
+    // Validate we have items to fulfill
+    if (lineItemsForFulfillment.length === 0) {
+      console.warn('⚠️ No items to fulfill');
+      
+      await supabase.from('shopify_sync_logs').insert({
+        company_id: order.company_id,
+        sync_type: 'fulfillment',
+        direction: 'outbound',
+        status: 'skipped',
+        shopify_order_id: mapping.shopify_order_id,
+        ship_tornado_order_id: orderShipment.order_id,
+        error_message: 'All items already fulfilled or no matching items',
+        metadata: { 
+          shippedItems: orderShipment.package_info?.items?.map((si: any) => ({ sku: si.sku, name: si.name }))
+        }
+      });
+      
+      return new Response(
+        JSON.stringify({ 
+          message: 'No items to fulfill',
+          reason: 'All items already fulfilled or SKUs do not match'
+        }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    console.log(`📦 Prepared ${lineItemsForFulfillment.length} line items for fulfillment`);
+
+    // Create fulfillment using legacy mutation (works without fulfillment service)
+    console.log('📤 Creating fulfillment via GraphQL (legacy mutation)');
 
     const createFulfillmentMutation = `
-      mutation fulfillmentCreateV2($fulfillment: FulfillmentV2Input!) {
-        fulfillmentCreateV2(fulfillment: $fulfillment) {
+      mutation fulfillmentCreate($input: FulfillmentInput!) {
+        fulfillmentCreate(input: $input) {
           fulfillment {
             id
             status
@@ -443,25 +404,23 @@ serve(async (req) => {
     `;
 
     const fulfillmentInput = {
-      lineItemsByFulfillmentOrder: Array.from(itemsByFulfillmentOrder.entries()).map(([foId, items]) => ({
-        fulfillmentOrderId: foId,
-        fulfillmentOrderLineItems: items
-      })),
+      orderId: shopifyOrder.id,
+      lineItems: lineItemsForFulfillment,
       notifyCustomer: shopifySettings?.fulfillment?.notify_customers ?? true,
       trackingInfo: {
-        number: trackingNumber,
-        url: trackingUrl || undefined,
+        number: trackingNumber || '',
+        url: trackingUrl || '',
         company: carrier || 'Unknown'
       }
     };
 
-    console.log('📦 Fulfillment input structure:', JSON.stringify(fulfillmentInput, null, 2));
+    console.log('📦 Fulfillment input:', JSON.stringify(fulfillmentInput, null, 2));
 
     const fulfillmentResult = await shopifyGraphQL(shopifySettings, createFulfillmentMutation, {
-      fulfillment: fulfillmentInput
+      input: fulfillmentInput
     });
 
-    const userErrors = fulfillmentResult.fulfillmentCreateV2.userErrors;
+    const userErrors = fulfillmentResult.fulfillmentCreate.userErrors;
     if (userErrors && userErrors.length > 0) {
       console.error('❌ Shopify validation errors:', userErrors);
       
@@ -479,7 +438,7 @@ serve(async (req) => {
       throw new Error(`Fulfillment validation failed: ${userErrors.map(e => `${e.field}: ${e.message}`).join(', ')}`);
     }
 
-    const fulfillment = fulfillmentResult.fulfillmentCreateV2.fulfillment;
+    const fulfillment = fulfillmentResult.fulfillmentCreate.fulfillment;
     if (!fulfillment) {
       throw new Error('Fulfillment creation returned no fulfillment object');
     }
@@ -501,7 +460,7 @@ serve(async (req) => {
     console.log('✅ Successfully created fulfillment:', {
       fulfillmentId,
       trackingNumber: fulfillment.trackingInfo?.number,
-      itemsRequested: Array.from(itemsByFulfillmentOrder.values()).reduce((sum, items) => sum + items.length, 0),
+      itemsRequested: lineItemsForFulfillment.length,
       itemsActuallyFulfilled: fulfillment.fulfillmentLineItems.edges.length
     });
 
@@ -528,7 +487,7 @@ serve(async (req) => {
           fulfillmentId,
           trackingNumber,
           packageIndex: orderShipment.package_index || 0,
-          itemsFulfilled: lineItemsToFulfill.length,
+          itemsFulfilled: lineItemsForFulfillment.length,
           carrier,
           service: requestBody.service
         },
@@ -541,7 +500,7 @@ serve(async (req) => {
         success: true, 
         fulfillmentId,
         trackingNumber,
-        itemsFulfilled: lineItemsToFulfill.length,
+        itemsFulfilled: lineItemsForFulfillment.length,
         message: 'Fulfillment created successfully'
       }),
       { 
