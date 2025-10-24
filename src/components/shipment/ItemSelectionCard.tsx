@@ -25,6 +25,14 @@ export const ItemSelectionCard = ({
   const [localSelection, setLocalSelection] = useState<Map<string, number>>(new Map());
   const [shippedItemsFromDB, setShippedItemsFromDB] = useState<Map<string, number>>(new Map());
 
+  // Create a unique key combining itemId, name, and sku to handle variants with same itemId
+  const getUniqueItemKey = (item: any): string => {
+    const baseId = item.itemId || item.id;
+    const name = item.name || '';
+    const sku = item.sku || '';
+    return `${baseId}__${name}__${sku}`;
+  };
+
   // Fetch already shipped items from database
   useEffect(() => {
     const fetchShippedItems = async () => {
@@ -67,8 +75,10 @@ export const ItemSelectionCard = ({
         if (packageInfo?.items && Array.isArray(packageInfo.items)) {
           console.log(`✅ Processing package_info from shipment ${index + 1}:`, packageInfo.items.length, 'items');
           packageInfo.items.forEach((item: any) => {
-            const existing = shippedMap.get(item.itemId) || 0;
-            shippedMap.set(item.itemId, existing + (item.quantity || 0));
+            // Use unique key if available, fallback to itemId for legacy data
+            const key = item._uniqueKey || item.itemId;
+            const existing = shippedMap.get(key) || 0;
+            shippedMap.set(key, existing + (item.quantity || 0));
           });
         } else {
           console.warn(`⚠️ order_shipment record ${index + 1} has invalid package_info structure:`, packageInfo);
@@ -88,7 +98,7 @@ export const ItemSelectionCard = ({
 
   // Calculate remaining quantity for each item
   const getRemainingQuantity = (item: any) => {
-    const itemKey = item.itemId || item.id;
+    const itemKey = getUniqueItemKey(item);
     const alreadyShipped = shippedItemsFromDB.get(itemKey) || 0;
     return item.quantity - alreadyShipped;
   };
@@ -98,7 +108,7 @@ export const ItemSelectionCard = ({
 
   // Handle item toggle
   const handleToggleItem = (item: any) => {
-    const itemKey = item.itemId || item.id;
+    const itemKey = getUniqueItemKey(item);
     const newSelection = new Map(localSelection);
     
     if (newSelection.has(itemKey)) {
@@ -114,7 +124,7 @@ export const ItemSelectionCard = ({
 
   // Handle quantity change
   const handleQuantityChange = (item: any, quantity: number) => {
-    const itemKey = item.itemId || item.id;
+    const itemKey = getUniqueItemKey(item);
     const remaining = getRemainingQuantity(item);
     const validQty = Math.max(0, Math.min(quantity, remaining));
     
@@ -132,15 +142,16 @@ export const ItemSelectionCard = ({
   // Convert local selection to parent format
   const updateParent = (selectionMap: Map<string, number>) => {
     const selectedItems: SelectedItem[] = [];
-    selectionMap.forEach((quantity, itemId) => {
-      const item = orderItems.find(i => (i.itemId || i.id) === itemId);
+    selectionMap.forEach((quantity, uniqueKey) => {
+      const item = orderItems.find(i => getUniqueItemKey(i) === uniqueKey);
       if (item) {
         selectedItems.push({
           itemId: item.itemId || item.id,
           name: item.name,
           sku: item.sku,
           quantity: quantity,
-          dimensions: item.dimensions
+          dimensions: item.dimensions,
+          _uniqueKey: uniqueKey // Add unique key for tracking variants
         });
       }
     });
@@ -150,8 +161,8 @@ export const ItemSelectionCard = ({
   // Calculate summary
   const selectedCount = localSelection.size;
   const totalSelectedQty = Array.from(localSelection.values()).reduce((sum, qty) => sum + qty, 0);
-  const estimatedWeight = Array.from(localSelection.entries()).reduce((sum, [itemId, qty]) => {
-    const item = orderItems.find(i => (i.itemId || i.id) === itemId);
+  const estimatedWeight = Array.from(localSelection.entries()).reduce((sum, [uniqueKey, qty]) => {
+    const item = orderItems.find(i => getUniqueItemKey(i) === uniqueKey);
     const itemWeight = item?.dimensions?.weight || 0;
     return sum + (itemWeight * qty);
   }, 0);
@@ -185,7 +196,7 @@ export const ItemSelectionCard = ({
           <>
             <div className="space-y-3">
               {orderItems.map((item) => {
-                const itemKey = item.itemId || item.id;
+                const itemKey = getUniqueItemKey(item);
                 const remaining = getRemainingQuantity(item);
                 const isSelected = localSelection.has(itemKey);
                 const selectedQty = localSelection.get(itemKey) || 0;

@@ -12,6 +12,7 @@ export interface SelectedItem {
     height: number;
     weight: number;
   };
+  _uniqueKey?: string; // For tracking variants with same itemId
 }
 
 export interface FulfillmentData {
