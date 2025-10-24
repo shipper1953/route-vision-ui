@@ -224,11 +224,37 @@ async function handleFulfillmentServiceFlow(
     })));
 
     // Match shipped items to fulfillment order line items
+    console.log('Fulfillment order line items:', JSON.stringify(fulfillmentOrder.line_items, null, 2));
+    
     for (const foLineItem of fulfillmentOrder.line_items) {
-      const shippedItem = shippedItems.find((si: any) => 
-        si.itemId === foLineItem.line_item_id?.toString() ||
-        si.sku === foLineItem.sku
-      );
+      // Try multiple matching strategies
+      const shippedItem = shippedItems.find((si: any) => {
+        // Strategy 1: Match by itemId (UUID from items table)
+        if (si.itemId && foLineItem.line_item_id) {
+          if (si.itemId === foLineItem.line_item_id?.toString()) {
+            console.log(`Matched by itemId: ${si.itemId}`);
+            return true;
+          }
+        }
+        
+        // Strategy 2: Match by SKU (most reliable for Shopify)
+        if (si.sku && foLineItem.sku) {
+          if (si.sku === foLineItem.sku) {
+            console.log(`Matched by SKU: ${si.sku}`);
+            return true;
+          }
+        }
+        
+        // Strategy 3: Match by name (fallback)
+        if (si.name && foLineItem.name) {
+          if (si.name.toLowerCase().trim() === foLineItem.name.toLowerCase().trim()) {
+            console.log(`Matched by name: ${si.name}`);
+            return true;
+          }
+        }
+        
+        return false;
+      });
 
       if (shippedItem) {
         const qtyToFulfill = Math.min(
@@ -241,7 +267,14 @@ async function handleFulfillmentServiceFlow(
           quantity: qtyToFulfill
         });
 
-        console.log(`✅ Matched: ${foLineItem.sku} - fulfilling ${qtyToFulfill} units`);
+        console.log(`✅ Matched: ${foLineItem.sku || foLineItem.name} - fulfilling ${qtyToFulfill} units`);
+      } else {
+        console.warn(`⚠️ No match found for FO line item:`, {
+          id: foLineItem.id,
+          sku: foLineItem.sku,
+          name: foLineItem.name,
+          line_item_id: foLineItem.line_item_id
+        });
       }
     }
   } else {
