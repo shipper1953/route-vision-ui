@@ -505,6 +505,89 @@ serve(async (req) => {
         const linkSuccess = await linkShipmentToOrder(supabase, orderId, finalShipmentId, enhancedMetadata)
         if (linkSuccess) {
           console.log('✅ Order successfully linked to shipment with item tracking')
+          
+          // Check if this is a Shopify order and sync fulfillment if enabled
+          try {
+            console.log('🛒 Checking if order is from Shopify for fulfillment sync...')
+            
+            // Query shopify_order_mappings to see if this order is from Shopify
+            const { data: shopifyMapping, error: mappingError } = await supabase
+              .from('shopify_order_mappings')
+              .select('shopify_order_id, shop_domain, company_id')
+              .eq('ship_tornado_order_id', orderId)
+              .maybeSingle()
+            
+            if (mappingError) {
+              console.error('❌ Error checking Shopify mapping:', mappingError)
+            } else if (shopifyMapping) {
+              console.log('✅ Order is from Shopify:', shopifyMapping.shopify_order_id)
+              
+              // Check if fulfillment sync is enabled for this company
+              const { data: companySettings, error: settingsError } = await supabase
+                .from('companies')
+                .select('settings')
+                .eq('id', shopifyMapping.company_id)
+                .maybeSingle()
+              
+              if (settingsError) {
+                console.error('❌ Error fetching company settings:', settingsError)
+              } else {
+                const autoUpdateOnShip = companySettings?.settings?.shopify?.auto_update_on_ship ?? true
+                console.log('📋 Shopify auto_update_on_ship setting:', autoUpdateOnShip)
+                
+                if (autoUpdateOnShip) {
+                  console.log('🚀 Triggering Shopify fulfillment update...')
+                  
+                  // Extract tracking information from purchase response
+                  const trackingNumber = provider === 'shippo'
+                    ? (purchaseResponse.tracking_number || purchaseResponse.tracking_code || '')
+                    : (purchaseResponse.tracking_code || purchaseResponse.tracking_number || '')
+                  
+                  const trackingUrl = provider === 'shippo'
+                    ? (purchaseResponse.tracking_url_provider || purchaseResponse.label_url || '')
+                    : (purchaseResponse.tracker?.public_url || purchaseResponse.postage_label?.label_url || '')
+                  
+                  const carrier = provider === 'shippo'
+                    ? (purchaseResponse.rate?.provider || purchaseResponse.carrier_account || 'Unknown')
+                    : (purchaseResponse.selected_rate?.carrier || 'Unknown')
+                  
+                  const service = provider === 'shippo'
+                    ? (purchaseResponse.rate?.servicelevel?.name || purchaseResponse.servicelevel?.name || '')
+                    : (purchaseResponse.selected_rate?.service || '')
+                  
+                  // Call shopify-update-fulfillment edge function
+                  const { data: fulfillmentResult, error: fulfillmentError } = await supabase.functions.invoke(
+                    'shopify-update-fulfillment',
+                    {
+                      body: {
+                        shipmentId: finalShipmentId,
+                        status: 'purchased',
+                        trackingNumber,
+                        trackingUrl,
+                        carrier,
+                        service
+                      }
+                    }
+                  )
+                  
+                  if (fulfillmentError) {
+                    console.error('❌ Shopify fulfillment update failed:', fulfillmentError)
+                    console.error('   This does not affect the label purchase, but Shopify may not be updated')
+                  } else {
+                    console.log('✅ Shopify fulfillment updated successfully:', fulfillmentResult)
+                  }
+                } else {
+                  console.log('ℹ️ Shopify auto-update is disabled for this company')
+                }
+              }
+            } else {
+              console.log('ℹ️ Order is not from Shopify, skipping fulfillment sync')
+            }
+          } catch (shopifyError) {
+            console.error('⚠️ Shopify fulfillment sync error (non-blocking):', shopifyError)
+            // Don't fail the request - the label was purchased successfully
+          }
+          
           // Fire Slack notification for "order shipped"
           try {
             const slackWebhook = Deno.env.get('SLACK_WEBHOOK_URL')
