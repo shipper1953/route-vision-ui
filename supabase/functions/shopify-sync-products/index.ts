@@ -75,9 +75,13 @@ serve(async (req) => {
                     title
                     price
                     inventoryQuantity
-                    weight {
-                      value
-                      unit
+                    inventoryItem {
+                      measurement {
+                        weight {
+                          value
+                          unit
+                        }
+                      }
                     }
                   }
                 }
@@ -137,7 +141,7 @@ serve(async (req) => {
               sku: product.variants?.edges?.[0]?.node?.sku || `SHOP-${product.legacyResourceId}`,
               title: product.title,
               price: product.variants?.edges?.[0]?.node?.price || '0',
-              weight: product.variants?.edges?.[0]?.node?.weight
+              weight: product.variants?.edges?.[0]?.node?.inventoryItem?.measurement?.weight
             }];
 
         for (const variant of itemsToProcess) {
