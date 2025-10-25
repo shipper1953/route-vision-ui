@@ -113,6 +113,39 @@ Deno.serve(async (req) => {
     let estimatedDeliveryDate = shipment.estimated_delivery_date;
     let actualDeliveryDate = shipment.actual_delivery_date;
     let status = shipment.status;
+    
+    // Store all tracking events for timeline
+    if (tracker.tracking_details && tracker.tracking_details.length > 0) {
+      const trackingEvents = tracker.tracking_details.map((detail: any) => ({
+        shipment_id: shipment.id,
+        provider: 'easypost',
+        event_type: mapStatusToEventType(detail.status, detail.status_detail),
+        status: detail.status,
+        status_detail: detail.status_detail,
+        message: detail.message,
+        description: detail.description,
+        location: detail.tracking_location ? {
+          city: detail.tracking_location.city,
+          state: detail.tracking_location.state,
+          country: detail.tracking_location.country,
+          zip: detail.tracking_location.zip
+        } : null,
+        carrier_timestamp: detail.datetime,
+        carrier_code: detail.carrier_code,
+        source: 'webhook',
+        raw_data: detail
+      }));
+      
+      // Upsert events to avoid duplicates
+      for (const event of trackingEvents) {
+        await supabase.from('tracking_events').upsert(event, {
+          onConflict: 'shipment_id,carrier_timestamp,status',
+          ignoreDuplicates: true
+        });
+      }
+      
+      console.log(`Stored ${trackingEvents.length} tracking events for shipment ${shipment.id}`);
+    }
 
     // Update estimated delivery date if available from EasyPost
     if (tracker.est_delivery_date) {
@@ -160,6 +193,15 @@ Deno.serve(async (req) => {
       }
 
       console.log(`Updated shipment ${shipment.id} with delivery information from EasyPost webhook`);
+      
+      // Trigger notifications for status changes
+      if (status === 'out_for_delivery' && shipment.status !== 'out_for_delivery') {
+        await triggerNotification(supabase, shipment.id, 'out_for_delivery');
+      } else if (status === 'delivered' && shipment.status !== 'delivered') {
+        await triggerNotification(supabase, shipment.id, 'delivered');
+      } else if (tracker.status === 'failure' || tracker.status === 'error') {
+        await triggerNotification(supabase, shipment.id, 'exception');
+      }
     } else {
       console.log(`No updates needed for shipment ${shipment.id}`);
     }
@@ -173,3 +215,43 @@ Deno.serve(async (req) => {
     return new Response('OK', { status: 200, headers: corsHeaders });
   }
 });
+
+function mapStatusToEventType(status: string, statusDetail: string): string {
+  const statusLower = status?.toLowerCase() || '';
+  const detailLower = statusDetail?.toLowerCase() || '';
+  
+  if (statusLower === 'delivered' || detailLower.includes('delivered')) return 'delivered';
+  if (statusLower === 'out_for_delivery' || detailLower.includes('out for delivery')) return 'out_for_delivery';
+  if (statusLower === 'in_transit') return 'in_transit';
+  if (statusLower === 'pre_transit') return 'pre_transit';
+  if (statusLower === 'returned' || detailLower.includes('return')) return 'returned';
+  if (statusLower === 'failure' || statusLower === 'error') return 'exception';
+  
+  return 'in_transit';
+}
+
+async function triggerNotification(supabase: any, shipmentId: number, notificationType: string) {
+  try {
+    // Get customer info from linked order
+    const { data: orderShipment } = await supabase
+      .from('order_shipments')
+      .select('order_id, orders(customer_email, customer_name)')
+      .eq('shipment_id', shipmentId)
+      .single();
+    
+    if (orderShipment?.orders) {
+      await supabase.functions.invoke('send-shipment-notification', {
+        body: {
+          type: notificationType,
+          shipmentId: shipmentId,
+          orderId: orderShipment.order_id,
+          customerEmail: orderShipment.orders.customer_email,
+          customerName: orderShipment.orders.customer_name
+        }
+      });
+      console.log(`Triggered ${notificationType} notification for shipment ${shipmentId}`);
+    }
+  } catch (error) {
+    console.error('Error triggering notification:', error);
+  }
+}

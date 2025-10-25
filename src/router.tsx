@@ -13,6 +13,8 @@ import Orders from "@/pages/Orders";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 
 // Lazy load all other pages for code splitting
+const TrackOrder = lazy(() => import("@/pages/TrackOrder"));
+const DeliveryPreferences = lazy(() => import("@/pages/DeliveryPreferences"));
 const CreateOrder = lazy(() => import("@/pages/CreateOrder"));
 const EditOrder = lazy(() => import("@/pages/EditOrder"));
 const OrderDetails = lazy(() => import("@/pages/OrderDetails"));
@@ -61,6 +63,18 @@ const router = createBrowserRouter([
     {
       path: "/privacy",
       element: <PrivacyPolicy />,
+    },
+    {
+      path: "/track/:trackingNumber",
+      element: <LazyRoute Component={TrackOrder} />,
+    },
+    {
+      path: "/track",
+      element: <LazyRoute Component={TrackOrder} />,
+    },
+    {
+      path: "/delivery-preferences",
+      element: <LazyRoute Component={DeliveryPreferences} />,
     },
     {
       path: "/orders",
