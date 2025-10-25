@@ -3,13 +3,15 @@
 
 import { OrderData, OrderItem } from "@/types/orderTypes";
 
+const DEBUG_ENABLED = import.meta.env.VITE_DEBUG_ORDER_PARSER === 'true' || import.meta.env.DEV;
+
 export const parseOrderItems = (rawItems: any): OrderItem[] => {
-  if (import.meta.env.DEV) {
+  if (DEBUG_ENABLED) {
     console.log("Parsing order items:", rawItems);
   }
   
   if (!rawItems) {
-    if (import.meta.env.DEV) {
+    if (DEBUG_ENABLED) {
       console.log("No raw items provided");
     }
     return [];
@@ -17,7 +19,7 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
 
   // Handle if items is already an array
   if (Array.isArray(rawItems)) {
-    if (import.meta.env.DEV) {
+    if (DEBUG_ENABLED) {
       console.log("Items is already an array:", rawItems);
     }
     return rawItems.map((item: any) => ({
@@ -44,7 +46,7 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
   if (typeof rawItems === 'string') {
     try {
       const parsed = JSON.parse(rawItems);
-      if (import.meta.env.DEV) {
+      if (DEBUG_ENABLED) {
         console.log("Parsed items from JSON:", parsed);
       }
       return parseOrderItems(parsed);
@@ -56,7 +58,7 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
 
   // Handle if items is a number (count only)
   if (typeof rawItems === 'number') {
-    if (import.meta.env.DEV) {
+    if (DEBUG_ENABLED) {
       console.log("Items is just a count:", rawItems);
     }
     // Create placeholder items
@@ -67,7 +69,7 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
     }));
   }
 
-  if (import.meta.env.DEV) {
+  if (DEBUG_ENABLED) {
     console.log("Unknown items format:", typeof rawItems, rawItems);
   }
   return [];
@@ -75,7 +77,7 @@ export const parseOrderItems = (rawItems: any): OrderItem[] => {
 
 export const parseParcelInfo = (qboidData: any) => {
   if (!qboidData) {
-    if (import.meta.env.DEV) {
+    if (DEBUG_ENABLED) {
       console.warn("No Qboid dimensions found for order");
     }
     return null;
@@ -83,7 +85,7 @@ export const parseParcelInfo = (qboidData: any) => {
 
   try {
     const parsed = typeof qboidData === 'string' ? JSON.parse(qboidData) : qboidData;
-    if (import.meta.env.DEV) {
+    if (DEBUG_ENABLED) {
       console.log("Qboid dimensions found for order:", parsed.orderId, parsed);
     }
     return {
@@ -129,7 +131,7 @@ export const parseShippingAddress = (addressData: any) => {
     };
   }
 
-  if (import.meta.env.DEV) {
+  if (DEBUG_ENABLED) {
     console.log("Parsed shipping address:", {
       street1: addressData.street1 || "",
       street2: addressData.street2 || "",
@@ -151,12 +153,12 @@ export const parseShippingAddress = (addressData: any) => {
 };
 
 export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
-  if (import.meta.env.DEV) {
+  if (DEBUG_ENABLED) {
     console.log("Converting Supabase order to OrderData:", supabaseOrder);
   }
   
   const parsedItems = parseOrderItems(supabaseOrder.items);
-  if (import.meta.env.DEV) {
+  if (DEBUG_ENABLED) {
     console.log("Parsed items for order:", supabaseOrder.id, parsedItems);
   }
 

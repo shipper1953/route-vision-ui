@@ -2,10 +2,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { OrderData } from "@/types/orderTypes";
 import { convertSupabaseToOrderData } from "./orderDataParser";
+import { hydrateOrdersWithShipments } from "./orderShipmentHydration";
+
+const DEBUG_ENABLED = import.meta.env.VITE_DEBUG_ORDER_PARSER === 'true' || import.meta.env.DEV;
 
 export const fetchOrderById = async (orderId: string): Promise<OrderData | null> => {
   try {
-    if (import.meta.env.DEV) {
+    if (DEBUG_ENABLED) {
       console.log(`Fetching order by ID: ${orderId}`);
     }
     
@@ -17,14 +20,15 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
       return null;
     }
     
-    // Fetch order with cartonization data
+    // Fetch order with narrowed projection
     const { data: order, error } = await supabase
       .from('orders')
       .select(`
         id, order_id, customer_name, customer_company, customer_email, customer_phone,
         status, order_date, required_delivery_date, value, items, shipping_address,
         qboid_dimensions, user_id, company_id, warehouse_id, created_at,
-        estimated_delivery_date, actual_delivery_date, shipment_id
+        estimated_delivery_date, actual_delivery_date, shipment_id,
+        items_shipped, items_total, fulfillment_percentage, fulfillment_status
       `)
       .eq('id', orderIdNumber)
       .maybeSingle();
@@ -35,11 +39,14 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
     }
 
     if (!order) {
-      if (import.meta.env.DEV) {
+      if (DEBUG_ENABLED) {
         console.log(`Order ${orderId} not found`);
       }
       return null;
     }
+
+    // Hydrate order with shipment data using shared utility
+    const [hydratedOrder] = await hydrateOrdersWithShipments([order]);
 
     // Fetch cartonization data separately
     const { data: cartonizationData } = await supabase
@@ -48,14 +55,14 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
       .eq('order_id', orderIdNumber)
       .maybeSingle();
 
-    if (import.meta.env.DEV) {
+    if (DEBUG_ENABLED) {
       console.log("Raw order data from database:", order);
       if (cartonizationData) {
         console.log("Cartonization data found:", cartonizationData);
       }
     }
     
-    const convertedOrder = convertSupabaseToOrderData(order);
+    const convertedOrder = convertSupabaseToOrderData(hydratedOrder);
     
     // Add cartonization data if available
     if (cartonizationData && cartonizationData.recommended_box_data) {
@@ -79,7 +86,7 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
       };
     }
     
-    if (import.meta.env.DEV) {
+    if (DEBUG_ENABLED) {
       console.log("Converted order data with cartonization:", convertedOrder);
     }
     
