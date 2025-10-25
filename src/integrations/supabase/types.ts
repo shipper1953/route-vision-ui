@@ -154,6 +154,57 @@ export type Database = {
         }
         Relationships: []
       }
+      company_processing_times: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          cutoff_time: string | null
+          holiday_processing: boolean | null
+          id: string
+          standard_processing_days: number | null
+          updated_at: string | null
+          warehouse_id: string | null
+          weekend_processing: boolean | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          cutoff_time?: string | null
+          holiday_processing?: boolean | null
+          id?: string
+          standard_processing_days?: number | null
+          updated_at?: string | null
+          warehouse_id?: string | null
+          weekend_processing?: boolean | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          cutoff_time?: string | null
+          holiday_processing?: boolean | null
+          id?: string
+          standard_processing_days?: number | null
+          updated_at?: string | null
+          warehouse_id?: string | null
+          weekend_processing?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_processing_times_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_processing_times_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_shipping_prefs: {
         Row: {
           carrier_whitelist: string[] | null
@@ -192,6 +243,125 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      customer_delivery_preferences: {
+        Row: {
+          access_code: string | null
+          company_id: string | null
+          created_at: string | null
+          customer_email: string
+          delivery_instructions: string | null
+          email_notifications: boolean | null
+          gate_code: string | null
+          id: string
+          phone_number: string | null
+          preferred_delivery_window: string | null
+          safe_place: string | null
+          signature_required: boolean | null
+          sms_notifications: boolean | null
+          updated_at: string | null
+          vacation_hold_end: string | null
+          vacation_hold_start: string | null
+        }
+        Insert: {
+          access_code?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          customer_email: string
+          delivery_instructions?: string | null
+          email_notifications?: boolean | null
+          gate_code?: string | null
+          id?: string
+          phone_number?: string | null
+          preferred_delivery_window?: string | null
+          safe_place?: string | null
+          signature_required?: boolean | null
+          sms_notifications?: boolean | null
+          updated_at?: string | null
+          vacation_hold_end?: string | null
+          vacation_hold_start?: string | null
+        }
+        Update: {
+          access_code?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          customer_email?: string
+          delivery_instructions?: string | null
+          email_notifications?: boolean | null
+          gate_code?: string | null
+          id?: string
+          phone_number?: string | null
+          preferred_delivery_window?: string | null
+          safe_place?: string | null
+          signature_required?: boolean | null
+          sms_notifications?: boolean | null
+          updated_at?: string | null
+          vacation_hold_end?: string | null
+          vacation_hold_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_delivery_preferences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_notifications: {
+        Row: {
+          channel: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          notification_type: string
+          order_id: number | null
+          recipient: string
+          sent_at: string | null
+          shipment_id: number | null
+          status: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          notification_type: string
+          order_id?: number | null
+          recipient: string
+          sent_at?: string | null
+          shipment_id?: number | null
+          status?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          notification_type?: string
+          order_id?: number | null
+          recipient?: string
+          sent_at?: string | null
+          shipment_id?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notifications_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       items: {
         Row: {
@@ -1196,6 +1366,125 @@ export type Database = {
           },
         ]
       }
+      tracking_events: {
+        Row: {
+          carrier_code: string | null
+          carrier_timestamp: string
+          created_at: string | null
+          description: string | null
+          event_type: string
+          id: string
+          location: Json | null
+          message: string | null
+          provider: string
+          raw_data: Json | null
+          shipment_id: number
+          source: string | null
+          status: string
+          status_detail: string | null
+        }
+        Insert: {
+          carrier_code?: string | null
+          carrier_timestamp: string
+          created_at?: string | null
+          description?: string | null
+          event_type: string
+          id?: string
+          location?: Json | null
+          message?: string | null
+          provider: string
+          raw_data?: Json | null
+          shipment_id: number
+          source?: string | null
+          status: string
+          status_detail?: string | null
+        }
+        Update: {
+          carrier_code?: string | null
+          carrier_timestamp?: string
+          created_at?: string | null
+          description?: string | null
+          event_type?: string
+          id?: string
+          location?: Json | null
+          message?: string | null
+          provider?: string
+          raw_data?: Json | null
+          shipment_id?: number
+          source?: string | null
+          status?: string
+          status_detail?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_events_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracking_tokens: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          custom_message: string | null
+          expires_at: string | null
+          id: string
+          last_viewed_at: string | null
+          shipment_id: number
+          show_customer_info: boolean | null
+          show_items: boolean | null
+          token: string
+          tracking_number: string
+          views: number | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          custom_message?: string | null
+          expires_at?: string | null
+          id?: string
+          last_viewed_at?: string | null
+          shipment_id: number
+          show_customer_info?: boolean | null
+          show_items?: boolean | null
+          token?: string
+          tracking_number: string
+          views?: number | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          custom_message?: string | null
+          expires_at?: string | null
+          id?: string
+          last_viewed_at?: string | null
+          shipment_id?: number
+          show_customer_info?: boolean | null
+          show_items?: boolean | null
+          token?: string
+          tracking_number?: string
+          views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_tokens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracking_tokens_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
@@ -1501,6 +1790,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_tracking_views: {
+        Args: { p_tracking_number: string }
+        Returns: undefined
       }
       update_order_cartonization: {
         Args: {
