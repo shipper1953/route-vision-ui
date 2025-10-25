@@ -90,8 +90,6 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
   }
 
   const orderId = orderIdResult;
-
-
   // Prepare items data - include both legacy format and detailed items
   const itemsData = orderData.orderItems && orderData.orderItems.length > 0 
     ? orderData.orderItems.map(item => ({

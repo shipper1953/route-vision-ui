@@ -1773,6 +1773,14 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_qboid_dimensions_for_orders: {
+        Args: { p_days_lookback?: number; p_order_identifiers: string[] }
+        Returns: {
+          created_at: string
+          dimensions: Json
+          order_identifier: string
+        }[]
+      }
       get_user_profile: {
         Args: { user_id: string }
         Returns: {
@@ -1794,6 +1802,14 @@ export type Database = {
       increment_tracking_views: {
         Args: { p_tracking_number: string }
         Returns: undefined
+      }
+      link_shipments_to_orders: {
+        Args: { p_order_identifiers: string[]; p_shipment_ids: number[] }
+        Returns: {
+          matched: boolean
+          order_id: number
+          shipment_id: number
+        }[]
       }
       update_order_cartonization: {
         Args: {
