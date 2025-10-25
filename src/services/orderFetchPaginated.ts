@@ -1,6 +1,7 @@
 import { OrderData } from "@/types/orderTypes";
 import { supabase } from "@/integrations/supabase/client";
 import { convertSupabaseToOrderData } from "./orderDataParser";
+import { hydrateOrdersWithShipments } from "./orderShipmentHydration";
 
 export interface PaginatedOrdersResult {
   orders: OrderData[];
@@ -31,12 +32,7 @@ export async function fetchOrdersPaginated(
         id, order_id, customer_name, customer_company, customer_email, customer_phone,
         status, order_date, required_delivery_date, value, items, shipping_address,
         qboid_dimensions, user_id, company_id, warehouse_id, created_at,
-        estimated_delivery_date, actual_delivery_date, shipment_id,
-        shipments(
-          id, easypost_id, carrier, service, status, tracking_number, tracking_url,
-          cost, original_cost, label_url, estimated_delivery_date, actual_delivery_date,
-          package_dimensions, package_weights, actual_package_sku, actual_package_master_id, package_count
-        )
+        estimated_delivery_date, actual_delivery_date, shipment_id
       `, { count: 'exact' });
     
     // Add search filter if provided
@@ -78,73 +74,11 @@ export async function fetchOrdersPaginated(
     
     console.log(`Found ${data.length} orders on page ${page}, total: ${count}`);
     
-    // Batch fetch qboid data for all orders in current page - FULLY OPTIMIZED
-    const orderIdLinks = data.map(order => `ORD-${order.order_id || order.id}`);
+    // Use shared hydration utility with qboid enrichment
+    const hydratedOrders = await hydrateOrdersWithShipments(data, true);
     
-    // For performance: only fetch recent events (30 days) to avoid full table scan
-    // Future optimization: use a materialized view or index on data->>'orderId'
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const { data: allQboidData } = await supabase
-      .from('qboid_events')
-      .select('*')
-      .eq('event_type', 'dimensions_received')
-      .gte('created_at', thirtyDaysAgo.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(200); // Cap at 200 most recent to avoid massive payloads
-    
-    // Filter to only events matching current page's orders (minimal client-side work)
-    const qboidData = allQboidData?.filter(event => {
-      const eventData = event.data as any;
-      const orderId = eventData?.orderId || eventData?.barcode;
-      return orderId && orderIdLinks.includes(orderId);
-    });
-    
-    // Create a map of qboid data by order ID for quick lookup
-    const qboidMap = new Map();
-    if (qboidData) {
-      qboidData.forEach(event => {
-        const eventData = event.data as any;
-        if (eventData && (eventData.orderId || eventData.barcode)) {
-          const orderId = eventData.orderId || eventData.barcode;
-          if (!qboidMap.has(orderId)) {
-            qboidMap.set(orderId, eventData);
-          }
-        }
-      });
-    }
-    
-    // Process orders with enhanced data
-    const processedOrders = data.map(order => {
-      const orderIdLink = `ORD-${order.order_id || order.id}`;
-      const qboidDimensions = qboidMap.get(orderIdLink);
-      
-      // Enhanced data object
-      const enhancedData = {
-        ...order,
-        qboid_dimensions: qboidDimensions ? {
-          length: qboidDimensions.dimensions?.length || qboidDimensions.length,
-          width: qboidDimensions.dimensions?.width || qboidDimensions.width,
-          height: qboidDimensions.dimensions?.height || qboidDimensions.height,
-          weight: qboidDimensions.dimensions?.weight || qboidDimensions.weight,
-          orderId: qboidDimensions.orderId || qboidDimensions.barcode
-        } : order.qboid_dimensions,
-        shipment_data: order.shipments ? {
-          id: order.shipments.easypost_id || String(order.shipments.id),
-          carrier: order.shipments.carrier,
-          service: order.shipments.service,
-          trackingNumber: order.shipments.tracking_number || 'Pending',
-          trackingUrl: order.shipments.tracking_url || `https://www.trackingmore.com/track/en/${order.shipments.tracking_number}`,
-          estimatedDeliveryDate: order.shipments.estimated_delivery_date,
-          actualDeliveryDate: order.shipments.actual_delivery_date,
-          cost: order.shipments.cost,
-          labelUrl: order.shipments.label_url
-        } : null
-      };
-      
-      return convertSupabaseToOrderData(enhancedData);
-    });
+    // Convert to OrderData format
+    const processedOrders = hydratedOrders.map(order => convertSupabaseToOrderData(order));
     
     const totalCount = count || 0;
     const totalPages = Math.ceil(totalCount / pageSize);

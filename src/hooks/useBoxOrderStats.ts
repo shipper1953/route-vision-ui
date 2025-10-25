@@ -33,6 +33,10 @@ export const useBoxOrderStats = () => {
           });
         });
 
+        // OPTIMIZATION: Reuse CartonizationEngine instance across all orders
+        const engine = new CartonizationEngine(boxes);
+        console.log(`Initialized shared CartonizationEngine for ${orders.length} orders`);
+
         // Calculate recommendations for each open order
         for (const order of orders) {
           // Check if order.items is an array and has items
@@ -41,7 +45,6 @@ export const useBoxOrderStats = () => {
             const items = createItemsFromOrderData(order.items, []);
             
             if (items.length > 0) {
-              const engine = new CartonizationEngine(boxes);
               const result = engine.calculateOptimalBox(items);
               
               if (result && result.recommendedBox) {

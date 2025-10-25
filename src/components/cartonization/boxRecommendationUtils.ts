@@ -200,8 +200,10 @@ export const analyzeBoxRecommendations = async (
     return [];
   }
 
+  // OPTIMIZATION: Reuse CartonizationEngine instances across all orders
   const currentEngine = new CartonizationEngine(boxes, parameters);
   const catalogEngine = new CartonizationEngine([...boxes, ...CATALOG_BOXES], parameters);
+  console.log(`Initialized shared CartonizationEngines for ${recentOrders.length} orders`);
   
   const boxAnalysis = new Map<string, {
     orders: string[],
