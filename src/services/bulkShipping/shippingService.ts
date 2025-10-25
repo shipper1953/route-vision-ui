@@ -14,23 +14,36 @@ export class BulkShippingService {
   }
 
   async processOrdersForShipping(orders: OrderWithRates[]): Promise<ShippingResult[]> {
-    console.log('Starting bulk shipping for orders:', orders.map(o => o.id));
+    console.log(`Starting bulk label purchase for ${orders.length} orders`);
+    
+    // OPTIMIZATION: Batch fetch all shipping addresses upfront
+    const orderIds = orders.map(o => o.id);
+    const addressMap = await this.batchFetchShippingAddresses(orderIds);
+    console.log(`✅ Pre-fetched ${addressMap.size} shipping addresses`);
     
     const results: ShippingResult[] = [];
+    const CONCURRENCY_LIMIT = 3;
+    let rateLimitHit = false;
+    let backoffMs = 0;
 
-    // Process orders one at a time to avoid rate limiting
-    for (let i = 0; i < orders.length; i++) {
-      const order = orders[i];
+    // OPTIMIZATION: Process with limited concurrency
+    for (let i = 0; i < orders.length; i += CONCURRENCY_LIMIT) {
+      if (rateLimitHit) break;
       
-      try {
-        console.log(`Processing order ${order.id} (${i + 1}/${orders.length})...`);
-        
+      const batch = orders.slice(i, i + CONCURRENCY_LIMIT);
+      console.log(`Processing label batch ${Math.floor(i / CONCURRENCY_LIMIT) + 1}/${Math.ceil(orders.length / CONCURRENCY_LIMIT)}: ${batch.length} orders`);
+      
+      const batchPromises = batch.map(async (order) => {
         // Since we already have rates from the fetch rates step, we don't need to create a new shipment
         // We need to use the existing shipment ID and selected rate
         const selectedRate = order.rates?.find(r => r.id === order.selectedRateId);
         
         if (!selectedRate) {
-          throw new Error('No rate selected for order');
+          return {
+            orderId: order.id,
+            success: false,
+            error: 'No rate selected for order'
+          };
         }
 
         // The rates we have should include the shipment ID from when they were fetched
@@ -39,7 +52,15 @@ export class BulkShippingService {
         
         if (!shipmentId) {
           console.log(`Creating new shipment for order ${order.id} as no shipment ID found in rate`);
-          shipmentId = await this.createShipmentForOrder(order, selectedRate);
+          try {
+            shipmentId = await this.createShipmentForOrder(order, selectedRate);
+          } catch (error: any) {
+            return {
+              orderId: order.id,
+              success: false,
+              error: error.message || 'Failed to create shipment'
+            };
+          }
         }
 
         // Purchase label with error handling
@@ -58,8 +79,7 @@ export class BulkShippingService {
             quantity: parseInt(item.quantity?.toString() || '1')
           }));
 
-          console.log(`Purchasing label for order ${order.id} with box:`, selectedBoxData);
-          console.log(`Selected items for order ${order.id}:`, selectedItems);
+          console.log(`Purchasing label for order ${order.id}`);
           console.log(`Selected rate for order ${order.id}:`, { 
             carrier: selectedRate.carrier, 
             service: selectedRate.service, 
@@ -81,51 +101,82 @@ export class BulkShippingService {
             markedUpCost
           );
 
-        console.log(`Label purchased for order ${order.id}:`, labelResponse.tracking_code);
+          console.log(`✅ Label purchased for order ${order.id}:`, labelResponse.tracking_code);
 
-          results.push({
+          return {
             orderId: order.id,
             success: true,
             trackingNumber: labelResponse.tracking_code,
             labelUrl: labelResponse.postage_label?.label_url,
-            cost: parseFloat(selectedRate.rate) // Use the rate the user saw
-          });
-        } catch (labelError: any) {
-          // Handle rate limiting on label purchase
-          if (labelError.message?.includes('rate-limited') || labelError.message?.includes('RATE_LIMITED')) {
-            toast.error('API rate limit reached during label purchase. Please wait a few minutes before trying again.');
-            results.push({
-              orderId: order.id,
-              success: false,
-              error: 'Rate limited during label purchase - please try again later'
-            });
-            break; // Stop processing and return what we have
+            cost: parseFloat(selectedRate.rate)
+          };
+
+        } catch (error: any) {
+          console.error(`Error processing order ${order.id}:`, error);
+          
+          // Check for rate limiting
+          const isRateLimited = error.message?.includes('rate-limited') || 
+                                 error.message?.includes('RATE_LIMITED') ||
+                                 error.message?.includes('429');
+          
+          if (isRateLimited) {
+            rateLimitHit = true;
           }
-          throw labelError;
+          
+          return {
+            orderId: order.id,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          };
         }
+      });
 
-      } catch (error: any) {
-        console.error(`Error processing order ${order.id}:`, error);
-        
-        // Check if it's a rate limit error
-        const isRateLimited = error.message?.includes('rate-limited') || error.message?.includes('RATE_LIMITED');
-        
-        results.push({
-          orderId: order.id,
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-
-        // If rate limited, stop processing more orders
-        if (isRateLimited) {
-          console.error('Rate limit detected, stopping batch processing');
-          break;
+      // Process batch concurrently
+      const batchResults = await Promise.allSettled(batchPromises);
+      
+      // Collect results
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled' && result.value) {
+          results.push(result.value);
         }
+      }
+
+      // OPTIMIZATION: Exponential backoff only on rate limiting
+      if (rateLimitHit) {
+        backoffMs = backoffMs === 0 ? 2000 : Math.min(backoffMs * 2, 30000);
+        console.warn(`⚠️ Rate limit detected - backing off for ${backoffMs}ms`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
       }
     }
 
     this.reportResults(results);
     return results;
+  }
+
+  private async batchFetchShippingAddresses(orderIds: string[]): Promise<Map<string, any>> {
+    const addressMap = new Map<string, any>();
+    
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_id, shipping_address')
+        .in('order_id', orderIds);
+
+      if (error) {
+        console.error('Error batch fetching shipping addresses:', error);
+        return addressMap;
+      }
+
+      if (data) {
+        data.forEach(order => {
+          addressMap.set(order.order_id, order.shipping_address);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to batch fetch shipping addresses:', error);
+    }
+    
+    return addressMap;
   }
 
   private async createShipmentForOrder(order: OrderWithRates, selectedRate: any): Promise<string> {
@@ -216,13 +267,22 @@ export class BulkShippingService {
     try {
       console.log(`Updating order ${orderId} with shipment info:`, shipmentInfo);
       
+      // Fetch current shipping address
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('shipping_address')
+        .eq('order_id', orderId)
+        .maybeSingle();
+      
+      const currentAddress = (orderData?.shipping_address || {}) as Record<string, any>;
+      
       // Update the order status and shipping details
       const { error } = await supabase
         .from('orders')
         .update({
           status: 'shipped',
           shipping_address: {
-            ...((await this.getOrderShippingAddress(orderId)) || {}),
+            ...currentAddress,
             carrier: shipmentInfo.carrier,
             service: shipmentInfo.service,
             trackingNumber: shipmentInfo.trackingNumber,
@@ -246,25 +306,6 @@ export class BulkShippingService {
     }
   }
 
-  private async getOrderShippingAddress(orderId: string): Promise<any> {
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('shipping_address')
-        .eq('order_id', orderId)
-        .maybeSingle();
-
-      if (error) {
-        console.error(`Error fetching shipping address for order ${orderId}:`, error);
-        return null;
-      }
-
-      return data?.shipping_address;
-    } catch (error) {
-      console.error(`Failed to get shipping address for order ${orderId}:`, error);
-      return null;
-    }
-  }
 
   private reportResults(results: ShippingResult[]): void {
     const successfulShipments = results.filter(r => r.success);

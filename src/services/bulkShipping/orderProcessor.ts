@@ -15,6 +15,18 @@ export class OrderProcessor {
     const boxGroups = new Map<string, BoxShippingGroup>();
     const excludedOrders: { orderId: string; reason: string; packageCount: number }[] = [];
 
+    // OPTIMIZATION: Reuse CartonizationEngine instance across all orders
+    const engine = new CartonizationEngine(this.boxes, {
+      fillRateThreshold: 45,
+      maxPackageWeight: 50,
+      dimensionalWeightFactor: 139,
+      packingEfficiency: 85,
+      allowPartialFill: true,
+      optimizeForCost: false,
+      optimizeForSpace: false
+    });
+    console.log(`Initialized shared CartonizationEngine with ${this.boxes.length} available boxes`);
+
     for (const order of readyToShipOrders) {
       console.log(`Processing order ${order.id} for cartonization:`, order);
       
@@ -25,16 +37,7 @@ export class OrderProcessor {
         console.log(`Created cartonization items for order ${order.id}:`, items);
         
         if (items.length > 0) {
-          const engine = new CartonizationEngine(this.boxes, {
-            fillRateThreshold: 45,
-            maxPackageWeight: 50,
-            dimensionalWeightFactor: 139,
-            packingEfficiency: 85,
-            allowPartialFill: true,
-            optimizeForCost: false,
-            optimizeForSpace: false // Prioritize utilization, not smallest box
-          });
-          console.log(`Running enhanced cartonization for order ${order.id} with ${this.boxes.length} available boxes`);
+          console.log(`Running cartonization for order ${order.id}`);
           const result = engine.calculateOptimalBox(items, true); // Enable multi-package detection
           console.log(`Enhanced cartonization result for order ${order.id}:`, result);
           

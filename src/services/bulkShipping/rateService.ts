@@ -11,7 +11,7 @@ export class RateService {
   }
 
   async fetchRatesForOrders(orders: OrderForShipping[]): Promise<OrderWithRates[]> {
-    console.log('Fetching rates for orders:', orders.map(o => o.id));
+    console.log(`Fetching rates for ${orders.length} orders with concurrency...`);
     
     // Get company info for markup
     const { data: { user } } = await supabase.auth.getUser();
@@ -35,13 +35,19 @@ export class RateService {
     }
     
     const ordersWithRates: OrderWithRates[] = [];
+    const CONCURRENCY_LIMIT = 3;
+    let rateLimitHit = false;
 
-    // Process orders one at a time to get rates
-    for (let i = 0; i < orders.length; i++) {
-      const order = orders[i];
+    // OPTIMIZATION: Process orders with limited concurrency
+    for (let i = 0; i < orders.length; i += CONCURRENCY_LIMIT) {
+      if (rateLimitHit) break;
       
-      try {
-        console.log(`Fetching rates for order ${order.id} (${i + 1}/${orders.length})...`);
+      const batch = orders.slice(i, i + CONCURRENCY_LIMIT);
+      console.log(`Processing batch ${Math.floor(i / CONCURRENCY_LIMIT) + 1}/${Math.ceil(orders.length / CONCURRENCY_LIMIT)}: ${batch.length} orders`);
+      
+      const batchPromises = batch.map(async (order) => {
+        try {
+          console.log(`Fetching rates for order ${order.id}...`);
         
         // Create shipment data
         const shipmentData = {
@@ -161,35 +167,50 @@ export class RateService {
           console.log(`Auto-selected cheapest rate for order ${order.id}: ${cheapest.carrier} ${cheapest.service} ($${cheapest.rate})`);
         }
 
-        ordersWithRates.push({
-          ...order,
-          rates: allRates,
-          selectedRateId
-        });
-
-        console.log(`Rates fetched for order ${order.id}:`, shipmentResponse.id);
-
-      } catch (error: any) {
-        console.error(`Error fetching rates for order ${order.id}:`, error);
-        
-        // Check for rate limiting and break the loop if detected
-        if (error.message?.includes('rate-limited') || error.message?.includes('RATE_LIMITED')) {
-          console.error('Rate limit detected, stopping batch processing');
-          ordersWithRates.push({
+          return {
             ...order,
-            rates: []
-          });
-          break; // Stop processing more orders
+            rates: allRates,
+            selectedRateId
+          };
+
+        } catch (error: any) {
+          console.error(`Error fetching rates for order ${order.id}:`, error);
+          
+          // Check for rate limiting
+          if (error.message?.includes('rate-limited') || error.message?.includes('RATE_LIMITED') || error.message?.includes('429')) {
+            console.error('Rate limit detected');
+            rateLimitHit = true;
+          }
+          
+          return {
+            ...order,
+            rates: [],
+            error: error.message
+          };
         }
-        
-        // Add order with empty rates on error
-        ordersWithRates.push({
-          ...order,
-          rates: []
-        });
+      });
+
+      // Process batch concurrently
+      const batchResults = await Promise.allSettled(batchPromises);
+      
+      // Collect results and check for rate limiting
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled' && result.value) {
+          ordersWithRates.push(result.value);
+          if ((result.value as any).error?.includes('rate-limit')) {
+            rateLimitHit = true;
+          }
+        }
+      }
+
+      // OPTIMIZATION: Only add delay if rate limited
+      if (rateLimitHit) {
+        console.warn('⚠️ Rate limit detected - stopping batch processing');
+        break;
       }
     }
 
+    console.log(`✅ Fetched rates for ${ordersWithRates.length} orders`);
     return ordersWithRates;
   }
 }
