@@ -33,6 +33,14 @@ const GenerateDemoOrders = lazy(() => import("@/pages/GenerateDemoOrders"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
+// WMS pages
+const WmsDashboard = lazy(() => import("@/pages/wms/Dashboard"));
+const WmsReceiving = lazy(() => import("@/pages/wms/Receiving"));
+const WmsQuality = lazy(() => import("@/pages/wms/Quality"));
+const WmsInventory = lazy(() => import("@/pages/wms/Inventory"));
+const WmsPicking = lazy(() => import("@/pages/wms/Picking"));
+const WmsReporting = lazy(() => import("@/pages/wms/Reporting"));
+
 // Loading component for Suspense fallback
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -147,6 +155,30 @@ const router = createBrowserRouter([
   {
     path: "/onboarding",
     element: <LazyRoute Component={Onboarding} />,
+  },
+  {
+    path: "/wms/dashboard",
+    element: <LazyRoute Component={WmsDashboard} />,
+  },
+  {
+    path: "/wms/receiving",
+    element: <LazyRoute Component={WmsReceiving} />,
+  },
+  {
+    path: "/wms/quality",
+    element: <LazyRoute Component={WmsQuality} />,
+  },
+  {
+    path: "/wms/inventory",
+    element: <LazyRoute Component={WmsInventory} />,
+  },
+  {
+    path: "/wms/picking",
+    element: <LazyRoute Component={WmsPicking} />,
+  },
+  {
+    path: "/wms/reporting",
+    element: <LazyRoute Component={WmsReporting} />,
   },
   {
     path: "*",

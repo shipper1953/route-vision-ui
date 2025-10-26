@@ -10,6 +10,7 @@ import { ShipmentsNavItem } from "./sidebar/ShipmentsNavItem";
 import { ItemMasterNavItem } from "./sidebar/ItemMasterNavItem";
 import { TornadoPackNavItem } from "./sidebar/TornadoPackNavItem";
 import { CompanyAdminNavItem } from "./sidebar/CompanyAdminNavItem";
+import { WmsNavItem } from "./sidebar/WmsNavItem";
 import { UserProfile } from "./sidebar/UserProfile";
 import { CreateMenu } from "./sidebar/CreateMenu";
 import { LogoutButton } from "./sidebar/LogoutButton";
@@ -71,6 +72,9 @@ export const TmsSidebar = () => {
           <ShipmentsNavItem />
           <ItemMasterNavItem />
           <TornadoPackNavItem />
+          
+          <Separator className="my-4 bg-sidebar-border" />
+          <WmsNavItem isCollapsed={isCollapsed} />
           
           {(isAdmin || isSuperAdmin) && (
             <>
