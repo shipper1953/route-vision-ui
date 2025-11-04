@@ -76,11 +76,14 @@ export const usePrintNode = () => {
       // Remove data URL prefix to get just the base64 content
       const base64Content = base64.split(',')[1];
       
-      // Determine if it's a PDF or image
+      // Determine content type based on actual file type
       const isPdf = blob.type.includes('pdf') || pdfUrl.toLowerCase().endsWith('.pdf');
-      const contentType = isPdf ? 'pdf_base64' : 'pdf_base64'; // Use pdf_base64 for both so PrintNode converts
+      const isPng = blob.type.includes('png') || pdfUrl.toLowerCase().endsWith('.png');
       
-      console.log('PrintNode - File type:', blob.type, '| Using base64 conversion for printer compatibility');
+      // Use correct content type so PrintNode converts properly to ZPL
+      const contentType = isPng ? 'png_base64' : (isPdf ? 'pdf_base64' : 'pdf_base64');
+      
+      console.log('PrintNode - File type:', blob.type, '| ContentType:', contentType, '| Will convert to ZPL for thermal printer');
 
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
