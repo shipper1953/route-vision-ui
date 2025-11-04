@@ -335,15 +335,17 @@ async function tryGetZplLabel(shipmentId: string, apiKey: string): Promise<strin
 function ensureZpl4x6Dimensions(zplCode: string): string {
   console.log('🔧 Ensuring ZPL code has 4x6 dimensions (812x1218 dots at 203 DPI)');
   
-  // Remove any existing ^PW (Print Width) and ^LL (Label Length) commands
-  let modifiedZpl = zplCode.replace(/\^PW\d+/g, '').replace(/\^LL\d+/g, '');
+  // Remove any existing ^PW, ^LL, ^LT commands
+  let modifiedZpl = zplCode.replace(/\^PW\d+/g, '').replace(/\^LL\d+/g, '').replace(/\^LT\d+/g, '');
   
-  // Add 4x6 dimensions right after ^XA (start of label)
-  // ^PW812 = 4 inches width at 203 DPI
-  // ^LL1218 = 6 inches height at 203 DPI  
-  modifiedZpl = modifiedZpl.replace(/\^XA/, '^XA^PW812^LL1218');
+  // Add critical 4x6 configuration right after ^XA
+  // ^MNN = Media Tracking Mode - ignore physical label detection, use ZPL dimensions
+  // ^LT0 = Label Top position 0 (no offset)
+  // ^PW812 = Print Width 4 inches (812 dots at 203 DPI)
+  // ^LL1218 = Label Length 6 inches (1218 dots at 203 DPI)
+  modifiedZpl = modifiedZpl.replace(/\^XA/, '^XA\n^MNN\n^LT0\n^PW812\n^LL1218');
   
-  console.log('✅ ZPL dimensions set to 4x6 inches');
+  console.log('✅ ZPL configured for 4x6 with media tracking override');
   return modifiedZpl;
 }
 
