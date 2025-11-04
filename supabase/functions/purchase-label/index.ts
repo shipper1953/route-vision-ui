@@ -202,6 +202,7 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
   
   await ensureValidPhoneNumbers(shipmentId, apiKey);
   
+  // Request ZPL format for 4x6 thermal labels
   const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
     method: 'POST',
     headers: {
@@ -211,9 +212,12 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
     body: JSON.stringify({ 
       rate: { id: rateId },
       label_format: 'ZPL',
+      file_format: 'ZPL',
       label_size: '4x6'
     }),
   })
+  
+  console.log('📋 Buy request sent with ZPL format request')
   
   const responseText = await response.text()
   let responseData
@@ -282,7 +286,26 @@ async function tryGetZplLabel(shipmentId: string, apiKey: string): Promise<strin
   try {
     console.log('🏷️  Attempting to retrieve ZPL format for shipment:', shipmentId);
     
-    const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/label`, {
+    // Try to get ZPL from label endpoint with ZPL file format
+    const zplResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/label?file_format=ZPL`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'text/plain, application/zpl',
+      },
+    });
+    
+    if (zplResponse.ok) {
+      const zplContent = await zplResponse.text();
+      
+      if (zplContent && zplContent.trim().startsWith('^XA')) {
+        console.log('✅ Successfully retrieved ZPL format via file_format param (length:', zplContent.length, ')');
+        return zplContent;
+      }
+    }
+    
+    // Fallback: Try Accept header method
+    const acceptResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/label`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -290,20 +313,17 @@ async function tryGetZplLabel(shipmentId: string, apiKey: string): Promise<strin
       },
     });
     
-    if (!response.ok) {
-      console.warn('⚠️  ZPL format not available for this carrier:', response.status);
-      return null;
+    if (acceptResponse.ok) {
+      const zplContent = await acceptResponse.text();
+      
+      if (zplContent && zplContent.trim().startsWith('^XA')) {
+        console.log('✅ Successfully retrieved ZPL format via Accept header (length:', zplContent.length, ')');
+        return zplContent;
+      }
     }
     
-    const zplContent = await response.text();
-    
-    if (zplContent.trim().startsWith('^XA')) {
-      console.log('✅ Successfully retrieved ZPL format (length:', zplContent.length, ')');
-      return zplContent;
-    } else {
-      console.warn('⚠️  Response is not valid ZPL format');
-      return null;
-    }
+    console.warn('⚠️  ZPL format not available - this is normal in test mode. Production mode with real carriers will provide ZPL.');
+    return null;
   } catch (error) {
     console.error('❌ Error retrieving ZPL format:', error);
     return null;
@@ -358,6 +378,34 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
   if (!responseData.label_url) {
     const warningMessages = responseData.messages?.map((msg: any) => msg.text).join('; ') || 'No additional details';
     throw new Error(`Shippo label was created but no label URL was provided. Messages: ${warningMessages}`)
+  }
+  
+  // Try to get ZPL content from Shippo response
+  let zplContent = responseData.label_zpl || null;
+  
+  // If no direct ZPL content, try fetching from label_url if it's a ZPL file
+  if (!zplContent && responseData.label_url && responseData.label_url.includes('.zpl')) {
+    console.log('🔄 Fetching ZPL content from Shippo label URL...');
+    try {
+      const zplResponse = await fetch(responseData.label_url);
+      if (zplResponse.ok) {
+        const content = await zplResponse.text();
+        if (content && content.trim().startsWith('^XA')) {
+          zplContent = content;
+          console.log('✅ ZPL content retrieved from Shippo label URL (length:', zplContent.length, ')');
+        }
+      }
+    } catch (err) {
+      console.warn('⚠️ Failed to fetch ZPL from Shippo label URL:', err);
+    }
+  }
+  
+  // Attach ZPL content to response
+  if (zplContent) {
+    responseData.label_zpl = zplContent;
+    console.log('✅ Shippo ZPL content attached to response');
+  } else {
+    console.warn('⚠️ No ZPL content available from Shippo - this may be due to test mode or carrier limitations');
   }
   
   console.log('✅ Shippo label purchased successfully')
