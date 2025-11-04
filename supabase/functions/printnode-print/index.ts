@@ -55,6 +55,82 @@ Deno.serve(async (req) => {
     // Base64 encode the API key for basic auth
     const authHeader = `Basic ${btoa(apiKey)}`;
 
+    if (action === 'print-png') {
+      // New action: Download PNG, convert to base64, and print with raw_base64
+      const { printerId, title, url } = body;
+
+      if (!printerId || !url) {
+        return new Response(
+          JSON.stringify({ error: 'Missing printerId or url for print-png action' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+
+      try {
+        console.log('Downloading PNG from:', url);
+        
+        // Download the PNG file
+        const imageResponse = await fetch(url);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
+        }
+
+        const imageBlob = await imageResponse.blob();
+        const arrayBuffer = await imageBlob.arrayBuffer();
+        const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+        console.log('PNG downloaded and converted to base64, sending to PrintNode');
+
+        // Send to PrintNode with raw_base64
+        const printJob = {
+          printerId: parseInt(printerId),
+          title: title || 'Shipping Label',
+          contentType: 'raw_base64',
+          content: base64Content,
+          source: 'ShipTornado'
+        };
+
+        const printResponse = await fetch('https://api.printnode.com/printjobs', {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(printJob),
+        });
+
+        if (!printResponse.ok) {
+          const errorText = await printResponse.text();
+          console.error('PrintNode API error:', errorText);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Failed to submit print job',
+              details: errorText,
+              status: printResponse.status
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: printResponse.status }
+          );
+        }
+
+        const jobId = await printResponse.json();
+        console.log('Print job created:', jobId);
+
+        return new Response(
+          JSON.stringify({ success: true, jobId }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('Error in print-png:', error);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to process PNG print job',
+            details: error.message 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        );
+      }
+    }
+
     if (action === 'list-printers') {
       // Get list of printers
       const response = await fetch('https://api.printnode.com/printers', {

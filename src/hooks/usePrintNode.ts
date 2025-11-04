@@ -102,22 +102,16 @@ export const usePrintNode = () => {
       const isPng = pdfUrl.toLowerCase().includes('.png');
       console.log(`PrintNode - Detected file type: ${isPng ? 'PNG' : 'PDF'} (thermal: ${isThermalPrinter})`);
 
-      // For PNG files, download and convert to base64, then use pdf_base64
+      // For PNG files, let the edge function download and convert
       if (isPng) {
-        console.log('PrintNode - Downloading PNG and converting to base64');
-        const response = await fetch(pdfUrl);
-        const blob = await response.blob();
-        const base64 = await blobToBase64(blob);
-        // Remove the data:image/png;base64, prefix
-        const base64Content = base64.split(',')[1];
+        console.log('PrintNode - Sending PNG URL to edge function for conversion');
 
         const { data, error } = await supabase.functions.invoke('printnode-print', {
           body: {
-            action: 'print',
+            action: 'print-png',
             printerId: selectedPrinter,
             title,
-            contentType: 'raw_base64',
-            content: base64Content,
+            url: pdfUrl,
             source: 'ShipTornado',
           },
         });
