@@ -335,54 +335,39 @@ async function tryGetZplLabel(shipmentId: string, apiKey: string): Promise<strin
 function ensureZpl4x6Dimensions(zplCode: string): string {
   console.log('🔧 Ensuring ZPL code has 4x6 dimensions (812x1218 dots at 203 DPI)');
   
-  // Step 1: Remove existing dimension/config commands
+  // Step 1: Add newlines before EVERY ^command throughout the entire ZPL
+  // This ensures all commands are properly separated
   let modifiedZpl = zplCode
-    .replace(/\^PW\d+/g, '')
-    .replace(/\^LL\d+/g, '')
-    .replace(/\^LT\d+/g, '')
-    .replace(/\^MN[NMYW]/g, '')
-    .replace(/\^JM[A-Z]/g, '')
-    .replace(/\^LS-?\d+/g, '');
+    .replace(/(\^[A-Z]{2,3})/g, '\n$1')  // Split all commands
+    .trim();
   
-  // Step 2: Find ^XA and extract any immediately following commands (no newlines)
-  // This captures things like: ^XA^POI^LH5,5^CI28
-  const headerMatch = modifiedZpl.match(/\^XA(\^[A-Z]{2,3}[^\^]*?)*/);
+  // Step 2: Remove existing dimension/config commands
+  modifiedZpl = modifiedZpl
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trim();
+      return !trimmed.match(/^\^PW\d+/) &&
+             !trimmed.match(/^\^LL\d+/) &&
+             !trimmed.match(/^\^LT\d+/) &&
+             !trimmed.match(/^\^MN[NMYW]/) &&
+             !trimmed.match(/^\^JM[A-Z]/) &&
+             !trimmed.match(/^\^LS-?\d+/);
+    })
+    .join('\n');
   
-  if (headerMatch) {
-    const fullHeader = headerMatch[0];
-    
-    // Extract commands after ^XA (everything except ^XA itself)
-    const afterXA = fullHeader.substring(3); // Remove ^XA
-    
-    // Split concatenated commands and add newlines
-    // This regex finds command boundaries: ^XX followed by parameters
-    const commandsWithNewlines = afterXA
-      .replace(/(\^[A-Z]{2,3})/g, '\n$1') // Add newline before each ^XX command
-      .trim();
-    
-    // Our dimension enforcement commands
-    const dimensionCommands = [
-      '^MNM',    // Media Tracking Mark
-      '^JMA',    // 203 DPI resolution
-      '^LT0',    // Label Top 0
-      '^PW812',  // Print Width 4"
-      '^LL1218', // Label Length 6"
-      '^LS0'     // Label Shift 0
-    ].join('\n');
-    
-    // Rebuild: ^XA + newline + our commands + newline + original commands
-    const newHeader = `^XA\n${dimensionCommands}${commandsWithNewlines ? '\n' + commandsWithNewlines : ''}`;
-    
-    modifiedZpl = modifiedZpl.replace(fullHeader, newHeader);
-    
-    console.log('✅ ZPL header reconstructed with proper command separation');
-  } else {
-    // Fallback
-    modifiedZpl = modifiedZpl.replace(/\^XA/, '^XA\n^MNM\n^JMA\n^LT0\n^PW812\n^LL1218\n^LS0');
-  }
+  // Step 3: Insert our dimension commands right after ^XA
+  const dimensionCommands = [
+    '^MNM',    // Media Tracking Mark
+    '^JMA',    // 203 DPI resolution  
+    '^LT0',    // Label Top 0
+    '^PW812',  // Print Width 4"
+    '^LL1218', // Label Length 6"
+    '^LS0'     // Label Shift 0
+  ].join('\n');
   
-  console.log('✅ ZPL configured for 4x6 with enhanced dimension enforcement');
-  console.log('📏 All commands properly separated with newlines');
+  modifiedZpl = modifiedZpl.replace(/\^XA/, `^XA\n${dimensionCommands}`);
+  
+  console.log('✅ ZPL configured for 4x6 with all commands properly separated');
   
   return modifiedZpl;
 }
