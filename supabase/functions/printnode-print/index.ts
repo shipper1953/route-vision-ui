@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     const authHeader = `Basic ${btoa(apiKey)}`;
 
     if (action === 'print-png') {
-      // New action: Download PNG, convert to base64, and print with raw_base64
+      // For thermal printers, use pdf_uri to let PrintNode handle conversion
       const { printerId, title, url } = body;
 
       if (!printerId || !url) {
@@ -67,26 +67,14 @@ Deno.serve(async (req) => {
       }
 
       try {
-        console.log('Downloading PNG from:', url);
-        
-        // Download the PNG file
-        const imageResponse = await fetch(url);
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
-        }
+        console.log('Sending PNG URL directly to PrintNode with pdf_uri:', url);
 
-        const imageBlob = await imageResponse.blob();
-        const arrayBuffer = await imageBlob.arrayBuffer();
-        const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-        console.log('PNG downloaded and converted to base64, sending to PrintNode');
-
-        // Send to PrintNode with raw_base64
+        // Use pdf_uri to let PrintNode download and convert the image
         const printJob = {
           printerId: parseInt(printerId),
           title: title || 'Shipping Label',
-          contentType: 'raw_base64',
-          content: base64Content,
+          contentType: 'pdf_uri',
+          content: url,
           source: 'ShipTornado'
         };
 
