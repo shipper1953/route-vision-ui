@@ -304,6 +304,7 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
   
   const requestBody = {
     rate: rateId,
+    label_file_type: 'zpl',
     async: false
   };
   
