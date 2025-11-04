@@ -81,28 +81,20 @@ Deno.serve(async (req) => {
         throw new Error('Missing required fields: printerId, content');
       }
 
-      // Submit print job with URI and rendering options for thermal printers
+      // Submit print job with URI - PrintNode will auto-detect and convert to printer format
       const printJob = {
         printerId,
         title: title || 'Print Job',
         contentType: contentType || 'pdf_uri',
         content, // This is a URL, not base64
         source: source || 'ShipTornado',
-        options: {
-          // Tell PrintNode to render this for the printer
-          // This converts PNG/PDF to printer-native format (ZPL for thermal)
-          rotate: 0,
-          paper: 'Custom.4x6in', // 4x6 label size
-          fit_to_page: true
-        }
       };
 
-      console.log('📋 Submitting print job with rendering options:', {
+      console.log('📋 Submitting print job to PrintNode:', {
         printerId,
         title,
         contentType,
-        hasRenderingOptions: true,
-        paperSize: 'Custom.4x6in'
+        contentUrlPreview: content.substring(0, 80) + '...'
       });
 
       const response = await fetch('https://api.printnode.com/printjobs', {
