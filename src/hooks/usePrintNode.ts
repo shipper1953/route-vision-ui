@@ -92,20 +92,10 @@ export const usePrintNode = () => {
           const zplCode = shipmentData.label_zpl || shipmentData.zpl_label;
           console.log('PrintNode - Found ZPL data, printing with ZPL for thermal printer');
           return await printZPL(zplCode, title);
-        } else {
-          console.log('PrintNode - No ZPL data found for thermal printer');
-          
-          // Check if it's a PNG file
-          const isPng = pdfUrl.toLowerCase().includes('.png');
-          
-          if (isPng) {
-            toast.error(
-              'Thermal printer requires ZPL format. Test mode labels are PNG-only. Solutions: 1) Use production mode for ZPL labels, 2) Select a regular printer, or 3) Switch printer to non-RAW mode.',
-              { duration: 8000 }
-            );
-            return false;
-          }
         }
+        
+        // No ZPL available - fall through to PDF/PNG printing via emulation
+        console.log('PrintNode - No ZPL data, using PDF/PNG via printer emulation');
       }
 
       // Use pdf_uri for non-thermal or PDF files
