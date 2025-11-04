@@ -68,8 +68,38 @@ export const usePrintNode = () => {
     try {
       setLoading(true);
 
-      // Use pdf_uri for all file types - PrintNode handles PNG/PDF conversion
-      console.log('PrintNode - Sending file URL for automatic conversion to printer format');
+      // Check if this is a thermal printer (Zebra, ZPL-based)
+      const selectedPrinterInfo = printers.find(p => p.id === selectedPrinter);
+      const isThermalPrinter = selectedPrinterInfo?.name?.toLowerCase().includes('zebra') || 
+                               selectedPrinterInfo?.name?.toLowerCase().includes('zpl') ||
+                               selectedPrinterInfo?.name?.toLowerCase().includes('zt');
+
+      // Try to extract shipment ID from title (e.g., "Shipping Label 425")
+      const shipmentIdMatch = title.match(/\d+/);
+      
+      if (isThermalPrinter && shipmentIdMatch) {
+        const shipmentId = parseInt(shipmentIdMatch[0]);
+        console.log(`PrintNode - Thermal printer detected, checking for ZPL data for shipment ${shipmentId}`);
+        
+        // Query for ZPL label data
+        const { data: shipmentData, error: shipmentError } = await supabase
+          .from('shipments')
+          .select('label_zpl, zpl_label')
+          .eq('id', shipmentId)
+          .single();
+
+        if (!shipmentError && shipmentData && (shipmentData.label_zpl || shipmentData.zpl_label)) {
+          const zplCode = shipmentData.label_zpl || shipmentData.zpl_label;
+          console.log('PrintNode - Found ZPL data, printing with ZPL for thermal printer');
+          return await printZPL(zplCode, title);
+        } else {
+          console.log('PrintNode - No ZPL data found, falling back to PDF/PNG print');
+        }
+      }
+
+      // Fallback: Use pdf_uri for PDF files (works for regular printers)
+      // For PNG files on non-thermal printers, this will work via browser rendering
+      console.log('PrintNode - Using pdf_uri for label URL');
 
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
