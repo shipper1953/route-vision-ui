@@ -116,7 +116,7 @@ export const usePrintNode = () => {
             action: 'print',
             printerId: selectedPrinter,
             title,
-            contentType: 'pdf_base64',
+            contentType: 'raw_base64',
             content: base64Content,
             source: 'ShipTornado',
           },
