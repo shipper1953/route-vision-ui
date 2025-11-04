@@ -98,9 +98,10 @@ export const usePrintNode = () => {
         console.log('PrintNode - No ZPL data, using PDF/PNG via printer emulation');
       }
 
-      // Use pdf_uri for non-thermal or PDF files
-      const contentType = 'pdf_uri';
-      console.log(`PrintNode - Using ${contentType} for label (thermal: ${isThermalPrinter})`);
+      // Detect file type and use appropriate content type
+      const isPng = pdfUrl.toLowerCase().includes('.png');
+      const contentType = isPng ? 'raw_uri' : 'pdf_uri';
+      console.log(`PrintNode - Using ${contentType} for label (thermal: ${isThermalPrinter}, isPng: ${isPng})`);
 
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
