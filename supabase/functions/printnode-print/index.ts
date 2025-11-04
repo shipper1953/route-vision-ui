@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     const authHeader = `Basic ${btoa(apiKey)}`;
 
     if (action === 'print-png') {
-      // For thermal printers, use pdf_uri to let PrintNode handle conversion
+      // Download PNG and send as png_base64 for thermal printer compatibility
       const { printerId, title, url } = body;
 
       if (!printerId || !url) {
@@ -67,14 +67,25 @@ Deno.serve(async (req) => {
       }
 
       try {
-        console.log('Sending PNG URL directly to PrintNode with pdf_uri:', url);
+        console.log('Downloading PNG for thermal printer:', url);
 
-        // Use pdf_uri to let PrintNode download and convert the image
+        // Download the PNG file
+        const imageResponse = await fetch(url);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to download image: ${imageResponse.status}`);
+        }
+
+        const arrayBuffer = await imageResponse.arrayBuffer();
+        const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+        console.log('Sending PNG as png_base64 to PrintNode');
+
+        // Send as png_base64 for proper thermal printer conversion
         const printJob = {
           printerId: parseInt(printerId),
           title: title || 'Shipping Label',
-          contentType: 'pdf_uri',
-          content: url,
+          contentType: 'png_base64',
+          content: base64Content,
           source: 'ShipTornado'
         };
 
