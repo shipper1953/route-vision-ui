@@ -97,24 +97,19 @@ export const usePrintNode = () => {
         }
       }
 
-      // Thermal printers require ZPL format - can't print PNG images
+      // Fallback: Smart content type based on file type and printer
+      // For thermal printers with PNG files, use raw_uri to let PrintNode convert
       const isPng = pdfUrl.toLowerCase().includes('.png');
+      const contentType = (isThermalPrinter && isPng) ? 'raw_uri' : 'pdf_uri';
       
-      if (isThermalPrinter && isPng) {
-        console.error('PrintNode - Cannot print PNG to thermal printer without ZPL data');
-        toast.error('Thermal printers require ZPL format. PNG labels are not supported. Please use production mode or select a regular printer.');
-        return false;
-      }
-      
-      // For PDF files or non-thermal printers, use pdf_uri
-      console.log(`PrintNode - Using pdf_uri for label (thermal: ${isThermalPrinter}, isPng: ${isPng})`);
+      console.log(`PrintNode - Using ${contentType} for label (thermal: ${isThermalPrinter}, isPng: ${isPng})`);
 
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
           action: 'print-uri',
           printerId: selectedPrinter,
           title,
-          contentType: 'pdf_uri',
+          contentType,
           content: pdfUrl,
           source: 'ShipTornado',
         },
