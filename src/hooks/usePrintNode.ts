@@ -72,15 +72,11 @@ export const usePrintNode = () => {
       const response = await fetch(pdfUrl);
       const blob = await response.blob();
       
-      // Determine if it's a PDF or image (PNG)
-      const isPdf = blob.type.includes('pdf') || pdfUrl.toLowerCase().endsWith('.pdf');
-      
-      // Use raw_uri for images (PNG) so PrintNode can convert to ZPL
-      // Use pdf_uri for actual PDF files
-      const contentType = isPdf ? 'pdf_uri' : 'raw_uri';
+      // Use pdf_uri for both PDFs and images - PrintNode will render to printer format
+      const contentType = 'pdf_uri';
       
       console.log('PrintNode - File type:', blob.type, '| Using contentType:', contentType);
-      console.log('⚠️ Using image conversion (not native ZPL). For best results, use printZPL() with native ZPL content.');
+      console.log('📋 PrintNode will render image to printer-native format (ZPL for thermal printers)');
 
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
