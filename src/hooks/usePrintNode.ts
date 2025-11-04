@@ -97,16 +97,18 @@ export const usePrintNode = () => {
         }
       }
 
-      // Fallback: Use pdf_uri for PDF files (works for regular printers)
-      // For PNG files on non-thermal printers, this will work via browser rendering
-      console.log('PrintNode - Using pdf_uri for label URL');
+      // Fallback: Smart content type based on file type and printer
+      const isPng = pdfUrl.toLowerCase().includes('.png');
+      const contentType = (isThermalPrinter && isPng) ? 'raw_uri' : 'pdf_uri';
+      
+      console.log(`PrintNode - Using ${contentType} for label (thermal: ${isThermalPrinter}, isPng: ${isPng})`);
 
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
           action: 'print-uri',
           printerId: selectedPrinter,
           title,
-          contentType: 'pdf_uri',
+          contentType,
           content: pdfUrl,
           source: 'ShipTornado',
         },
