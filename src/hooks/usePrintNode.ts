@@ -88,59 +88,16 @@ export const usePrintNode = () => {
           .eq('id', shipmentId)
           .single();
 
-      if (!shipmentError && shipmentData && (shipmentData.label_zpl || shipmentData.zpl_label)) {
+        if (!shipmentError && shipmentData && (shipmentData.label_zpl || shipmentData.zpl_label)) {
           const zplCode = shipmentData.label_zpl || shipmentData.zpl_label;
           console.log('PrintNode - Found ZPL data, printing with ZPL for thermal printer');
           return await printZPL(zplCode, title);
         }
         
-        // No ZPL available - fall through to PDF/PNG printing via emulation
-        console.log('PrintNode - No ZPL data, using PDF/PNG via printer emulation');
+        console.log('PrintNode - No ZPL data, using PDF via PrintNode conversion');
       }
 
-      // Detect file type
-      const isPng = pdfUrl.toLowerCase().includes('.png');
-      console.log(`PrintNode - Detected file type: ${isPng ? 'PNG' : 'PDF'} (thermal: ${isThermalPrinter})`);
-
-      // For PNG files, let the edge function download and convert
-      if (isPng) {
-        console.log('PrintNode - Sending PNG URL to edge function for conversion');
-
-        const { data, error } = await supabase.functions.invoke('printnode-print', {
-          body: {
-            action: 'print-png',
-            printerId: selectedPrinter,
-            title,
-            url: pdfUrl,
-            source: 'ShipTornado',
-          },
-        });
-
-        if (error) {
-          const errorMsg = error.message || 'Unknown error';
-          console.error('Edge function error:', error);
-          toast.error(`Print failed: ${errorMsg}`);
-          throw error;
-        }
-
-        if (data?.error) {
-          console.error('PrintNode API error:', data);
-          const details = data.details ? `\n${data.details}` : '';
-          toast.error(`PrintNode error: ${data.error}${details}`);
-          return false;
-        }
-
-        if (data?.success) {
-          toast.success(`Print job sent successfully (ID: ${data.jobId})`);
-          return true;
-        } else {
-          console.error('PrintNode unexpected response:', data);
-          toast.error('Print job failed - unexpected response');
-          return false;
-        }
-      }
-
-      // For PDF files, use pdf_uri
+      // Use pdf_uri for all files - label-proxy converts PNGs to PDF automatically
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
           action: 'print-uri',
