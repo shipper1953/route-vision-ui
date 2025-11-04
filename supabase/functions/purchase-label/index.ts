@@ -335,17 +335,47 @@ async function tryGetZplLabel(shipmentId: string, apiKey: string): Promise<strin
 function ensureZpl4x6Dimensions(zplCode: string): string {
   console.log('🔧 Ensuring ZPL code has 4x6 dimensions (812x1218 dots at 203 DPI)');
   
-  // Remove any existing ^PW, ^LL, ^LT commands
-  let modifiedZpl = zplCode.replace(/\^PW\d+/g, '').replace(/\^LL\d+/g, '').replace(/\^LT\d+/g, '');
+  // Step 1: Remove existing dimension commands
+  let modifiedZpl = zplCode
+    .replace(/\^PW\d+/g, '')
+    .replace(/\^LL\d+/g, '')
+    .replace(/\^LT\d+/g, '')
+    .replace(/\^MN[NMYW]/g, '') // Remove any media tracking commands
+    .replace(/\^JM[A-Z]/g, '');  // Remove any dots/mm commands
   
-  // Add critical 4x6 configuration right after ^XA
-  // ^MNN = Media Tracking Mode - ignore physical label detection, use ZPL dimensions
-  // ^LT0 = Label Top position 0 (no offset)
-  // ^PW812 = Print Width 4 inches (812 dots at 203 DPI)
-  // ^LL1218 = Label Length 6 inches (1218 dots at 203 DPI)
-  modifiedZpl = modifiedZpl.replace(/\^XA/, '^XA\n^MNN\n^LT0\n^PW812\n^LL1218');
+  // Step 2: Find position after ^XA and any immediate following commands (^POI, ^LH)
+  // Shippo puts ^XA^POI^LH5,5 right at start, we need to inject BEFORE content starts
+  const afterHeaderMatch = modifiedZpl.match(/\^XA(\^POI)?(\^LH\d+,\d+)?/);
   
-  console.log('✅ ZPL configured for 4x6 with media tracking override');
+  if (afterHeaderMatch) {
+    const headerEnd = afterHeaderMatch[0];
+    
+    // Build our dimension enforcement block with proper spacing
+    const dimensionCommands = [
+      '^MNM',          // Media Tracking Mark (more compatible than ^MNN)
+      '^JMA',          // Set resolution to 8 dots/mm (203 DPI)
+      '^LT0',          // Label Top at 0
+      '^PW812',        // Print Width: 4 inches
+      '^LL1218',       // Label Length: 6 inches
+      '^LS0'           // Label Shift: 0 (no offset)
+    ].join('\n');
+    
+    // Replace header with header + our commands
+    modifiedZpl = modifiedZpl.replace(
+      afterHeaderMatch[0], 
+      `${headerEnd}\n${dimensionCommands}\n`
+    );
+  } else {
+    // Fallback: inject after ^XA if pattern doesn't match
+    modifiedZpl = modifiedZpl.replace(
+      /\^XA/, 
+      '^XA\n^MNM\n^JMA\n^LT0\n^PW812\n^LL1218\n^LS0\n'
+    );
+  }
+  
+  console.log('✅ ZPL configured for 4x6 with enhanced dimension enforcement');
+  console.log('📏 Commands added: ^MNM (tracking), ^JMA (DPI), ^PW812, ^LL1218, ^LS0');
+  
   return modifiedZpl;
 }
 
