@@ -25,14 +25,15 @@ export async function fetchOrdersPaginated(
     // Calculate offset
     const offset = (page - 1) * pageSize;
     
-    // Build base query with specific column projection
+    // Build base query with specific column projection including fulfillment fields
     let query = supabase
       .from('orders')
       .select(`
         id, order_id, customer_name, customer_company, customer_email, customer_phone,
         status, order_date, required_delivery_date, value, items, shipping_address,
         qboid_dimensions, user_id, company_id, warehouse_id, created_at,
-        estimated_delivery_date, actual_delivery_date, shipment_id
+        estimated_delivery_date, actual_delivery_date, shipment_id,
+        items_shipped, items_total, fulfillment_percentage, fulfillment_status
       `, { count: 'exact' });
     
     // Add search filter if provided
@@ -43,7 +44,12 @@ export async function fetchOrdersPaginated(
     
     // Add status filter if provided and not "all"
     if (statusFilter && statusFilter !== 'all') {
-      query = query.eq('status', statusFilter);
+      // Handle partial fulfillment filter separately
+      if (statusFilter === 'partially_fulfilled') {
+        query = query.eq('fulfillment_status', 'partially_fulfilled');
+      } else {
+        query = query.eq('status', statusFilter);
+      }
     }
     
     // Add pagination and ordering

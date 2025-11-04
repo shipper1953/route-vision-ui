@@ -59,6 +59,7 @@ export const OrdersFilters = ({
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="processing">Processing</SelectItem>
             <SelectItem value="ready_to_ship">Ready to Ship</SelectItem>
+            <SelectItem value="partially_fulfilled">Partially Fulfilled</SelectItem>
             <SelectItem value="shipped">Shipped</SelectItem>
             <SelectItem value="delivered">Delivered</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>

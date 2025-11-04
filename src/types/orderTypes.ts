@@ -75,4 +75,9 @@ export interface OrderData {
     boxWeight: number;
     totalWeight: number;
   };
+  // Fulfillment tracking
+  items_shipped?: number;
+  items_total?: number;
+  fulfillment_percentage?: number;
+  fulfillment_status?: 'unfulfilled' | 'partially_fulfilled' | 'fulfilled';
 }

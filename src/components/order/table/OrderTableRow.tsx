@@ -258,9 +258,20 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
       <TableCell>{renderOrderItems(order.items)}</TableCell>
       <TableCell>{order.value}</TableCell>
       <TableCell>
-        <Badge variant={getStatusBadgeVariant(order.status)}>
-          {order.status.replace('_', ' ')}
-        </Badge>
+        <div className="flex flex-col gap-1">
+          <Badge variant={getStatusBadgeVariant(order.status)}>
+            {order.status.replace('_', ' ')}
+          </Badge>
+          {(order.fulfillment_status === 'partially_fulfilled' || 
+            (order.items_total && order.items_shipped !== undefined && order.items_shipped < order.items_total)) && (
+            <FulfillmentBadge
+              itemsShipped={order.items_shipped || 0}
+              itemsTotal={order.items_total || 0}
+              fulfillmentPercentage={order.fulfillment_percentage || 0}
+              status={order.fulfillment_status || 'unfulfilled'}
+            />
+          )}
+        </div>
       </TableCell>
       <TableCell>
         {earliestEstimatedDelivery 
