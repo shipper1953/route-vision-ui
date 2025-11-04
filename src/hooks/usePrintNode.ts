@@ -88,21 +88,29 @@ export const usePrintNode = () => {
           .eq('id', shipmentId)
           .single();
 
-        if (!shipmentError && shipmentData && (shipmentData.label_zpl || shipmentData.zpl_label)) {
+      if (!shipmentError && shipmentData && (shipmentData.label_zpl || shipmentData.zpl_label)) {
           const zplCode = shipmentData.label_zpl || shipmentData.zpl_label;
           console.log('PrintNode - Found ZPL data, printing with ZPL for thermal printer');
           return await printZPL(zplCode, title);
         } else {
-          console.log('PrintNode - No ZPL data found, falling back to PDF/PNG print');
+          console.log('PrintNode - No ZPL data found for thermal printer');
+          
+          // Check if it's a PNG file
+          const isPng = pdfUrl.toLowerCase().includes('.png');
+          
+          if (isPng) {
+            toast.error(
+              'Thermal printer requires ZPL format. Test mode labels are PNG-only. Solutions: 1) Use production mode for ZPL labels, 2) Select a regular printer, or 3) Switch printer to non-RAW mode.',
+              { duration: 8000 }
+            );
+            return false;
+          }
         }
       }
 
-      // Fallback: Smart content type based on file type and printer
-      // For thermal printers with PNG files, use raw_uri to let PrintNode convert
-      const isPng = pdfUrl.toLowerCase().includes('.png');
-      const contentType = (isThermalPrinter && isPng) ? 'raw_uri' : 'pdf_uri';
-      
-      console.log(`PrintNode - Using ${contentType} for label (thermal: ${isThermalPrinter}, isPng: ${isPng})`);
+      // Use pdf_uri for non-thermal or PDF files
+      const contentType = 'pdf_uri';
+      console.log(`PrintNode - Using ${contentType} for label (thermal: ${isThermalPrinter})`);
 
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
