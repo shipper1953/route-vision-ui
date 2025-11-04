@@ -270,10 +270,10 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
     zplContent = await tryGetZplLabel(responseData.id, apiKey);
   }
   
-  // Store the ZPL content if we got it
+  // Store the ZPL content if we got it with proper 4x6 dimensions
   if (zplContent) {
-    responseData.label_zpl = zplContent;
-    console.log('✅ ZPL content successfully retrieved and attached');
+    responseData.label_zpl = ensureZpl4x6Dimensions(zplContent);
+    console.log('✅ ZPL content successfully retrieved and attached with 4x6 dimensions enforced');
   } else {
     console.warn('⚠️ Could not retrieve ZPL content. This may be due to test mode limitations or carrier restrictions.');
   }
@@ -332,6 +332,21 @@ async function tryGetZplLabel(shipmentId: string, apiKey: string): Promise<strin
 
 // ========== SHIPPO SERVICE ==========
 
+function ensureZpl4x6Dimensions(zplCode: string): string {
+  console.log('🔧 Ensuring ZPL code has 4x6 dimensions (812x1218 dots at 203 DPI)');
+  
+  // Remove any existing ^PW (Print Width) and ^LL (Label Length) commands
+  let modifiedZpl = zplCode.replace(/\^PW\d+/g, '').replace(/\^LL\d+/g, '');
+  
+  // Add 4x6 dimensions right after ^XA (start of label)
+  // ^PW812 = 4 inches width at 203 DPI
+  // ^LL1218 = 6 inches height at 203 DPI  
+  modifiedZpl = modifiedZpl.replace(/\^XA/, '^XA^PW812^LL1218');
+  
+  console.log('✅ ZPL dimensions set to 4x6 inches');
+  return modifiedZpl;
+}
+
 async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: string) {
   console.log('🚚 === PURCHASING SHIPPO LABEL ===')
   console.log('🚚 Shipment ID:', shipmentId)
@@ -340,7 +355,6 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
   const requestBody = {
     rate: rateId,
     label_file_type: 'ZPLII',
-    label_format: 'direct_thermal',
     async: false
   };
   
@@ -400,10 +414,10 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
     }
   }
   
-  // Attach ZPL content to response
+  // Attach ZPL content to response and ensure 4x6 dimensions
   if (zplContent) {
-    responseData.label_zpl = zplContent;
-    console.log('✅ Shippo ZPL content attached to response');
+    responseData.label_zpl = ensureZpl4x6Dimensions(zplContent);
+    console.log('✅ Shippo ZPL content attached to response with 4x6 dimensions enforced');
   } else {
     console.warn('⚠️ No ZPL content available from Shippo - this may be due to test mode or carrier limitations');
   }
