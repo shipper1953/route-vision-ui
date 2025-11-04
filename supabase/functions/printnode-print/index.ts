@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     const authHeader = `Basic ${btoa(apiKey)}`;
 
     if (action === 'print-png') {
-      // For thermal printers: use pdf_uri to let PrintNode auto-convert PNG to ZPL
+      // Download PNG and send as raw_base64 for thermal printer conversion
       const { printerId, title, url } = body;
 
       if (!printerId || !url) {
@@ -67,14 +67,25 @@ Deno.serve(async (req) => {
       }
 
       try {
-        console.log('Sending PNG to PrintNode with pdf_uri for thermal conversion:', url);
+        console.log('Downloading PNG for thermal printer conversion:', url);
 
-        // Use pdf_uri - PrintNode will download and auto-convert PNG to ZPL
+        // Download the PNG file
+        const imageResponse = await fetch(url);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to download PNG: ${imageResponse.status}`);
+        }
+
+        const arrayBuffer = await imageResponse.arrayBuffer();
+        const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+        console.log('Sending PNG as raw_base64 to PrintNode for ZPL conversion');
+
+        // Send as raw_base64 - PrintNode will convert to printer's native format (ZPL)
         const printJob = {
           printerId: parseInt(printerId),
           title: title || 'Shipping Label',
-          contentType: 'pdf_uri',
-          content: url,
+          contentType: 'raw_base64',
+          content: base64Content,
           source: 'ShipTornado'
         };
 
