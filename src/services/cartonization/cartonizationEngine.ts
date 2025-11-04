@@ -175,7 +175,7 @@ export class CartonizationEngine {
     if (this.parameters.optimizeForCost) {
       rulesApplied.push('Cost Optimization Rule');
     } else {
-      rulesApplied.push('Highest Utilization Rule (up to 99%)');
+      rulesApplied.push('Highest Utilization Rule (up to 99.9%)');
     }
 
     // Apply fill rate threshold rule - use as preference weight, not hard filter
@@ -278,19 +278,19 @@ export class CartonizationEngine {
     };
   }
 
-  // Sorting method that prioritizes highest utilization up to 99%
+  // Sorting method that prioritizes highest utilization up to 99.9%
   private sortBoxesByOptimization(analyses: any[]): any[] {
-    // Filter out boxes with utilization >= 99% or unrealistically low utilization
+    // Filter out boxes with utilization > 99.9% or unrealistically low utilization
     const viableBoxes = analyses.filter(analysis => {
-      const isRealistic = analysis.utilization >= 30 && analysis.utilization < 99;
+      const isRealistic = analysis.utilization >= 30 && analysis.utilization <= 99.9;
       if (!isRealistic) {
-        console.log(`⚠️ Filtering out ${analysis.box.name}: utilization ${analysis.utilization.toFixed(1)}% is ${analysis.utilization < 30 ? 'too low (oversized)' : 'too high (exceeds 99% threshold)'}`);
+        console.log(`⚠️ Filtering out ${analysis.box.name}: utilization ${analysis.utilization.toFixed(1)}% is ${analysis.utilization < 30 ? 'too low (oversized)' : 'too high (exceeds 99.9% threshold)'}`);
       }
       return isRealistic;
     });
     
     return viableBoxes.sort((a, b) => {
-      // PRIMARY: Highest utilization up to 99% (descending order)
+      // PRIMARY: Highest utilization up to 99.9% (descending order)
       const utilizationDiff = b.utilization - a.utilization;
       if (Math.abs(utilizationDiff) > 0.01) { // Only use tiebreaker if virtually identical
         return utilizationDiff; // Higher utilization first

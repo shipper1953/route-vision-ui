@@ -210,7 +210,8 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
     },
     body: JSON.stringify({ 
       rate: { id: rateId },
-      label_format: 'ZPL'
+      label_format: 'ZPL',
+      label_size: '4x6'
     }),
   })
   
@@ -250,13 +251,27 @@ async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey:
     throw new Error(responseData.error?.message || 'Failed to purchase label')
   }
   
-  // Try to get ZPL content
-  if (!responseData.label_zpl && responseData.postage_label?.label_zpl_url) {
+  // Try to get ZPL content from multiple sources
+  let zplContent = responseData.label_zpl || null;
+  
+  // Try fetching from label_zpl_url if available
+  if (!zplContent && responseData.postage_label?.label_zpl_url) {
     console.log('🔄 Fetching ZPL from postage_label.label_zpl_url...');
-    const zplContent = await fetchZplContent(responseData.postage_label.label_zpl_url, apiKey);
-    if (zplContent) {
-      responseData.label_zpl = zplContent;
-    }
+    zplContent = await fetchZplContent(responseData.postage_label.label_zpl_url, apiKey);
+  }
+  
+  // Try using the GET /label endpoint for ZPL
+  if (!zplContent) {
+    console.log('🔄 Attempting to retrieve ZPL via GET /label endpoint...');
+    zplContent = await tryGetZplLabel(responseData.id, apiKey);
+  }
+  
+  // Store the ZPL content if we got it
+  if (zplContent) {
+    responseData.label_zpl = zplContent;
+    console.log('✅ ZPL content successfully retrieved and attached');
+  } else {
+    console.warn('⚠️ Could not retrieve ZPL content. This may be due to test mode limitations or carrier restrictions.');
   }
   
   console.log('✅ Label purchased successfully')
@@ -305,6 +320,7 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
   const requestBody = {
     rate: rateId,
     label_file_type: 'zpl',
+    label_format: 'direct_thermal',
     async: false
   };
   
@@ -440,6 +456,7 @@ async function saveShipmentToDatabase(
       service: purchaseResponse.rate?.servicelevel?.name || purchaseResponse.servicelevel?.name || 'Unknown',
       status: 'purchased',
       label_url: purchaseResponse.label_url,
+      label_zpl: purchaseResponse.label_zpl || null,
       tracking_url: purchaseResponse.tracking_url_provider,
       original_cost: finalOriginalCost,
       cost: finalMarkedUpCost,
@@ -474,9 +491,16 @@ async function saveShipmentToDatabase(
     
     let zplContent = purchaseResponse.label_zpl || null;
     
+    // Try fetching from label_zpl_url if available
     if (!zplContent && purchaseResponse.postage_label?.label_zpl_url && apiKey) {
       console.log('🔄 Fetching ZPL from postage_label.label_zpl_url...');
       zplContent = await fetchZplContent(purchaseResponse.postage_label.label_zpl_url, apiKey);
+    }
+    
+    // Try using the GET /label endpoint for ZPL
+    if (!zplContent && apiKey) {
+      console.log('🔄 Attempting to retrieve ZPL via GET /label endpoint...');
+      zplContent = await tryGetZplLabel(purchaseResponse.id, apiKey);
     }
     
     shipmentData = {
