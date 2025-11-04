@@ -98,17 +98,61 @@ export const usePrintNode = () => {
         console.log('PrintNode - No ZPL data, using PDF/PNG via printer emulation');
       }
 
-      // Detect file type and use appropriate content type
+      // Detect file type
       const isPng = pdfUrl.toLowerCase().includes('.png');
-      const contentType = isPng ? 'raw_uri' : 'pdf_uri';
-      console.log(`PrintNode - Using ${contentType} for label (thermal: ${isThermalPrinter}, isPng: ${isPng})`);
+      console.log(`PrintNode - Detected file type: ${isPng ? 'PNG' : 'PDF'} (thermal: ${isThermalPrinter})`);
 
+      // For PNG files, download and convert to base64, then use pdf_base64
+      if (isPng) {
+        console.log('PrintNode - Downloading PNG and converting to base64');
+        const response = await fetch(pdfUrl);
+        const blob = await response.blob();
+        const base64 = await blobToBase64(blob);
+        // Remove the data:image/png;base64, prefix
+        const base64Content = base64.split(',')[1];
+
+        const { data, error } = await supabase.functions.invoke('printnode-print', {
+          body: {
+            action: 'print',
+            printerId: selectedPrinter,
+            title,
+            contentType: 'pdf_base64',
+            content: base64Content,
+            source: 'ShipTornado',
+          },
+        });
+
+        if (error) {
+          const errorMsg = error.message || 'Unknown error';
+          console.error('Edge function error:', error);
+          toast.error(`Print failed: ${errorMsg}`);
+          throw error;
+        }
+
+        if (data?.error) {
+          console.error('PrintNode API error:', data);
+          const details = data.details ? `\n${data.details}` : '';
+          toast.error(`PrintNode error: ${data.error}${details}`);
+          return false;
+        }
+
+        if (data?.success) {
+          toast.success(`Print job sent successfully (ID: ${data.jobId})`);
+          return true;
+        } else {
+          console.error('PrintNode unexpected response:', data);
+          toast.error('Print job failed - unexpected response');
+          return false;
+        }
+      }
+
+      // For PDF files, use pdf_uri
       const { data, error } = await supabase.functions.invoke('printnode-print', {
         body: {
           action: 'print-uri',
           printerId: selectedPrinter,
           title,
-          contentType,
+          contentType: 'pdf_uri',
           content: pdfUrl,
           source: 'ShipTornado',
         },
