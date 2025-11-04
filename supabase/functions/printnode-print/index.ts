@@ -79,8 +79,8 @@ Deno.serve(async (req) => {
         
         console.log('Converting PNG to ZPL via labelzoom.net');
         
-        // Convert PNG to ZPL using labelzoom service
-        const zplResponse = await fetch('https://www.labelzoom.net/api/v2/convert/png/to/zpl', {
+        // Convert PNG to ZPL using labelzoom service with 4x6 label size
+        const zplResponse = await fetch('https://www.labelzoom.net/api/v2/convert/png/to/zpl?width=4&height=6&unit=inch&dpmm=8', {
           method: 'POST',
           headers: {
             'Content-Type': 'image/png',
