@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     const authHeader = `Basic ${btoa(apiKey)}`;
 
     if (action === 'print-png') {
-      // Download PNG and send as raw_base64 for thermal printer conversion
+      // Convert PNG to ZPL for thermal printers
       const { printerId, title, url } = body;
 
       if (!printerId || !url) {
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       }
 
       try {
-        console.log('Downloading PNG for thermal printer conversion:', url);
+        console.log('Downloading PNG for ZPL conversion:', url);
 
         // Download the PNG file
         const imageResponse = await fetch(url);
@@ -75,17 +75,32 @@ Deno.serve(async (req) => {
           throw new Error(`Failed to download PNG: ${imageResponse.status}`);
         }
 
-        const arrayBuffer = await imageResponse.arrayBuffer();
-        const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const pngBlob = await imageResponse.blob();
+        
+        console.log('Converting PNG to ZPL via labelzoom.net');
+        
+        // Convert PNG to ZPL using labelzoom service
+        const zplResponse = await fetch('https://www.labelzoom.net/api/v2/convert/png/to/zpl', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'image/png',
+          },
+          body: pngBlob,
+        });
 
-        console.log('Sending PNG as raw_base64 to PrintNode for ZPL conversion');
+        if (!zplResponse.ok) {
+          throw new Error(`ZPL conversion failed: ${zplResponse.status}`);
+        }
 
-        // Send as raw_base64 - PrintNode will convert to printer's native format (ZPL)
+        const zplCode = await zplResponse.text();
+        console.log('PNG converted to ZPL successfully');
+
+        // Send ZPL as raw_base64
         const printJob = {
           printerId: parseInt(printerId),
           title: title || 'Shipping Label',
           contentType: 'raw_base64',
-          content: base64Content,
+          content: btoa(zplCode),
           source: 'ShipTornado'
         };
 
