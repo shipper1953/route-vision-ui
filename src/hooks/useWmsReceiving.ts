@@ -146,7 +146,9 @@ export const useWmsReceiving = () => {
 
   return {
     loading,
+    purchaseOrders,
     fetchPurchaseOrders,
+    startReceiving,
     createReceivingSession,
     receiveItem,
     completeReceivingSession,
