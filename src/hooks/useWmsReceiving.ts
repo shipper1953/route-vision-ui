@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 
 export const useWmsReceiving = () => {
   const [loading, setLoading] = useState(false);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const { userProfile } = useAuth();
+
+  useEffect(() => {
+    if (userProfile?.company_id) {
+      fetchPurchaseOrders();
+    }
+  }, [userProfile?.company_id]);
 
   const fetchPurchaseOrders = async (status?: string) => {
     try {
@@ -17,6 +24,7 @@ export const useWmsReceiving = () => {
         .order('expected_date', { ascending: true });
 
       if (error) throw error;
+      setPurchaseOrders(data || []);
       return data || [];
     } catch (error) {
       console.error('Error fetching purchase orders:', error);
@@ -25,6 +33,10 @@ export const useWmsReceiving = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const startReceiving = async (params: any) => {
+    return receiveItem(params);
   };
 
   const createReceivingSession = async (poId: string, warehouseId: string) => {
