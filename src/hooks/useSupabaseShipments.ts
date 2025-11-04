@@ -124,7 +124,15 @@ export const useSupabaseShipments = () => {
           if (link.package_info && typeof link.package_info === 'object') {
             const packageInfo = link.package_info as any;
             if (Array.isArray(packageInfo.items)) {
-              items = packageInfo.items;
+              // Map the items to the expected format, extracting only needed fields
+              items = packageInfo.items
+                .filter((item: any) => item && (item.sku || item.name)) // Filter out invalid items
+                .map((item: any) => ({
+                  sku: item.sku || item.itemId || 'N/A',
+                  name: item.name || 'Unknown Item',
+                  quantity: item.quantity || 1
+                }));
+              console.log(`Shipment ${link.shipment_id}: Found ${items.length} items`);
             }
           }
           
