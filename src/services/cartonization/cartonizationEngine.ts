@@ -98,63 +98,48 @@ export class CartonizationEngine {
       return null;
     }
 
-    // CRITICAL: Sort boxes by volume (smallest first) to prioritize smallest suitable box
-    const sortedBoxes = suitableBoxes.sort((a, b) => {
-      const volumeA = a.length * a.width * a.height;
-      const volumeB = b.length * b.width * b.height;
-      return volumeA - volumeB; // Smallest first
-    });
-
-    console.log(`📦 Testing ${sortedBoxes.length} boxes (smallest first):`);
-    sortedBoxes.forEach(box => {
-      const volume = box.length * box.width * box.height;
-      console.log(`  - ${box.name}: ${box.length}×${box.width}×${box.height} (${volume} cubic inches)`);
-    });
+    console.log(`📦 Testing ${suitableBoxes.length} boxes for optimal utilization:`);
 
     const rulesApplied: string[] = [];
     
-    // Calculate analysis for each suitable box with enhanced 3D packing (test in size order)
-    const boxAnalysis = sortedBoxes.map(box => {
+    // Calculate analysis for each suitable box - SIMPLE VOLUME-BASED UTILIZATION
+    const boxAnalysis = suitableBoxes.map(box => {
       const boxVolume = box.length * box.width * box.height;
-      const basicUtilization = Math.min((totalVolume / boxVolume) * 100, 100);
       
-      console.log(`\n🧪 Testing box: ${box.name} (${box.length}×${box.width}×${box.height})`);
+      // SIMPLE volume-based utilization calculation
+      const volumeUtilization = (totalVolume / boxVolume) * 100;
       
-      // Use enhanced 3D bin packing to check if items actually fit
+      console.log(`\n🧪 Testing box: ${box.name} (${box.length}×${box.width}×${box.height}) = ${boxVolume} in³`);
+      console.log(`   Volume utilization: ${volumeUtilization.toFixed(1)}%`);
+      
+      // Use 3D bin packing to verify items can physically fit
       const packingResult = BinPackingAlgorithm.enhanced3DBinPacking(items, box);
       const itemsFit = packingResult.success;
-      const actualUtilization = packingResult.success ? 
-        (packingResult.usedVolume / boxVolume) * 100 : 0;
       
       if (!itemsFit) {
-        console.log(`❌ 3D packing failed for ${box.name}: Items do not fit`);
+        console.log(`❌ 3D packing failed for ${box.name}: Items do not fit geometrically`);
       } else {
-        console.log(`✅ ${box.name} - Utilization: ${actualUtilization.toFixed(1)}%`);
+        console.log(`✅ ${box.name} - Items fit with ${volumeUtilization.toFixed(1)}% volume utilization`);
       }
       
       const dimensionalWeight = CartonizationUtils.calculateDimensionalWeight(box, this.parameters.dimensionalWeightFactor);
       
-      // Calculate confidence based on utilization and packing efficiency only
-      let confidence = !itemsFit ? 0 : 
-        CartonizationUtils.calculateConfidence(
-          actualUtilization, 
-          totalWeight, 
-          box, 
-          packingResult.packingEfficiency
-        );
+      // Calculate confidence: closer to 99.9% = higher confidence
+      // Scale so that 99% utilization ≈ 100% confidence
+      const confidence = itemsFit ? Math.min(100, volumeUtilization * 1.01) : 0;
       
       if (itemsFit) {
-        console.log(`📈 ${box.name} confidence: ${confidence.toFixed(1)}%, utilization: ${actualUtilization.toFixed(1)}%`);
+        console.log(`📈 ${box.name} confidence: ${confidence.toFixed(1)}%`);
       }
       
       return {
         box,
-        utilization: actualUtilization,
+        utilization: volumeUtilization,
         itemsFit,
         cost: box.cost,
         dimensionalWeight,
-        confidence: Math.min(100, confidence),
-        volumeEfficiency: actualUtilization,
+        confidence,
+        volumeEfficiency: volumeUtilization,
         packingResult
       };
     });
@@ -280,27 +265,10 @@ export class CartonizationEngine {
 
   // Sorting method that prioritizes highest utilization up to 99.9%
   private sortBoxesByOptimization(analyses: any[]): any[] {
-    // Filter out boxes with utilization > 99.9% or unrealistically low utilization
-    const viableBoxes = analyses.filter(analysis => {
-      const isRealistic = analysis.utilization >= 30 && analysis.utilization <= 99.9;
-      if (!isRealistic) {
-        console.log(`⚠️ Filtering out ${analysis.box.name}: utilization ${analysis.utilization.toFixed(1)}% is ${analysis.utilization < 30 ? 'too low (oversized)' : 'too high (exceeds 99.9% threshold)'}`);
-      }
-      return isRealistic;
-    });
-    
-    return viableBoxes.sort((a, b) => {
-      // PRIMARY: Highest utilization up to 99.9% (descending order)
-      const utilizationDiff = b.utilization - a.utilization;
-      if (Math.abs(utilizationDiff) > 0.01) { // Only use tiebreaker if virtually identical
-        return utilizationDiff; // Higher utilization first
-      }
-
-      // SECONDARY: Only for virtually identical utilization, prefer smaller box
-      const volumeA = a.box.length * a.box.width * a.box.height;
-      const volumeB = b.box.length * b.box.width * b.box.height;
-      return volumeA - volumeB; // Smaller volume as tiebreaker only
-    });
+    return analyses
+      .filter(a => a.utilization > 0 && a.utilization <= 99.9)
+      .filter(a => a.utilization >= this.parameters.fillRateThreshold)
+      .sort((a, b) => b.utilization - a.utilization); // Highest utilization first, period
   }
 
   // Legacy method for backward compatibility
