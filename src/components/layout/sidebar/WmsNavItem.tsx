@@ -51,6 +51,12 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
       </CollapsibleTrigger>
       <CollapsibleContent className="ml-4 mt-1 space-y-1 border-l-2 border-sidebar-border pl-2">
         <NavItem 
+          icon={Warehouse} 
+          label="Dashboard" 
+          to="/wms/dashboard" 
+          isCollapsed={false}
+        />
+        <NavItem 
           icon={Users} 
           label="Customers" 
           to="/wms/customers" 
