@@ -26,7 +26,7 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
     height: '',
     weight: '',
     category: '',
-    customerId: '',
+    customerId: undefined as string | undefined,
     isActive: true
   });
 
@@ -60,7 +60,7 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
         height: '',
         weight: '',
         category: '',
-        customerId: '',
+        customerId: undefined,
         isActive: true
       });
       onClose();
@@ -110,12 +110,12 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
 
           <div>
             <Label htmlFor="customer">Customer</Label>
-            <Select value={formData.customerId} onValueChange={(value) => setFormData({ ...formData, customerId: value })}>
+            <Select value={formData.customerId || "none"} onValueChange={(value) => setFormData({ ...formData, customerId: value === "none" ? undefined : value })}>
               <SelectTrigger>
                 <SelectValue placeholder="Select customer (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No Customer (Warehouse Owned)</SelectItem>
+                <SelectItem value="none">No Customer (Warehouse Owned)</SelectItem>
                 {customers.map(customer => (
                   <SelectItem key={customer.id} value={customer.id}>
                     {customer.code ? `${customer.code} - ` : ''}{customer.name}

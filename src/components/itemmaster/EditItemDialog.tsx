@@ -27,7 +27,7 @@ export const EditItemDialog = ({ item, isOpen, onClose, onUpdate }: EditItemDial
     height: '',
     weight: '',
     category: '',
-    customerId: '',
+    customerId: undefined as string | undefined,
     isActive: true
   });
 
@@ -41,7 +41,7 @@ export const EditItemDialog = ({ item, isOpen, onClose, onUpdate }: EditItemDial
         height: item.height.toString(),
         weight: item.weight.toString(),
         category: item.category,
-        customerId: item.customerId || '',
+        customerId: item.customerId || undefined,
         isActive: item.isActive
       });
     }
@@ -117,12 +117,12 @@ export const EditItemDialog = ({ item, isOpen, onClose, onUpdate }: EditItemDial
 
           <div>
             <Label htmlFor="customer">Customer</Label>
-            <Select value={formData.customerId} onValueChange={(value) => setFormData({ ...formData, customerId: value })}>
+            <Select value={formData.customerId || "none"} onValueChange={(value) => setFormData({ ...formData, customerId: value === "none" ? undefined : value })}>
               <SelectTrigger>
                 <SelectValue placeholder="Select customer (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No Customer (Warehouse Owned)</SelectItem>
+                <SelectItem value="none">No Customer (Warehouse Owned)</SelectItem>
                 {customers.map(customer => (
                   <SelectItem key={customer.id} value={customer.id}>
                     {customer.code ? `${customer.code} - ` : ''}{customer.name}
