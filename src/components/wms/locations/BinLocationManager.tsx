@@ -15,13 +15,13 @@ export const BinLocationManager = () => {
   const { loading: transferLoading, transferBin } = useBinTransfers();
   const { warehouses, loading: warehousesLoading } = useWarehouses();
   
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string | undefined>(undefined);
   
   const [showCreate, setShowCreate] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   
   const [newLocation, setNewLocation] = useState({
-    warehouse_id: '',
+    warehouse_id: undefined as string | undefined,
     name: '',
     zone: '',
     aisle: '',
@@ -61,10 +61,10 @@ export const BinLocationManager = () => {
     }
     
     try {
-      await createLocation(newLocation);
+      await createLocation(newLocation as any);
       setShowCreate(false);
       setNewLocation({
-        warehouse_id: '',
+        warehouse_id: undefined,
         name: '',
         zone: '',
         aisle: '',
@@ -126,29 +126,43 @@ export const BinLocationManager = () => {
       </div>
 
       {/* Warehouse Selector */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <Label className="flex items-center gap-2 min-w-fit">
-              <Warehouse className="h-4 w-4" />
-              Warehouse:
-            </Label>
-            <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="Select warehouse" />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouses.map(wh => (
-                  <SelectItem key={wh.id} value={wh.id}>
-                    {wh.name}
-                    {wh.is_default && " (Default)"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {warehousesLoading ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">Loading warehouses...</p>
+          </CardContent>
+        </Card>
+      ) : warehouses.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">No warehouses found. Please create a warehouse first.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <Label className="flex items-center gap-2 min-w-fit">
+                <Warehouse className="h-4 w-4" />
+                Warehouse:
+              </Label>
+              <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Select warehouse" />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map(wh => (
+                    <SelectItem key={wh.id} value={wh.id}>
+                      {wh.name}
+                      {wh.is_default && " (Default)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {showCreate && (
         <Card>
