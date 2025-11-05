@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ChevronDown, Package, ClipboardCheck, Warehouse, ListChecks, BarChart3 } from "lucide-react";
+import { ChevronDown, Package, ClipboardCheck, Warehouse, ListChecks, BarChart3, Users, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -50,6 +50,18 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent className="ml-4 mt-1 space-y-1 border-l-2 border-sidebar-border pl-2">
+        <NavItem 
+          icon={Users} 
+          label="Customers" 
+          to="/wms/customers" 
+          isCollapsed={false}
+        />
+        <NavItem 
+          icon={FileText} 
+          label="Purchase Orders" 
+          to="/wms/purchase-orders" 
+          isCollapsed={false}
+        />
         {hasReceiving && (
           <NavItem 
             icon={Package} 

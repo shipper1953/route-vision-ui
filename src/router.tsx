@@ -35,6 +35,8 @@ const NotFound = lazy(() => import("@/pages/NotFound"));
 
 // WMS pages
 const WmsDashboard = lazy(() => import("@/pages/wms/Dashboard"));
+const WmsCustomers = lazy(() => import("@/pages/wms/Customers"));
+const WmsPurchaseOrders = lazy(() => import("@/pages/wms/PurchaseOrders"));
 const WmsReceiving = lazy(() => import("@/pages/wms/Receiving"));
 const WmsQuality = lazy(() => import("@/pages/wms/Quality"));
 const WmsInventory = lazy(() => import("@/pages/wms/Inventory"));
@@ -159,6 +161,14 @@ const router = createBrowserRouter([
   {
     path: "/wms/dashboard",
     element: <LazyRoute Component={WmsDashboard} />,
+  },
+  {
+    path: "/wms/customers",
+    element: <LazyRoute Component={WmsCustomers} />,
+  },
+  {
+    path: "/wms/purchase-orders",
+    element: <LazyRoute Component={WmsPurchaseOrders} />,
   },
   {
     path: "/wms/receiving",
