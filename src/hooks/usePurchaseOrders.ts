@@ -47,7 +47,7 @@ export const usePurchaseOrders = () => {
     try {
       setLoading(true);
       let query = supabase
-        .from('purchase_orders')
+        .from('purchase_orders' as any)
         .select('*')
         .eq('company_id', userProfile.company_id)
         .order('created_at', { ascending: false });
@@ -68,7 +68,7 @@ export const usePurchaseOrders = () => {
       const { data, error } = await query;
 
       if (error) throw error;
-      setPurchaseOrders(data || []);
+      setPurchaseOrders((data as unknown as PurchaseOrder[]) || []);
     } catch (error) {
       console.error('Error fetching purchase orders:', error);
       toast.error('Failed to fetch purchase orders');
@@ -81,7 +81,7 @@ export const usePurchaseOrders = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('purchase_orders')
+        .from('purchase_orders' as any)
         .select('*, po_line_items(*)')
         .eq('id', id)
         .single();
@@ -106,7 +106,7 @@ export const usePurchaseOrders = () => {
 
       // Create PO
       const { data: po, error: poError } = await supabase
-        .from('purchase_orders')
+        .from('purchase_orders' as any)
         .insert([{
           ...poData,
           created_by: userProfile?.id
@@ -119,19 +119,19 @@ export const usePurchaseOrders = () => {
       // Create line items
       const lineItemsWithPoId = lineItems.map((item, index) => ({
         ...item,
-        po_id: po.id,
+        po_id: (po as any).id,
         line_number: index + 1
       }));
 
       const { error: lineItemsError } = await supabase
-        .from('po_line_items')
+        .from('po_line_items' as any)
         .insert(lineItemsWithPoId);
 
       if (lineItemsError) throw lineItemsError;
 
-      setPurchaseOrders([po, ...purchaseOrders]);
+      setPurchaseOrders([po as unknown as PurchaseOrder, ...purchaseOrders]);
       toast.success('Purchase order created successfully');
-      return po;
+      return po as unknown as PurchaseOrder;
     } catch (error: any) {
       console.error('Error creating purchase order:', error);
       toast.error(error.message || 'Failed to create purchase order');
@@ -145,7 +145,7 @@ export const usePurchaseOrders = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('purchase_orders')
+        .from('purchase_orders' as any)
         .update(updates)
         .eq('id', id)
         .select()
@@ -153,9 +153,9 @@ export const usePurchaseOrders = () => {
 
       if (error) throw error;
 
-      setPurchaseOrders(purchaseOrders.map(po => po.id === id ? data : po));
+      setPurchaseOrders(purchaseOrders.map(po => po.id === id ? data as unknown as PurchaseOrder : po));
       toast.success('Purchase order updated successfully');
-      return data;
+      return data as unknown as PurchaseOrder;
     } catch (error: any) {
       console.error('Error updating purchase order:', error);
       toast.error(error.message || 'Failed to update purchase order');

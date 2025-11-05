@@ -29,13 +29,13 @@ export const useCustomers = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('customers')
+        .from('customers' as any)
         .select('*')
         .eq('company_id', userProfile.company_id)
         .order('name');
 
       if (error) throw error;
-      setCustomers(data || []);
+      setCustomers((data as unknown as Customer[]) || []);
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast.error('Failed to fetch customers');
@@ -48,16 +48,16 @@ export const useCustomers = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('customers')
+        .from('customers' as any)
         .insert([customerData])
         .select()
         .single();
 
       if (error) throw error;
 
-      setCustomers([...customers, data]);
+      setCustomers([...customers, data as unknown as Customer]);
       toast.success('Customer created successfully');
-      return data;
+      return data as unknown as Customer;
     } catch (error: any) {
       console.error('Error creating customer:', error);
       toast.error(error.message || 'Failed to create customer');
@@ -71,7 +71,7 @@ export const useCustomers = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('customers')
+        .from('customers' as any)
         .update(updates)
         .eq('id', id)
         .select()
@@ -79,9 +79,9 @@ export const useCustomers = () => {
 
       if (error) throw error;
 
-      setCustomers(customers.map(c => c.id === id ? data : c));
+      setCustomers(customers.map(c => c.id === id ? data as unknown as Customer : c));
       toast.success('Customer updated successfully');
-      return data;
+      return data as unknown as Customer;
     } catch (error: any) {
       console.error('Error updating customer:', error);
       toast.error(error.message || 'Failed to update customer');
@@ -95,7 +95,7 @@ export const useCustomers = () => {
     try {
       setLoading(true);
       const { error } = await supabase
-        .from('customers')
+        .from('customers' as any)
         .delete()
         .eq('id', id);
 
