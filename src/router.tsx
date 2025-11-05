@@ -42,6 +42,8 @@ const WmsQuality = lazy(() => import("@/pages/wms/Quality"));
 const WmsInventory = lazy(() => import("@/pages/wms/Inventory"));
 const WmsPicking = lazy(() => import("@/pages/wms/Picking"));
 const WmsReporting = lazy(() => import("@/pages/wms/Reporting"));
+const WmsLocations = lazy(() => import("@/pages/wms/Locations"));
+const WmsPickWaves = lazy(() => import("@/pages/wms/PickWaves"));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -189,6 +191,14 @@ const router = createBrowserRouter([
   {
     path: "/wms/reporting",
     element: <LazyRoute Component={WmsReporting} />,
+  },
+  {
+    path: "/wms/locations",
+    element: <LazyRoute Component={WmsLocations} />,
+  },
+  {
+    path: "/wms/pick-waves",
+    element: <LazyRoute Component={WmsPickWaves} />,
   },
   {
     path: "*",

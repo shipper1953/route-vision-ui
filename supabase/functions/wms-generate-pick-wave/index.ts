@@ -67,6 +67,43 @@ Deno.serve(async (req) => {
       user_id
     } = await req.json();
 
+    // Get user and validate
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: userProfile, error: profileError } = await supabaseClient
+      .from('users')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !userProfile || userProfile.company_id !== company_id) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Company mismatch' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate warehouse ownership
+    const { data: warehouseValid } = await supabaseClient
+      .rpc('validate_warehouse_ownership', {
+        p_warehouse_id: warehouse_id,
+        p_company_id: userProfile.company_id
+      });
+
+    if (!warehouseValid) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Warehouse does not belong to your company' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Generate wave number
     const { data: existingWaves } = await supabaseClient
       .from('pick_waves')

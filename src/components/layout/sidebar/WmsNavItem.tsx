@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { ChevronDown, Package, ClipboardCheck, Warehouse, ListChecks, BarChart3, Users, FileText } from "lucide-react";
+import { ChevronDown, Package, ClipboardCheck, Warehouse, ListChecks, BarChart3, Users, FileText, MapPin, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -14,6 +14,13 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
   const location = useLocation();
   const { userProfile } = useAuth();
   const [isOpen, setIsOpen] = useState(location.pathname.startsWith('/wms'));
+
+  // Keep WMS menu expanded when on WMS pages
+  useEffect(() => {
+    if (location.pathname.startsWith('/wms')) {
+      setIsOpen(true);
+    }
+  }, [location.pathname]);
 
   // Check if user has any WMS modules enabled
   const wmsModules = userProfile?.company_id ? {} : {}; // TODO: fetch from company settings
@@ -93,10 +100,26 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
           />
         )}
         {hasPicking && (
+          <>
+            <NavItem 
+              icon={ListChecks} 
+              label="Picking" 
+              to="/wms/picking" 
+              isCollapsed={false}
+            />
+            <NavItem 
+              icon={Layers} 
+              label="Pick Waves" 
+              to="/wms/pick-waves" 
+              isCollapsed={false}
+            />
+          </>
+        )}
+        {hasInventory && (
           <NavItem 
-            icon={ListChecks} 
-            label="Picking" 
-            to="/wms/picking" 
+            icon={MapPin} 
+            label="Locations" 
+            to="/wms/locations" 
             isCollapsed={false}
           />
         )}

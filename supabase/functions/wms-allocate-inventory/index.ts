@@ -59,6 +59,20 @@ serve(async (req) => {
       throw new Error('Unauthorized: Warehouse does not belong to your company');
     }
 
+    // Additional validation using RPC function
+    const { data: warehouseValid } = await supabase
+      .rpc('validate_warehouse_ownership', {
+        p_warehouse_id: warehouseId,
+        p_company_id: userProfile.company_id
+      });
+
+    if (!warehouseValid) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Warehouse validation failed' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const allocations = [];
     const errors = [];
 

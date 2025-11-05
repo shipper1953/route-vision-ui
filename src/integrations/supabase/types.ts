@@ -1824,6 +1824,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      validate_warehouse_ownership: {
+        Args: { p_company_id: string; p_warehouse_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "super_admin" | "company_admin" | "user"
