@@ -14,7 +14,12 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
     );
 
     const { 
@@ -43,6 +48,43 @@ serve(async (req) => {
       .select('company_id, warehouse_ids')
       .eq('id', user.id)
       .single();
+
+    if (!userProfile) {
+      throw new Error('User profile not found');
+    }
+
+    // Validate session belongs to user's company
+    const { data: session } = await supabase
+      .from('receiving_sessions')
+      .select('company_id, warehouse_id')
+      .eq('id', sessionId)
+      .single();
+
+    if (!session || session.company_id !== userProfile.company_id) {
+      throw new Error('Unauthorized: Session does not belong to your company');
+    }
+
+    // Validate PO line belongs to user's company
+    const { data: poLine } = await supabase
+      .from('po_line_items')
+      .select('purchase_orders!inner(company_id)')
+      .eq('id', poLineId)
+      .single();
+
+    if (!poLine || poLine.purchase_orders.company_id !== userProfile.company_id) {
+      throw new Error('Unauthorized: PO line does not belong to your company');
+    }
+
+    // Validate item belongs to user's company
+    const { data: item } = await supabase
+      .from('items')
+      .select('company_id')
+      .eq('id', itemId)
+      .single();
+
+    if (!item || item.company_id !== userProfile.company_id) {
+      throw new Error('Unauthorized: Item does not belong to your company');
+    }
 
     // Insert receiving line item
     const { data: receivingLineItem, error: insertError } = await supabase

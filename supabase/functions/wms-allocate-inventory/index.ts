@@ -14,7 +14,12 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
     );
 
     const { 
@@ -32,6 +37,28 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
+    // Get user's company for tenant validation
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!userProfile) {
+      throw new Error('User profile not found');
+    }
+
+    // Validate warehouse belongs to user's company
+    const { data: warehouse } = await supabase
+      .from('warehouses')
+      .select('company_id')
+      .eq('id', warehouseId)
+      .single();
+
+    if (!warehouse || warehouse.company_id !== userProfile.company_id) {
+      throw new Error('Unauthorized: Warehouse does not belong to your company');
+    }
+
     const allocations = [];
     const errors = [];
 
@@ -41,6 +68,7 @@ serve(async (req) => {
         .select('*')
         .eq('item_id', item.itemId)
         .eq('warehouse_id', warehouseId)
+        .eq('company_id', userProfile.company_id)
         .gt('quantity_available', 0);
 
       // Apply allocation strategy
@@ -75,6 +103,12 @@ serve(async (req) => {
       for (const level of inventoryLevels) {
         if (remainingToAllocate <= 0) break;
 
+        // Verify inventory level belongs to user's company
+        if (level.company_id !== userProfile.company_id) {
+          errors.push({ itemId: item.itemId, error: 'Unauthorized inventory access' });
+          continue;
+        }
+
         const allocateQty = Math.min(level.quantity_available, remainingToAllocate);
 
         // Update inventory level
@@ -84,7 +118,8 @@ serve(async (req) => {
             quantity_allocated: level.quantity_allocated + allocateQty,
             updated_at: new Date().toISOString()
           })
-          .eq('id', level.id);
+          .eq('id', level.id)
+          .eq('company_id', userProfile.company_id);
 
         if (updateError) {
           errors.push({ itemId: item.itemId, error: updateError.message });

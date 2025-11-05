@@ -19,8 +19,8 @@ export default function WmsDashboard() {
         { count: lowStockItems },
       ] = await Promise.all([
         (supabase as any).from('purchase_orders').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'pending'),
-        (supabase as any).from('qc_inspections').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        (supabase as any).from('pick_lists').select('*', { count: 'exact', head: true }).eq('status', 'in_progress'),
+        (supabase as any).from('qc_inspections').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'pending'),
+        (supabase as any).from('pick_lists').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'in_progress'),
         (supabase as any).from('inventory_levels').select('*', { count: 'exact', head: true }).eq('company_id', companyId).lt('quantity_available', 10),
       ]);
 

@@ -14,7 +14,12 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
     );
 
     const { itemId, warehouseId, quantity, itemDimensions } = await req.json();
@@ -25,6 +30,39 @@ serve(async (req) => {
 
     if (!user) {
       throw new Error('Unauthorized');
+    }
+
+    // Get user's company for tenant validation
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!userProfile) {
+      throw new Error('User profile not found');
+    }
+
+    // Validate warehouse belongs to user's company
+    const { data: warehouse } = await supabase
+      .from('warehouses')
+      .select('company_id')
+      .eq('id', warehouseId)
+      .single();
+
+    if (!warehouse || warehouse.company_id !== userProfile.company_id) {
+      throw new Error('Unauthorized: Warehouse does not belong to your company');
+    }
+
+    // Validate item belongs to user's company
+    const { data: item } = await supabase
+      .from('items')
+      .select('company_id')
+      .eq('id', itemId)
+      .single();
+
+    if (!item || item.company_id !== userProfile.company_id) {
+      throw new Error('Unauthorized: Item does not belong to your company');
     }
 
     // Get available storage locations
@@ -44,7 +82,8 @@ serve(async (req) => {
     const { data: inventoryLevels } = await supabase
       .from('inventory_levels')
       .select('location_id, quantity_on_hand')
-      .eq('warehouse_id', warehouseId);
+      .eq('warehouse_id', warehouseId)
+      .eq('company_id', userProfile.company_id);
 
     const inventoryMap = new Map();
     inventoryLevels?.forEach(level => {

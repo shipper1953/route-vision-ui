@@ -30,6 +30,59 @@ Deno.serve(async (req) => {
       user_id
     } = await req.json();
 
+    // Get authenticated user for validation
+    const authHeader = req.headers.get('Authorization')!;
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user } } = await supabaseClient.auth.getUser(token);
+
+    if (!user) {
+      throw new Error('Unauthorized');
+    }
+
+    // Get user's company
+    const { data: userProfile } = await supabaseClient
+      .from('users')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!userProfile) {
+      throw new Error('User profile not found');
+    }
+
+    // Validate session belongs to user's company
+    const { data: session } = await supabaseClient
+      .from('receiving_sessions')
+      .select('company_id, warehouse_id')
+      .eq('id', session_id)
+      .single();
+
+    if (!session || session.company_id !== userProfile.company_id) {
+      throw new Error('Unauthorized: Session does not belong to your company');
+    }
+
+    // Validate PO line belongs to user's company
+    const { data: poLine } = await supabaseClient
+      .from('po_line_items')
+      .select('purchase_orders!inner(company_id)')
+      .eq('id', po_line_id)
+      .single();
+
+    if (!poLine || poLine.purchase_orders.company_id !== userProfile.company_id) {
+      throw new Error('Unauthorized: PO line does not belong to your company');
+    }
+
+    // Validate item belongs to user's company
+    const { data: item } = await supabaseClient
+      .from('items')
+      .select('company_id')
+      .eq('id', item_id)
+      .single();
+
+    if (!item || item.company_id !== userProfile.company_id) {
+      throw new Error('Unauthorized: Item does not belong to your company');
+    }
+
     // Insert receiving line item
     const { data: lineItem, error: lineError } = await supabaseClient
       .from('receiving_line_items')
@@ -58,13 +111,7 @@ Deno.serve(async (req) => {
 
     if (poUpdateError) console.error('Failed to update PO qty:', poUpdateError);
 
-    // Update or create inventory level
-    const { data: session } = await supabaseClient
-      .from('receiving_sessions')
-      .select('company_id, warehouse_id')
-      .eq('id', session_id)
-      .single();
-
+    // Update or create inventory level (session already validated above)
     if (session) {
       const { data: existingInventory } = await supabaseClient
         .from('inventory_levels')
