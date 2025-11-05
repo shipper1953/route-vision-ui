@@ -9,6 +9,7 @@ import { EditItemDialog } from "./EditItemDialog";
 import { BarcodePrintDialog } from "./BarcodePrintDialog";
 import { Item } from "@/types/itemMaster";
 import { formatDistanceToNow } from "date-fns";
+import { useCustomers } from "@/hooks/useCustomers";
 
 interface ItemMasterTableProps {
   items: Item[];
@@ -18,6 +19,7 @@ interface ItemMasterTableProps {
 }
 
 export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMasterTableProps) => {
+  const { customers } = useCustomers();
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
@@ -79,6 +81,11 @@ export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMast
     setPrintDialogOpen(true);
   };
 
+  const getCustomerName = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    return customer ? (customer.code ? `${customer.code} - ${customer.name}` : customer.name) : 'Unknown';
+  };
+
   const allSelected = items.length > 0 && selectedItems.size === items.length;
   const someSelected = selectedItems.size > 0 && selectedItems.size < items.length;
 
@@ -109,6 +116,7 @@ export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMast
             </TableHead>
             <TableHead>SKU</TableHead>
             <TableHead>Name</TableHead>
+            <TableHead>Customer</TableHead>
             <TableHead>Dimensions (L×W×H)</TableHead>
             <TableHead>Weight</TableHead>
             <TableHead>Category</TableHead>
@@ -130,6 +138,15 @@ export const ItemMasterTable = ({ items, loading, onUpdate, onDelete }: ItemMast
               </TableCell>
               <TableCell className="font-mono">{item.sku}</TableCell>
               <TableCell className="font-semibold">{item.name}</TableCell>
+              <TableCell>
+                {item.customerId ? (
+                  <Badge variant="outline" className="font-normal">
+                    {getCustomerName(item.customerId)}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground text-sm">Warehouse</span>
+                )}
+              </TableCell>
               <TableCell>{formatDimensions(item)}</TableCell>
               <TableCell>
                 <Badge className={getWeightColor(item.weight)}>

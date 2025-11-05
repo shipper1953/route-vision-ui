@@ -67,6 +67,7 @@ export const useItemMaster = () => {
         category: item.category,
         isActive: item.is_active,
         dimensionsUpdatedAt: item.dimensions_updated_at,
+        customerId: item.customer_id,
         
         // Legacy numeric IDs
         shopifyProductId: item.shopify_product_id,
@@ -105,6 +106,7 @@ export const useItemMaster = () => {
           weight: itemData.weight,
           category: itemData.category,
           is_active: itemData.isActive,
+          customer_id: itemData.customerId || null,
           company_id: userProfile.company_id
         })
         .select()
@@ -124,6 +126,7 @@ export const useItemMaster = () => {
         category: data.category,
         isActive: data.is_active,
         dimensionsUpdatedAt: data.dimensions_updated_at,
+        customerId: data.customer_id,
         shopifyProductId: data.shopify_product_id,
         shopifyVariantId: data.shopify_variant_id
       };
@@ -151,7 +154,8 @@ export const useItemMaster = () => {
           height: updatedItem.height,
           weight: updatedItem.weight,
           category: updatedItem.category,
-          is_active: updatedItem.isActive
+          is_active: updatedItem.isActive,
+          customer_id: updatedItem.customerId || null
         })
         .eq('id', updatedItem.id);
 

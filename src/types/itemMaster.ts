@@ -10,6 +10,7 @@ export interface Item {
   category: string;
   isActive: boolean;
   dimensionsUpdatedAt?: string;
+  customerId?: string;
   
   // Legacy numeric IDs (for REST API compatibility)
   shopifyProductId?: string;

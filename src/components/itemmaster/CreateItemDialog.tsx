@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Item } from "@/types/itemMaster";
+import { useCustomers } from "@/hooks/useCustomers";
 
 interface CreateItemDialogProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface CreateItemDialogProps {
 }
 
 export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDialogProps) => {
+  const { customers } = useCustomers();
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
@@ -24,6 +26,7 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
     height: '',
     weight: '',
     category: '',
+    customerId: '',
     isActive: true
   });
 
@@ -43,6 +46,7 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
       height: parseFloat(formData.height),
       weight: parseFloat(formData.weight),
       category: formData.category || 'General',
+      customerId: formData.customerId || undefined,
       isActive: formData.isActive
     };
 
@@ -56,6 +60,7 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
         height: '',
         weight: '',
         category: '',
+        customerId: '',
         isActive: true
       });
       onClose();
@@ -101,6 +106,23 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="customer">Customer</Label>
+            <Select value={formData.customerId} onValueChange={(value) => setFormData({ ...formData, customerId: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select customer (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No Customer (Warehouse Owned)</SelectItem>
+                {customers.map(customer => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.code ? `${customer.code} - ` : ''}{customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>

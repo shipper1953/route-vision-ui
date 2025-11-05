@@ -418,6 +418,7 @@ export type Database = {
           category: string
           company_id: string
           created_at: string
+          customer_id: string | null
           dimensions_updated_at: string | null
           height: number
           id: string
@@ -437,6 +438,7 @@ export type Database = {
           category: string
           company_id: string
           created_at?: string
+          customer_id?: string | null
           dimensions_updated_at?: string | null
           height: number
           id?: string
@@ -456,6 +458,7 @@ export type Database = {
           category?: string
           company_id?: string
           created_at?: string
+          customer_id?: string | null
           dimensions_updated_at?: string | null
           height?: number
           id?: string
@@ -471,7 +474,15 @@ export type Database = {
           weight?: number
           width?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "items_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       order_cartonization: {
         Row: {
