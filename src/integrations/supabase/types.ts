@@ -1728,6 +1728,69 @@ export type Database = {
           },
         ]
       }
+      warehouse_locations: {
+        Row: {
+          aisle: string | null
+          bin: string | null
+          company_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          location_type: string
+          name: string
+          rack: string | null
+          shelf: string | null
+          updated_at: string
+          warehouse_id: string
+          zone: string | null
+        }
+        Insert: {
+          aisle?: string | null
+          bin?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location_type?: string
+          name: string
+          rack?: string | null
+          shelf?: string | null
+          updated_at?: string
+          warehouse_id: string
+          zone?: string | null
+        }
+        Update: {
+          aisle?: string | null
+          bin?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location_type?: string
+          name?: string
+          rack?: string | null
+          shelf?: string | null
+          updated_at?: string
+          warehouse_id?: string
+          zone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_locations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_locations_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouses: {
         Row: {
           address: Json
