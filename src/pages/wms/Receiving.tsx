@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useWmsReceiving } from "@/hooks/useWmsReceiving";
-import { PageTransition } from "@/components/transitions/PageTransition";
+import { TmsLayout } from "@/components/layout/TmsLayout";
 import { POSelectionCard } from "@/components/wms/receiving/POSelectionCard";
 import { ReceivingSessionHeader } from "@/components/wms/receiving/ReceivingSessionHeader";
 import { BarcodeScanInput } from "@/components/wms/receiving/BarcodeScanInput";
@@ -110,8 +110,8 @@ const Receiving = () => {
   };
 
   return (
-    <PageTransition>
-      <div className="container mx-auto py-6 space-y-6 max-w-4xl">
+    <TmsLayout>
+      <div className="space-y-6 max-w-4xl">
         {/* Header */}
         <div className="flex items-center gap-4">
           {activeSession && (
@@ -194,7 +194,7 @@ const Receiving = () => {
           </div>
         )}
       </div>
-    </PageTransition>
+    </TmsLayout>
   );
 };
 

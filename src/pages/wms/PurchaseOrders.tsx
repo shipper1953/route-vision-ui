@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { CreatePurchaseOrderDialog } from "@/components/wms/po/CreatePurchaseOrderDialog";
 import { PurchaseOrdersList } from "@/components/wms/po/PurchaseOrdersList";
-import { PageTransition } from "@/components/transitions/PageTransition";
+import { TmsLayout } from "@/components/layout/TmsLayout";
 import {
   Select,
   SelectContent,
@@ -41,8 +41,8 @@ const PurchaseOrders = () => {
   };
 
   return (
-    <PageTransition>
-      <div className="container mx-auto py-6 space-y-6">
+    <TmsLayout>
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -103,7 +103,7 @@ const PurchaseOrders = () => {
           onSubmit={createPurchaseOrder}
         />
       </div>
-    </PageTransition>
+    </TmsLayout>
   );
 };
 

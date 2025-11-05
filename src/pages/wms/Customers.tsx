@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { CreateCustomerDialog } from "@/components/wms/customers/CreateCustomerDialog";
 import { CustomersList } from "@/components/wms/customers/CustomersList";
-import { PageTransition } from "@/components/transitions/PageTransition";
+import { TmsLayout } from "@/components/layout/TmsLayout";
 
 const Customers = () => {
   const { customers, loading, createCustomer, updateCustomer, deleteCustomer } = useCustomers();
@@ -26,8 +26,8 @@ const Customers = () => {
   };
 
   return (
-    <PageTransition>
-      <div className="container mx-auto py-6 space-y-6">
+    <TmsLayout>
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -75,7 +75,7 @@ const Customers = () => {
           onSubmit={createCustomer}
         />
       </div>
-    </PageTransition>
+    </TmsLayout>
   );
 };
 
