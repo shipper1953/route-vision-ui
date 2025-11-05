@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,22 +6,22 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWarehouseLocations, WarehouseLocation } from "@/hooks/useWarehouseLocations";
 import { useBinTransfers, BinTransfer } from "@/hooks/useBinTransfers";
-import { MapPin, ArrowRight, Plus } from "lucide-react";
+import { useWarehouses } from "@/hooks/useWarehouses";
+import { MapPin, ArrowRight, Plus, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 
-interface BinLocationManagerProps {
-  warehouseId: string;
-}
-
-export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => {
+export const BinLocationManager = () => {
   const { locations, loading: locationsLoading, createLocation, fetchLocations } = useWarehouseLocations();
   const { loading: transferLoading, transferBin } = useBinTransfers();
+  const { warehouses, loading: warehousesLoading } = useWarehouses();
+  
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   
   const [showCreate, setShowCreate] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   
   const [newLocation, setNewLocation] = useState({
-    warehouse_id: warehouseId,
+    warehouse_id: '',
     name: '',
     zone: '',
     aisle: '',
@@ -32,6 +32,21 @@ export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => 
     is_active: true
   });
 
+  // Set default warehouse when warehouses load
+  useEffect(() => {
+    if (warehouses.length > 0 && !selectedWarehouse) {
+      const defaultWarehouse = warehouses.find(w => w.is_default) || warehouses[0];
+      setSelectedWarehouse(defaultWarehouse.id);
+    }
+  }, [warehouses]);
+
+  // Fetch locations when selected warehouse changes
+  useEffect(() => {
+    if (selectedWarehouse) {
+      fetchLocations(selectedWarehouse);
+    }
+  }, [selectedWarehouse]);
+
   const [transfer, setTransfer] = useState<Partial<BinTransfer>>({
     from_location_id: '',
     to_location_id: '',
@@ -40,11 +55,16 @@ export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => 
   });
 
   const handleCreateLocation = async () => {
+    if (!newLocation.warehouse_id) {
+      toast.error('Please select a warehouse');
+      return;
+    }
+    
     try {
       await createLocation(newLocation);
       setShowCreate(false);
       setNewLocation({
-        warehouse_id: warehouseId,
+        warehouse_id: '',
         name: '',
         zone: '',
         aisle: '',
@@ -84,6 +104,11 @@ export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => 
   const receivingLocations = locations.filter(l => l.location_type === 'receiving');
   const shippingLocations = locations.filter(l => l.location_type === 'shipping');
 
+  const getWarehouseName = (warehouseId: string) => {
+    const warehouse = warehouses.find(w => w.id === warehouseId);
+    return warehouse?.name || 'Unknown';
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -100,6 +125,31 @@ export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => 
         </div>
       </div>
 
+      {/* Warehouse Selector */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4">
+            <Label className="flex items-center gap-2 min-w-fit">
+              <Warehouse className="h-4 w-4" />
+              Warehouse:
+            </Label>
+            <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select warehouse" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map(wh => (
+                  <SelectItem key={wh.id} value={wh.id}>
+                    {wh.name}
+                    {wh.is_default && " (Default)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       {showCreate && (
         <Card>
           <CardHeader>
@@ -107,6 +157,24 @@ export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => 
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Warehouse *</Label>
+                <Select
+                  value={newLocation.warehouse_id}
+                  onValueChange={(value) => setNewLocation({ ...newLocation, warehouse_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select warehouse" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map(wh => (
+                      <SelectItem key={wh.id} value={wh.id}>
+                        {wh.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>Location Name *</Label>
                 <Input
@@ -166,7 +234,10 @@ export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => 
               </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={handleCreateLocation} disabled={locationsLoading || !newLocation.name}>
+              <Button 
+                onClick={handleCreateLocation} 
+                disabled={locationsLoading || !newLocation.name || !newLocation.warehouse_id}
+              >
                 Create Location
               </Button>
               <Button variant="outline" onClick={() => setShowCreate(false)}>
@@ -267,7 +338,10 @@ export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => 
             <div className="space-y-2">
               {storageLocations.slice(0, 10).map(loc => (
                 <div key={loc.id} className="text-sm p-2 bg-accent/50 rounded">
-                  {loc.name} - Zone {loc.zone}
+                  <div className="font-medium">{loc.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Zone {loc.zone} • {getWarehouseName(loc.warehouse_id)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -285,7 +359,10 @@ export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => 
             <div className="space-y-2">
               {receivingLocations.map(loc => (
                 <div key={loc.id} className="text-sm p-2 bg-green-500/10 rounded">
-                  {loc.name}
+                  <div className="font-medium">{loc.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {getWarehouseName(loc.warehouse_id)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -303,7 +380,10 @@ export const BinLocationManager = ({ warehouseId }: BinLocationManagerProps) => 
             <div className="space-y-2">
               {shippingLocations.map(loc => (
                 <div key={loc.id} className="text-sm p-2 bg-blue-500/10 rounded">
-                  {loc.name}
+                  <div className="font-medium">{loc.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {getWarehouseName(loc.warehouse_id)}
+                  </div>
                 </div>
               ))}
             </div>
