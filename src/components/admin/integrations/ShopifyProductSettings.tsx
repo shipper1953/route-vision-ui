@@ -15,13 +15,15 @@ interface ShopifyProductSettingsProps {
   onUpdate: (settings: Partial<ShopifySettings>) => void;
   onChange: () => void;
   companyId?: string;
+  storeId?: string;
 }
 
 export const ShopifyProductSettings = ({ 
   settings, 
   onUpdate, 
   onChange,
-  companyId 
+  companyId,
+  storeId
 }: ShopifyProductSettingsProps) => {
   const [isImporting, setIsImporting] = useState(false);
   const [lastImport, setLastImport] = useState<Date | null>(null);
@@ -53,6 +55,11 @@ export const ShopifyProductSettings = ({
       return;
     }
 
+    if (!storeId) {
+      toast.error('Please select a store first');
+      return;
+    }
+
     setIsImporting(true);
     try {
       console.log('Starting product import from Shopify...');
@@ -60,6 +67,7 @@ export const ShopifyProductSettings = ({
       const { data, error } = await supabase.functions.invoke('shopify-sync-products', {
         body: {
           companyId,
+          storeId,
           importVariants: productConfig.import_variants,
           importBundles: productConfig.import_bundles,
           syncDimensions: productConfig.sync_product_dimensions,
