@@ -31,7 +31,17 @@ serve(async (req) => {
     }
 
     // Clean up store URL
-    const cleanUrl = storeUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    let cleanUrl = storeUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    
+    // Validate it's a proper Shopify domain
+    if (!cleanUrl.includes('.myshopify.com')) {
+      throw new Error(`Invalid Shopify store URL: "${cleanUrl}". Please use your store's .myshopify.com domain (e.g., your-store.myshopify.com), not an admin URL.`);
+    }
+    
+    // Additional validation for admin URLs
+    if (cleanUrl.includes('admin.shopify.com')) {
+      throw new Error('Please use your actual store domain (your-store.myshopify.com), not an admin.shopify.com URL');
+    }
 
     // Generate webhook secret
     const webhookSecret = crypto.randomUUID();

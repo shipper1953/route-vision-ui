@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Store, Loader2, Key, ExternalLink, User } from "lucide-react";
+import { Store, Loader2, Key, ExternalLink, User, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ShopifyConnectionDialogProps {
   open: boolean;
@@ -32,6 +33,71 @@ export const ShopifyConnectionDialog = ({
   const [storeUrl, setStoreUrl] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [loading, setLoading] = useState(false);
+  const [urlWarning, setUrlWarning] = useState<string | null>(null);
+
+  // Validate and clean store URL
+  const validateStoreUrl = (url: string): { isValid: boolean; cleanedUrl: string; warning: string | null } => {
+    if (!url.trim()) {
+      return { isValid: false, cleanedUrl: '', warning: null };
+    }
+
+    let cleaned = url.trim();
+    
+    // Check for admin URL pattern
+    if (cleaned.includes('admin.shopify.com/store/')) {
+      const match = cleaned.match(/admin\.shopify\.com\/store\/([^\/\?]+)/);
+      if (match) {
+        const storeName = match[1];
+        return {
+          isValid: true,
+          cleanedUrl: `${storeName}.myshopify.com`,
+          warning: `Detected admin URL. Using store domain: ${storeName}.myshopify.com`
+        };
+      }
+    }
+
+    // Strip protocol
+    cleaned = cleaned.replace(/^https?:\/\//, '');
+    
+    // Strip trailing slash
+    cleaned = cleaned.replace(/\/$/, '');
+    
+    // Strip www.
+    cleaned = cleaned.replace(/^www\./, '');
+
+    // Check if it's a valid Shopify domain
+    const shopifyDomainPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/;
+    
+    if (shopifyDomainPattern.test(cleaned)) {
+      return { isValid: true, cleanedUrl: cleaned, warning: null };
+    }
+
+    // If it doesn't have .myshopify.com, suggest adding it
+    if (!cleaned.includes('.')) {
+      return {
+        isValid: true,
+        cleanedUrl: `${cleaned}.myshopify.com`,
+        warning: `Added .myshopify.com to store name`
+      };
+    }
+
+    // Invalid format
+    return {
+      isValid: false,
+      cleanedUrl: cleaned,
+      warning: 'Invalid store URL format. Use: your-store.myshopify.com'
+    };
+  };
+
+  // Update URL warning when store URL changes
+  useEffect(() => {
+    if (storeUrl) {
+      const { warning } = validateStoreUrl(storeUrl);
+      setUrlWarning(warning);
+    } else {
+      setUrlWarning(null);
+    }
+  }, [storeUrl]);
 
   // Fetch companies based on user role
   useEffect(() => {
@@ -136,12 +202,24 @@ export const ShopifyConnectionDialog = ({
     setLoading(true);
 
     try {
-      const cleanUrl = storeUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      // Validate and clean the URL
+      const { isValid, cleanedUrl } = validateStoreUrl(storeUrl);
+      
+      if (!isValid) {
+        toast({
+          title: "Invalid Store URL",
+          description: "Please enter a valid Shopify store URL (e.g., your-store.myshopify.com)",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       const customer = customers.find(c => c.id === selectedCustomerId);
       
       const { error } = await supabase.functions.invoke('shopify-save-credentials', {
         body: {
-          storeUrl: cleanUrl,
+          storeUrl: cleanedUrl,
           accessToken,
           companyId: selectedCompanyId,
           customerId: selectedCustomerId,
@@ -203,11 +281,24 @@ export const ShopifyConnectionDialog = ({
     setLoading(true);
 
     try {
+      // Validate and clean the URL
+      const { isValid, cleanedUrl } = validateStoreUrl(storeUrl);
+      
+      if (!isValid) {
+        toast({
+          title: "Invalid Store URL",
+          description: "Please enter a valid Shopify store URL (e.g., your-store.myshopify.com)",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       const customer = customers.find(c => c.id === selectedCustomerId);
       
       const { data, error } = await supabase.functions.invoke('shopify-oauth-start', {
         body: {
-          storeUrl,
+          storeUrl: cleanedUrl,
           companyId: selectedCompanyId,
           customerId: selectedCustomerId,
           customerName: customer?.name,
@@ -403,6 +494,15 @@ export const ShopifyConnectionDialog = ({
                 onChange={(e) => setStoreUrl(e.target.value)}
                 disabled={loading}
               />
+              <p className="text-xs text-muted-foreground">
+                Enter your Shopify store domain (e.g., your-store.myshopify.com)
+              </p>
+              {urlWarning && (
+                <Alert variant={urlWarning.includes('Invalid') ? 'destructive' : 'default'}>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">{urlWarning}</AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -482,9 +582,20 @@ export const ShopifyConnectionDialog = ({
                 onChange={(e) => setStoreUrl(e.target.value)}
                 disabled={loading}
               />
-              <p className="text-sm text-muted-foreground">
-                Enter your .myshopify.com domain
-              </p>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Enter your Shopify store domain (e.g., your-store.myshopify.com)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Don't use admin.shopify.com URLs - use your actual store domain
+                </p>
+              </div>
+              {urlWarning && (
+                <Alert variant={urlWarning.includes('Invalid') ? 'destructive' : 'default'}>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">{urlWarning}</AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <div className="space-y-2">
