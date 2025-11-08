@@ -34,24 +34,38 @@ export const ShopifyConnectionDialog = ({
   const [accessToken, setAccessToken] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Fetch companies for super admins
+  // Fetch companies based on user role
   useEffect(() => {
     const fetchCompanies = async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
-      
-      if (data && !error) {
-        setCompanies(data);
+      if (isSuperAdmin) {
+        // Fetch all companies for super admins
+        const { data, error } = await supabase
+          .from('companies')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (data && !error) {
+          setCompanies(data);
+        }
+      } else if (userProfile?.company_id) {
+        // Fetch only the user's company for company admins
+        const { data, error } = await supabase
+          .from('companies')
+          .select('id, name')
+          .eq('id', userProfile.company_id)
+          .single();
+        
+        if (data && !error) {
+          setCompanies([data]);
+        }
       }
     };
     
-    if (isSuperAdmin && open) {
+    if (open) {
       fetchCompanies();
     }
-  }, [isSuperAdmin, open]);
+  }, [isSuperAdmin, open, userProfile?.company_id]);
 
   // Update selected company when dialog opens or companyId changes
   useEffect(() => {
