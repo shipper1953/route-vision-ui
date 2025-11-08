@@ -333,16 +333,20 @@ Deno.serve(async (req) => {
     for (const fo of fulfillmentOrders) {
       // Check if we've already processed this fulfillment order
       const fulfillmentOrderId = fo.id;
-      const { data: existingRecords } = await supabase
+      const fallbackCompanyId = store.company_id || fo.order?.company?.id || null;
+      const fallbackConditions = [
+        `shopify_store_id.eq.${store.id}`,
+        fallbackCompanyId
+          ? `and(shopify_store_id.is.null,company_id.eq.${fallbackCompanyId})`
+          : 'shopify_store_id.is.null'
+      ].join(',');
+
+      const { data: existing } = await supabase
         .from('shopify_fulfillment_orders')
         .select('id, shopify_store_id, company_id')
-        .eq('fulfillment_order_id', fulfillmentOrderId);
-
-      const existing = existingRecords?.find(
-        (record: { shopify_store_id: string | null; company_id: string | null }) =>
-          record.shopify_store_id === store.id ||
-          (!record.shopify_store_id && record.company_id === store.company_id)
-      );
+        .eq('fulfillment_order_id', fulfillmentOrderId)
+        .or(fallbackConditions)
+        .maybeSingle();
 
       if (existing) {
         console.log(`⏭️  Fulfillment order ${fulfillmentOrderId} already processed, skipping`);
