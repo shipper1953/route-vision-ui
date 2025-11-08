@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { companyId } = await req.json();
+    const { companyId, storeId, shopifySettings } = await req.json();
 
     if (!companyId) {
       return new Response(
@@ -40,25 +40,43 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch shopify settings from company record
-    const { data: companyData, error: companyError } = await supabase
-      .from('companies')
-      .select('settings')
-      .eq('id', companyId)
-      .single();
+    // Get store credentials - prioritize passed settings, fallback to database
+    let accessToken: string;
+    let storeUrl: string;
+    let actualStoreId = storeId;
 
-    if (companyError || !companyData) {
-      console.error('Failed to fetch company:', companyError);
+    if (shopifySettings?.access_token && shopifySettings?.store_url) {
+      accessToken = shopifySettings.access_token;
+      storeUrl = shopifySettings.store_url;
+    } else if (storeId) {
+      const { data: storeData, error: storeError } = await supabase
+        .from('shopify_stores')
+        .select('id, access_token, store_url')
+        .eq('id', storeId)
+        .eq('company_id', companyId)
+        .single();
+
+      if (storeError || !storeData) {
+        console.error('Failed to fetch store:', storeError);
+        return new Response(
+          JSON.stringify({ error: 'Shopify store not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      accessToken = storeData.access_token;
+      storeUrl = storeData.store_url;
+      actualStoreId = storeData.id;
+    } else {
       return new Response(
-        JSON.stringify({ error: 'Company not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Either storeId or shopifySettings must be provided' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const shopifySettings = companyData.settings?.shopify;
-    if (!shopifySettings?.access_token || !shopifySettings?.store_url) {
+    if (!accessToken || !storeUrl) {
       return new Response(
-        JSON.stringify({ error: 'Shopify not connected. Please connect your Shopify store first.' }),
+        JSON.stringify({ error: 'Shopify credentials missing' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -97,11 +115,11 @@ Deno.serve(async (req) => {
     `;
 
     const response = await fetch(
-      `https://${shopifySettings.store_url}/admin/api/2025-01/graphql.json`,
+      `https://${storeUrl}/admin/api/2025-01/graphql.json`,
       {
         method: 'POST',
         headers: {
-          'X-Shopify-Access-Token': shopifySettings.access_token,
+          'X-Shopify-Access-Token': accessToken,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -125,10 +143,95 @@ Deno.serve(async (req) => {
       throw new Error(`GraphQL error: ${result.errors.map(e => e.message).join(', ')}`);
     }
 
-    // Check for user errors
+    // Check for user errors - handle "already exists" gracefully
     if (result.data?.fulfillmentServiceCreate?.userErrors?.length) {
       const errors = result.data.fulfillmentServiceCreate.userErrors;
       console.error('User errors:', errors);
+      
+      // If already exists, try to fetch existing service
+      const nameExistsError = errors.find(e => 
+        e.message.toLowerCase().includes('already been taken') || 
+        e.message.toLowerCase().includes('name') && e.message.toLowerCase().includes('taken')
+      );
+      
+      if (nameExistsError) {
+        console.log('Fulfillment service already exists, fetching existing service...');
+        
+        // Query to get existing fulfillment service
+        const getServiceQuery = `
+          query {
+            shop {
+              fulfillmentServices(first: 10) {
+                edges {
+                  node {
+                    id
+                    serviceName
+                    location {
+                      id
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `;
+        
+        const getResponse = await fetch(
+          `https://${storeUrl}/admin/api/2025-01/graphql.json`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Shopify-Access-Token': accessToken,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: getServiceQuery }),
+          }
+        );
+        
+        const getResult = await getResponse.json();
+        const existingService = getResult.data?.shop?.fulfillmentServices?.edges?.find(
+          (edge: any) => edge.node.serviceName === 'Ship Tornado'
+        )?.node;
+        
+        if (existingService) {
+          console.log('Found existing Ship Tornado fulfillment service:', existingService.id);
+          
+          // Use existing service
+          const fulfillmentService = {
+            id: existingService.id,
+            location: {
+              id: existingService.location.id,
+              name: existingService.location.name,
+            }
+          };
+          
+          // Update shopify_stores with existing service
+          if (actualStoreId) {
+            await supabase
+              .from('shopify_stores')
+              .update({ 
+                fulfillment_service_id: existingService.id,
+                fulfillment_service_location_id: existingService.location.id,
+              })
+              .eq('id', actualStoreId);
+          }
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              fulfillmentService: {
+                id: fulfillmentService.id,
+                locationId: fulfillmentService.location.id,
+                locationName: fulfillmentService.location.name,
+                alreadyExisted: true,
+              },
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      
       throw new Error(`Fulfillment service creation failed: ${errors.map(e => e.message).join(', ')}`);
     }
 
@@ -138,32 +241,26 @@ Deno.serve(async (req) => {
       throw new Error('No fulfillment service returned from Shopify');
     }
 
-    // Update company settings with fulfillment service info
-    // Note: We don't store shared_secret - using query-based auth instead
-    const updatedSettings = {
-      ...(companyData.settings || {}),
-      shopify: {
-        ...(companyData.settings?.shopify || {}),
-        fulfillment_service: {
-          id: fulfillmentService.id,
-          location_id: fulfillmentService.location.id,
-          location_name: fulfillmentService.location.name,
-          registered_at: new Date().toISOString(),
-          enabled: true,
-        },
-      },
-    };
+    // Update shopify_stores table with fulfillment service info
+    if (actualStoreId) {
+      const { error: updateError } = await supabase
+        .from('shopify_stores')
+        .update({ 
+          fulfillment_service_id: fulfillmentService.id,
+          fulfillment_service_location_id: fulfillmentService.location.id,
+        })
+        .eq('id', actualStoreId);
 
-    const { error: updateError } = await supabase
-      .from('companies')
-      .update({ settings: updatedSettings })
-      .eq('id', companyId);
-
-    if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Failed to update store with fulfillment service:', updateError);
+        throw updateError;
+      }
+    }
 
     // Log success
     await supabase.from('shopify_sync_logs').insert({
       company_id: companyId,
+      shopify_store_id: actualStoreId,
       sync_type: 'fulfillment_service_registration',
       direction: 'outbound',
       status: 'success',
@@ -204,11 +301,11 @@ Deno.serve(async (req) => {
         `;
 
         const webhookResponse = await fetch(
-          `https://${shopifySettings.store_url}/admin/api/2025-01/graphql.json`,
+          `https://${storeUrl}/admin/api/2025-01/graphql.json`,
           {
             method: 'POST',
             headers: {
-              'X-Shopify-Access-Token': shopifySettings.access_token,
+              'X-Shopify-Access-Token': accessToken,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -239,19 +336,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update company settings with webhook IDs
-    const finalSettings = {
-      ...updatedSettings,
-      shopify: {
-        ...updatedSettings.shopify,
-        webhooks: webhookIds,
-      },
-    };
-
-    await supabase
-      .from('companies')
-      .update({ settings: finalSettings })
-      .eq('id', companyId);
+    // Store webhook IDs in shopify_stores if we have any
+    if (actualStoreId && Object.keys(webhookIds).length > 0) {
+      const { data: currentStore } = await supabase
+        .from('shopify_stores')
+        .select('settings')
+        .eq('id', actualStoreId)
+        .single();
+      
+      await supabase
+        .from('shopify_stores')
+        .update({ 
+          settings: {
+            ...(currentStore?.settings || {}),
+            webhooks: webhookIds,
+          }
+        })
+        .eq('id', actualStoreId);
+    }
 
     console.log('Webhook subscriptions completed:', Object.keys(webhookIds).length);
 
