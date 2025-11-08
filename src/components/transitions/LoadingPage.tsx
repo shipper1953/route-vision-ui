@@ -1,5 +1,5 @@
 
-import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
+import { TigerFistPumpIcon } from "@/components/ui/loading-spinner";
 import { cn } from "@/lib/utils";
 
 interface LoadingPageProps {
@@ -13,8 +13,10 @@ export function LoadingPage({ className }: LoadingPageProps) {
       className
     )}>
       <div className="flex flex-col items-center gap-4">
-        <ShipTornadoLogo size={48} className="text-tms-blue" />
-        <p className="text-muted-foreground">Loading your experience...</p>
+        <TigerFistPumpIcon size={120} className="text-emerald-600" />
+        <p className="text-muted-foreground text-center">
+          Reliving Tiger&apos;s iconic fist pump while we load your experience...
+        </p>
       </div>
     </div>
   );
