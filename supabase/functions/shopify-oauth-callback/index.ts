@@ -242,6 +242,22 @@ serve(async (req) => {
 
     console.log('Shopify OAuth connection successful for company:', companyId);
 
+    // Determine the redirect URL based on referer or use production as fallback
+    const referer = req.headers.get('referer') || '';
+    let appOrigin = 'https://ship-tornado.com';
+    
+    // Extract origin from referer if available
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        appOrigin = refererUrl.origin;
+      } catch (e) {
+        console.warn('Could not parse referer, using default origin:', e);
+      }
+    }
+    
+    const redirectUrl = `${appOrigin}/company-admin?tab=integrations&shopify=connected`;
+
     // Return HTML that communicates with popup opener or redirects
     const successHtml = `
       <!DOCTYPE html>
@@ -271,29 +287,38 @@ serve(async (req) => {
         <body>
           <div class="container">
             <h1 class="success">✓ Shopify Connected!</h1>
-            <p>Returning to Ship Tornado...</p>
+            <p>Closing window...</p>
           </div>
           <script>
-            try {
-              // Try to communicate with popup opener
-              if (window.opener && !window.opener.closed) {
-                window.opener.postMessage({
-                  type: 'shopify-oauth-success',
-                  connected: true
-                }, '*');
-                window.close();
-              } else {
-                // Fallback to redirect if not in popup
+            (function() {
+              try {
+                // Try to communicate with popup opener
+                if (window.opener && !window.opener.closed) {
+                  console.log('Sending success message to opener');
+                  window.opener.postMessage({
+                    type: 'shopify-oauth-success',
+                    connected: true
+                  }, '*');
+                  
+                  // Close after short delay to ensure message is sent
+                  setTimeout(() => {
+                    window.close();
+                  }, 100);
+                } else {
+                  console.log('No opener found, redirecting');
+                  // Fallback to redirect if not in popup
+                  setTimeout(() => {
+                    window.location.href = '${redirectUrl}';
+                  }, 1500);
+                }
+              } catch (e) {
+                console.error('Error in callback script:', e);
+                // Fallback to redirect on error
                 setTimeout(() => {
-                  window.location.href = 'https://ship-tornado.com/company-admin?tab=integrations&shopify=connected';
+                  window.location.href = '${redirectUrl}';
                 }, 1500);
               }
-            } catch (e) {
-              // Fallback to redirect on error
-              setTimeout(() => {
-                window.location.href = 'https://ship-tornado.com/company-admin?tab=integrations&shopify=connected';
-              }, 1500);
-            }
+            })();
           </script>
         </body>
       </html>
@@ -308,6 +333,21 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('OAuth callback error:', error);
+    
+    // Determine the redirect URL based on referer or use production as fallback
+    const referer = req.headers.get('referer') || '';
+    let appOrigin = 'https://ship-tornado.com';
+    
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        appOrigin = refererUrl.origin;
+      } catch (e) {
+        console.warn('Could not parse referer for error redirect');
+      }
+    }
+    
+    const errorRedirectUrl = `${appOrigin}/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}`;
     
     // Return HTML that communicates error to popup opener or redirects
     const errorHtml = `
@@ -339,26 +379,34 @@ serve(async (req) => {
           <div class="container">
             <h1 class="error">✗ Connection Failed</h1>
             <p>${error.message}</p>
-            <p>Returning to Ship Tornado...</p>
+            <p>Closing window...</p>
           </div>
           <script>
-            try {
-              if (window.opener && !window.opener.closed) {
-                window.opener.postMessage({
-                  type: 'shopify-oauth-error',
-                  error: '${error.message.replace(/'/g, "\\'")}'
-                }, '*');
-                window.close();
-              } else {
+            (function() {
+              try {
+                if (window.opener && !window.opener.closed) {
+                  console.log('Sending error message to opener');
+                  window.opener.postMessage({
+                    type: 'shopify-oauth-error',
+                    error: '${error.message.replace(/'/g, "\\'")}'
+                  }, '*');
+                  
+                  setTimeout(() => {
+                    window.close();
+                  }, 100);
+                } else {
+                  console.log('No opener found, redirecting to error page');
+                  setTimeout(() => {
+                    window.location.href = '${errorRedirectUrl}';
+                  }, 2000);
+                }
+              } catch (e) {
+                console.error('Error in callback error script:', e);
                 setTimeout(() => {
-                  window.location.href = 'https://ship-tornado.com/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}';
+                  window.location.href = '${errorRedirectUrl}';
                 }, 2000);
               }
-            } catch (e) {
-              setTimeout(() => {
-                window.location.href = 'https://ship-tornado.com/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}';
-              }, 2000);
-            }
+            })();
           </script>
         </body>
       </html>
