@@ -341,12 +341,25 @@ Deno.serve(async (req) => {
           : 'shopify_store_id.is.null'
       ].join(',');
 
-      const { data: existing } = await supabase
+      const {
+        data: existingMatches,
+        error: existingMatchesError,
+      } = await supabase
         .from('shopify_fulfillment_orders')
         .select('id, shopify_store_id, company_id')
         .eq('fulfillment_order_id', fulfillmentOrderId)
-        .or(fallbackConditions)
-        .maybeSingle();
+        .or(fallbackConditions);
+
+      if (existingMatchesError) {
+        console.error(
+          '⚠️  Error checking existing fulfillment order matches:',
+          existingMatchesError
+        );
+      }
+
+      const existing = existingMatches?.find(
+        (match) => match.shopify_store_id === store.id
+      ) || existingMatches?.[0];
 
       if (existing) {
         console.log(`⏭️  Fulfillment order ${fulfillmentOrderId} already processed, skipping`);
