@@ -1,5 +1,6 @@
 
 import { useAuth } from "@/hooks/useAuth";
+import { LoadingPage } from "@/components/transitions/LoadingPage";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -22,14 +23,7 @@ const AdminPanel = () => {
   }, [isAuthenticated, isSuperAdmin, isCompanyAdmin, loading, navigate]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen bg-background items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tms-navy mx-auto mb-4"></div>
-          <p>Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingPage />;
   }
 
   return null;

@@ -2,6 +2,7 @@
 import { TmsSidebar } from "./TmsSidebar";
 import { TmsHeader } from "./TmsHeader";
 import { PageTransition } from "@/components/transitions/PageTransition";
+import { LoadingPage } from "@/components/transitions/LoadingPage";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,14 +26,7 @@ export function TmsLayout({ children }: TmsLayoutProps) {
 
   // Show loading while checking authentication
   if (loading) {
-    return (
-      <div className="flex min-h-screen bg-background items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tms-navy mx-auto mb-4"></div>
-          <p>Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingPage />;
   }
 
   // Don't render layout if not authenticated

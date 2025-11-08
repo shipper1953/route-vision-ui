@@ -1,5 +1,6 @@
 
 import { TmsLayout } from "@/components/layout/TmsLayout";
+import { LoadingPage } from "@/components/transitions/LoadingPage";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { 
@@ -18,13 +19,7 @@ const CreateUser = () => {
   
   // Show loading state while checking auth
   if (authLoading) {
-    return (
-      <TmsLayout>
-        <div className="flex items-center justify-center min-h-64">
-          <div>Loading...</div>
-        </div>
-      </TmsLayout>
-    );
+    return <LoadingPage />;
   }
 
   // Redirect non-admin users
