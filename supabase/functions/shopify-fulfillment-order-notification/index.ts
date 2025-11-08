@@ -5,8 +5,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-shop-domain',
 };
 
+interface FulfillmentOrderReference {
+  id?: number | string;
+  admin_graphql_api_id?: string;
+  order_id?: number | string;
+}
+
+interface FulfillmentRequestPayload {
+  message?: string;
+  fulfillment_order: FulfillmentOrderReference;
+}
+
 interface FulfillmentServiceCallback {
   kind: 'FULFILLMENT_REQUEST' | 'CANCELLATION_REQUEST' | 'FULFILLMENT_REQUEST_HOLD' | 'FULFILLMENT_REQUEST_RELEASE_HOLD';
+  fulfillment_request?: FulfillmentRequestPayload;
+  cancellation_request?: FulfillmentRequestPayload;
 }
 
 async function fetchAssignedFulfillmentOrders(
@@ -191,6 +204,68 @@ async function acceptFulfillmentOrder(
   }
   
   return result.data.fulfillmentOrderAcceptFulfillmentRequest.fulfillmentOrder;
+}
+
+async function acceptFulfillmentOrderCancellation(
+  shopifySettings: { store_url: string; access_token: string },
+  fulfillmentOrderId: string,
+  message?: string
+) {
+  const mutation = `
+    mutation fulfillmentOrderAcceptCancellationRequest($id: ID!, $message: String) {
+      fulfillmentOrderAcceptCancellationRequest(id: $id, message: $message) {
+        fulfillmentOrder {
+          id
+          status
+          requestStatus
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    id: fulfillmentOrderId,
+    message: message || 'Cancellation accepted by Ship Tornado',
+  };
+
+  const response = await fetch(
+    `https://${shopifySettings.store_url}/admin/api/2025-01/graphql.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifySettings.access_token,
+      },
+      body: JSON.stringify({ query: mutation, variables }),
+    }
+  );
+
+  const result = await response.json();
+
+  if (result.errors || result.data?.fulfillmentOrderAcceptCancellationRequest?.userErrors?.length > 0) {
+    throw new Error(
+      `Failed to accept cancellation request: ${JSON.stringify(
+        result.errors || result.data.fulfillmentOrderAcceptCancellationRequest.userErrors
+      )}`
+    );
+  }
+
+  return result.data.fulfillmentOrderAcceptCancellationRequest.fulfillmentOrder;
+}
+
+function extractFulfillmentOrderGid(reference?: FulfillmentOrderReference): string | null {
+  if (!reference) return null;
+  if (reference.admin_graphql_api_id) {
+    return reference.admin_graphql_api_id;
+  }
+  if (reference.id) {
+    return `gid://shopify/FulfillmentOrder/${reference.id}`;
+  }
+  return null;
 }
 
 // ========== INLINED SHARED UTILITIES ==========
@@ -422,17 +497,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Only handle fulfillment_request kind
     const normalizedKind = webhook.kind?.toLowerCase();
-    if (normalizedKind !== 'fulfillment_request') {
-      console.log(`Received callback kind: ${webhook.kind} - not processing`);
-      return new Response(
-        JSON.stringify({ message: `Callback kind ${webhook.kind} acknowledged` }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('✅ Fulfillment request callback validated');
 
     // Find company by shop domain
     const { data: companies } = await supabase
@@ -462,6 +527,143 @@ Deno.serve(async (req) => {
     // Query-based authentication: We have a valid OAuth token from company settings
     // This proves authorization since only authenticated companies can connect Shopify
     console.log('🔐 Using query-based authentication (OAuth token validated)');
+
+    // Handle cancellation requests before processing fulfillment requests
+    if (normalizedKind === 'cancellation_request') {
+      const cancellationRequest = webhook.cancellation_request;
+
+      if (!cancellationRequest?.fulfillment_order) {
+        console.error('Cancellation request missing fulfillment order payload');
+        return new Response(
+          JSON.stringify({ error: 'Missing fulfillment order information for cancellation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const fulfillmentOrderId = extractFulfillmentOrderGid(cancellationRequest.fulfillment_order);
+
+      if (!fulfillmentOrderId) {
+        console.error('Unable to determine fulfillment order ID for cancellation');
+        return new Response(
+          JSON.stringify({ error: 'Invalid fulfillment order ID for cancellation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const cancellationMessage = sanitizeString(cancellationRequest.message, 500);
+
+      let acceptanceResult;
+      try {
+        acceptanceResult = await acceptFulfillmentOrderCancellation(
+          shopifySettings,
+          fulfillmentOrderId,
+          cancellationMessage ? `Cancellation accepted: ${cancellationMessage}` : undefined
+        );
+        console.log(`✅ Accepted cancellation for fulfillment order ${fulfillmentOrderId}`);
+      } catch (acceptError) {
+        console.error('Failed to accept cancellation request:', acceptError);
+
+        await supabase.from('shopify_sync_logs').insert({
+          company_id: company.id,
+          sync_type: 'fulfillment_order_cancellation',
+          direction: 'inbound',
+          status: 'error',
+          error_message: acceptError.message,
+          metadata: {
+            fulfillment_order_id: fulfillmentOrderId,
+            message: cancellationMessage,
+          },
+        });
+
+        return new Response(
+          JSON.stringify({
+            cancellation_request: {
+              status: 'rejected',
+              message: 'Failed to accept cancellation request',
+            },
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: fulfillmentOrderRecord } = await supabase
+        .from('shopify_fulfillment_orders')
+        .select('id, shopify_order_id, ship_tornado_order_id, metadata')
+        .eq('company_id', company.id)
+        .eq('fulfillment_order_id', fulfillmentOrderId)
+        .maybeSingle();
+
+      let shopifyOrderId: string | null = null;
+      let shipTornadoOrderId: number | null = null;
+
+      if (fulfillmentOrderRecord) {
+        shopifyOrderId = fulfillmentOrderRecord.shopify_order_id;
+        shipTornadoOrderId = fulfillmentOrderRecord.ship_tornado_order_id;
+
+        const updatedMetadata = {
+          ...(fulfillmentOrderRecord.metadata || {}),
+          cancellation_message: cancellationMessage,
+          cancellation_received_at: new Date().toISOString(),
+          cancellation_source: 'callback',
+        };
+
+        await supabase
+          .from('shopify_fulfillment_orders')
+          .update({
+            status: acceptanceResult?.status || 'cancelled',
+            request_status: acceptanceResult?.requestStatus || 'cancellation_accepted',
+            metadata: updatedMetadata,
+          })
+          .eq('id', fulfillmentOrderRecord.id);
+
+        if (shipTornadoOrderId) {
+          await supabase
+            .from('orders')
+            .update({ status: 'cancelled' })
+            .eq('id', shipTornadoOrderId);
+
+          await supabase
+            .from('shopify_order_mappings')
+            .update({ sync_status: 'cancelled' })
+            .eq('company_id', company.id)
+            .eq('ship_tornado_order_id', shipTornadoOrderId);
+        }
+      }
+
+      await supabase.from('shopify_sync_logs').insert({
+        company_id: company.id,
+        sync_type: 'fulfillment_order_cancellation',
+        direction: 'inbound',
+        status: fulfillmentOrderRecord ? 'success' : 'warning',
+        shopify_order_id: shopifyOrderId,
+        ship_tornado_order_id: shipTornadoOrderId,
+        error_message: fulfillmentOrderRecord ? null : 'Fulfillment order not found locally',
+        metadata: {
+          fulfillment_order_id: fulfillmentOrderId,
+          message: cancellationMessage,
+        },
+      });
+
+      return new Response(
+        JSON.stringify({
+          cancellation_request: {
+            status: 'accepted',
+            message: `Cancellation accepted for fulfillment order ${fulfillmentOrderId}`,
+          },
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (normalizedKind !== 'fulfillment_request') {
+      console.log(`Received callback kind: ${webhook.kind} - not processing`);
+      return new Response(
+        JSON.stringify({ message: `Callback kind ${webhook.kind} acknowledged` }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('✅ Fulfillment request callback validated');
 
     // Query Shopify for fulfillment orders
     console.log('🔍 Querying Shopify for fulfillment orders...');

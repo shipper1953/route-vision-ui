@@ -20,6 +20,8 @@ const ShopifyOrderSchema = z.object({
   ),
   currency: z.string().max(3).optional(),
   created_at: z.string().optional(),
+  cancel_reason: z.string().max(255).optional().nullable(),
+  cancelled_at: z.string().optional().nullable(),
   customer: z.object({
     id: z.union([z.number(), z.string()]).optional(),
     email: z.string().email().max(255).optional().nullable(),
@@ -107,7 +109,7 @@ serve(async (req) => {
     
     // Validate webhook data for orders
     let validatedOrder;
-    if (topic === 'orders/create' || topic === 'orders/updated') {
+    if (topic === 'orders/create' || topic === 'orders/updated' || topic === 'orders/cancelled') {
       try {
         validatedOrder = ShopifyOrderSchema.parse(webhookData);
       } catch (validationError) {
@@ -167,9 +169,131 @@ serve(async (req) => {
 
     console.log('✅ HMAC signature verified successfully');
 
+    if (topic === 'orders/cancelled' && validatedOrder) {
+      const shopifyOrderId = webhookData.id ? String(webhookData.id) : validatedOrder.id;
+      const shopifyOrderNumber = validatedOrder.order_number;
+      const cancellationReason = sanitizeString(
+        (webhookData.cancel_reason || validatedOrder.cancel_reason) ?? null,
+        255
+      );
+      const cancelledAt = webhookData.cancelled_at || validatedOrder.cancelled_at || new Date().toISOString();
+
+      console.log('🛑 Processing Shopify order cancellation', {
+        shopifyOrderId,
+        shopifyOrderNumber,
+        cancellationReason,
+      });
+
+      const { data: mapping } = await supabase
+        .from('shopify_order_mappings')
+        .select('ship_tornado_order_id')
+        .eq('company_id', companyId)
+        .eq('shopify_order_id', shopifyOrderId)
+        .maybeSingle();
+
+      let shipTornadoOrderId = mapping?.ship_tornado_order_id as number | null | undefined;
+
+      if (!shipTornadoOrderId) {
+        const { data: fallbackOrder } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('order_id', `SHOP-${shopifyOrderNumber}`)
+          .maybeSingle();
+
+        shipTornadoOrderId = fallbackOrder?.id ?? null;
+      }
+
+      let logStatus: 'success' | 'warning' | 'error' = shipTornadoOrderId ? 'success' : 'warning';
+      let errorMessage: string | null = shipTornadoOrderId
+        ? null
+        : 'No Ship Tornado order found for Shopify cancellation';
+
+      if (shipTornadoOrderId) {
+        const { error: orderUpdateError } = await supabase
+          .from('orders')
+          .update({ status: 'cancelled' })
+          .eq('id', shipTornadoOrderId);
+
+        if (orderUpdateError) {
+          console.error('Failed to update order status for cancellation:', orderUpdateError);
+          logStatus = 'error';
+          errorMessage = `Failed to update order status: ${orderUpdateError.message}`;
+        }
+
+        const { error: mappingUpdateError } = await supabase
+          .from('shopify_order_mappings')
+          .update({ sync_status: 'cancelled' })
+          .eq('company_id', companyId)
+          .eq('ship_tornado_order_id', shipTornadoOrderId);
+
+        if (mappingUpdateError) {
+          console.error('Failed to update Shopify order mapping status:', mappingUpdateError);
+          logStatus = 'error';
+          errorMessage = `Failed to update order mapping: ${mappingUpdateError.message}`;
+        }
+      }
+
+      const { data: fulfillmentOrderRecord } = await supabase
+        .from('shopify_fulfillment_orders')
+        .select('id, metadata, fulfillment_order_id')
+        .eq('company_id', companyId)
+        .eq('shopify_order_id', shopifyOrderId)
+        .maybeSingle();
+
+      let fulfillmentOrderId: string | null = null;
+
+      if (fulfillmentOrderRecord) {
+        fulfillmentOrderId = fulfillmentOrderRecord.fulfillment_order_id;
+        const updatedMetadata = {
+          ...(fulfillmentOrderRecord.metadata || {}),
+          cancellation_reason: cancellationReason,
+          cancellation_source: 'orders/cancelled_webhook',
+          cancellation_received_at: cancelledAt,
+          cancellation_processed_at: new Date().toISOString(),
+        };
+
+        const { error: fulfillmentUpdateError } = await supabase
+          .from('shopify_fulfillment_orders')
+          .update({
+            status: 'cancelled',
+            request_status: 'cancellation_received',
+            metadata: updatedMetadata,
+          })
+          .eq('id', fulfillmentOrderRecord.id);
+
+        if (fulfillmentUpdateError) {
+          console.error('Failed to update fulfillment order cancellation status:', fulfillmentUpdateError);
+          logStatus = 'error';
+          errorMessage = `Failed to update fulfillment order: ${fulfillmentUpdateError.message}`;
+        }
+      }
+
+      await supabase.from('shopify_sync_logs').insert({
+        company_id: companyId,
+        sync_type: 'order_cancellation',
+        direction: 'inbound',
+        status: logStatus,
+        shopify_order_id: shopifyOrderId,
+        ship_tornado_order_id: shipTornadoOrderId ?? null,
+        error_message: errorMessage,
+        metadata: {
+          cancellation_reason: cancellationReason,
+          cancelled_at: cancelledAt,
+          shopify_order_number: shopifyOrderNumber,
+          fulfillment_order_id: fulfillmentOrderId,
+        },
+      });
+
+      return new Response(JSON.stringify({ message: 'Order cancellation processed' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
     // NOTE: orders/create webhook removed - orders now sync on fulfillment request only
     // See shopify-fulfillment-order-notification function for order creation logic
-    
+
     return new Response(JSON.stringify({ message: 'Webhook received' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
