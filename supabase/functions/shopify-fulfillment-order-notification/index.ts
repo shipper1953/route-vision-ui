@@ -1,4 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  addBusinessDays,
+  ensureItemExists,
+  sanitizeString,
+} from '../_shared/shopify-item-matcher.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -221,159 +226,6 @@ function convertStateToCode(stateName: string | null | undefined): string {
   return STATE_NAME_TO_CODE[normalized] || stateName.slice(0, 10);
 }
 
-// Sanitization helper to prevent injection attacks
-function sanitizeString(str: string | null | undefined, maxLength: number = 255): string | null {
-  if (!str) return null;
-  return str.trim().slice(0, maxLength);
-}
-
-// Utility function to add business days (skip weekends)
-function addBusinessDays(startDate: Date, daysToAdd: number): Date {
-  const result = new Date(startDate);
-  let addedDays = 0;
-  
-  while (addedDays < daysToAdd) {
-    result.setDate(result.getDate() + 1);
-    // Skip weekends (0 = Sunday, 6 = Saturday)
-    if (result.getDay() !== 0 && result.getDay() !== 6) {
-      addedDays++;
-    }
-  }
-  
-  return result;
-}
-
-// Helper function to find/create item with Shopify ID matching
-async function ensureItemExists(
-  supabase: any,
-  companyId: string,
-  lineItem: any
-): Promise<{ id: string; details: any }> {
-  // PRIORITY 1: Try to match by variant_id (most specific)
-  if (lineItem.variant_id) {
-    const { data: variantMatch } = await supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight')
-      .eq('company_id', companyId)
-      .eq('shopify_variant_id', lineItem.variant_id.toString())
-      .maybeSingle();
-    
-    if (variantMatch) {
-      console.log(`✅ Matched by variant_id: ${lineItem.variant_id}`);
-      
-      // Backfill Shopify IDs if missing
-      if (!variantMatch.shopify_variant_id || !variantMatch.shopify_product_id) {
-        await supabase
-          .from('items')
-          .update({
-            shopify_product_id: lineItem.product_id?.toString() || null,
-            shopify_variant_id: lineItem.variant_id?.toString() || null
-          })
-          .eq('id', variantMatch.id);
-        console.log(`🔄 Backfilled Shopify IDs for item ${variantMatch.sku}`);
-      }
-      
-      return { id: variantMatch.id, details: variantMatch };
-    }
-  }
-  
-  // PRIORITY 2: Try to match by product_id
-  if (lineItem.product_id) {
-    const { data: productMatch } = await supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight')
-      .eq('company_id', companyId)
-      .eq('shopify_product_id', lineItem.product_id.toString())
-      .maybeSingle();
-    
-    if (productMatch) {
-      console.log(`✅ Matched by product_id: ${lineItem.product_id}`);
-      
-      // Backfill Shopify IDs if missing
-      if (!productMatch.shopify_variant_id || !productMatch.shopify_product_id) {
-        await supabase
-          .from('items')
-          .update({
-            shopify_product_id: lineItem.product_id?.toString() || null,
-            shopify_variant_id: lineItem.variant_id?.toString() || null
-          })
-          .eq('id', productMatch.id);
-        console.log(`🔄 Backfilled Shopify IDs for item ${productMatch.sku}`);
-      }
-      
-      return { id: productMatch.id, details: productMatch };
-    }
-  }
-  
-  // PRIORITY 3: Fallback to SKU matching
-  if (lineItem.sku) {
-    const { data: skuMatch } = await supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight')
-      .eq('company_id', companyId)
-      .eq('sku', lineItem.sku)
-      .maybeSingle();
-    
-    if (skuMatch) {
-      console.log(`✅ Matched by SKU: ${lineItem.sku}`);
-      
-      // Backfill Shopify IDs if missing
-      if (!skuMatch.shopify_variant_id || !skuMatch.shopify_product_id) {
-        await supabase
-          .from('items')
-          .update({
-            shopify_product_id: lineItem.product_id?.toString() || null,
-            shopify_variant_id: lineItem.variant_id?.toString() || null
-          })
-          .eq('id', skuMatch.id);
-        console.log(`🔄 Backfilled Shopify IDs for item ${skuMatch.sku}`);
-      }
-      
-      return { id: skuMatch.id, details: skuMatch };
-    }
-  }
-  
-  // PRIORITY 4: Create new item
-  console.log(`📦 Creating new item for product_id: ${lineItem.product_id}, variant_id: ${lineItem.variant_id}`);
-  
-  const sku = sanitizeString(lineItem.sku || `SHOP-${lineItem.variant_id || lineItem.product_id}`, 100);
-  
-  let weightInLbs = 0.125;
-  if (lineItem.grams && lineItem.grams > 0) {
-    weightInLbs = lineItem.grams / 453.592;
-  }
-  
-  const itemData = {
-    company_id: companyId,
-    sku: sku,
-    name: sanitizeString(lineItem.name || lineItem.title, 255),
-    category: 'Shopify Product',
-    is_active: true,
-    length: 12,
-    width: 12,
-    height: 12,
-    weight: weightInLbs,
-    shopify_product_id: lineItem.product_id?.toString() || null,
-    shopify_variant_id: lineItem.variant_id?.toString() || null
-  };
-  
-  const { data: newItem, error: itemError } = await supabase
-    .from('items')
-    .insert(itemData)
-    .select('id, sku, name, length, width, height, weight')
-    .single();
-  
-  if (itemError) {
-    console.error('Error creating item:', itemError);
-    throw new Error(`Failed to create item: ${itemError.message}`);
-  }
-  
-  console.log(`✅ Created item: ${sku} with Shopify IDs`);
-  return { id: newItem.id, details: newItem };
-}
-
-// ========== END INLINED UTILITIES ==========
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -434,34 +286,33 @@ Deno.serve(async (req) => {
 
     console.log('✅ Fulfillment request callback validated');
 
-    // Find company by shop domain
-    const { data: companies } = await supabase
-      .from('companies')
-      .select('id, settings')
-      .ilike('settings->shopify->>store_url', `%${shopDomain}%`);
+    // Find connected store by shop domain
+    const { data: store, error: storeError } = await supabase
+      .from('shopify_stores')
+      .select('id, company_id, customer_id, access_token, store_url, fulfillment_service_location_id, settings')
+      .eq('store_url', shopDomain)
+      .eq('is_active', true)
+      .single();
 
-    if (!companies || companies.length === 0) {
-      console.error('No company found for shop:', shopDomain);
+    if (storeError || !store) {
+      console.error('No active Shopify store found for domain:', shopDomain, storeError);
       return new Response(
-        JSON.stringify({ error: 'Company not found' }),
+        JSON.stringify({ error: 'Shopify store not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const company = companies[0];
-    const shopifySettings = company.settings?.shopify;
+    const shopifySettings = {
+      store_url: store.store_url,
+      access_token: store.access_token,
+    };
 
-    if (!shopifySettings?.access_token) {
-      console.error('Missing Shopify credentials');
-      return new Response(
-        JSON.stringify({ error: 'Shopify credentials not configured' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const fulfillmentLocationId =
+      store.fulfillment_service_location_id ||
+      store.settings?.fulfillment_service?.location_id ||
+      null;
 
-    // Query-based authentication: We have a valid OAuth token from company settings
-    // This proves authorization since only authenticated companies can connect Shopify
-    console.log('🔐 Using query-based authentication (OAuth token validated)');
+    console.log('🔐 Using query-based authentication (store token validated)');
 
     // Query Shopify for fulfillment orders
     console.log('🔍 Querying Shopify for fulfillment orders...');
@@ -469,15 +320,15 @@ Deno.serve(async (req) => {
 
     console.log(`📦 Found ${fulfillmentOrders.length} fulfillment orders`);
 
-    const processedFulfillmentOrderIds = [];
-
-    // Get default warehouse
+    // Get default warehouse for the store's company
     const { data: warehouse } = await supabase
       .from('warehouses')
       .select('id')
-      .eq('company_id', company.id)
+      .eq('company_id', store.company_id)
       .eq('is_default', true)
-      .single();
+      .maybeSingle();
+
+    const processedFulfillmentOrderIds: Array<{ id: string; status: string }> = [];
 
     for (const fo of fulfillmentOrders) {
       // Check if we've already processed this fulfillment order
@@ -486,8 +337,8 @@ Deno.serve(async (req) => {
         .from('shopify_fulfillment_orders')
         .select('id')
         .eq('fulfillment_order_id', fulfillmentOrderId)
-        .eq('company_id', company.id)
-        .single();
+        .eq('shopify_store_id', store.id)
+        .maybeSingle();
 
       if (existing) {
         console.log(`⏭️  Fulfillment order ${fulfillmentOrderId} already processed, skipping`);
@@ -537,7 +388,13 @@ Deno.serve(async (req) => {
         };
 
         try {
-          const { id: itemId, details } = await ensureItemExists(supabase, company.id, lineItemData);
+          const { id: itemId, details } = await ensureItemExists(
+            supabase,
+            store.company_id,
+            lineItemData,
+            store.id,
+            store.customer_id
+          );
           
           if (details.shopify_variant_id === variantIdNum?.toString() || 
               details.shopify_product_id === productIdNum?.toString() ||
@@ -597,7 +454,8 @@ Deno.serve(async (req) => {
         order_date: fo.order.createdAt,
         required_delivery_date: addBusinessDays(new Date(fo.order.createdAt), 5).toISOString().split('T')[0],
         status: 'ready_to_ship',
-        company_id: company.id,
+        company_id: store.company_id,
+        customer_id: store.customer_id || null,
         warehouse_id: warehouse?.id || null,
         user_id: null,
       };
@@ -612,7 +470,8 @@ Deno.serve(async (req) => {
         console.error('Error creating order:', orderError);
         // Log error but continue processing other orders
         await supabase.from('shopify_sync_logs').insert({
-          company_id: company.id,
+          company_id: store.company_id,
+          shopify_store_id: store.id,
           sync_type: 'fulfillment_order_notification',
           direction: 'inbound',
           status: 'error',
@@ -627,10 +486,11 @@ Deno.serve(async (req) => {
 
       // Create mappings
       await supabase.from('shopify_order_mappings').insert({
-        company_id: company.id,
+        company_id: store.company_id,
         ship_tornado_order_id: newOrder.id,
         shopify_order_id: shopifyOrderId,
         shopify_order_number: shopifyOrderNumber,
+        shopify_store_id: store.id,
         sync_status: 'synced',
       });
 
@@ -654,7 +514,7 @@ Deno.serve(async (req) => {
       });
 
       await supabase.from('shopify_fulfillment_orders').insert({
-        company_id: company.id,
+        company_id: store.company_id,
         ship_tornado_order_id: newOrder.id,
         shopify_order_id: shopifyOrderId,
         fulfillment_order_id: fulfillmentOrderId,
@@ -662,8 +522,9 @@ Deno.serve(async (req) => {
         status: fo.status,
         request_status: fo.requestStatus,
         line_items: enrichedFulfillmentLineItems,
-        assigned_location_id: shopifySettings.fulfillment_service_location_id,
+        assigned_location_id: fulfillmentLocationId,
         destination: fo.destination,
+        shopify_store_id: store.id,
       });
 
       // Accept the fulfillment order in Shopify
@@ -684,13 +545,15 @@ Deno.serve(async (req) => {
             status: acceptedFO.status,
             request_status: acceptedFO.requestStatus,
           })
-          .eq('fulfillment_order_id', fulfillmentOrderId);
+          .eq('fulfillment_order_id', fulfillmentOrderId)
+          .eq('shopify_store_id', store.id);
           
       } catch (acceptError) {
         console.error(`⚠️  Failed to accept fulfillment order ${fulfillmentOrderId}:`, acceptError);
         // Log but don't fail - the order was created successfully
         await supabase.from('shopify_sync_logs').insert({
-          company_id: company.id,
+          company_id: store.company_id,
+          shopify_store_id: store.id,
           sync_type: 'fulfillment_order_acceptance',
           direction: 'outbound',
           status: 'error',
@@ -703,7 +566,8 @@ Deno.serve(async (req) => {
 
       // Log success
       await supabase.from('shopify_sync_logs').insert({
-        company_id: company.id,
+        company_id: store.company_id,
+        shopify_store_id: store.id,
         sync_type: 'fulfillment_order_notification',
         direction: 'inbound',
         status: 'success',

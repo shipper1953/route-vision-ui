@@ -24,11 +24,11 @@ export async function shopifyGraphQL(
   }
 
   const result = await response.json();
-  
+
   if (result.errors) {
     throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
   }
-  
+
   return result;
 }
 
@@ -42,7 +42,7 @@ export function sanitizeString(str: string | null | undefined, maxLength: number
 export function addBusinessDays(startDate: Date, daysToAdd: number): Date {
   const result = new Date(startDate);
   let addedDays = 0;
-  
+
   while (addedDays < daysToAdd) {
     result.setDate(result.getDate() + 1);
     // Skip weekends (0 = Sunday, 6 = Saturday)
@@ -50,8 +50,60 @@ export function addBusinessDays(startDate: Date, daysToAdd: number): Date {
       addedDays++;
     }
   }
-  
+
   return result;
+}
+
+type ItemMatch = {
+  id: string;
+  sku: string;
+  name: string;
+  length: number;
+  width: number;
+  height: number;
+  weight: number;
+  shopify_store_id?: string | null;
+  shopify_variant_id?: string | null;
+  shopify_product_id?: string | null;
+  customer_id?: string | null;
+};
+
+async function findItem(
+  supabase: SupabaseClient,
+  filters: Record<string, string | number | boolean>
+): Promise<ItemMatch | null> {
+  let query = supabase
+    .from('items')
+    .select(
+      'id, sku, name, length, width, height, weight, shopify_store_id, shopify_variant_id, shopify_product_id, customer_id'
+    );
+
+  for (const [column, value] of Object.entries(filters)) {
+    query = query.eq(column, value);
+  }
+
+  const { data } = await query.maybeSingle();
+  return data ?? null;
+}
+
+function belongsToCustomer(item: ItemMatch, customerId: string | null | undefined): boolean {
+  if (!item.customer_id) return true;
+  if (!customerId) return false;
+  return item.customer_id === customerId;
+}
+
+function prepareUpdate(update: Record<string, string | null | undefined>): Record<string, string | null> {
+  const payload: Record<string, string | null> = {};
+  for (const [key, value] of Object.entries(update)) {
+    if (value !== undefined) {
+      payload[key] = value;
+    }
+  }
+  return payload;
+}
+
+function applyDetails(item: ItemMatch, update: Record<string, string | null>): ItemMatch {
+  return { ...item, ...update };
 }
 
 // Helper function to find/create item with Shopify ID matching
@@ -59,168 +111,240 @@ export async function ensureItemExists(
   supabase: SupabaseClient,
   companyId: string,
   lineItem: any,
-  shopifyStoreId?: string
-): Promise<{ id: string; details: any }> {
+  shopifyStoreId?: string | null,
+  customerId?: string | null
+): Promise<{ id: string; details: ItemMatch }> {
   // PRIORITY 1: Try to match by variant_id (most specific)
   if (lineItem.variant_id) {
-    const query = supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight')
-      .eq('company_id', companyId)
-      .eq('shopify_variant_id', lineItem.variant_id.toString());
-    
-    // If store ID provided, prefer store-specific items
     if (shopifyStoreId) {
-      const { data: storeMatch } = await query
-        .eq('shopify_store_id', shopifyStoreId)
-        .maybeSingle();
-      
-      if (storeMatch) {
+      const storeMatch = await findItem(supabase, {
+        company_id: companyId,
+        shopify_variant_id: lineItem.variant_id.toString(),
+        shopify_store_id: shopifyStoreId,
+      });
+
+      if (storeMatch && belongsToCustomer(storeMatch, customerId)) {
         console.log(`✅ Matched by variant_id + store: ${lineItem.variant_id}`);
-        return { id: storeMatch.id, details: storeMatch };
+
+        const update = prepareUpdate({
+          shopify_product_id: storeMatch.shopify_product_id || lineItem.product_id?.toString() || null,
+          shopify_variant_id: storeMatch.shopify_variant_id || lineItem.variant_id?.toString() || null,
+          customer_id: storeMatch.customer_id || customerId || null,
+        });
+
+        if (Object.keys(update).length > 0) {
+          await supabase.from('items').update(update).eq('id', storeMatch.id);
+        }
+
+        return { id: storeMatch.id, details: applyDetails(storeMatch, update) };
       }
     }
-    
-    // Fallback to any item with this variant (shared items)
-    const { data: variantMatch } = await query.maybeSingle();
-    
-    if (variantMatch) {
+
+    if (customerId) {
+      const customerMatch = await findItem(supabase, {
+        company_id: companyId,
+        shopify_variant_id: lineItem.variant_id.toString(),
+        customer_id: customerId,
+      });
+
+      if (customerMatch) {
+        console.log(`✅ Matched by variant_id + customer: ${lineItem.variant_id}`);
+
+        const update = prepareUpdate({
+          shopify_product_id: customerMatch.shopify_product_id || lineItem.product_id?.toString() || null,
+          shopify_variant_id: customerMatch.shopify_variant_id || lineItem.variant_id?.toString() || null,
+          shopify_store_id: customerMatch.shopify_store_id || shopifyStoreId || null,
+        });
+
+        if (Object.keys(update).length > 0) {
+          await supabase.from('items').update(update).eq('id', customerMatch.id);
+        }
+
+        return { id: customerMatch.id, details: applyDetails(customerMatch, update) };
+      }
+    }
+
+    const variantMatch = await findItem(supabase, {
+      company_id: companyId,
+      shopify_variant_id: lineItem.variant_id.toString(),
+    });
+
+    if (variantMatch && belongsToCustomer(variantMatch, customerId)) {
       console.log(`✅ Matched by variant_id: ${lineItem.variant_id}`);
-      
-      // Backfill Shopify IDs and store ID if missing
-      if (!variantMatch.shopify_variant_id || !variantMatch.shopify_product_id || !variantMatch.shopify_store_id) {
-        await supabase
-          .from('items')
-          .update({
-            shopify_product_id: lineItem.product_id?.toString() || null,
-            shopify_variant_id: lineItem.variant_id?.toString() || null,
-            shopify_store_id: shopifyStoreId || null,
-          })
-          .eq('id', variantMatch.id);
+
+      const update = prepareUpdate({
+        shopify_product_id: variantMatch.shopify_product_id || lineItem.product_id?.toString() || null,
+        shopify_variant_id: variantMatch.shopify_variant_id || lineItem.variant_id?.toString() || null,
+        shopify_store_id: variantMatch.shopify_store_id || shopifyStoreId || null,
+        customer_id: variantMatch.customer_id || customerId || null,
+      });
+
+      if (Object.keys(update).length > 0) {
+        await supabase.from('items').update(update).eq('id', variantMatch.id);
         console.log(`🔄 Backfilled Shopify IDs for item ${variantMatch.sku}`);
       }
-      
-      return { id: variantMatch.id, details: variantMatch };
+
+      return { id: variantMatch.id, details: applyDetails(variantMatch, update) };
     }
   }
-  
+
   // PRIORITY 2: Try to match by product_id
   if (lineItem.product_id) {
-    const query = supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight')
-      .eq('company_id', companyId)
-      .eq('shopify_product_id', lineItem.product_id.toString());
-    
-    // If store ID provided, prefer store-specific items
     if (shopifyStoreId) {
-      const { data: storeMatch } = await query
-        .eq('shopify_store_id', shopifyStoreId)
-        .maybeSingle();
-      
-      if (storeMatch) {
+      const storeMatch = await findItem(supabase, {
+        company_id: companyId,
+        shopify_product_id: lineItem.product_id.toString(),
+        shopify_store_id: shopifyStoreId,
+      });
+
+      if (storeMatch && belongsToCustomer(storeMatch, customerId)) {
         console.log(`✅ Matched by product_id + store: ${lineItem.product_id}`);
-        
-        // Backfill variant ID if missing
-        if (!storeMatch.shopify_variant_id) {
-          await supabase
-            .from('items')
-            .update({
-              shopify_variant_id: lineItem.variant_id?.toString() || null,
-            })
-            .eq('id', storeMatch.id);
+
+        const update = prepareUpdate({
+          shopify_variant_id: storeMatch.shopify_variant_id || lineItem.variant_id?.toString() || null,
+          customer_id: storeMatch.customer_id || customerId || null,
+        });
+
+        if (Object.keys(update).length > 0) {
+          await supabase.from('items').update(update).eq('id', storeMatch.id);
         }
-        
-        return { id: storeMatch.id, details: storeMatch };
+
+        return { id: storeMatch.id, details: applyDetails(storeMatch, update) };
       }
     }
-    
-    const { data: productMatch } = await query.maybeSingle();
-    
-    if (productMatch) {
+
+    if (customerId) {
+      const customerMatch = await findItem(supabase, {
+        company_id: companyId,
+        shopify_product_id: lineItem.product_id.toString(),
+        customer_id: customerId,
+      });
+
+      if (customerMatch) {
+        console.log(`✅ Matched by product_id + customer: ${lineItem.product_id}`);
+
+        const update = prepareUpdate({
+          shopify_variant_id: customerMatch.shopify_variant_id || lineItem.variant_id?.toString() || null,
+          shopify_store_id: customerMatch.shopify_store_id || shopifyStoreId || null,
+        });
+
+        if (Object.keys(update).length > 0) {
+          await supabase.from('items').update(update).eq('id', customerMatch.id);
+        }
+
+        return { id: customerMatch.id, details: applyDetails(customerMatch, update) };
+      }
+    }
+
+    const productMatch = await findItem(supabase, {
+      company_id: companyId,
+      shopify_product_id: lineItem.product_id.toString(),
+    });
+
+    if (productMatch && belongsToCustomer(productMatch, customerId)) {
       console.log(`✅ Matched by product_id: ${lineItem.product_id}`);
-      
-      // Backfill Shopify IDs and store ID if missing
-      if (!productMatch.shopify_variant_id || !productMatch.shopify_product_id || !productMatch.shopify_store_id) {
-        await supabase
-          .from('items')
-          .update({
-            shopify_product_id: lineItem.product_id?.toString() || null,
-            shopify_variant_id: lineItem.variant_id?.toString() || null,
-            shopify_store_id: shopifyStoreId || null,
-          })
-          .eq('id', productMatch.id);
+
+      const update = prepareUpdate({
+        shopify_variant_id: productMatch.shopify_variant_id || lineItem.variant_id?.toString() || null,
+        shopify_store_id: productMatch.shopify_store_id || shopifyStoreId || null,
+        customer_id: productMatch.customer_id || customerId || null,
+      });
+
+      if (Object.keys(update).length > 0) {
+        await supabase.from('items').update(update).eq('id', productMatch.id);
         console.log(`🔄 Backfilled Shopify IDs for item ${productMatch.sku}`);
       }
-      
-      return { id: productMatch.id, details: productMatch };
+
+      return { id: productMatch.id, details: applyDetails(productMatch, update) };
     }
   }
-  
+
   // PRIORITY 3: Fallback to SKU matching
   if (lineItem.sku) {
-    const query = supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight')
-      .eq('company_id', companyId)
-      .eq('sku', lineItem.sku);
-    
-    // If store ID provided, prefer store-specific items
     if (shopifyStoreId) {
-      const { data: storeMatch } = await query
-        .eq('shopify_store_id', shopifyStoreId)
-        .maybeSingle();
-      
-      if (storeMatch) {
+      const storeMatch = await findItem(supabase, {
+        company_id: companyId,
+        sku: lineItem.sku,
+        shopify_store_id: shopifyStoreId,
+      });
+
+      if (storeMatch && belongsToCustomer(storeMatch, customerId)) {
         console.log(`✅ Matched by SKU + store: ${lineItem.sku}`);
-        
-        // Backfill Shopify IDs
-        if (!storeMatch.shopify_variant_id || !storeMatch.shopify_product_id) {
-          await supabase
-            .from('items')
-            .update({
-              shopify_product_id: lineItem.product_id?.toString() || null,
-              shopify_variant_id: lineItem.variant_id?.toString() || null,
-            })
-            .eq('id', storeMatch.id);
+
+        const update = prepareUpdate({
+          shopify_product_id: storeMatch.shopify_product_id || lineItem.product_id?.toString() || null,
+          shopify_variant_id: storeMatch.shopify_variant_id || lineItem.variant_id?.toString() || null,
+          customer_id: storeMatch.customer_id || customerId || null,
+        });
+
+        if (Object.keys(update).length > 0) {
+          await supabase.from('items').update(update).eq('id', storeMatch.id);
         }
-        
-        return { id: storeMatch.id, details: storeMatch };
+
+        return { id: storeMatch.id, details: applyDetails(storeMatch, update) };
       }
     }
-    
-    const { data: skuMatch } = await query.maybeSingle();
-    
-    if (skuMatch) {
+
+    if (customerId) {
+      const customerMatch = await findItem(supabase, {
+        company_id: companyId,
+        sku: lineItem.sku,
+        customer_id: customerId,
+      });
+
+      if (customerMatch) {
+        console.log(`✅ Matched by SKU + customer: ${lineItem.sku}`);
+
+        const update = prepareUpdate({
+          shopify_product_id: customerMatch.shopify_product_id || lineItem.product_id?.toString() || null,
+          shopify_variant_id: customerMatch.shopify_variant_id || lineItem.variant_id?.toString() || null,
+          shopify_store_id: customerMatch.shopify_store_id || shopifyStoreId || null,
+        });
+
+        if (Object.keys(update).length > 0) {
+          await supabase.from('items').update(update).eq('id', customerMatch.id);
+        }
+
+        return { id: customerMatch.id, details: applyDetails(customerMatch, update) };
+      }
+    }
+
+    const skuMatch = await findItem(supabase, {
+      company_id: companyId,
+      sku: lineItem.sku,
+    });
+
+    if (skuMatch && belongsToCustomer(skuMatch, customerId)) {
       console.log(`✅ Matched by SKU: ${lineItem.sku}`);
-      
-      // Backfill Shopify IDs and store ID if missing
-      if (!skuMatch.shopify_variant_id || !skuMatch.shopify_product_id || !skuMatch.shopify_store_id) {
-        await supabase
-          .from('items')
-          .update({
-            shopify_product_id: lineItem.product_id?.toString() || null,
-            shopify_variant_id: lineItem.variant_id?.toString() || null,
-            shopify_store_id: shopifyStoreId || null,
-          })
-          .eq('id', skuMatch.id);
+
+      const update = prepareUpdate({
+        shopify_product_id: skuMatch.shopify_product_id || lineItem.product_id?.toString() || null,
+        shopify_variant_id: skuMatch.shopify_variant_id || lineItem.variant_id?.toString() || null,
+        shopify_store_id: skuMatch.shopify_store_id || shopifyStoreId || null,
+        customer_id: skuMatch.customer_id || customerId || null,
+      });
+
+      if (Object.keys(update).length > 0) {
+        await supabase.from('items').update(update).eq('id', skuMatch.id);
         console.log(`🔄 Backfilled Shopify IDs for item ${skuMatch.sku}`);
       }
-      
-      return { id: skuMatch.id, details: skuMatch };
+
+      return { id: skuMatch.id, details: applyDetails(skuMatch, update) };
     }
   }
-  
+
   // PRIORITY 4: Create new item
-  console.log(`📦 Creating new item for product_id: ${lineItem.product_id}, variant_id: ${lineItem.variant_id}, store: ${shopifyStoreId}`);
-  
+  console.log(
+    `📦 Creating new item for product_id: ${lineItem.product_id}, variant_id: ${lineItem.variant_id}, store: ${shopifyStoreId}`
+  );
+
   const sku = sanitizeString(lineItem.sku || `SHOP-${lineItem.variant_id || lineItem.product_id}`, 100);
-  
+
   let weightInLbs = 0.125;
   if (lineItem.grams && lineItem.grams > 0) {
     weightInLbs = lineItem.grams / 453.592;
   }
-  
+
   const itemData = {
     company_id: companyId,
     sku: sku,
@@ -234,19 +358,22 @@ export async function ensureItemExists(
     shopify_product_id: lineItem.product_id?.toString() || null,
     shopify_variant_id: lineItem.variant_id?.toString() || null,
     shopify_store_id: shopifyStoreId || null,
+    customer_id: customerId || null,
   };
-  
+
   const { data: newItem, error: itemError } = await supabase
     .from('items')
     .insert(itemData)
-    .select('id, sku, name, length, width, height, weight')
+    .select(
+      'id, sku, name, length, width, height, weight, shopify_store_id, customer_id, shopify_variant_id, shopify_product_id'
+    )
     .single();
-  
+
   if (itemError) {
     console.error('Error creating item:', itemError);
     throw new Error(`Failed to create item: ${itemError.message}`);
   }
-  
-  console.log(`✅ Created item: ${sku} with Shopify IDs (store: ${shopifyStoreId})`);
+
+  console.log(`✅ Created item: ${sku} with Shopify IDs (store: ${shopifyStoreId}, customer: ${customerId})`);
   return { id: newItem.id, details: newItem };
 }

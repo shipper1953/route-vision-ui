@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { z, ZodError } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { shopifyGraphQL } from '../_shared/shopify-item-matcher.ts';
 
 // Sanitization helper to prevent injection attacks
 function sanitizeString(str: string | null | undefined, maxLength: number = 255): string | null {
@@ -11,6 +12,7 @@ function sanitizeString(str: string | null | undefined, maxLength: number = 255)
 // Shopify webhook order validation schema
 const ShopifyOrderSchema = z.object({
   id: z.union([z.number(), z.string()]).transform(String),
+  admin_graphql_api_id: z.string().optional().nullable(),
   order_number: z.union([z.number(), z.string()]).transform(String),
   email: z.string().email().max(255).optional().nullable(),
   financial_status: z.string().max(50).optional(),
@@ -63,6 +65,193 @@ const ShopifyOrderSchema = z.object({
 });
 
 type ShopifyOrder = z.infer<typeof ShopifyOrderSchema>;
+
+async function autoRequestFulfillment(
+  supabase: any,
+  store: any,
+  order: ShopifyOrder,
+  topic: string
+) {
+  const locationId =
+    store.fulfillment_service_location_id ||
+    store.settings?.fulfillment_service?.location_id ||
+    null;
+
+  if (!locationId) {
+    console.log('⚠️  Skipping auto-fulfillment request - no fulfillment location configured for store', store.id);
+    await supabase.from('shopify_sync_logs').insert({
+      company_id: store.company_id,
+      shopify_store_id: store.id,
+      sync_type: 'fulfillment_request_auto',
+      direction: 'outbound',
+      status: 'skipped',
+      shopify_order_id: order.id,
+      metadata: { reason: 'missing_location', topic },
+    });
+    return;
+  }
+
+  const orderGid = order.admin_graphql_api_id || (order.id ? `gid://shopify/Order/${order.id}` : null);
+
+  if (!orderGid) {
+    console.log('⚠️  Skipping auto-fulfillment request - unable to determine order GID');
+    await supabase.from('shopify_sync_logs').insert({
+      company_id: store.company_id,
+      shopify_store_id: store.id,
+      sync_type: 'fulfillment_request_auto',
+      direction: 'outbound',
+      status: 'skipped',
+      shopify_order_id: order.id,
+      metadata: { reason: 'missing_order_gid', topic },
+    });
+    return;
+  }
+
+  const shopifySettings = {
+    store_url: store.store_url,
+    access_token: store.access_token,
+  };
+
+  const actions: Array<Record<string, unknown>> = [];
+
+  try {
+    const fulfillmentQuery = `
+      query ($id: ID!) {
+        order(id: $id) {
+          fulfillmentOrders(first: 20) {
+            nodes {
+              id
+              status
+              requestStatus
+              assignedLocation {
+                location {
+                  id
+                  name
+                }
+              }
+              supportedActions {
+                action
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const fulfillmentResult = await shopifyGraphQL(shopifySettings, fulfillmentQuery, { id: orderGid });
+    const fulfillmentNodes =
+      fulfillmentResult.data?.order?.fulfillmentOrders?.nodes ?? [];
+
+    if (fulfillmentNodes.length === 0) {
+      actions.push({ status: 'skipped', reason: 'no_fulfillment_orders' });
+    }
+
+    for (const node of fulfillmentNodes) {
+      const assignedLocationId = node.assignedLocation?.location?.id;
+      const foId: string = node.id;
+
+      if (assignedLocationId !== locationId) {
+        actions.push({ id: foId, status: 'skipped', reason: 'location_mismatch' });
+        continue;
+      }
+
+      if (node.requestStatus && node.requestStatus !== 'UNSUBMITTED') {
+        actions.push({
+          id: foId,
+          status: 'skipped',
+          reason: `already_${node.requestStatus.toLowerCase()}`,
+        });
+        continue;
+      }
+
+      const supportsRequest = Array.isArray(node.supportedActions)
+        ? node.supportedActions.some((action: any) => action.action === 'REQUEST_FULFILLMENT')
+        : false;
+
+      if (!supportsRequest) {
+        actions.push({ id: foId, status: 'skipped', reason: 'request_not_supported' });
+        continue;
+      }
+
+      const requestMutation = `
+        mutation ($id: ID!, $message: String) {
+          fulfillmentOrderSubmitFulfillmentRequest(id: $id, message: $message) {
+            fulfillmentOrder {
+              id
+              status
+              requestStatus
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      try {
+        const mutationResult = await shopifyGraphQL(shopifySettings, requestMutation, {
+          id: foId,
+          message: `Auto-requested by Ship Tornado (${topic})`,
+        });
+
+        const mutationData = mutationResult.data?.fulfillmentOrderSubmitFulfillmentRequest;
+        const userErrors = mutationData?.userErrors ?? [];
+
+        if (userErrors.length > 0) {
+          actions.push({ id: foId, status: 'error', reason: 'user_errors', details: userErrors });
+          continue;
+        }
+
+        actions.push({
+          id: foId,
+          status: 'success',
+          previousRequestStatus: node.requestStatus,
+          newRequestStatus: mutationData?.fulfillmentOrder?.requestStatus,
+          newStatus: mutationData?.fulfillmentOrder?.status,
+        });
+      } catch (mutationError: any) {
+        console.error('Failed to submit fulfillment request:', mutationError);
+        actions.push({ id: foId, status: 'error', reason: 'mutation_failed', message: mutationError.message });
+      }
+    }
+
+    const allSkipped = actions.length > 0 && actions.every(action => action.status === 'skipped');
+    const hasError = actions.some(action => action.status === 'error');
+    const logStatus = allSkipped ? 'skipped' : hasError ? 'error' : 'success';
+
+    await supabase.from('shopify_sync_logs').insert({
+      company_id: store.company_id,
+      shopify_store_id: store.id,
+      sync_type: 'fulfillment_request_auto',
+      direction: 'outbound',
+      status: logStatus,
+      shopify_order_id: order.id,
+      metadata: {
+        topic,
+        locationId,
+        orderGid,
+        actions,
+      },
+    });
+  } catch (error: any) {
+    console.error('❌ Auto fulfillment request failed:', error);
+    await supabase.from('shopify_sync_logs').insert({
+      company_id: store.company_id,
+      shopify_store_id: store.id,
+      sync_type: 'fulfillment_request_auto',
+      direction: 'outbound',
+      status: 'error',
+      shopify_order_id: order.id,
+      error_message: error.message,
+      metadata: {
+        topic,
+        locationId,
+        orderGid,
+      },
+    });
+  }
+}
 
 // Utility function to add business days (skip weekends)
 function addBusinessDays(startDate: Date, daysToAdd: number): Date {
@@ -167,9 +356,18 @@ serve(async (req) => {
 
     console.log('✅ HMAC signature verified successfully');
 
+    // Automatically request fulfillment when receiving relevant order webhooks
+    if (
+      validatedOrder &&
+      topic &&
+      (topic === 'orders/create' || topic === 'orders/updated')
+    ) {
+      await autoRequestFulfillment(supabase, store, validatedOrder, topic);
+    }
+
     // NOTE: orders/create webhook removed - orders now sync on fulfillment request only
     // See shopify-fulfillment-order-notification function for order creation logic
-    
+
     return new Response(JSON.stringify({ message: 'Webhook received' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
