@@ -427,6 +427,7 @@ export type Database = {
           name: string
           shopify_product_gid: string | null
           shopify_product_id: string | null
+          shopify_store_id: string | null
           shopify_variant_gid: string | null
           shopify_variant_id: string | null
           sku: string
@@ -447,6 +448,7 @@ export type Database = {
           name: string
           shopify_product_gid?: string | null
           shopify_product_id?: string | null
+          shopify_store_id?: string | null
           shopify_variant_gid?: string | null
           shopify_variant_id?: string | null
           sku: string
@@ -467,6 +469,7 @@ export type Database = {
           name?: string
           shopify_product_gid?: string | null
           shopify_product_id?: string | null
+          shopify_store_id?: string | null
           shopify_variant_gid?: string | null
           shopify_variant_id?: string | null
           sku?: string
@@ -480,6 +483,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "items_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
             referencedColumns: ["id"]
           },
         ]
@@ -1271,6 +1281,7 @@ export type Database = {
           request_status: string | null
           ship_tornado_order_id: number | null
           shopify_order_id: string
+          shopify_store_id: string | null
           status: string
           updated_at: string | null
         }
@@ -1290,6 +1301,7 @@ export type Database = {
           request_status?: string | null
           ship_tornado_order_id?: number | null
           shopify_order_id: string
+          shopify_store_id?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -1309,6 +1321,7 @@ export type Database = {
           request_status?: string | null
           ship_tornado_order_id?: number | null
           shopify_order_id?: string
+          shopify_store_id?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -1327,6 +1340,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "shopify_fulfillment_orders_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
+            referencedColumns: ["id"]
+          },
         ]
       }
       shopify_order_mappings: {
@@ -1339,6 +1359,7 @@ export type Database = {
           ship_tornado_order_id: number
           shopify_order_id: string
           shopify_order_number: string | null
+          shopify_store_id: string | null
           sync_status: string
         }
         Insert: {
@@ -1350,6 +1371,7 @@ export type Database = {
           ship_tornado_order_id: number
           shopify_order_id: string
           shopify_order_number?: string | null
+          shopify_store_id?: string | null
           sync_status?: string
         }
         Update: {
@@ -1361,6 +1383,7 @@ export type Database = {
           ship_tornado_order_id?: number
           shopify_order_id?: string
           shopify_order_number?: string | null
+          shopify_store_id?: string | null
           sync_status?: string
         }
         Relationships: [
@@ -1378,6 +1401,87 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "shopify_order_mappings_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopify_stores: {
+        Row: {
+          access_token: string
+          company_id: string
+          connected_at: string | null
+          created_at: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_reference: string | null
+          fulfillment_location_id: string | null
+          fulfillment_location_name: string | null
+          fulfillment_service_id: string | null
+          id: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          oauth_state: string | null
+          settings: Json | null
+          store_name: string | null
+          store_url: string
+          updated_at: string | null
+          webhook_secret: string | null
+        }
+        Insert: {
+          access_token: string
+          company_id: string
+          connected_at?: string | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_reference?: string | null
+          fulfillment_location_id?: string | null
+          fulfillment_location_name?: string | null
+          fulfillment_service_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          oauth_state?: string | null
+          settings?: Json | null
+          store_name?: string | null
+          store_url: string
+          updated_at?: string | null
+          webhook_secret?: string | null
+        }
+        Update: {
+          access_token?: string
+          company_id?: string
+          connected_at?: string | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_reference?: string | null
+          fulfillment_location_id?: string | null
+          fulfillment_location_name?: string | null
+          fulfillment_service_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          oauth_state?: string | null
+          settings?: Json | null
+          store_name?: string | null
+          store_url?: string
+          updated_at?: string | null
+          webhook_secret?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_stores_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
         ]
       }
       shopify_sync_logs: {
@@ -1390,6 +1494,7 @@ export type Database = {
           metadata: Json | null
           ship_tornado_order_id: number | null
           shopify_order_id: string | null
+          shopify_store_id: string | null
           status: string
           sync_type: string
         }
@@ -1402,6 +1507,7 @@ export type Database = {
           metadata?: Json | null
           ship_tornado_order_id?: number | null
           shopify_order_id?: string | null
+          shopify_store_id?: string | null
           status: string
           sync_type: string
         }
@@ -1414,6 +1520,7 @@ export type Database = {
           metadata?: Json | null
           ship_tornado_order_id?: number | null
           shopify_order_id?: string | null
+          shopify_store_id?: string | null
           status?: string
           sync_type?: string
         }
@@ -1423,6 +1530,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_sync_logs_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
             referencedColumns: ["id"]
           },
         ]

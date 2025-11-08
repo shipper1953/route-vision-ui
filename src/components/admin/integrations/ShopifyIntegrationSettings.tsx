@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Video, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useShopifySettings } from "@/hooks/useShopifySettings";
+import { useShopifyStores } from "@/hooks/useShopifyStores";
 import { ShopifyConnectionCard } from "./ShopifyConnectionCard";
 import { ShopifyOrderSyncSettings } from "./ShopifyOrderSyncSettings";
 import { ShopifyFulfillmentSettings } from "./ShopifyFulfillmentSettings";
@@ -12,6 +13,8 @@ import { ShopifyInventorySettings } from "./ShopifyInventorySettings";
 import { ShopifyProductSettings } from "./ShopifyProductSettings";
 import { ShopifyAdvancedSettings } from "./ShopifyAdvancedSettings";
 import { ShopifySyncLogViewer } from "./ShopifySyncLogViewer";
+import { ShopifyStoreManagement } from "./ShopifyStoreManagement";
+import { ShopifyStoreSelector } from "@/components/integrations/ShopifyStoreSelector";
 import { PrivacyPolicyCard } from "./PrivacyPolicyCard";
 
 interface ShopifyIntegrationSettingsProps {
@@ -20,8 +23,9 @@ interface ShopifyIntegrationSettingsProps {
 
 export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSettingsProps) => {
   const navigate = useNavigate();
-  const { settings, loading, saving, updateSettings, refetch } = useShopifySettings(companyId);
-  const [activeTab, setActiveTab] = useState("connection");
+  const { stores, activeStoreId } = useShopifyStores(companyId);
+  const { settings, loading, saving, updateSettings, refetch } = useShopifySettings(companyId, activeStoreId || undefined);
+  const [activeTab, setActiveTab] = useState("stores");
   const [hasChanges, setHasChanges] = useState(false);
 
   if (loading) {
@@ -42,19 +46,23 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="connection">Connection</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="fulfillment">Fulfillment</TabsTrigger>
-          <TabsTrigger value="inventory">
-            Inventory
-          </TabsTrigger>
-          <TabsTrigger value="products">
-            Products
-          </TabsTrigger>
-          <TabsTrigger value="advanced">Advanced</TabsTrigger>
-          <TabsTrigger value="logs">Sync Logs</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-4">
+          <TabsList className="grid w-full grid-cols-8">
+            <TabsTrigger value="stores">Stores</TabsTrigger>
+            <TabsTrigger value="connection">Connection</TabsTrigger>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="fulfillment">Fulfillment</TabsTrigger>
+            <TabsTrigger value="inventory">Inventory</TabsTrigger>
+            <TabsTrigger value="products">Products</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger value="logs">Sync Logs</TabsTrigger>
+          </TabsList>
+          {stores.length > 1 && activeTab !== "stores" && <ShopifyStoreSelector />}
+        </div>
+
+        <TabsContent value="stores">
+          <ShopifyStoreManagement />
+        </TabsContent>
 
         <TabsContent value="connection">
           <div className="space-y-6">

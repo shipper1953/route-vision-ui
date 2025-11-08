@@ -130,7 +130,7 @@ const DEFAULT_SETTINGS: ShopifySettings = {
   },
 };
 
-export const useShopifySettings = (companyId?: string) => {
+export const useShopifySettings = (companyId?: string, storeId?: string) => {
   const { toast } = useToast();
   const [settings, setSettings] = useState<ShopifySettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -143,54 +143,82 @@ export const useShopifySettings = (companyId?: string) => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('settings')
-        .eq('id', companyId)
-        .single();
+      if (storeId) {
+        // Fetch store-specific settings from shopify_stores table
+        const { data: storeData, error: storeError } = await supabase
+          .from('shopify_stores')
+          .select('*')
+          .eq('id', storeId)
+          .single();
 
-      if (error) throw error;
+        if (storeError) throw storeError;
 
-      const shopifySettings = (data?.settings as any)?.shopify;
-      if (shopifySettings) {
-        setSettings({
-          ...DEFAULT_SETTINGS,
-          connection: {
-            store_url: shopifySettings.store_url || '',
-            connected: shopifySettings.connected || false,
-            connected_at: shopifySettings.connected_at,
-            last_sync: shopifySettings.last_sync,
-          },
-          fulfillment_service: shopifySettings.fulfillment_service,
-          sync_config: {
-            ...DEFAULT_SETTINGS.sync_config,
-            ...shopifySettings.sync_config,
-            orders: {
-              ...DEFAULT_SETTINGS.sync_config.orders,
-              ...shopifySettings.sync_config?.orders,
+        if (storeData) {
+          const storeSettings = (storeData.settings as any) || {};
+          setSettings({
+            ...DEFAULT_SETTINGS,
+            connection: {
+              store_url: storeData.store_url || '',
+              connected: storeData.is_active || false,
+              connected_at: storeData.connected_at,
+              last_sync: storeData.last_sync_at,
             },
-            fulfillment: {
-              ...DEFAULT_SETTINGS.sync_config.fulfillment,
-              ...shopifySettings.sync_config?.fulfillment,
+            fulfillment_service: storeData.fulfillment_service_id ? {
+              id: storeData.fulfillment_service_id,
+              location_id: storeData.fulfillment_location_id || '',
+              location_name: storeData.fulfillment_location_name || '',
+              registered_at: storeData.connected_at,
+              enabled: true,
+            } : undefined,
+            sync_config: {
+              ...DEFAULT_SETTINGS.sync_config,
+              ...storeSettings.sync_config,
             },
-            inventory: {
-              ...DEFAULT_SETTINGS.sync_config.inventory,
-              ...shopifySettings.sync_config?.inventory,
+            features: {
+              ...DEFAULT_SETTINGS.features,
+              ...storeSettings.features,
             },
-            products: {
-              ...DEFAULT_SETTINGS.sync_config.products,
-              ...shopifySettings.sync_config?.products,
+            mappings: {
+              ...DEFAULT_SETTINGS.mappings,
+              ...storeSettings.mappings,
             },
-          },
-          features: {
-            ...DEFAULT_SETTINGS.features,
-            ...shopifySettings.features,
-          },
-          mappings: {
-            ...DEFAULT_SETTINGS.mappings,
-            ...shopifySettings.mappings,
-          },
-        });
+          });
+        }
+      } else {
+        // Fetch company-level defaults (backward compatibility)
+        const { data, error } = await supabase
+          .from('companies')
+          .select('settings')
+          .eq('id', companyId)
+          .single();
+
+        if (error) throw error;
+
+        const shopifySettings = (data?.settings as any)?.shopify;
+        if (shopifySettings) {
+          setSettings({
+            ...DEFAULT_SETTINGS,
+            connection: {
+              store_url: shopifySettings.store_url || '',
+              connected: shopifySettings.connected || false,
+              connected_at: shopifySettings.connected_at,
+              last_sync: shopifySettings.last_sync,
+            },
+            fulfillment_service: shopifySettings.fulfillment_service,
+            sync_config: {
+              ...DEFAULT_SETTINGS.sync_config,
+              ...shopifySettings.sync_config,
+            },
+            features: {
+              ...DEFAULT_SETTINGS.features,
+              ...shopifySettings.features,
+            },
+            mappings: {
+              ...DEFAULT_SETTINGS.mappings,
+              ...shopifySettings.mappings,
+            },
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching Shopify settings:', error);
@@ -238,7 +266,7 @@ export const useShopifySettings = (companyId?: string) => {
 
   useEffect(() => {
     fetchSettings();
-  }, [companyId]);
+  }, [companyId, storeId]);
 
   return {
     settings,
