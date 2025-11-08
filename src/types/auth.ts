@@ -7,6 +7,10 @@ export interface AuthContextType {
   isSuperAdmin: boolean;
   isCompanyAdmin: boolean;
   userProfile: UserProfile | null;
+  tenantId: string | null;
+  availableCompanies: UserCompanyAccess[];
+  activeCompanyId: string | null;
+  setActiveCompany: (companyId: string) => void;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
@@ -21,8 +25,15 @@ export interface UserProfile {
   email: string;
   name: string;
   role: 'user' | 'company_admin' | 'super_admin';
+  tenant_id: string;
   company_id?: string;
   warehouse_ids?: string[];
+  accessible_companies: UserCompanyAccess[];
+}
+
+export interface UserCompanyAccess {
+  id: string;
+  name: string;
 }
 
 export interface Company {
@@ -37,6 +48,7 @@ export interface Company {
   is_active: boolean;
   markup_type?: 'percentage' | 'fixed';
   markup_value?: number;
+  tenant_id: string;
 }
 
 export interface CompanyAddress {

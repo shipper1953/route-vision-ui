@@ -13,6 +13,7 @@ export interface DatabaseUser {
   role: 'user' | 'company_admin' | 'super_admin';
   company_id: string | null;
   warehouse_ids: any;
+  tenant_id: string;
 }
 
 export interface DatabaseCompany {
@@ -25,4 +26,5 @@ export interface DatabaseCompany {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  tenant_id: string;
 }

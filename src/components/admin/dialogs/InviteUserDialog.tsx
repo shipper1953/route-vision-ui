@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface InviteUserDialogProps {
   companyId: string;
@@ -22,11 +23,17 @@ export const InviteUserDialog = ({ companyId, onUserInvited }: InviteUserDialogP
     name: '',
     role: 'user' as 'user' | 'company_admin'
   });
+  const { tenantId } = useAuth();
 
   const inviteUser = async () => {
     try {
       setIsInviting(true);
       console.log('Inviting user with data:', { ...newUser, companyId });
+
+      if (!tenantId) {
+        toast.error('Unable to determine tenant for invitation');
+        return;
+      }
       
       // Generate a temporary password
       const tempPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
@@ -39,6 +46,7 @@ export const InviteUserDialog = ({ companyId, onUserInvited }: InviteUserDialogP
           name: newUser.name,
           role: newUser.role,
           company_id: companyId,
+          tenant_id: tenantId,
         },
       });
 

@@ -25,7 +25,8 @@ const transformCompanyData = (dbCompany: any): Company => {
     updated_at: dbCompany.updated_at,
     is_active: dbCompany.is_active,
     markup_type: dbCompany.markup_type || 'percentage',
-    markup_value: dbCompany.markup_value || 0
+    markup_value: dbCompany.markup_value || 0,
+    tenant_id: dbCompany.tenant_id
   };
 };
 

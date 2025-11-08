@@ -122,6 +122,7 @@ export type Database = {
           phone: string | null
           settings: Json | null
           stripe_customer_id: string | null
+          tenant_id: string
           updated_at: string
         }
         Insert: {
@@ -136,6 +137,7 @@ export type Database = {
           phone?: string | null
           settings?: Json | null
           stripe_customer_id?: string | null
+          tenant_id?: string
           updated_at?: string
         }
         Update: {
@@ -150,6 +152,42 @@ export type Database = {
           phone?: string | null
           settings?: Json | null
           stripe_customer_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+          slug?: string
           updated_at?: string
         }
         Relationships: []
@@ -1760,6 +1798,7 @@ export type Database = {
           name: string
           password: string
           role: Database["public"]["Enums"]["app_role"] | null
+          tenant_id: string
           warehouse_ids: Json | null
         }
         Insert: {
@@ -1769,6 +1808,7 @@ export type Database = {
           name: string
           password: string
           role?: Database["public"]["Enums"]["app_role"] | null
+          tenant_id?: string
           warehouse_ids?: Json | null
         }
         Update: {
@@ -1778,6 +1818,7 @@ export type Database = {
           name?: string
           password?: string
           role?: Database["public"]["Enums"]["app_role"] | null
+          tenant_id?: string
           warehouse_ids?: Json | null
         }
         Relationships: [
@@ -1793,6 +1834,59 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "users_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_company_access: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_company_access_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_company_access_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_company_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1966,6 +2060,8 @@ export type Database = {
         Returns: string
       }
       auth_user_company_id: { Args: never; Returns: string }
+      auth_user_has_company_access: { Args: { _company_id: string }; Returns: boolean }
+      auth_user_tenant_id: { Args: never; Returns: string }
       auth_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
@@ -2022,11 +2118,13 @@ export type Database = {
       get_user_profile: {
         Args: { user_id: string }
         Returns: {
-          company_id: string
+          accessible_companies: Json
+          company_id: string | null
           email: string
           id: string
           name: string
           role: Database["public"]["Enums"]["app_role"]
+          tenant_id: string
           warehouse_ids: Json
         }[]
       }

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 export interface CreateUserData {
   firstName: string;
@@ -15,11 +16,17 @@ export interface CreateUserData {
 export const useCreateUser = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { tenantId } = useAuth();
 
   const createUser = async (data: CreateUserData) => {
     try {
       setIsSubmitting(true);
       console.log('Creating user with data:', data);
+
+      if (!tenantId) {
+        toast.error('Unable to determine tenant for new user');
+        return;
+      }
       
       // Generate a temporary password
       const tempPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
@@ -32,6 +39,7 @@ export const useCreateUser = () => {
           name: `${data.firstName} ${data.lastName}`,
           role: data.role,
           company_id: null, // No company assignment by default
+          tenant_id: tenantId,
         },
       });
 

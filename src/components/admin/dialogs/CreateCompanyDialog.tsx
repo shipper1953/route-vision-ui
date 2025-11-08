@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Company } from "@/types/auth";
+import { useAuth } from "@/hooks/useAuth";
 import { Plus } from "lucide-react";
 
 interface CreateCompanyDialogProps {
@@ -23,14 +24,20 @@ export const CreateCompanyDialog = ({ onCompanyCreated }: CreateCompanyDialogPro
     markup_type: 'percentage' as 'percentage' | 'fixed',
     markup_value: 0
   });
+  const { tenantId } = useAuth();
 
   const createCompany = async () => {
     try {
       console.log('Creating company:', newCompany);
-      
+
+      if (!tenantId) {
+        toast.error('Unable to determine tenant context for company creation');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('companies')
-        .insert([newCompany])
+        .insert([{ ...newCompany, tenant_id: tenantId }])
         .select()
         .single();
 
@@ -52,7 +59,8 @@ export const CreateCompanyDialog = ({ onCompanyCreated }: CreateCompanyDialogPro
         updated_at: data.updated_at,
         is_active: data.is_active,
         markup_type: (data.markup_type as 'percentage' | 'fixed') || 'percentage',
-        markup_value: data.markup_value || 0
+        markup_value: data.markup_value || 0,
+        tenant_id: data.tenant_id
       };
       
       onCompanyCreated(transformedCompany);

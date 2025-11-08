@@ -29,12 +29,14 @@ export const useCompanyUsers = (companyId?: string) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        company_id: user.company_id,
-        warehouse_ids: Array.isArray(user.warehouse_ids) 
-          ? user.warehouse_ids 
-          : typeof user.warehouse_ids === 'string' 
+        tenant_id: user.tenant_id,
+        company_id: user.company_id || undefined,
+        warehouse_ids: Array.isArray(user.warehouse_ids)
+          ? user.warehouse_ids
+          : typeof user.warehouse_ids === 'string'
             ? JSON.parse(user.warehouse_ids)
-            : []
+            : [],
+        accessible_companies: []
       })) || [];
       
       setUsers(transformedUsers);
