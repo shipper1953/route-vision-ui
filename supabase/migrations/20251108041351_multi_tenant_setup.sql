@@ -14,6 +14,13 @@ CREATE TABLE IF NOT EXISTS public.tenants (
 
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 
+-- 2. Add tenant_id columns to companies and users
+ALTER TABLE public.companies
+  ADD COLUMN IF NOT EXISTS tenant_id uuid;
+
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS tenant_id uuid;
+
 -- Helper: tenant id lookup must exist before policies reference it
 CREATE OR REPLACE FUNCTION public.auth_user_tenant_id()
 RETURNS uuid
@@ -38,13 +45,6 @@ CREATE POLICY "Tenant members can read tenant"
 ON public.tenants
 FOR SELECT
 USING (id = auth_user_tenant_id());
-
--- 2. Add tenant_id columns to companies and users
-ALTER TABLE public.companies
-  ADD COLUMN IF NOT EXISTS tenant_id uuid;
-
-ALTER TABLE public.users
-  ADD COLUMN IF NOT EXISTS tenant_id uuid;
 
 -- 3. Seed a default tenant and backfill existing data
 DO $$
