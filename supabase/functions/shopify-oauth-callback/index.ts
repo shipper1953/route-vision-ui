@@ -24,18 +24,20 @@ serve(async (req) => {
 
     console.log('OAuth callback received for shop:', shop);
 
-    // Find company by state
-    const { data: companies } = await supabase
-      .from('companies')
-      .select('id, settings')
-      .contains('settings', { shopify: { oauth_state: state } });
+    // Find company by OAuth state from shopify_stores table
+    const { data: stores, error: storeError } = await supabase
+      .from('shopify_stores')
+      .select('id, company_id, customer_name, customer_email, customer_reference')
+      .eq('oauth_state', state)
+      .single();
 
-    if (!companies || companies.length === 0) {
-      throw new Error('Invalid OAuth state');
+    if (storeError || !stores) {
+      console.error('Invalid OAuth state or store not found:', storeError);
+      throw new Error('Invalid OAuth state - store not found');
     }
 
-    const company = companies[0];
-    const companyId = company.id;
+    const companyId = stores.company_id;
+    const storeId = stores.id;
 
     // Verify HMAC (important security check)
     const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
@@ -149,33 +151,45 @@ serve(async (req) => {
     // Generate webhook secret for signature verification
     const webhookSecret = crypto.randomUUID();
 
-    // Store credentials securely in company settings
-    const existingSettings = company.settings || {};
-    const updatedSettings = {
-      ...existingSettings,
-      shopify: {
-        store_url: shop,
+    // Fetch store name from Shopify
+    let storeName = shop;
+    try {
+      const shopResponse = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+        },
+      });
+      if (shopResponse.ok) {
+        const shopData = await shopResponse.json();
+        storeName = shopData.shop?.name || shop;
+      }
+    } catch (error) {
+      console.warn('Failed to fetch store name, using domain:', error);
+    }
+
+    // Update shopify_stores record with credentials and clear OAuth state
+    const { error: updateError } = await supabase
+      .from('shopify_stores')
+      .update({
         access_token: accessToken,
         webhook_secret: webhookSecret,
-        connected: true,
+        store_name: storeName,
+        is_active: true,
         connected_at: new Date().toISOString(),
-        last_sync: new Date().toISOString(),
-        oauth_state: null, // Clear the OAuth state
-        scopes: ['read_orders', 'write_orders', 'read_products', 'write_products', 'read_inventory', 'write_inventory'],
-      },
-    };
-
-    const { error: updateError } = await supabase
-      .from('companies')
-      .update({ settings: updatedSettings })
-      .eq('id', companyId);
+        last_sync_at: new Date().toISOString(),
+        oauth_state: null, // Clear the OAuth state for security
+        settings: {
+          scopes: ['read_orders', 'write_orders', 'read_products', 'write_products', 'read_inventory', 'write_inventory'],
+        }
+      })
+      .eq('id', storeId);
 
     if (updateError) {
       console.error('Failed to store Shopify credentials:', updateError);
       throw new Error('Failed to store credentials securely');
     }
 
-    console.log('Successfully stored Shopify credentials for company:', companyId);
+    console.log('Successfully stored Shopify credentials for store:', storeId);
 
     // Register Ship Tornado as a fulfillment service
     console.log('Registering fulfillment service...');
@@ -183,6 +197,7 @@ serve(async (req) => {
       const fsResponse = await supabase.functions.invoke('shopify-register-fulfillment-service', {
         body: {
           companyId,
+          storeId,
           shopifySettings: {
             store_url: shop,
             access_token: accessToken,
@@ -195,6 +210,14 @@ serve(async (req) => {
         // Continue anyway - they can register later
       } else {
         console.log('Fulfillment service registered successfully:', fsResponse.data);
+        
+        // Update store with fulfillment service ID if returned
+        if (fsResponse.data?.fulfillmentServiceId) {
+          await supabase
+            .from('shopify_stores')
+            .update({ fulfillment_service_id: fsResponse.data.fulfillmentServiceId })
+            .eq('id', storeId);
+        }
       }
     } catch (fsError) {
       console.error('Error registering fulfillment service:', fsError);
@@ -206,10 +229,15 @@ serve(async (req) => {
       .from('shopify_sync_logs')
       .insert({
         company_id: companyId,
+        shopify_store_id: storeId,
         sync_type: 'connection',
         direction: 'outbound',
         status: 'success',
-        metadata: { store_url: shop },
+        metadata: { 
+          store_url: shop,
+          store_name: storeName,
+          store_id: storeId
+        },
       });
 
     console.log('Shopify OAuth connection successful for company:', companyId);
