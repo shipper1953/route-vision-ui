@@ -56,9 +56,15 @@ serve(async (req) => {
       throw new Error(`Store not found: ${storeError?.message}`);
     }
 
-    const shopifyUrl = store.store_url.replace(/\/$/, '');
+    // Clean and format store URL (remove https://, http://, trailing slashes)
+    const cleanUrl = store.store_url
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
+    const shopifyUrl = `https://${cleanUrl}`;
     const accessToken = store.access_token;
     const webhookUrl = `${supabaseUrl}/functions/v1/shopify-webhook`;
+
+    console.log(`[Webhook Registration] Using store URL: ${shopifyUrl}`);
 
     const registeredWebhooks = [];
     const errors = [];
