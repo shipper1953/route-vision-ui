@@ -8,6 +8,7 @@ const corsHeaders = {
 
 interface ProductSyncRequest {
   companyId: string;
+  storeId: string;
   importVariants?: boolean;
   importBundles?: boolean;
   syncDimensions?: boolean;
@@ -27,6 +28,7 @@ serve(async (req) => {
 
     const {
       companyId,
+      storeId,
       importVariants = true,
       importBundles = false,
       syncDimensions = true,
@@ -34,26 +36,31 @@ serve(async (req) => {
       mapToItemMaster = true
     }: ProductSyncRequest = await req.json();
 
-    console.log('Starting Shopify product sync for company:', companyId);
+    if (!companyId) {
+      throw new Error('Company ID is required');
+    }
 
-    // Get company settings
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('settings')
-      .eq('id', companyId)
+    if (!storeId) {
+      throw new Error('Store ID is required');
+    }
+
+    console.log('Starting Shopify product sync for store:', storeId);
+
+    // Get store-specific Shopify credentials
+    const { data: store, error: storeError } = await supabase
+      .from('shopify_stores')
+      .select('id, company_id, store_url, access_token, customer_id')
+      .eq('id', storeId)
+      .eq('company_id', companyId)
       .single();
 
-    if (companyError || !company) {
-      throw new Error('Company not found');
+    if (storeError) throw storeError;
+
+    if (!store?.access_token || !store?.store_url) {
+      throw new Error('Store credentials not found or invalid');
     }
 
-    const shopifySettings = company.settings?.shopify;
-
-    if (!shopifySettings || !shopifySettings.connected) {
-      throw new Error('Shopify not connected');
-    }
-
-    console.log('Fetching products from Shopify store:', shopifySettings.store_url);
+    console.log('Fetching products from Shopify store:', store.store_url);
 
     // Fetch products from Shopify using GraphQL
     const productsQuery = `
@@ -93,11 +100,11 @@ serve(async (req) => {
     `;
 
     const productsResponse = await fetch(
-      `https://${shopifySettings.store_url}/admin/api/2024-10/graphql.json`,
+      `https://${store.store_url}/admin/api/2024-10/graphql.json`,
       {
         method: 'POST',
         headers: {
-          'X-Shopify-Access-Token': shopifySettings.access_token,
+          'X-Shopify-Access-Token': store.access_token,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -164,6 +171,8 @@ serve(async (req) => {
               : product.title,
             category: product.productType || 'General',
             is_active: product.status === 'ACTIVE',
+            shopify_store_id: storeId,
+            customer_id: store.customer_id || null,
             
             // Store both numeric IDs (legacy) and GIDs (new)
             shopify_product_id: product.legacyResourceId,

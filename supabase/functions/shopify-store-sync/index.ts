@@ -46,8 +46,7 @@ Deno.serve(async (req) => {
       throw new Error('Store not found');
     }
 
-    // Trigger a bulk import for this specific store
-    // This would typically call the bulk import function with store-specific parameters
+    // Invoke bulk import function for orders
     const { data, error } = await supabase.functions.invoke('shopify-bulk-import', {
       body: {
         companyId: store.company_id,
@@ -55,12 +54,35 @@ Deno.serve(async (req) => {
         dateRangeDays: 30,
       },
       headers: {
-        Authorization: authHeader, // Forward the auth token
+        Authorization: authHeader,
       },
     });
 
     if (error) {
-      throw error;
+      throw new Error(`Bulk import failed: ${error.message}`);
+    }
+
+    console.log('Bulk import completed:', data);
+
+    // Also sync products for this store
+    const { data: productData, error: productError } = await supabase.functions.invoke('shopify-sync-products', {
+      body: {
+        companyId: store.company_id,
+        storeId: storeId,
+        importVariants: true,
+        syncDimensions: true,
+        syncWeight: true,
+      },
+      headers: {
+        Authorization: authHeader,
+      },
+    });
+
+    if (productError) {
+      console.error('Product sync failed:', productError);
+      // Don't throw - order sync succeeded, just log the product sync failure
+    } else {
+      console.log('Product sync completed:', productData);
     }
 
     // Update last_sync_at timestamp

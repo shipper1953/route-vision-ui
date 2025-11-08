@@ -29,26 +29,34 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { companyId, dateRangeDays } = await req.json();
+    const { companyId, storeId, dateRangeDays } = await req.json();
 
-    // Get company Shopify settings
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('settings')
-      .eq('id', companyId)
+    if (!companyId) {
+      throw new Error('Company ID is required');
+    }
+
+    if (!storeId) {
+      throw new Error('Store ID is required');
+    }
+
+    console.log('Starting Shopify bulk import for store:', storeId);
+
+    // Get store-specific Shopify credentials
+    const { data: store, error: storeError } = await supabase
+      .from('shopify_stores')
+      .select('id, company_id, store_url, access_token, customer_id')
+      .eq('id', storeId)
+      .eq('company_id', companyId)
       .single();
 
-    if (companyError || !company) {
-      throw new Error('Company not found');
+    if (storeError) throw storeError;
+
+    if (!store?.access_token || !store?.store_url) {
+      throw new Error('Store credentials not found or invalid');
     }
 
-    const shopifySettings = company.settings?.shopify;
-    if (!shopifySettings?.connected || !shopifySettings?.access_token) {
-      throw new Error('Shopify not connected');
-    }
-
-    const storeUrl = shopifySettings.store_url;
-    const accessToken = shopifySettings.access_token;
+    const storeUrl = store.store_url;
+    const accessToken = store.access_token;
 
     // Calculate date range
     const endDate = new Date();
@@ -135,6 +143,8 @@ serve(async (req) => {
           company_id: companyId,
           warehouse_id: warehouse?.id || null,
           user_id: user.id,
+          shopify_store_id: storeId,
+          customer_id: store.customer_id || null,
         };
 
         const { data: newOrder, error: orderError } = await supabase
@@ -153,6 +163,7 @@ serve(async (req) => {
             ship_tornado_order_id: newOrder.id,
             shopify_order_id: shopifyOrder.id.toString(),
             shopify_order_number: shopifyOrder.order_number.toString(),
+            shopify_store_id: storeId,
             sync_status: 'synced',
           });
 

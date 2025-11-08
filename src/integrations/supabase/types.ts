@@ -670,6 +670,7 @@ export type Database = {
           required_delivery_date: string | null
           shipment_id: number | null
           shipping_address: Json | null
+          shopify_store_id: string | null
           status: string | null
           user_id: string | null
           value: number
@@ -696,6 +697,7 @@ export type Database = {
           required_delivery_date?: string | null
           shipment_id?: number | null
           shipping_address?: Json | null
+          shopify_store_id?: string | null
           status?: string | null
           user_id?: string | null
           value?: number
@@ -722,6 +724,7 @@ export type Database = {
           required_delivery_date?: string | null
           shipment_id?: number | null
           shipping_address?: Json | null
+          shopify_store_id?: string | null
           status?: string | null
           user_id?: string | null
           value?: number
@@ -747,6 +750,13 @@ export type Database = {
             columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
             referencedColumns: ["id"]
           },
         ]
