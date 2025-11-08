@@ -1,107 +1,96 @@
-import { useState } from "react";
-import { usePurchaseOrders, PurchaseOrder } from "@/hooks/usePurchaseOrders";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
-import { CreatePurchaseOrderDialog } from "@/components/wms/po/CreatePurchaseOrderDialog";
-import { PurchaseOrdersList } from "@/components/wms/po/PurchaseOrdersList";
+import { useState, useEffect } from "react";
 import { TmsLayout } from "@/components/layout/TmsLayout";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PackageOpen, Calendar, Building2, User } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 const PurchaseOrders = () => {
-  const { 
-    purchaseOrders, 
-    loading, 
-    createPurchaseOrder, 
-    cancelPurchaseOrder,
-    fetchPurchaseOrders 
-  } = usePurchaseOrders();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { userProfile } = useAuth();
+  const navigate = useNavigate();
 
-  const filteredPOs = purchaseOrders.filter(po => {
-    const matchesSearch = po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         po.vendor_name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || po.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  useEffect(() => {
+    if (userProfile?.company_id) {
+      fetchPurchaseOrders();
+    }
+  }, [userProfile?.company_id]);
 
-  const handleCancel = async (id: string) => {
-    if (confirm('Are you sure you want to cancel this purchase order?')) {
-      await cancelPurchaseOrder(id);
+  const fetchPurchaseOrders = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('purchase_orders' as any)
+        .select('*, customers(*), po_line_items(*)')
+        .eq('company_id', userProfile?.company_id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPurchaseOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching purchase orders:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <TmsLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="space-y-6 max-w-7xl">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Purchase Orders</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage inbound purchase orders
-            </p>
+            <p className="text-muted-foreground mt-1">Manage incoming inventory</p>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create PO
+          <Button onClick={() => navigate('/wms/receiving')}>
+            <PackageOpen className="mr-2 h-4 w-4" />
+            Start Receiving
           </Button>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search POs..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="partially_received">Partially Received</SelectItem>
-              <SelectItem value="received">Received</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Purchase Orders List */}
-        {loading && purchaseOrders.length === 0 ? (
+        {loading ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading purchase orders...</p>
+            <p className="text-muted-foreground">Loading...</p>
           </div>
         ) : (
-          <PurchaseOrdersList
-            purchaseOrders={filteredPOs}
-            onView={setSelectedPO}
-            onCancel={handleCancel}
-          />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {purchaseOrders.map((po) => (
+              <Card key={po.id} className="hover:border-primary transition-colors">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <CardTitle className="text-lg">{po.po_number}</CardTitle>
+                    <Badge>{po.status.replace('_', ' ')}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {po.vendor_name && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <span>{po.vendor_name}</span>
+                    </div>
+                  )}
+                  {po.expected_date && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span>{format(new Date(po.expected_date), 'MMM d, yyyy')}</span>
+                    </div>
+                  )}
+                  {po.status !== 'received' && (
+                    <Button className="w-full" size="sm" onClick={() => navigate('/wms/receiving')}>
+                      <PackageOpen className="mr-2 h-4 w-4" />
+                      Start Receiving
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
-
-        {/* Create Dialog */}
-        <CreatePurchaseOrderDialog
-          open={createDialogOpen}
-          onOpenChange={setCreateDialogOpen}
-          onSubmit={createPurchaseOrder}
-        />
       </div>
     </TmsLayout>
   );

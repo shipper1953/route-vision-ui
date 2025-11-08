@@ -972,6 +972,155 @@ export type Database = {
         }
         Relationships: []
       }
+      po_line_items: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string | null
+          metadata: Json | null
+          po_id: string
+          product_name: string
+          quantity_ordered: number
+          quantity_received: number
+          shopify_line_item_id: string | null
+          sku: string
+          unit_cost: number | null
+          uom: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          metadata?: Json | null
+          po_id: string
+          product_name: string
+          quantity_ordered?: number
+          quantity_received?: number
+          shopify_line_item_id?: string | null
+          sku: string
+          unit_cost?: number | null
+          uom?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          metadata?: Json | null
+          po_id?: string
+          product_name?: string
+          quantity_ordered?: number
+          quantity_received?: number
+          shopify_line_item_id?: string | null
+          sku?: string
+          unit_cost?: number | null
+          uom?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_line_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "po_line_items_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          company_id: string
+          created_at: string
+          customer_id: string | null
+          expected_date: string | null
+          id: string
+          metadata: Json | null
+          notes: string | null
+          po_number: string
+          shopify_po_id: string | null
+          shopify_store_id: string | null
+          source_type: string | null
+          status: string
+          updated_at: string
+          vendor_id: string | null
+          vendor_name: string | null
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          customer_id?: string | null
+          expected_date?: string | null
+          id?: string
+          metadata?: Json | null
+          notes?: string | null
+          po_number: string
+          shopify_po_id?: string | null
+          shopify_store_id?: string | null
+          source_type?: string | null
+          status?: string
+          updated_at?: string
+          vendor_id?: string | null
+          vendor_name?: string | null
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          customer_id?: string | null
+          expected_date?: string | null
+          id?: string
+          metadata?: Json | null
+          notes?: string | null
+          po_number?: string
+          shopify_po_id?: string | null
+          shopify_store_id?: string | null
+          source_type?: string | null
+          status?: string
+          updated_at?: string
+          vendor_id?: string | null
+          vendor_name?: string | null
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       qboid_events: {
         Row: {
           created_at: string | null
@@ -992,6 +1141,152 @@ export type Database = {
           id?: number
         }
         Relationships: []
+      }
+      receiving_line_items: {
+        Row: {
+          condition: string
+          created_at: string
+          id: string
+          item_id: string
+          lot_number: string | null
+          notes: string | null
+          po_line_id: string
+          qc_passed: boolean | null
+          qc_required: boolean | null
+          quantity_received: number
+          received_at: string
+          received_by: string | null
+          serial_numbers: string[] | null
+          session_id: string
+          uom: string
+        }
+        Insert: {
+          condition?: string
+          created_at?: string
+          id?: string
+          item_id: string
+          lot_number?: string | null
+          notes?: string | null
+          po_line_id: string
+          qc_passed?: boolean | null
+          qc_required?: boolean | null
+          quantity_received?: number
+          received_at?: string
+          received_by?: string | null
+          serial_numbers?: string[] | null
+          session_id: string
+          uom?: string
+        }
+        Update: {
+          condition?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          lot_number?: string | null
+          notes?: string | null
+          po_line_id?: string
+          qc_passed?: boolean | null
+          qc_required?: boolean | null
+          quantity_received?: number
+          received_at?: string
+          received_by?: string | null
+          serial_numbers?: string[] | null
+          session_id?: string
+          uom?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receiving_line_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receiving_line_items_po_line_id_fkey"
+            columns: ["po_line_id"]
+            isOneToOne: false
+            referencedRelation: "po_line_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receiving_line_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "receiving_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      receiving_sessions: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          paused_at: string | null
+          po_id: string
+          session_number: string
+          started_at: string
+          status: string
+          updated_at: string
+          user_id: string
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paused_at?: string | null
+          po_id: string
+          session_number: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paused_at?: string | null
+          po_id?: string
+          session_number?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receiving_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receiving_sessions_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receiving_sessions_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       service_mappings: {
         Row: {
@@ -1413,6 +1708,70 @@ export type Database = {
           },
           {
             foreignKeyName: "shopify_order_mappings_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopify_po_mappings: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          metadata: Json | null
+          ship_tornado_po_id: string
+          shopify_po_id: string
+          shopify_po_number: string | null
+          shopify_store_id: string
+          source_type: string
+          sync_status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          metadata?: Json | null
+          ship_tornado_po_id: string
+          shopify_po_id: string
+          shopify_po_number?: string | null
+          shopify_store_id: string
+          source_type?: string
+          sync_status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          metadata?: Json | null
+          ship_tornado_po_id?: string
+          shopify_po_id?: string
+          shopify_po_number?: string | null
+          shopify_store_id?: string
+          source_type?: string
+          sync_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_po_mappings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_po_mappings_ship_tornado_po_id_fkey"
+            columns: ["ship_tornado_po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_po_mappings_shopify_store_id_fkey"
             columns: ["shopify_store_id"]
             isOneToOne: false
             referencedRelation: "shopify_stores"

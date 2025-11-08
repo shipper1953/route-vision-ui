@@ -85,6 +85,44 @@ Deno.serve(async (req) => {
       console.log('Product sync completed:', productData);
     }
 
+    // Sync Purchase Orders
+    console.log('Syncing purchase orders...');
+    const { data: poData, error: poError } = await supabase.functions.invoke('shopify-sync-purchase-orders', {
+      body: {
+        companyId: store.company_id,
+        storeId: storeId,
+        dateRangeDays: 90,
+      },
+      headers: {
+        Authorization: authHeader,
+      },
+    });
+
+    if (poError) {
+      console.error('PO sync failed:', poError);
+    } else {
+      console.log('PO sync completed:', poData);
+    }
+
+    // Sync Transfer Orders
+    console.log('Syncing transfer orders...');
+    const { data: transferData, error: transferError } = await supabase.functions.invoke('shopify-sync-transfer-orders', {
+      body: {
+        companyId: store.company_id,
+        storeId: storeId,
+        dateRangeDays: 90,
+      },
+      headers: {
+        Authorization: authHeader,
+      },
+    });
+
+    if (transferError) {
+      console.error('Transfer sync failed:', transferError);
+    } else {
+      console.log('Transfer sync completed:', transferData);
+    }
+
     // Update last_sync_at timestamp
     await supabase
       .from('shopify_stores')

@@ -75,11 +75,12 @@ export const useWmsReceiving = () => {
       const { data, error } = await supabase
         .from('receiving_sessions' as any)
         .insert([{
+          company_id: userProfile?.company_id,
           po_id: poId,
           session_number: sessionNumber,
           warehouse_id: warehouseId,
-          receiving_user_id: userProfile?.id,
-          status: 'in_progress'
+          user_id: userProfile?.id,
+          status: 'active'
         }])
         .select()
         .single();
@@ -114,17 +115,69 @@ export const useWmsReceiving = () => {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase.functions.invoke('wms-receive-inbound', {
-        body: params
-      });
+      const { error } = await supabase
+        .from('receiving_line_items' as any)
+        .insert({
+          session_id: params.sessionId,
+          po_line_id: params.poLineId,
+          item_id: params.itemId,
+          quantity_received: params.quantityReceived,
+          uom: params.uom,
+          lot_number: params.lotNumber,
+          serial_numbers: params.serialNumbers,
+          condition: params.condition || 'new',
+          qc_required: params.qcRequired || false,
+          received_by: userProfile?.id,
+          received_at: new Date().toISOString(),
+        });
 
       if (error) throw error;
+
+      // Update PO line item quantity
+      const poLineResult = await supabase
+        .from('po_line_items' as any)
+        .select('quantity_received, quantity_ordered, po_id')
+        .eq('id', params.poLineId)
+        .single();
+
+      if (!poLineResult.error && poLineResult.data) {
+        const poLine = poLineResult.data as unknown as { quantity_received: number; quantity_ordered: number; po_id: string };
+        const newQuantity = (poLine.quantity_received || 0) + params.quantityReceived;
+        
+        await supabase
+          .from('po_line_items' as any)
+          .update({ quantity_received: newQuantity })
+          .eq('id', params.poLineId);
+
+        // Check if PO is fully received
+        const allLinesResult = await supabase
+          .from('po_line_items' as any)
+          .select('quantity_received, quantity_ordered')
+          .eq('po_id', poLine.po_id);
+
+        if (!allLinesResult.error && allLinesResult.data) {
+          const allLines = allLinesResult.data as unknown as Array<{ quantity_received: number; quantity_ordered: number }>;
+          const fullyReceived = allLines.every(
+            (line) => line.quantity_received >= line.quantity_ordered
+          );
+          const partiallyReceived = allLines.some(
+            (line) => line.quantity_received > 0
+          );
+
+          await supabase
+            .from('purchase_orders' as any)
+            .update({
+              status: fullyReceived ? 'received' : (partiallyReceived ? 'partially_received' : 'pending')
+            })
+            .eq('id', poLine.po_id);
+        }
+      }
 
       // Fetch updated received items
       await fetchReceivedItems(params.sessionId);
       
       toast.success('Item received successfully');
-      return data;
+      return true;
     } catch (error: any) {
       console.error('Error receiving item:', error);
       toast.error(error.message || 'Failed to receive item');
