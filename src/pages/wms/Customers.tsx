@@ -2,16 +2,19 @@ import { useState } from "react";
 import { useCustomers, Customer } from "@/hooks/useCustomers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, LayoutGrid, List } from "lucide-react";
 import { CreateCustomerDialog } from "@/components/wms/customers/CreateCustomerDialog";
 import { CustomersList } from "@/components/wms/customers/CustomersList";
+import { CustomerDetailCard } from "@/components/wms/customers/CustomerDetailCard";
 import { TmsLayout } from "@/components/layout/TmsLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Customers = () => {
   const { customers, loading, createCustomer, updateCustomer, deleteCustomer } = useCustomers();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "cards">("cards");
 
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -42,8 +45,8 @@ const Customers = () => {
           </Button>
         </div>
 
-        {/* Search */}
-        <div className="flex items-center gap-2">
+        {/* Search & View Toggle */}
+        <div className="flex items-center justify-between gap-2">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -53,12 +56,44 @@ const Customers = () => {
               className="pl-10"
             />
           </div>
+          <div className="flex gap-1 border rounded-lg p-1">
+            <Button
+              variant={viewMode === "cards" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("cards")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        {/* Customers List */}
+        {/* Customers View */}
         {loading && customers.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground">Loading customers...</p>
+          </div>
+        ) : viewMode === "cards" ? (
+          <div className="grid gap-4">
+            {filteredCustomers.map((customer) => (
+              <CustomerDetailCard
+                key={customer.id}
+                customer={customer}
+                onEdit={setEditingCustomer}
+                onDelete={handleDelete}
+              />
+            ))}
+            {filteredCustomers.length === 0 && (
+              <div className="text-center py-12 border rounded-lg">
+                <p className="text-muted-foreground">No customers found.</p>
+              </div>
+            )}
           </div>
         ) : (
           <CustomersList
