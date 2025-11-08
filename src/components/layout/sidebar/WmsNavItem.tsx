@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, NavLink } from "react-router-dom";
 import { ChevronDown, Package, ClipboardCheck, Warehouse, ListChecks, BarChart3, Users, FileText, MapPin, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/hooks/useAuth";
+import { useSidebar } from "@/context/SidebarContext";
 
 interface WmsNavItemProps {
   isCollapsed?: boolean;
@@ -13,7 +14,10 @@ interface WmsNavItemProps {
 export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
   const location = useLocation();
   const { userProfile } = useAuth();
+  const { setIsCollapsed } = useSidebar();
   const [isOpen, setIsOpen] = useState(location.pathname.startsWith('/wms'));
+  const [isHovered, setIsHovered] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
 
   // Keep WMS menu expanded when on WMS pages
   useEffect(() => {
@@ -37,8 +41,78 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
     return null;
   }
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsCollapsed(true);
+  };
+
+  const getTooltipPosition = () => {
+    if (!navRef.current) return {};
+    const rect = navRef.current.getBoundingClientRect();
+    return {
+      left: rect.right + 8,
+      top: rect.top,
+    };
+  };
+
+  const wmsSubmenuItems = [
+    { label: "Dashboard", to: "/wms/dashboard" },
+    { label: "Customers", to: "/wms/customers" },
+    { label: "Purchase Orders", to: "/wms/purchase-orders" },
+    ...(hasReceiving ? [{ label: "Receiving", to: "/wms/receiving" }] : []),
+    ...(hasQuality ? [{ label: "Quality", to: "/wms/quality" }] : []),
+    ...(hasInventory ? [{ label: "Inventory", to: "/wms/inventory" }] : []),
+    ...(hasPicking ? [{ label: "Picking", to: "/wms/picking" }, { label: "Pick Waves", to: "/wms/pick-waves" }] : []),
+    ...(hasInventory ? [{ label: "Locations", to: "/wms/locations" }] : []),
+    ...(hasReporting ? [{ label: "Reports", to: "/wms/reporting" }] : []),
+  ];
+
   if (isCollapsed) {
-    return <NavItem icon={Warehouse} label="WMS" to="/wms/dashboard" isCollapsed={isCollapsed} />;
+    return (
+      <div
+        ref={navRef}
+        className="relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div
+          className={cn(
+            "flex items-center justify-center px-3 py-2 rounded-md transition-colors cursor-pointer",
+            location.pathname.startsWith('/wms')
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+              : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80"
+          )}
+        >
+          <Warehouse size={20} />
+        </div>
+
+        {isHovered && (
+          <div
+            className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[160px]"
+            style={getTooltipPosition()}
+          >
+            <div className="py-1">
+              {wmsSubmenuItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={handleClick}
+                  className={({ isActive }) =>
+                    cn(
+                      "block px-4 py-2 text-sm hover:bg-gray-800 transition-colors",
+                      isActive && "bg-gray-800"
+                    )
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+            <div className="absolute right-full top-4 border-4 border-transparent border-r-gray-900"></div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (

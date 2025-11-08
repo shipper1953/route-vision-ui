@@ -1,15 +1,25 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
-import { useState, useRef } from "react";
-import { Database, ChevronRight } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Database, ChevronDown, Plus, List } from "lucide-react";
+import { NavItem } from "./NavItem";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export const ItemMasterNavItem = () => {
   const location = useLocation();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const [isHovered, setIsHovered] = useState(false);
+  const [isOpen, setIsOpen] = useState(location.pathname.startsWith('/item-master'));
   const navRef = useRef<HTMLDivElement>(null);
   const isActive = location.pathname.startsWith('/item-master');
+
+  // Keep menu expanded when on Item Master pages
+  useEffect(() => {
+    if (location.pathname.startsWith('/item-master')) {
+      setIsOpen(true);
+    }
+  }, [location.pathname]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -26,8 +36,8 @@ export const ItemMasterNavItem = () => {
   };
 
   const submenuItems = [
-    { label: "Create Item", path: "/item-master/create" },
-    { label: "Items", path: "/item-master" }
+    { icon: Plus, label: "Create Item", to: "/item-master/create" },
+    { icon: List, label: "Items", to: "/item-master" }
   ];
 
   return (
@@ -58,8 +68,8 @@ export const ItemMasterNavItem = () => {
               <div className="py-1">
                 {submenuItems.map((item) => (
                   <NavLink
-                    key={item.path}
-                    to={item.path}
+                    key={item.to}
+                    to={item.to}
                     onClick={handleClick}
                     className={({ isActive }) =>
                       cn(
@@ -77,46 +87,34 @@ export const ItemMasterNavItem = () => {
           )}
         </>
       ) : (
-        <>
-          <div
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md transition-colors cursor-pointer",
-              isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
-            )}
-          >
-            <Database size={20} />
-            <span className="flex-1">Item Master</span>
-            <ChevronRight size={16} className="text-sidebar-foreground/60" />
-          </div>
-
-          {isHovered && (
-            <div
-              className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[160px]"
-              style={getTooltipPosition()}
-            >
-              <div className="py-1">
-                {submenuItems.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    onClick={handleClick}
-                    className={({ isActive }) =>
-                      cn(
-                        "block px-4 py-2 text-sm hover:bg-gray-800 transition-colors",
-                        isActive && "bg-gray-800"
-                      )
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
-              </div>
-              <div className="absolute right-full top-4 border-4 border-transparent border-r-gray-900"></div>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger className="w-full">
+            <div className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-sidebar-accent group",
+              isActive && "bg-sidebar-accent"
+            )}>
+              <Database className="h-5 w-5 flex-shrink-0 text-sidebar-foreground" />
+              <span className="flex-1 text-left text-sm font-medium text-sidebar-foreground">
+                Item Master
+              </span>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-sidebar-foreground transition-transform",
+                isOpen && "rotate-180"
+              )} />
             </div>
-          )}
-        </>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="ml-4 mt-1 space-y-1 border-l-2 border-sidebar-border pl-2">
+            {submenuItems.map(item => (
+              <NavItem 
+                key={item.to}
+                icon={item.icon} 
+                label={item.label} 
+                to={item.to} 
+                isCollapsed={false}
+              />
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </div>
   );

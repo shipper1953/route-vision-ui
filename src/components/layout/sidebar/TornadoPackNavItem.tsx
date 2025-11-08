@@ -1,15 +1,25 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
-import { useState, useRef } from "react";
-import { Box, ChevronRight } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Package, ChevronDown, History, Archive, Lightbulb, BookOpen, TestTube, Printer } from "lucide-react";
+import { NavItem } from "./NavItem";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export const TornadoPackNavItem = () => {
   const location = useLocation();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const [isHovered, setIsHovered] = useState(false);
+  const [isOpen, setIsOpen] = useState(location.pathname.startsWith('/packaging'));
   const navRef = useRef<HTMLDivElement>(null);
   const isActive = location.pathname.startsWith('/packaging');
+
+  // Keep menu expanded when on Packaging pages
+  useEffect(() => {
+    if (location.pathname.startsWith('/packaging')) {
+      setIsOpen(true);
+    }
+  }, [location.pathname]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -26,12 +36,12 @@ export const TornadoPackNavItem = () => {
   };
 
   const submenuItems = [
-    { label: "Historical", path: "/packaging?tab=historical-usage" },
-    { label: "Inventory", path: "/packaging?tab=box-inventory" },
-    { label: "Recommendations", path: "/packaging?tab=box-recommendations" },
-    { label: "Rules", path: "/packaging?tab=packaging-rules" },
-    { label: "Testing", path: "/packaging?tab=testing" },
-    { label: "Printer", path: "/packaging?tab=printer" }
+    { icon: History, label: "Historical", to: "/packaging?tab=historical-usage" },
+    { icon: Archive, label: "Inventory", to: "/packaging?tab=box-inventory" },
+    { icon: Lightbulb, label: "Recommendations", to: "/packaging?tab=box-recommendations" },
+    { icon: BookOpen, label: "Rules", to: "/packaging?tab=packaging-rules" },
+    { icon: TestTube, label: "Testing", to: "/packaging?tab=testing" },
+    { icon: Printer, label: "Printer", to: "/packaging?tab=printer" }
   ];
 
   return (
@@ -51,7 +61,7 @@ export const TornadoPackNavItem = () => {
                 : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
             )}
           >
-            <Box size={20} />
+            <Package size={20} />
           </div>
 
           {isHovered && (
@@ -62,8 +72,8 @@ export const TornadoPackNavItem = () => {
               <div className="py-1">
                 {submenuItems.map((item) => (
                   <NavLink
-                    key={item.path}
-                    to={item.path}
+                    key={item.to}
+                    to={item.to}
                     onClick={handleClick}
                     className={({ isActive }) =>
                       cn(
@@ -81,46 +91,34 @@ export const TornadoPackNavItem = () => {
           )}
         </>
       ) : (
-        <>
-          <div
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md transition-colors cursor-pointer",
-              isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
-            )}
-          >
-            <Box size={20} />
-            <span className="flex-1">Tornado Pack</span>
-            <ChevronRight size={16} className="text-sidebar-foreground/60" />
-          </div>
-
-          {isHovered && (
-            <div
-              className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[180px]"
-              style={getTooltipPosition()}
-            >
-              <div className="py-1">
-                {submenuItems.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    onClick={handleClick}
-                    className={({ isActive }) =>
-                      cn(
-                        "block px-4 py-2 text-sm hover:bg-gray-800 transition-colors",
-                        isActive && "bg-gray-800"
-                      )
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
-              </div>
-              <div className="absolute right-full top-4 border-4 border-transparent border-r-gray-900"></div>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger className="w-full">
+            <div className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-sidebar-accent group",
+              isActive && "bg-sidebar-accent"
+            )}>
+              <Package className="h-5 w-5 flex-shrink-0 text-sidebar-foreground" />
+              <span className="flex-1 text-left text-sm font-medium text-sidebar-foreground">
+                Tornado Pack
+              </span>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-sidebar-foreground transition-transform",
+                isOpen && "rotate-180"
+              )} />
             </div>
-          )}
-        </>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="ml-4 mt-1 space-y-1 border-l-2 border-sidebar-border pl-2">
+            {submenuItems.map(item => (
+              <NavItem 
+                key={item.to}
+                icon={item.icon} 
+                label={item.label} 
+                to={item.to} 
+                isCollapsed={false}
+              />
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </div>
   );
