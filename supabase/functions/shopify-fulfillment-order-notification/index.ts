@@ -333,12 +333,16 @@ Deno.serve(async (req) => {
     for (const fo of fulfillmentOrders) {
       // Check if we've already processed this fulfillment order
       const fulfillmentOrderId = fo.id;
-      const { data: existing } = await supabase
+      const { data: existingRecords } = await supabase
         .from('shopify_fulfillment_orders')
-        .select('id')
-        .eq('fulfillment_order_id', fulfillmentOrderId)
-        .eq('shopify_store_id', store.id)
-        .maybeSingle();
+        .select('id, shopify_store_id, company_id')
+        .eq('fulfillment_order_id', fulfillmentOrderId);
+
+      const existing = existingRecords?.find(
+        (record: { shopify_store_id: string | null; company_id: string | null }) =>
+          record.shopify_store_id === store.id ||
+          (!record.shopify_store_id && record.company_id === store.company_id)
+      );
 
       if (existing) {
         console.log(`⏭️  Fulfillment order ${fulfillmentOrderId} already processed, skipping`);
@@ -539,15 +543,24 @@ Deno.serve(async (req) => {
         console.log(`   Status: ${acceptedFO.status}, Request Status: ${acceptedFO.requestStatus}`);
         
         // Update our tracking with the new status
+        const updatePayload = {
+          status: acceptedFO.status,
+          request_status: acceptedFO.requestStatus,
+        };
+
         await supabase
           .from('shopify_fulfillment_orders')
-          .update({
-            status: acceptedFO.status,
-            request_status: acceptedFO.requestStatus,
-          })
+          .update(updatePayload)
           .eq('fulfillment_order_id', fulfillmentOrderId)
           .eq('shopify_store_id', store.id);
-          
+
+        await supabase
+          .from('shopify_fulfillment_orders')
+          .update(updatePayload)
+          .eq('fulfillment_order_id', fulfillmentOrderId)
+          .is('shopify_store_id', null)
+          .eq('company_id', store.company_id);
+
       } catch (acceptError) {
         console.error(`⚠️  Failed to accept fulfillment order ${fulfillmentOrderId}:`, acceptError);
         // Log but don't fail - the order was created successfully

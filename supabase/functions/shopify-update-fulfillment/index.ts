@@ -213,13 +213,17 @@ async function handleFulfillmentServiceFlow(
   console.log('Fetching fulfillment order for order:', orderShipment.order_id);
 
   // Get fulfillment order for this Ship Tornado order
-  const { data: fulfillmentOrders, error: foError } = await supabase
+  const { data: fulfillmentOrdersRaw, error: foError } = await supabase
     .from('shopify_fulfillment_orders')
     .select('*')
     .eq('ship_tornado_order_id', orderShipment.order_id)
-    .eq('shopify_store_id', store.id)
     .not('status', 'in', '("closed","cancelled")');
-  
+
+  const fulfillmentOrders = fulfillmentOrdersRaw?.filter((fo: any) =>
+    fo.shopify_store_id === store.id ||
+    (!fo.shopify_store_id && fo.company_id === (store.company_id || order.company_id))
+  );
+
   console.log(`Found ${fulfillmentOrders?.length || 0} fulfillment orders with status: ${fulfillmentOrders?.map(fo => fo.status).join(', ')}`);
 
   if (foError) {
