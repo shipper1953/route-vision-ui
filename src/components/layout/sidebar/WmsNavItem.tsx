@@ -88,7 +88,7 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
 
         {isHovered && (
           <div
-            className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[160px]"
+            className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[160px] animate-fade-in"
             style={getTooltipPosition()}
           >
             <div className="py-1">

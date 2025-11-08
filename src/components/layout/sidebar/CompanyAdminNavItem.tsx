@@ -67,7 +67,7 @@ export const CompanyAdminNavItem = () => {
 
           {isHovered && (
             <div
-              className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[180px]"
+              className="fixed bg-gray-900 text-white rounded-md shadow-lg border border-gray-700 z-[9999] min-w-[180px] animate-fade-in"
               style={getTooltipPosition()}
             >
               <div className="py-1">
