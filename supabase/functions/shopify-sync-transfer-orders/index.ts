@@ -58,8 +58,13 @@ Deno.serve(async (req) => {
       throw new Error('No default warehouse found');
     }
 
-    const shopifyUrl = store.store_url.replace(/\/$/, '');
+    // Clean and format store URL (remove https://, http://, trailing slashes)
+    const shopifyUrl = store.store_url
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
     const accessToken = store.access_token;
+
+    console.log(`[Transfer Sync] Using store URL: https://${shopifyUrl}`);
 
     // Calculate date range
     const createdAtMin = new Date();
@@ -80,7 +85,7 @@ Deno.serve(async (req) => {
       });
 
       const response = await fetch(
-        `${shopifyUrl}/admin/api/2024-01/inventory_transfers.json?${params}`,
+        `https://${shopifyUrl}/admin/api/2024-01/inventory_transfers.json?${params}`,
         {
           headers: {
             'X-Shopify-Access-Token': accessToken,
@@ -90,8 +95,10 @@ Deno.serve(async (req) => {
       );
 
       if (!response.ok) {
-        console.error(`Shopify API error: ${response.status}`);
-        break;
+        const errorBody = await response.text();
+        console.error(`[Transfer Sync] Shopify API error - Status: ${response.status} ${response.statusText}`);
+        console.error(`[Transfer Sync] Response body: ${errorBody}`);
+        throw new Error(`Shopify API error (${response.status}): ${response.statusText}`);
       }
 
       const data = await response.json();

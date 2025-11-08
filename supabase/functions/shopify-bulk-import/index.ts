@@ -55,8 +55,14 @@ serve(async (req) => {
       throw new Error('Store credentials not found or invalid');
     }
 
-    const storeUrl = store.store_url;
+    // Clean and format store URL (remove https://, http://, trailing slashes)
+    let storeUrl = store.store_url
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
+    
     const accessToken = store.access_token;
+
+    console.log(`Using store URL: ${storeUrl}`);
 
     // Calculate date range
     const endDate = new Date();
@@ -82,7 +88,11 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      throw new Error(`Shopify API error: ${response.statusText}`);
+      const errorBody = await response.text();
+      console.error(`Shopify API error - Status: ${response.status} ${response.statusText}`);
+      console.error(`URL called: ${shopifyApiUrl}?${params}`);
+      console.error(`Response body: ${errorBody}`);
+      throw new Error(`Shopify API error (${response.status}): ${response.statusText}. ${errorBody}`);
     }
 
     const { orders } = await response.json();
