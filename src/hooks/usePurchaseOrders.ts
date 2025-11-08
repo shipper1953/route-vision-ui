@@ -78,13 +78,23 @@ export const usePurchaseOrders = () => {
   };
 
   const fetchPurchaseOrderById = async (id: string) => {
+    if (!userProfile?.company_id && userProfile?.role !== 'super_admin') {
+      toast.error('Company context not found');
+      return null;
+    }
+
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('purchase_orders' as any)
         .select('*, po_line_items(*)')
-        .eq('id', id)
-        .single();
+        .eq('id', id);
+
+      if (userProfile?.company_id) {
+        query = query.eq('company_id', userProfile.company_id);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) throw error;
       return data;
@@ -101,15 +111,50 @@ export const usePurchaseOrders = () => {
     poData: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>,
     lineItems: PurchaseOrderLineItem[]
   ) => {
+    if (!userProfile?.company_id) {
+      toast.error('Company information not found');
+      return null;
+    }
+
     try {
       setLoading(true);
+
+      const missingItem = lineItems.find(item => !item.item_id);
+      if (missingItem) {
+        toast.error('All purchase order line items must have an item selected');
+        return null;
+      }
+
+      const itemIds = Array.from(new Set(lineItems.map(item => item.item_id)));
+
+      const { data: itemsForCompany, error: itemsError } = await supabase
+        .from('items')
+        .select('id, company_id')
+        .in('id', itemIds);
+
+      if (itemsError) {
+        toast.error(itemsError.message || 'Failed to validate line items');
+        return null;
+      }
+
+      if (!itemsForCompany || itemsForCompany.length !== itemIds.length) {
+        toast.error('One or more selected items are not available for this company');
+        return null;
+      }
+
+      const invalidItem = itemsForCompany.find(item => item.company_id !== userProfile.company_id);
+      if (invalidItem) {
+        toast.error('Purchase orders can only include items that belong to your company');
+        return null;
+      }
 
       // Create PO
       const { data: po, error: poError } = await supabase
         .from('purchase_orders' as any)
         .insert([{
           ...poData,
-          created_by: userProfile?.id
+          created_by: userProfile?.id,
+          company_id: userProfile.company_id
         }])
         .select()
         .single();
@@ -142,12 +187,23 @@ export const usePurchaseOrders = () => {
   };
 
   const updatePurchaseOrder = async (id: string, updates: Partial<PurchaseOrder>) => {
+    if (!userProfile?.company_id && userProfile?.role !== 'super_admin') {
+      toast.error('Company context not found');
+      return null;
+    }
+
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('purchase_orders' as any)
         .update(updates)
-        .eq('id', id)
+        .eq('id', id);
+
+      if (userProfile?.company_id) {
+        query = query.eq('company_id', userProfile.company_id);
+      }
+
+      const { data, error } = await query
         .select()
         .single();
 

@@ -3,6 +3,7 @@ export interface Item {
   id: string;
   sku: string;
   name: string;
+  companyId?: string;
   length: number;
   width: number;
   height: number;

@@ -46,12 +46,23 @@ export const useItemMaster = () => {
   }, [userProfile]);
 
   const fetchItems = async () => {
+    if (!userProfile?.company_id && userProfile?.role !== 'super_admin') {
+      setItems([]);
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('items')
         .select('*')
         .order('name');
+
+      if (userProfile?.company_id) {
+        query = query.eq('company_id', userProfile.company_id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -60,6 +71,7 @@ export const useItemMaster = () => {
         id: item.id,
         sku: item.sku,
         name: item.name,
+        companyId: item.company_id,
         length: Number(item.length),
         width: Number(item.width),
         height: Number(item.height),
@@ -119,6 +131,7 @@ export const useItemMaster = () => {
         id: data.id,
         sku: data.sku,
         name: data.name,
+        companyId: data.company_id,
         length: Number(data.length),
         width: Number(data.width),
         height: Number(data.height),
@@ -142,6 +155,11 @@ export const useItemMaster = () => {
   };
 
   const updateItem = async (updatedItem: Item) => {
+    if (!userProfile?.company_id) {
+      toast.error('Company information not found');
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
@@ -157,7 +175,8 @@ export const useItemMaster = () => {
           is_active: updatedItem.isActive,
           customer_id: updatedItem.customerId || null
         })
-        .eq('id', updatedItem.id);
+        .eq('id', updatedItem.id)
+        .eq('company_id', userProfile.company_id);
 
       if (error) throw error;
 
@@ -174,12 +193,18 @@ export const useItemMaster = () => {
   };
 
   const deleteItem = async (id: string) => {
+    if (!userProfile?.company_id) {
+      toast.error('Company information not found');
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
         .from('items')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('company_id', userProfile.company_id);
 
       if (error) throw error;
 

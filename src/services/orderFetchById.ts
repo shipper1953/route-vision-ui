@@ -11,17 +11,38 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
     if (DEBUG_ENABLED) {
       console.log(`Fetching order by ID: ${orderId}`);
     }
-    
+
+    let companyId: string | null = null;
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error('Failed to resolve authenticated user for order lookup:', authError);
+    }
+
+    if (authData?.user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('company_id, role')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      if (!profileError) {
+        companyId = profile?.company_id ?? null;
+      } else {
+        console.error('Failed to resolve user profile for order lookup:', profileError);
+      }
+    }
+
     // Convert orderId to number since the database id column is bigint
     const orderIdNumber = parseInt(orderId, 10);
-    
+
     if (isNaN(orderIdNumber)) {
       console.error(`Invalid order ID format: ${orderId}`);
       return null;
     }
     
     // Fetch order with narrowed projection
-    const { data: order, error } = await supabase
+    let query = supabase
       .from('orders')
       .select(`
         id, order_id, customer_name, customer_company, customer_email, customer_phone,
@@ -30,8 +51,13 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
         estimated_delivery_date, actual_delivery_date, shipment_id,
         items_shipped, items_total, fulfillment_percentage, fulfillment_status
       `)
-      .eq('id', orderIdNumber)
-      .maybeSingle();
+      .eq('id', orderIdNumber);
+
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+
+    const { data: order, error } = await query.maybeSingle();
 
     if (error) {
       console.error('Error fetching order:', error);

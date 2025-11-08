@@ -17,14 +17,39 @@ export async function fetchOrdersPaginated(
   page: number = 1,
   pageSize: number = 10,
   searchTerm?: string,
-  statusFilter?: string
+  statusFilter?: string,
+  companyIdOverride?: string
 ): Promise<PaginatedOrdersResult> {
   console.log(`Fetching paginated orders: page ${page}, size ${pageSize}, search: ${searchTerm}, status: ${statusFilter}`);
-  
+
   try {
+    let companyId: string | null | undefined = companyIdOverride;
+
+    if (!companyIdOverride) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError) {
+        console.error('Failed to resolve authenticated user for order query:', authError);
+      }
+
+      if (user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('company_id, role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (!profileError) {
+          companyId = profile?.company_id;
+        } else {
+          console.error('Failed to resolve user profile for order query:', profileError);
+        }
+      }
+    }
+
     // Calculate offset
     const offset = (page - 1) * pageSize;
-    
+
     // Build base query with specific column projection including fulfillment fields
     let query = supabase
       .from('orders')
@@ -35,6 +60,10 @@ export async function fetchOrdersPaginated(
         estimated_delivery_date, actual_delivery_date, shipment_id,
         items_shipped, items_total, fulfillment_percentage, fulfillment_status
       `, { count: 'exact' });
+
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
     
     // Add search filter if provided
     if (searchTerm && searchTerm.trim()) {
