@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,8 +15,7 @@ import { CreateMenu } from "./sidebar/CreateMenu";
 import { LogoutButton } from "./sidebar/LogoutButton";
 import { ShipTornadoLogo } from "@/components/logo/ShipTornadoLogo";
 import { useSidebar } from "@/context/SidebarContext";
-import { useLocation } from "react-router-dom";
-import { 
+import {
   Home,
   Database,
   Truck,
@@ -25,9 +23,11 @@ import {
   Users,
   Settings,
   BarChart3,
-  Shield
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const TmsSidebar = () => {
   const { isCollapsed, toggleSidebar, sidebarRef } = useSidebar();
@@ -36,25 +36,20 @@ export const TmsSidebar = () => {
   const isAdmin = userProfile?.role === 'company_admin';
   const isSuperAdmin = userProfile?.role === 'super_admin';
 
-  const handleSidebarClick = () => {
-    toggleSidebar();
-  };
-
   return (
     <div
       ref={sidebarRef}
       className={cn(
-        "fixed left-0 top-0 z-40 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out flex flex-col cursor-pointer",
+        "fixed left-0 top-0 z-40 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out flex flex-col",
         isCollapsed ? "w-16" : "w-64"
       )}
-      onClick={handleSidebarClick}
     >
       {/* Header with Ship Tornado Logo */}
-      <div className="p-4 border-b border-sidebar-border flex items-center justify-center">
+      <div className="relative p-4 border-b border-sidebar-border flex items-center justify-center">
         <div className="flex items-center gap-3">
-          <ShipTornadoLogo 
-            size={24} 
-            className="text-sidebar-foreground flex-shrink-0" 
+          <ShipTornadoLogo
+            size={24}
+            className="text-sidebar-foreground flex-shrink-0"
           />
           {!isCollapsed && (
             <span className="text-lg font-semibold text-sidebar-foreground">
@@ -62,6 +57,25 @@ export const TmsSidebar = () => {
             </span>
           )}
         </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2 h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground"
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleSidebar();
+              }}
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="text-xs">
+            {isCollapsed ? "Expand" : "Collapse"}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Navigation */}

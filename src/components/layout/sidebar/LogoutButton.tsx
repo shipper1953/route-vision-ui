@@ -5,6 +5,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LogoutButtonProps {
   isCollapsed: boolean;
@@ -14,10 +15,13 @@ export const LogoutButton = ({ isCollapsed }: LogoutButtonProps) => {
   const { logout, loading, clearAuthState } = useAuth();
   const { setIsCollapsed } = useSidebar();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const handleLogout = async () => {
-    setIsCollapsed(true);
-    
+    if (isMobile) {
+      setIsCollapsed(true);
+    }
+
     try {
       console.log('Starting logout process...');
       

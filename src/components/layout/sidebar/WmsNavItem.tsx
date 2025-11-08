@@ -6,6 +6,7 @@ import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebar } from "@/context/SidebarContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface WmsNavItemProps {
   isCollapsed?: boolean;
@@ -18,6 +19,7 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
   const [isOpen, setIsOpen] = useState(location.pathname.startsWith('/wms'));
   const [isHovered, setIsHovered] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // Keep WMS menu expanded when on WMS pages
   useEffect(() => {
@@ -43,7 +45,9 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsCollapsed(true);
+    if (isMobile) {
+      setIsCollapsed(true);
+    }
   };
 
   const getTooltipPosition = () => {

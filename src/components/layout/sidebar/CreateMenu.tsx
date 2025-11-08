@@ -4,6 +4,7 @@ import { Package, Plus, Truck, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,9 +19,12 @@ interface CreateMenuProps {
 export const CreateMenu = ({ isCollapsed }: CreateMenuProps) => {
   const { setIsCollapsed } = useSidebar();
   const { isAdmin } = useAuth();
+  const isMobile = useIsMobile();
 
   const handleMenuItemClick = () => {
-    setIsCollapsed(true);
+    if (isMobile) {
+      setIsCollapsed(true);
+    }
   };
 
   return (

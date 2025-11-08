@@ -1,10 +1,11 @@
+import { useState, useRef, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
-import { useState, useRef, useEffect } from "react";
 import { Database, ChevronDown, Plus, List } from "lucide-react";
 import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export const ItemMasterNavItem = () => {
   const location = useLocation();
@@ -13,6 +14,7 @@ export const ItemMasterNavItem = () => {
   const [isOpen, setIsOpen] = useState(location.pathname.startsWith('/item-master'));
   const navRef = useRef<HTMLDivElement>(null);
   const isActive = location.pathname.startsWith('/item-master');
+  const isMobile = useIsMobile();
 
   // Keep menu expanded when on Item Master pages
   useEffect(() => {
@@ -23,7 +25,9 @@ export const ItemMasterNavItem = () => {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsCollapsed(true);
+    if (isMobile) {
+      setIsCollapsed(true);
+    }
   };
 
   const getTooltipPosition = () => {
