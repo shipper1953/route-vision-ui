@@ -4,11 +4,12 @@ import { toast } from "sonner";
 import { useSupabaseShipments } from "./useSupabaseShipments";
 import { useOrderShipments } from "./useOrderShipments";
 import { usePurchasedLabelHandler } from "./usePurchasedLabelHandler";
-import { 
-  loadShipmentsFromLocalStorage, 
-  saveShipmentsToLocalStorage 
+import {
+  loadShipmentsFromLocalStorage,
+  saveShipmentsToLocalStorage
 } from "@/utils/shipmentDataUtils";
 import { sampleShipments } from "@/types/shipmentTypes";
+import { useAuth } from "./useAuth";
 
 const PAGE_SIZE = 10;
 
@@ -17,6 +18,7 @@ export const usePaginatedShipments = () => {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const { isAuthenticated } = useAuth();
 
   // Get shipments from various sources
   const { shipments: supabaseShipments, loading: loadingSupabase, error: supabaseError } = useSupabaseShipments();
@@ -49,14 +51,19 @@ export const usePaginatedShipments = () => {
           // Get local storage shipments as fallback
           const localStorageShipments = loadShipmentsFromLocalStorage();
           console.log("Local storage shipments:", localStorageShipments.length);
-          
+
           if (localStorageShipments.length > 0) {
             console.log("Using local storage shipments, total:", localStorageShipments.length);
             setAllShipments(localStorageShipments);
           } else {
-            // Use sample data only if nothing else is available
-            console.log("No shipments found from any source, using sample data");
-            setAllShipments(sampleShipments);
+            if (isAuthenticated) {
+              console.log("Authenticated user with no shipments found; skipping sample dataset fallback");
+              setAllShipments([]);
+            } else {
+              // Use sample data only if nothing else is available for unauthenticated sessions
+              console.log("No shipments found from any source, using sample data");
+              setAllShipments(sampleShipments);
+            }
           }
         }
         
@@ -74,20 +81,22 @@ export const usePaginatedShipments = () => {
         const localStorageShipments = loadShipmentsFromLocalStorage();
         if (localStorageShipments.length > 0) {
           setAllShipments(localStorageShipments);
+        } else if (isAuthenticated) {
+          setAllShipments([]);
         } else {
-          // As a last resort, use sample data
+          // As a last resort for unauthenticated users, use sample data
           setAllShipments(sampleShipments);
         }
       } finally {
         setLoading(false);
       }
     };
-    
+
     // Only load when both sources have finished loading
     if (!loadingSupabase && !loadingOrders) {
       loadAllShipments();
     }
-  }, [supabaseShipments, orderShipments, loadingSupabase, loadingOrders, supabaseError]);
+  }, [supabaseShipments, orderShipments, loadingSupabase, loadingOrders, supabaseError, isAuthenticated]);
 
   // Filter shipments based on search term
   const filteredShipments = useMemo(() => {
