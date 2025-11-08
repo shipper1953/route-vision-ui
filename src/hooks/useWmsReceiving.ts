@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
@@ -134,7 +134,7 @@ export const useWmsReceiving = () => {
     }
   };
 
-  const fetchReceivedItems = async (sessionId: string) => {
+  const fetchReceivedItems = useCallback(async (sessionId: string) => {
     try {
       const { data, error } = await supabase
         .from('receiving_line_items' as any)
@@ -147,7 +147,7 @@ export const useWmsReceiving = () => {
     } catch (error) {
       console.error('Error fetching received items:', error);
     }
-  };
+  }, []);
 
   const completeReceivingSession = async (sessionId: string) => {
     try {
