@@ -88,7 +88,7 @@ serve(async (req) => {
     // Get Shopify order mapping
     const { data: mapping, error: mappingError } = await supabase
       .from('shopify_order_mappings')
-      .select('shopify_order_id')
+      .select('shopify_order_id, shopify_store_id, company_id')
       .eq('ship_tornado_order_id', orderShipment.order_id)
       .maybeSingle();
 
@@ -102,16 +102,50 @@ serve(async (req) => {
       });
     }
 
-    // Get company Shopify settings
-    const { data: company } = await supabase
-      .from('companies')
-      .select('settings')
-      .eq('id', order.company_id)
-      .single();
+    // Resolve Shopify store connection for this order
+    const { data: storeRecord, error: storeError } = await supabase
+      .from('shopify_stores')
+      .select('id, store_url, access_token, fulfillment_service_id, fulfillment_service_location_id, company_id, customer_id, settings')
+      .eq('id', mapping.shopify_store_id)
+      .maybeSingle();
 
-    const shopifySettings = company?.settings?.shopify;
+    let store = storeRecord;
 
-    if (!shopifySettings?.access_token) {
+    if ((!store || storeError) && order.company_id) {
+      const { data: fallbackStore } = await supabase
+        .from('shopify_stores')
+        .select('id, store_url, access_token, fulfillment_service_id, fulfillment_service_location_id, company_id, customer_id, settings')
+        .eq('company_id', order.company_id)
+        .eq('is_active', true)
+        .order('connected_at', { ascending: false })
+        .maybeSingle();
+
+      if (fallbackStore) {
+        console.warn('⚠️  Shopify store mapping missing store_id, using fallback store connection');
+        store = fallbackStore;
+      }
+    }
+
+    if (!store) {
+      throw new Error('Shopify store connection not found for order');
+    }
+
+    const baseSettings = store.settings || {};
+    const shopifySettings = {
+      ...baseSettings,
+      store_url: store.store_url,
+      access_token: store.access_token,
+      fulfillment_service: store.fulfillment_service_id
+        ? {
+            id: store.fulfillment_service_id,
+            location_id: store.fulfillment_service_location_id,
+          }
+        : baseSettings.fulfillment_service || null,
+      fulfillment_service_location_id:
+        store.fulfillment_service_location_id || baseSettings.fulfillment_service?.location_id || null,
+    };
+
+    if (!shopifySettings.access_token) {
       throw new Error('Shopify not connected');
     }
 
@@ -128,6 +162,7 @@ serve(async (req) => {
       return await handleFulfillmentServiceFlow(
         supabase,
         shopifySettings,
+        store,
         orderShipment,
         order,
         mapping,
@@ -141,6 +176,7 @@ serve(async (req) => {
       return await handleLegacyFlow(
         supabase,
         shopifySettings,
+        store,
         orderShipment,
         order,
         mapping,
@@ -165,6 +201,7 @@ serve(async (req) => {
 async function handleFulfillmentServiceFlow(
   supabase: any,
   shopifySettings: any,
+  store: any,
   orderShipment: any,
   order: any,
   mapping: any,
@@ -176,12 +213,17 @@ async function handleFulfillmentServiceFlow(
   console.log('Fetching fulfillment order for order:', orderShipment.order_id);
 
   // Get fulfillment order for this Ship Tornado order
-  const { data: fulfillmentOrders, error: foError } = await supabase
+  const { data: fulfillmentOrdersRaw, error: foError } = await supabase
     .from('shopify_fulfillment_orders')
     .select('*')
     .eq('ship_tornado_order_id', orderShipment.order_id)
     .not('status', 'in', '("closed","cancelled")');
-  
+
+  const fulfillmentOrders = fulfillmentOrdersRaw?.filter((fo: any) =>
+    fo.shopify_store_id === store.id ||
+    (!fo.shopify_store_id && fo.company_id === (store.company_id || order.company_id))
+  );
+
   console.log(`Found ${fulfillmentOrders?.length || 0} fulfillment orders with status: ${fulfillmentOrders?.map(fo => fo.status).join(', ')}`);
 
   if (foError) {
@@ -193,7 +235,8 @@ async function handleFulfillmentServiceFlow(
     console.warn('No open fulfillment orders found - order may not be assigned yet');
     
     await supabase.from('shopify_sync_logs').insert({
-      company_id: order.company_id,
+      company_id: store.company_id || order.company_id,
+      shopify_store_id: store.id,
       sync_type: 'fulfillment',
       direction: 'outbound',
       status: 'skipped',
@@ -368,7 +411,8 @@ async function handleFulfillmentServiceFlow(
     console.error('Fulfillment creation errors:', errors);
 
     await supabase.from('shopify_sync_logs').insert({
-      company_id: order.company_id,
+      company_id: store.company_id || order.company_id,
+      shopify_store_id: store.id,
       sync_type: 'fulfillment',
       direction: 'outbound',
       status: 'error',
@@ -412,7 +456,8 @@ async function handleFulfillmentServiceFlow(
       fulfillment_id: fulfillment.id,
       fulfilled_at: allItemsFulfilled ? new Date().toISOString() : null
     })
-    .eq('id', fulfillmentOrder.id);
+    .eq('id', fulfillmentOrder.id)
+    .eq('shopify_store_id', store.id);
 
   // Update mapping
   await supabase
@@ -425,11 +470,13 @@ async function handleFulfillmentServiceFlow(
         last_tracking_number: trackingNumber
       }
     })
-    .eq('shopify_order_id', mapping.shopify_order_id);
+    .eq('shopify_order_id', mapping.shopify_order_id)
+    .eq('shopify_store_id', store.id);
 
   // Log success
   await supabase.from('shopify_sync_logs').insert({
-    company_id: order.company_id,
+    company_id: store.company_id || order.company_id,
+    shopify_store_id: store.id,
     sync_type: 'fulfillment',
     direction: 'outbound',
     status: 'success',
@@ -456,6 +503,7 @@ async function handleFulfillmentServiceFlow(
 async function handleLegacyFlow(
   supabase: any,
   shopifySettings: any,
+  store: any,
   orderShipment: any,
   order: any,
   mapping: any,
@@ -569,7 +617,8 @@ async function handleLegacyFlow(
 
   // Log success
   await supabase.from('shopify_sync_logs').insert({
-    company_id: order.company_id,
+    company_id: store.company_id || order.company_id,
+    shopify_store_id: store.id,
     sync_type: 'fulfillment',
     direction: 'outbound',
     status: 'success',
