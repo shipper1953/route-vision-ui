@@ -98,12 +98,12 @@ export const ShipmentsNavItem = () => {
                 Shipments
               </span>
               <ChevronDown className={cn(
-                "h-4 w-4 text-sidebar-foreground transition-transform",
+                "h-4 w-4 text-sidebar-foreground transition-transform duration-300 ease-out",
                 isOpen && "rotate-180"
               )} />
             </div>
           </CollapsibleTrigger>
-          <CollapsibleContent className="ml-4 mt-1 space-y-1 border-l-2 border-sidebar-border pl-2">
+          <CollapsibleContent className="ml-4 mt-1 space-y-1 border-l-2 border-sidebar-border pl-2 animate-accordion-down data-[state=closed]:animate-accordion-up">
             {submenuItems.map(item => (
               <NavItem 
                 key={item.to}
