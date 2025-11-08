@@ -1,138 +1,119 @@
-import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useShopifySyncLogs } from "@/hooks/useShopifySyncLogs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter } from "lucide-react";
+import { useShopifyStores } from "@/hooks/useShopifyStores";
+import { formatDistanceToNow } from "date-fns";
+import { ArrowDownToLine, ArrowUpFromLine, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { ShopifyStoreSelector } from "@/components/integrations/ShopifyStoreSelector";
 
 interface ShopifySyncLogViewerProps {
   companyId?: string;
 }
 
 export const ShopifySyncLogViewer = ({ companyId }: ShopifySyncLogViewerProps) => {
-  const { logs, loading } = useShopifySyncLogs();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const { activeStoreId, stores } = useShopifyStores(companyId);
+  const { logs, loading } = useShopifySyncLogs(activeStoreId || undefined);
 
-  const filteredLogs = logs.filter((log) => {
-    const matchesSearch = 
-      log.shopify_order_id?.includes(searchTerm) ||
-      log.ship_tornado_order_id?.toString().includes(searchTerm);
-    const matchesType = filterType === "all" || log.sync_type === filterType;
-    const matchesStatus = filterStatus === "all" || log.status === filterStatus;
-    
-    return matchesSearch && matchesType && matchesStatus;
-  });
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "destructive" | "secondary"> = {
-      success: "default",
-      failed: "destructive",
-      pending: "secondary",
-    };
-    return <Badge variant={variants[status] || "secondary"}>{status}</Badge>;
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'success':
+        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+      case 'failed':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'pending':
+        return <Clock className="h-4 w-4 text-yellow-600" />;
+      default:
+        return <Clock className="h-4 w-4 text-gray-600" />;
+    }
   };
+
+  const getDirectionIcon = (direction: string) => {
+    if (direction === 'inbound') {
+      return <ArrowDownToLine className="h-4 w-4 text-blue-600" />;
+    }
+    return <ArrowUpFromLine className="h-4 w-4 text-purple-600" />;
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sync Logs</CardTitle>
-        <CardDescription>
-          View synchronization history between Shopify and Ship Tornado
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by order ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="order_import">Order Import</SelectItem>
-              <SelectItem value="fulfillment_update">Fulfillment</SelectItem>
-              <SelectItem value="inventory_sync">Inventory</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="success">Success</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Direction</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Shopify Order</TableHead>
-                <TableHead>Ship Tornado Order</TableHead>
-                <TableHead>Timestamp</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    Loading sync logs...
-                  </TableCell>
-                </TableRow>
-              ) : filteredLogs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No sync logs found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredLogs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="font-medium">{log.sync_type}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{log.direction}</Badge>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(log.status)}</TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {log.shopify_order_id || '-'}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {log.ship_tornado_order_id || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(log.created_at).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Sync Logs</CardTitle>
+            <CardDescription>
+              Recent synchronization activity
+              {stores.length > 1 && activeStoreId && (
+                <span className="ml-2 text-primary">
+                  (filtered by selected store)
+                </span>
               )}
-            </TableBody>
-          </Table>
+            </CardDescription>
+          </div>
+          {stores.length > 1 && <ShopifyStoreSelector />}
         </div>
-
-        {filteredLogs.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            Showing {filteredLogs.length} of {logs.length} logs
-          </p>
+      </CardHeader>
+      <CardContent>
+        {logs.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No sync logs yet
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {logs.map((log) => (
+              <div
+                key={log.id}
+                className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex gap-2 mt-1">
+                  {getStatusIcon(log.status)}
+                  {getDirectionIcon(log.direction)}
+                </div>
+                
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{log.sync_type}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {log.direction}
+                    </Badge>
+                    {log.shopify_order_id && (
+                      <span className="text-xs text-muted-foreground">
+                        Order: {log.shopify_order_id}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {log.error_message && (
+                    <p className="text-sm text-red-600">{log.error_message}</p>
+                  )}
+                  
+                  {log.metadata && (
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      {log.metadata.orders_synced && (
+                        <div>Orders synced: {log.metadata.orders_synced}</div>
+                      )}
+                      {log.metadata.store_url && (
+                        <div>Store: {log.metadata.store_url}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="text-xs text-muted-foreground whitespace-nowrap">
+                  {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

@@ -119,31 +119,22 @@ serve(async (req) => {
       }
     }
 
-    // Find company with matching Shopify store domain
-    const { data: companies, error: companyError } = await supabase
-      .from('companies')
-      .select('id, settings')
-      .eq('is_active', true);
+    // Find store by Shopify domain in shopify_stores table
+    const { data: store, error: storeError } = await supabase
+      .from('shopify_stores')
+      .select('*')
+      .eq('store_url', shopDomain)
+      .eq('is_active', true)
+      .single();
 
-    if (companyError) {
-      console.error('Error querying companies:', companyError);
-      throw new Error('Database error');
+    if (storeError || !store) {
+      console.error('No active store found for domain:', shopDomain);
+      throw new Error(`No store connected with domain: ${shopDomain}`);
     }
 
-    // Find the company that has this Shopify store connected
-    const company = companies?.find(c => {
-      const shopifySettings = (c.settings as any)?.shopify;
-      return shopifySettings?.connected && shopifySettings?.store_url === shopDomain;
-    });
-
-    if (!company) {
-      console.error('No company found with Shopify store:', shopDomain);
-      throw new Error(`No company connected to Shopify store: ${shopDomain}`);
-    }
-
-    const shopifySettings = (company.settings as any)?.shopify;
-    const companyId = company.id;
-    console.log('✅ Found company:', companyId, 'for shop:', shopDomain);
+    const companyId = store.company_id;
+    const shopifyStoreId = store.id;
+    console.log('✅ Found store:', shopifyStoreId, 'for company:', companyId);
 
     // SECURITY: HMAC validation is MANDATORY
     if (!hmacHeader) {
@@ -151,7 +142,7 @@ serve(async (req) => {
       throw new Error('Missing webhook signature - HMAC header required');
     }
 
-    const apiSecret = Deno.env.get('SHOPIFY_API_SECRET') || shopifySettings.webhook_secret;
+    const apiSecret = Deno.env.get('SHOPIFY_API_SECRET') || store.webhook_secret;
     if (!apiSecret) {
       console.error('SHOPIFY_API_SECRET not configured');
       throw new Error('Webhook secret not configured');

@@ -9,12 +9,13 @@ interface SyncLog {
   status: string;
   shopify_order_id: string | null;
   ship_tornado_order_id: number | null;
+  shopify_store_id: string | null;
   error_message: string | null;
   metadata: any;
   created_at: string;
 }
 
-export const useShopifySyncLogs = () => {
+export const useShopifySyncLogs = (storeId?: string) => {
   const { userProfile } = useAuth();
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,10 +27,16 @@ export const useShopifySyncLogs = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('shopify_sync_logs')
         .select('*')
-        .eq('company_id', userProfile.company_id)
+        .eq('company_id', userProfile.company_id);
+      
+      if (storeId) {
+        query = query.eq('shopify_store_id', storeId);
+      }
+      
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -59,7 +66,11 @@ export const useShopifySyncLogs = () => {
             filter: `company_id=eq.${userProfile.company_id}`,
           },
           (payload) => {
-            setLogs((current) => [payload.new as SyncLog, ...current].slice(0, 50));
+            const newLog = payload.new as SyncLog;
+            // Only add if matches filter
+            if (!storeId || newLog.shopify_store_id === storeId) {
+              setLogs((current) => [newLog, ...current].slice(0, 50));
+            }
           }
         )
         .subscribe();
@@ -68,7 +79,7 @@ export const useShopifySyncLogs = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [userProfile?.company_id]);
+  }, [userProfile?.company_id, storeId]);
 
   return {
     logs,

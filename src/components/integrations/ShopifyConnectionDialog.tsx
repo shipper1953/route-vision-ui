@@ -23,6 +23,9 @@ export const ShopifyConnectionDialog = ({
 }: ShopifyConnectionDialogProps) => {
   const { toast } = useToast();
   const [storeUrl, setStoreUrl] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerReference, setCustomerReference] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -89,6 +92,9 @@ export const ShopifyConnectionDialog = ({
         body: {
           storeUrl,
           companyId,
+          customerName: customerName || undefined,
+          customerEmail: customerEmail || undefined,
+          customerReference: customerReference || undefined,
         },
       });
 
@@ -248,6 +254,46 @@ export const ShopifyConnectionDialog = ({
               />
               <p className="text-sm text-muted-foreground">
                 Enter your .myshopify.com domain
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customerName">Customer/Brand Name (Optional)</Label>
+              <Input
+                id="customerName"
+                placeholder="e.g., Acme Corp"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Name to identify this store in your 3PL operations
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customerEmail">Contact Email (Optional)</Label>
+              <Input
+                id="customerEmail"
+                type="email"
+                placeholder="contact@customer.com"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customerRef">Reference ID (Optional)</Label>
+              <Input
+                id="customerRef"
+                placeholder="CUST-001"
+                value={customerReference}
+                onChange={(e) => setCustomerReference(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Your internal customer reference number
               </p>
             </div>
 

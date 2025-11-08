@@ -24,7 +24,7 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { storeUrl, companyId } = await req.json();
+    const { storeUrl, companyId, customerName, customerEmail, customerReference } = await req.json();
 
     if (!storeUrl || !companyId) {
       throw new Error('Store URL and company ID are required');
@@ -42,28 +42,26 @@ serve(async (req) => {
     // Generate state parameter for OAuth security
     const state = crypto.randomUUID();
 
-    // Store state in company settings for verification
-    const { data: company } = await supabase
-      .from('companies')
-      .select('settings')
-      .eq('id', companyId)
-      .single();
-
-    const existingSettings = company?.settings || {};
-    
-    const updatedSettings = {
-      ...existingSettings,
-      shopify: {
-        ...(existingSettings.shopify || {}),
-        oauth_state: state,
+    // Create or update shopify_stores record with OAuth state
+    const { error: storeError } = await supabase
+      .from('shopify_stores')
+      .upsert({
+        company_id: companyId,
         store_url: cleanUrl,
-      },
-    };
+        oauth_state: state,
+        customer_name: customerName || null,
+        customer_email: customerEmail || null,
+        customer_reference: customerReference || null,
+        is_active: false, // Will be activated after OAuth completion
+        access_token: 'pending', // Placeholder, will be updated in callback
+      }, {
+        onConflict: 'company_id,store_url',
+      });
 
-    await supabase
-      .from('companies')
-      .update({ settings: updatedSettings })
-      .eq('id', companyId);
+    if (storeError) {
+      console.error('Error storing OAuth state:', storeError);
+      throw new Error('Failed to initiate OAuth flow');
+    }
 
     // Build OAuth authorization URL
     const redirectUri = `${supabaseUrl}/functions/v1/shopify-oauth-callback`;
