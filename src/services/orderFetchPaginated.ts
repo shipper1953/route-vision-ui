@@ -23,10 +23,12 @@ export async function fetchOrdersPaginated(
   console.log(`Fetching paginated orders: page ${page}, size ${pageSize}, search: ${searchTerm}, status: ${statusFilter}`);
 
   try {
-    let companyId: string | null | undefined = companyIdOverride;
+    let companyId: string | null | undefined;
     let isSuperAdmin = false;
 
-    if (!companyIdOverride) {
+    const normalizedOverride = companyIdOverride?.trim();
+
+    if (!normalizedOverride) {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError) {
@@ -88,8 +90,7 @@ export async function fetchOrdersPaginated(
         };
       }
     } else {
-      // When an override is supplied, assume it is only permitted for super admins.
-      isSuperAdmin = true;
+      companyId = normalizedOverride;
     }
 
     // Calculate offset
