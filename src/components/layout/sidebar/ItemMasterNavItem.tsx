@@ -88,7 +88,7 @@ export const ItemMasterNavItem = () => {
         </>
       ) : (
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-          <CollapsibleTrigger className="w-full">
+          <CollapsibleTrigger className="w-full" onClick={(e) => e.stopPropagation()}>
             <div className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-sidebar-accent group",
               isActive && "bg-sidebar-accent"
