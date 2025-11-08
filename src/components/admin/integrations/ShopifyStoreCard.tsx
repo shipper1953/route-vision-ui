@@ -1,9 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Store, RefreshCw, Unplug, Calendar, Settings } from "lucide-react";
+import { Store, RefreshCw, Unplug, Calendar, Settings, Building2 } from "lucide-react";
 import { ShopifyStore } from "@/hooks/useShopifyStores";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ShopifyStoreCardProps {
   store: ShopifyStore;
@@ -18,6 +21,28 @@ export const ShopifyStoreCard = ({
   onSync, 
   onConfigure 
 }: ShopifyStoreCardProps) => {
+  const { isSuperAdmin } = useAuth();
+  const [companyName, setCompanyName] = useState<string>("");
+
+  // Fetch company name for super admins
+  useEffect(() => {
+    const fetchCompanyName = async () => {
+      if (isSuperAdmin && store.company_id) {
+        const { data } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('id', store.company_id)
+          .single();
+        
+        if (data) {
+          setCompanyName(data.name);
+        }
+      }
+    };
+    
+    fetchCompanyName();
+  }, [isSuperAdmin, store.company_id]);
+
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
@@ -35,6 +60,16 @@ export const ShopifyStoreCard = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2 text-sm">
+          {isSuperAdmin && companyName && (
+            <div className="flex justify-between items-center pb-2 border-b">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Building2 className="h-3 w-3" />
+                Company:
+              </span>
+              <span className="font-medium">{companyName}</span>
+            </div>
+          )}
+          
           <div className="flex justify-between">
             <span className="text-muted-foreground">Store URL:</span>
             <span className="font-mono text-xs">{store.store_url}</span>

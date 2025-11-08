@@ -1,17 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Store, Loader2, Key, ExternalLink } from "lucide-react";
 
 interface ShopifyConnectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  companyId: string;
+  companyId?: string;
   onSuccess: () => void;
 }
 
@@ -22,6 +24,9 @@ export const ShopifyConnectionDialog = ({
   onSuccess,
 }: ShopifyConnectionDialogProps) => {
   const { toast } = useToast();
+  const { userProfile, isSuperAdmin } = useAuth();
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(companyId || userProfile?.company_id || "");
   const [storeUrl, setStoreUrl] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -29,8 +34,43 @@ export const ShopifyConnectionDialog = ({
   const [accessToken, setAccessToken] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Fetch companies for super admins
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (data && !error) {
+        setCompanies(data);
+      }
+    };
+    
+    if (isSuperAdmin && open) {
+      fetchCompanies();
+    }
+  }, [isSuperAdmin, open]);
+
+  // Update selected company when dialog opens or companyId changes
+  useEffect(() => {
+    if (open) {
+      setSelectedCompanyId(companyId || userProfile?.company_id || "");
+    }
+  }, [open, companyId, userProfile?.company_id]);
+
   // Manual token connection (for custom/private apps)
   const handleManualConnect = async () => {
+    if (!selectedCompanyId) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a company",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!storeUrl || !accessToken) {
       toast({
         title: "Missing Information",
@@ -49,7 +89,7 @@ export const ShopifyConnectionDialog = ({
         body: {
           storeUrl: cleanUrl,
           accessToken,
-          companyId,
+          companyId: selectedCompanyId,
         },
       });
 
@@ -76,6 +116,15 @@ export const ShopifyConnectionDialog = ({
 
   // OAuth connection (for public apps)
   const handleOAuthConnect = async () => {
+    if (!selectedCompanyId) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a company",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!storeUrl) {
       toast({
         title: "Missing Information",
@@ -91,7 +140,7 @@ export const ShopifyConnectionDialog = ({
       const { data, error } = await supabase.functions.invoke('shopify-oauth-start', {
         body: {
           storeUrl,
-          companyId,
+          companyId: selectedCompanyId,
           customerName: customerName || undefined,
           customerEmail: customerEmail || undefined,
           customerReference: customerReference || undefined,
@@ -231,6 +280,38 @@ export const ShopifyConnectionDialog = ({
             Choose how to connect your Shopify store
           </DialogDescription>
         </DialogHeader>
+
+        {/* Company Selection - Always visible */}
+        <div className="space-y-2 pb-4 border-b">
+          <Label htmlFor="company">Company</Label>
+          {isSuperAdmin ? (
+            <Select
+              value={selectedCompanyId}
+              onValueChange={setSelectedCompanyId}
+              disabled={loading}
+            >
+              <SelectTrigger id="company">
+                <SelectValue placeholder="Select company..." />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={companies.find(c => c.id === selectedCompanyId)?.name || userProfile?.company_id ? 'Loading...' : 'No company'}
+              disabled
+              className="bg-muted"
+            />
+          )}
+          <p className="text-xs text-muted-foreground">
+            This Shopify store will be linked to the selected company
+          </p>
+        </div>
 
         <Tabs defaultValue="manual" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
