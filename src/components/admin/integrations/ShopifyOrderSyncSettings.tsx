@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -18,17 +19,47 @@ interface ShopifyOrderSyncSettingsProps {
   companyId?: string;
 }
 
-export const ShopifyOrderSyncSettings = ({ 
-  settings, 
-  onUpdate, 
+export const ShopifyOrderSyncSettings = ({
+  settings,
+  onUpdate,
   onChange,
-  companyId 
+  companyId
 }: ShopifyOrderSyncSettingsProps) => {
+  type SyncConfig = ShopifySettings["sync_config"];
+  const [localSyncConfig, setLocalSyncConfig] = useState<SyncConfig>(settings.sync_config);
+
+  useEffect(() => {
+    setLocalSyncConfig(settings.sync_config);
+  }, [settings.sync_config]);
+
   const { progress, importing, triggerImport } = useShopifyBulkImport(companyId);
-  const orderConfig = settings.sync_config.orders;
-  const transferConfig = settings.sync_config.transfer_orders;
-  const purchaseConfig = settings.sync_config.purchase_orders;
-  const receiptConfig = settings.sync_config.receipts;
+  const orderConfig = localSyncConfig.orders;
+  const transferConfig = localSyncConfig.transfer_orders;
+  const purchaseConfig = localSyncConfig.purchase_orders;
+  const receiptConfig = localSyncConfig.receipts;
+
+  const updateSyncSection = <K extends keyof SyncConfig>(
+    section: K,
+    updates: Partial<SyncConfig[K]>
+  ) => {
+    setLocalSyncConfig((previous) => {
+      const nextSection = {
+        ...previous[section],
+        ...updates,
+      };
+
+      const nextConfig = {
+        ...previous,
+        [section]: nextSection,
+      } as SyncConfig;
+
+      onUpdate({
+        sync_config: nextConfig,
+      });
+
+      return nextConfig;
+    });
+  };
 
   const transferStatusOptions = [
     { id: 'open', label: 'Open' },
@@ -43,51 +74,19 @@ export const ShopifyOrderSyncSettings = ({
   ];
 
   const updateOrderConfig = (updates: Partial<typeof orderConfig>) => {
-    onUpdate({
-      sync_config: {
-        ...settings.sync_config,
-        orders: {
-          ...orderConfig,
-          ...updates,
-        },
-      },
-    });
+    updateSyncSection("orders", updates);
   };
 
   const updateTransferOrderConfig = (updates: Partial<typeof transferConfig>) => {
-    onUpdate({
-      sync_config: {
-        ...settings.sync_config,
-        transfer_orders: {
-          ...transferConfig,
-          ...updates,
-        },
-      },
-    });
+    updateSyncSection("transfer_orders", updates);
   };
 
   const updatePurchaseOrderConfig = (updates: Partial<typeof purchaseConfig>) => {
-    onUpdate({
-      sync_config: {
-        ...settings.sync_config,
-        purchase_orders: {
-          ...purchaseConfig,
-          ...updates,
-        },
-      },
-    });
+    updateSyncSection("purchase_orders", updates);
   };
 
   const updateReceiptConfig = (updates: Partial<typeof receiptConfig>) => {
-    onUpdate({
-      sync_config: {
-        ...settings.sync_config,
-        receipts: {
-          ...receiptConfig,
-          ...updates,
-        },
-      },
-    });
+    updateSyncSection("receipts", updates);
   };
 
   const handleBulkImport = () => {
