@@ -972,6 +972,221 @@ export type Database = {
         }
         Relationships: []
       }
+      pick_list_items: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          location_id: string | null
+          lot_number: string | null
+          pick_list_id: string
+          picked_at: string | null
+          quantity_ordered: number
+          quantity_picked: number
+          serial_number: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          location_id?: string | null
+          lot_number?: string | null
+          pick_list_id: string
+          picked_at?: string | null
+          quantity_ordered?: number
+          quantity_picked?: number
+          serial_number?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          location_id?: string | null
+          lot_number?: string | null
+          pick_list_id?: string
+          picked_at?: string | null
+          quantity_ordered?: number
+          quantity_picked?: number
+          serial_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pick_list_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_pick_list_id_fkey"
+            columns: ["pick_list_id"]
+            isOneToOne: false
+            referencedRelation: "pick_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pick_lists: {
+        Row: {
+          assigned_to: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          order_id: number
+          started_at: string | null
+          status: string
+          warehouse_id: string
+          wave_id: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id: number
+          started_at?: string | null
+          status?: string
+          warehouse_id: string
+          wave_id?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id?: number
+          started_at?: string | null
+          status?: string
+          warehouse_id?: string
+          wave_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pick_lists_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_lists_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_lists_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_lists_wave_id_fkey"
+            columns: ["wave_id"]
+            isOneToOne: false
+            referencedRelation: "pick_waves"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pick_waves: {
+        Row: {
+          assigned_to: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          priority: number | null
+          released_at: string | null
+          started_at: string | null
+          status: string
+          total_orders: number | null
+          total_picks: number | null
+          warehouse_id: string
+          wave_number: string
+          wave_type: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          released_at?: string | null
+          started_at?: string | null
+          status?: string
+          total_orders?: number | null
+          total_picks?: number | null
+          warehouse_id: string
+          wave_number: string
+          wave_type?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          released_at?: string | null
+          started_at?: string | null
+          status?: string
+          total_orders?: number | null
+          total_picks?: number | null
+          warehouse_id?: string
+          wave_number?: string
+          wave_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pick_waves_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_waves_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_waves_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_line_items: {
         Row: {
           created_at: string
