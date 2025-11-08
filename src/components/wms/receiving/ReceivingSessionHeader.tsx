@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X, Pause, CheckCircle } from "lucide-react";
@@ -10,13 +11,22 @@ interface ReceivingSessionHeaderProps {
   onCancel: () => void;
 }
 
-export const ReceivingSessionHeader = ({ 
-  session, 
-  poData, 
-  onPause, 
+const STATUS_CONFIG: Record<string, { label: string; variant: ComponentProps<typeof Badge>["variant"] }> = {
+  in_progress: { label: 'In Progress', variant: 'default' },
+  paused: { label: 'Paused', variant: 'secondary' },
+  completed: { label: 'Completed', variant: 'success' },
+  cancelled: { label: 'Cancelled', variant: 'destructive' }
+};
+
+export const ReceivingSessionHeader = ({
+  session,
+  poData,
+  onPause,
   onComplete,
-  onCancel 
+  onCancel
 }: ReceivingSessionHeaderProps) => {
+  const statusConfig = STATUS_CONFIG[session.status] ?? STATUS_CONFIG.in_progress;
+
   return (
     <div className="bg-card border rounded-lg p-4 space-y-3">
       <div className="flex justify-between items-start">
@@ -26,7 +36,7 @@ export const ReceivingSessionHeader = ({
             Session: {session.session_number}
           </p>
         </div>
-        <Badge variant="default">In Progress</Badge>
+        <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
       </div>
       
       <div className="text-sm space-y-1">
