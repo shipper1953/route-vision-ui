@@ -117,19 +117,34 @@ export const ShopifyConnectionDialog = ({
         
         console.log('Popup opened:', !!popup);
 
-        // Listen for message from popup
+        // Listen for message from popup - set up BEFORE opening
+        let messageReceived = false;
+        
         const handleMessage = (event: MessageEvent) => {
+          console.log('Received postMessage:', event.data);
+          
           if (event.data.type === 'shopify-oauth-success') {
+            messageReceived = true;
             window.removeEventListener('message', handleMessage);
+            
+            if (checkInterval) clearInterval(checkInterval);
+            if (timeoutId) clearTimeout(timeoutId);
+            
             setLoading(false);
             onOpenChange(false);
+            
             toast({
               title: "Shopify Connected",
               description: "Your store has been connected successfully",
             });
             onSuccess();
           } else if (event.data.type === 'shopify-oauth-error') {
+            messageReceived = true;
             window.removeEventListener('message', handleMessage);
+            
+            if (checkInterval) clearInterval(checkInterval);
+            if (timeoutId) clearTimeout(timeoutId);
+            
             setLoading(false);
             toast({
               title: "Connection Failed",
@@ -140,6 +155,7 @@ export const ShopifyConnectionDialog = ({
         };
 
         window.addEventListener('message', handleMessage);
+        console.log('Message listener added, waiting for OAuth...');
 
         // Check if popup was blocked
         if (!popup || popup.closed) {
@@ -147,14 +163,48 @@ export const ShopifyConnectionDialog = ({
           throw new Error('Popup was blocked. Please allow popups for this site.');
         }
 
-        // Fallback: Check if popup closed without message
-        const checkPopup = setInterval(() => {
+        // Check if popup closed - if it closes and we didn't get message, assume success and refresh
+        let checkInterval: NodeJS.Timeout | null = null;
+        let timeoutId: NodeJS.Timeout | null = null;
+        
+        checkInterval = setInterval(() => {
           if (popup.closed) {
-            clearInterval(checkPopup);
+            console.log('Popup closed, message received:', messageReceived);
+            clearInterval(checkInterval!);
+            clearTimeout(timeoutId!);
             window.removeEventListener('message', handleMessage);
-            setLoading(false);
+            
+            if (!messageReceived) {
+              // Popup closed without message - check if connection succeeded
+              setLoading(false);
+              toast({
+                title: "Checking Connection",
+                description: "Verifying Shopify connection...",
+              });
+              
+              // Close dialog and trigger success callback to refresh
+              setTimeout(() => {
+                onOpenChange(false);
+                onSuccess();
+              }, 500);
+            }
           }
         }, 500);
+        
+        // Timeout after 5 minutes
+        timeoutId = setTimeout(() => {
+          if (!messageReceived && popup && !popup.closed) {
+            clearInterval(checkInterval!);
+            window.removeEventListener('message', handleMessage);
+            popup.close();
+            setLoading(false);
+            toast({
+              title: "Connection Timeout",
+              description: "OAuth process took too long. Please try again.",
+              variant: "destructive",
+            });
+          }
+        }, 300000);
       } else {
         throw new Error('No authorization URL received');
       }

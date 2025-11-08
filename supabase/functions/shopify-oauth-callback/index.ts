@@ -264,6 +264,7 @@ serve(async (req) => {
       <html>
         <head>
           <title>Shopify Connected</title>
+          <meta charset="UTF-8">
           <style>
             body {
               font-family: system-ui, -apple-system, sans-serif;
@@ -280,44 +281,89 @@ serve(async (req) => {
               background: white;
               border-radius: 8px;
               box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              max-width: 400px;
             }
-            .success { color: #10b981; }
+            .success { color: #10b981; margin: 0 0 1rem 0; }
+            .message { color: #6b7280; margin-bottom: 1rem; }
+            .button {
+              display: inline-block;
+              padding: 0.5rem 1rem;
+              background: #3b82f6;
+              color: white;
+              border-radius: 4px;
+              text-decoration: none;
+              cursor: pointer;
+              border: none;
+              font-size: 14px;
+            }
+            .button:hover { background: #2563eb; }
           </style>
         </head>
         <body>
           <div class="container">
             <h1 class="success">✓ Shopify Connected!</h1>
-            <p>Closing window...</p>
+            <p class="message" id="status">This window should close automatically...</p>
+            <button class="button" onclick="closeWindow()">Close Window</button>
           </div>
           <script>
+            function closeWindow() {
+              if (window.opener) {
+                window.opener.postMessage({
+                  type: 'shopify-oauth-success',
+                  connected: true
+                }, '*');
+              }
+              window.close();
+              // If close fails, redirect
+              setTimeout(() => {
+                window.location.href = '${redirectUrl}';
+              }, 500);
+            }
+            
             (function() {
-              try {
-                // Try to communicate with popup opener
-                if (window.opener && !window.opener.closed) {
-                  console.log('Sending success message to opener');
-                  window.opener.postMessage({
-                    type: 'shopify-oauth-success',
-                    connected: true
-                  }, '*');
-                  
-                  // Close after short delay to ensure message is sent
-                  setTimeout(() => {
-                    window.close();
-                  }, 100);
-                } else {
-                  console.log('No opener found, redirecting');
-                  // Fallback to redirect if not in popup
+              console.log('Shopify OAuth callback loaded');
+              console.log('Has opener:', !!window.opener);
+              console.log('Opener closed:', window.opener ? window.opener.closed : 'N/A');
+              
+              let messageSent = false;
+              
+              // Try multiple times to send message
+              function sendMessage() {
+                try {
+                  if (window.opener && !window.opener.closed) {
+                    console.log('Sending success message to opener');
+                    window.opener.postMessage({
+                      type: 'shopify-oauth-success',
+                      connected: true
+                    }, '*');
+                    messageSent = true;
+                    
+                    // Try to close after confirming message sent
+                    setTimeout(() => {
+                      console.log('Attempting to close window');
+                      const closed = window.close();
+                      if (!closed) {
+                        document.getElementById('status').textContent = 'Please close this window manually';
+                      }
+                    }, 300);
+                  } else {
+                    console.log('No valid opener, will redirect');
+                    setTimeout(() => {
+                      window.location.href = '${redirectUrl}';
+                    }, 2000);
+                  }
+                } catch (e) {
+                  console.error('Error sending message:', e);
                   setTimeout(() => {
                     window.location.href = '${redirectUrl}';
-                  }, 1500);
+                  }, 2000);
                 }
-              } catch (e) {
-                console.error('Error in callback script:', e);
-                // Fallback to redirect on error
-                setTimeout(() => {
-                  window.location.href = '${redirectUrl}';
-                }, 1500);
               }
+              
+              // Send message immediately and retry
+              sendMessage();
+              setTimeout(sendMessage, 100);
+              setTimeout(sendMessage, 300);
             })();
           </script>
         </body>
@@ -355,6 +401,7 @@ serve(async (req) => {
       <html>
         <head>
           <title>Connection Failed</title>
+          <meta charset="UTF-8">
           <style>
             body {
               font-family: system-ui, -apple-system, sans-serif;
@@ -371,17 +418,44 @@ serve(async (req) => {
               background: white;
               border-radius: 8px;
               box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              max-width: 400px;
             }
-            .error { color: #ef4444; }
+            .error { color: #ef4444; margin: 0 0 1rem 0; }
+            .message { color: #6b7280; margin-bottom: 1rem; }
+            .button {
+              display: inline-block;
+              padding: 0.5rem 1rem;
+              background: #3b82f6;
+              color: white;
+              border-radius: 4px;
+              text-decoration: none;
+              cursor: pointer;
+              border: none;
+              font-size: 14px;
+            }
+            .button:hover { background: #2563eb; }
           </style>
         </head>
         <body>
           <div class="container">
             <h1 class="error">✗ Connection Failed</h1>
-            <p>${error.message}</p>
-            <p>Closing window...</p>
+            <p class="message">${error.message}</p>
+            <button class="button" onclick="closeWindow()">Close Window</button>
           </div>
           <script>
+            function closeWindow() {
+              if (window.opener) {
+                window.opener.postMessage({
+                  type: 'shopify-oauth-error',
+                  error: '${error.message.replace(/'/g, "\\'")}'
+                }, '*');
+              }
+              window.close();
+              setTimeout(() => {
+                window.location.href = '${errorRedirectUrl}';
+              }, 500);
+            }
+            
             (function() {
               try {
                 if (window.opener && !window.opener.closed) {
@@ -392,16 +466,19 @@ serve(async (req) => {
                   }, '*');
                   
                   setTimeout(() => {
-                    window.close();
+                    const closed = window.close();
+                    if (!closed) {
+                      document.querySelector('.message').textContent = '${error.message}. Please close this window.';
+                    }
                   }, 100);
                 } else {
-                  console.log('No opener found, redirecting to error page');
+                  console.log('No opener, redirecting');
                   setTimeout(() => {
                     window.location.href = '${errorRedirectUrl}';
                   }, 2000);
                 }
               } catch (e) {
-                console.error('Error in callback error script:', e);
+                console.error('Error in callback:', e);
                 setTimeout(() => {
                   window.location.href = '${errorRedirectUrl}';
                 }, 2000);
