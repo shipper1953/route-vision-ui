@@ -357,9 +357,19 @@ Deno.serve(async (req) => {
         );
       }
 
-      const existing = existingMatches?.find(
+      const storeMatch = existingMatches?.find(
         (match) => match.shopify_store_id === store.id
-      ) || existingMatches?.[0];
+      );
+
+      const fallbackMatch = storeMatch
+        ? undefined
+        : existingMatches?.find(
+            (match) =>
+              match.shopify_store_id === null &&
+              match.company_id === fallbackCompanyId
+          );
+
+      const existing = storeMatch ?? fallbackMatch;
 
       if (existing) {
         console.log(`⏭️  Fulfillment order ${fulfillmentOrderId} already processed, skipping`);
