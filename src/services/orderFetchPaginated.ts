@@ -24,27 +24,72 @@ export async function fetchOrdersPaginated(
 
   try {
     let companyId: string | null | undefined = companyIdOverride;
+    let isSuperAdmin = false;
 
     if (!companyIdOverride) {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError) {
         console.error('Failed to resolve authenticated user for order query:', authError);
+        return {
+          orders: [],
+          totalCount: 0,
+          hasNextPage: false,
+          hasPreviousPage: false
+        };
       }
 
-      if (user) {
-        const { data: profile, error: profileError } = await supabase
-          .from('users')
-          .select('company_id, role')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (!profileError) {
-          companyId = profile?.company_id;
-        } else {
-          console.error('Failed to resolve user profile for order query:', profileError);
-        }
+      if (!user) {
+        console.error('No authenticated user found for order query.');
+        return {
+          orders: [],
+          totalCount: 0,
+          hasNextPage: false,
+          hasPreviousPage: false
+        };
       }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('company_id, role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('Failed to resolve user profile for order query:', profileError);
+        return {
+          orders: [],
+          totalCount: 0,
+          hasNextPage: false,
+          hasPreviousPage: false
+        };
+      }
+
+      if (!profile) {
+        console.error('User profile not found for order query.');
+        return {
+          orders: [],
+          totalCount: 0,
+          hasNextPage: false,
+          hasPreviousPage: false
+        };
+      }
+
+      companyId = profile.company_id;
+      isSuperAdmin = profile.role === 'super_admin';
+
+      if (!isSuperAdmin && !companyId) {
+        console.error('Company scope missing for order query.');
+        return {
+          orders: [],
+          totalCount: 0,
+          hasNextPage: false,
+          hasPreviousPage: false
+        };
+      }
+    } else {
+      // When an override is supplied, assume it is only permitted for super admins.
+      isSuperAdmin = true;
     }
 
     // Calculate offset
@@ -61,8 +106,8 @@ export async function fetchOrdersPaginated(
         items_shipped, items_total, fulfillment_percentage, fulfillment_status
       `, { count: 'exact' });
 
-    if (companyId) {
-      query = query.eq('company_id', companyId);
+    if (!isSuperAdmin) {
+      query = query.eq('company_id', companyId as string);
     }
     
     // Add search filter if provided

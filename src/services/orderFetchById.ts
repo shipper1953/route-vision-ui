@@ -13,24 +13,41 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
     }
 
     let companyId: string | null = null;
+    let isSuperAdmin = false;
     const { data: authData, error: authError } = await supabase.auth.getUser();
 
     if (authError) {
       console.error('Failed to resolve authenticated user for order lookup:', authError);
+      return null;
     }
 
-    if (authData?.user) {
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('company_id, role')
-        .eq('id', authData.user.id)
-        .maybeSingle();
+    if (!authData?.user) {
+      console.error('No authenticated user found for order lookup.');
+      return null;
+    }
 
-      if (!profileError) {
-        companyId = profile?.company_id ?? null;
-      } else {
-        console.error('Failed to resolve user profile for order lookup:', profileError);
-      }
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('company_id, role')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Failed to resolve user profile for order lookup:', profileError);
+      return null;
+    }
+
+    if (!profile) {
+      console.error('User profile not found for order lookup.');
+      return null;
+    }
+
+    companyId = profile.company_id ?? null;
+    isSuperAdmin = profile.role === 'super_admin';
+
+    if (!isSuperAdmin && !companyId) {
+      console.error('Company scope missing for order lookup.');
+      return null;
     }
 
     // Convert orderId to number since the database id column is bigint
@@ -53,7 +70,7 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
       `)
       .eq('id', orderIdNumber);
 
-    if (companyId) {
+    if (!isSuperAdmin) {
       query = query.eq('company_id', companyId);
     }
 
