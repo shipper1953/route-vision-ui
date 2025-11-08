@@ -111,6 +111,34 @@ export const useShopifyStores = (companyId?: string) => {
     }
   };
 
+  const registerWebhooks = async (storeId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('shopify-register-webhooks', {
+        body: { 
+          storeId,
+          companyId: effectiveCompanyId
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Webhooks Registered',
+        description: `Successfully registered ${data.registered?.length || 0} webhooks for real-time PO updates`,
+      });
+
+      return data;
+    } catch (error: any) {
+      console.error('Error registering webhooks:', error);
+      toast({
+        title: 'Webhook Registration Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   const setActiveStore = (storeId: string) => {
     setActiveStoreId(storeId);
     if (effectiveCompanyId) {
@@ -161,6 +189,7 @@ export const useShopifyStores = (companyId?: string) => {
     fetchStores,
     disconnectStore,
     syncStore,
+    registerWebhooks,
     setActiveStore,
   };
 };

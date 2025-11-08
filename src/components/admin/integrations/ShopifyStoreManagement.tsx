@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export const ShopifyStoreManagement = () => {
   const { userProfile } = useAuth();
-  const { stores, loading, disconnectStore, syncStore } = useShopifyStores();
+  const { stores, loading, disconnectStore, syncStore, registerWebhooks } = useShopifyStores();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
 
@@ -21,9 +21,15 @@ export const ShopifyStoreManagement = () => {
 
   const handleConfigure = (storeId: string) => {
     setSelectedStoreId(storeId);
-    // Configuration would open settings specific to this store
-    // For now, we'll just show which store was selected
     console.log('Configure store:', storeId);
+  };
+
+  const handleRegisterWebhooks = async (storeId: string) => {
+    try {
+      await registerWebhooks(storeId);
+    } catch (error) {
+      console.error('Failed to register webhooks:', error);
+    }
   };
 
   if (loading) {
@@ -61,6 +67,7 @@ export const ShopifyStoreManagement = () => {
                 onDisconnect={handleDisconnect}
                 onSync={syncStore}
                 onConfigure={handleConfigure}
+                onRegisterWebhooks={handleRegisterWebhooks}
               />
             ))}
           </div>

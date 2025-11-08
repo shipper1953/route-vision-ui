@@ -132,3 +132,12 @@ verify_jwt = true  # EasyPost shipment creation requires authentication
 
 [functions.create-shippo-shipment]
 verify_jwt = true  # Shippo shipment creation requires authentication
+
+[functions.shopify-register-webhooks]
+verify_jwt = true  # Requires authentication to register webhooks
+
+[functions.shopify-sync-purchase-orders]
+verify_jwt = true  # Requires authentication to sync purchase orders
+
+[functions.shopify-sync-transfer-orders]
+verify_jwt = true  # Requires authentication to sync transfer orders

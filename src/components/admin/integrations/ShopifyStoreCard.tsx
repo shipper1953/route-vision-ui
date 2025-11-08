@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Store, RefreshCw, Unplug, Calendar, Settings, Building2, User } from "lucide-react";
+import { Store, RefreshCw, Unplug, Calendar, Settings, Building2, User, Webhook } from "lucide-react";
 import { ShopifyStore } from "@/hooks/useShopifyStores";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,13 +13,15 @@ interface ShopifyStoreCardProps {
   onDisconnect: (storeId: string) => void;
   onSync: (storeId: string) => void;
   onConfigure: (storeId: string) => void;
+  onRegisterWebhooks: (storeId: string) => void;
 }
 
 export const ShopifyStoreCard = ({ 
   store, 
   onDisconnect, 
   onSync, 
-  onConfigure 
+  onConfigure,
+  onRegisterWebhooks 
 }: ShopifyStoreCardProps) => {
   const { isSuperAdmin } = useAuth();
   const [companyName, setCompanyName] = useState<string>("");
@@ -140,32 +142,45 @@ export const ShopifyStoreCard = ({
           )}
         </div>
 
-        <div className="flex gap-2 pt-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => onSync(store.id)}
-            className="flex-1"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Sync
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => onConfigure(store.id)}
-            className="flex-1"
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-          <Button 
-            variant="destructive" 
-            size="sm" 
-            onClick={() => onDisconnect(store.id)}
-          >
-            <Unplug className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-col gap-2 pt-2">
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onSync(store.id)}
+              className="flex-1"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Sync
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onRegisterWebhooks(store.id)}
+              className="flex-1"
+            >
+              <Webhook className="h-4 w-4 mr-2" />
+              Register Webhooks
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onConfigure(store.id)}
+              className="flex-1"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={() => onDisconnect(store.id)}
+            >
+              <Unplug className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

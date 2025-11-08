@@ -64,6 +64,66 @@ const ShopifyOrderSchema = z.object({
 
 type ShopifyOrder = z.infer<typeof ShopifyOrderSchema>;
 
+// Shopify Purchase Order webhook validation schema
+const ShopifyPurchaseOrderSchema = z.object({
+  id: z.union([z.number(), z.string()]).transform(String),
+  name: z.string().optional(),
+  status: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  expected_at: z.string().optional().nullable(),
+  supplier: z.object({
+    id: z.union([z.number(), z.string()]).optional(),
+    name: z.string().optional(),
+  }).optional().nullable(),
+  destination: z.object({
+    id: z.union([z.number(), z.string()]).optional(),
+    name: z.string().optional(),
+  }).optional().nullable(),
+  line_items: z.array(
+    z.object({
+      id: z.union([z.number(), z.string()]),
+      variant_id: z.union([z.number(), z.string()]).optional().nullable(),
+      product_id: z.union([z.number(), z.string()]).optional().nullable(),
+      quantity: z.number(),
+      quantity_received: z.number().optional().default(0),
+      sku: z.string().optional().nullable(),
+      name: z.string().optional(),
+      title: z.string().optional(),
+      price: z.union([z.string(), z.number()]).optional().nullable(),
+    })
+  ).default([]),
+  note: z.string().optional().nullable(),
+});
+
+// Shopify Inventory Transfer webhook validation schema
+const ShopifyTransferSchema = z.object({
+  id: z.union([z.number(), z.string()]).transform(String),
+  status: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  expected_at: z.string().optional().nullable(),
+  origin_location: z.object({
+    id: z.union([z.number(), z.string()]).optional(),
+    name: z.string().optional(),
+  }).optional().nullable(),
+  destination_location: z.object({
+    id: z.union([z.number(), z.string()]).optional(),
+    name: z.string().optional(),
+  }).optional().nullable(),
+  line_items: z.array(
+    z.object({
+      id: z.union([z.number(), z.string()]),
+      variant_id: z.union([z.number(), z.string()]).optional().nullable(),
+      product_id: z.union([z.number(), z.string()]).optional().nullable(),
+      quantity: z.number(),
+      quantity_received: z.number().optional().default(0),
+      product_title: z.string().optional(),
+      title: z.string().optional(),
+    })
+  ).default([]),
+});
+
 // Utility function to add business days (skip weekends)
 function addBusinessDays(startDate: Date, daysToAdd: number): Date {
   const result = new Date(startDate);
@@ -84,6 +144,281 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-hmac-sha256, x-shopify-shop-domain, x-shopify-topic',
 };
+
+// Helper functions for webhook processing
+async function handlePurchaseOrderWebhook(supabase: any, webhookData: any, store: any, topic: string) {
+  console.log(`Processing ${topic} for PO:`, webhookData.id);
+  
+  try {
+    const validatedPO = ShopifyPurchaseOrderSchema.parse(webhookData);
+    
+    const { data: existingMapping } = await supabase
+      .from('shopify_po_mappings')
+      .select('ship_tornado_po_id')
+      .eq('shopify_store_id', store.id)
+      .eq('shopify_po_id', validatedPO.id)
+      .single();
+    
+    const { data: warehouse } = await supabase
+      .from('warehouses')
+      .select('id')
+      .eq('company_id', store.company_id)
+      .eq('is_default', true)
+      .single();
+    
+    if (!warehouse) throw new Error('No default warehouse found');
+    
+    const poData = {
+      company_id: store.company_id,
+      customer_id: store.customer_id || null,
+      warehouse_id: warehouse.id,
+      po_number: `SHOP-PO-${validatedPO.name || validatedPO.id}`,
+      vendor_name: validatedPO.supplier?.name || 'Unknown Supplier',
+      vendor_id: validatedPO.supplier?.id?.toString(),
+      expected_date: validatedPO.expected_at ? new Date(validatedPO.expected_at).toISOString().split('T')[0] : null,
+      status: mapShopifyPOStatus(validatedPO.status),
+      notes: validatedPO.note || null,
+      shopify_po_id: validatedPO.id,
+      shopify_store_id: store.id,
+      source_type: 'shopify_purchase_order',
+      metadata: {
+        shopify_created_at: validatedPO.created_at,
+        shopify_updated_at: validatedPO.updated_at,
+      },
+    };
+    
+    let shipTornadoPoId: string;
+    
+    if (existingMapping) {
+      const { error: updateError } = await supabase
+        .from('purchase_orders')
+        .update(poData)
+        .eq('id', existingMapping.ship_tornado_po_id);
+      
+      if (updateError) throw updateError;
+      shipTornadoPoId = existingMapping.ship_tornado_po_id;
+    } else {
+      const { data: newPO, error: insertError } = await supabase
+        .from('purchase_orders')
+        .insert(poData)
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      shipTornadoPoId = newPO.id;
+      
+      await supabase.from('shopify_po_mappings').insert({
+        company_id: store.company_id,
+        shopify_store_id: store.id,
+        shopify_po_id: validatedPO.id,
+        shopify_po_number: validatedPO.name || validatedPO.id,
+        ship_tornado_po_id: shipTornadoPoId,
+        source_type: 'purchase_order',
+      });
+    }
+    
+    await syncPOLineItems(supabase, shipTornadoPoId, validatedPO.line_items, store.company_id);
+    console.log(`✅ Successfully processed ${topic} for PO:`, validatedPO.id);
+  } catch (error) {
+    console.error('Error processing purchase order webhook:', error);
+    throw error;
+  }
+}
+
+async function handleTransferWebhook(supabase: any, webhookData: any, store: any, topic: string) {
+  console.log(`Processing ${topic} for Transfer:`, webhookData.id);
+  
+  try {
+    const validatedTransfer = ShopifyTransferSchema.parse(webhookData);
+    
+    const { data: existingMapping } = await supabase
+      .from('shopify_po_mappings')
+      .select('ship_tornado_po_id')
+      .eq('shopify_store_id', store.id)
+      .eq('shopify_po_id', validatedTransfer.id)
+      .single();
+    
+    const { data: warehouse } = await supabase
+      .from('warehouses')
+      .select('id')
+      .eq('company_id', store.company_id)
+      .eq('is_default', true)
+      .single();
+    
+    if (!warehouse) throw new Error('No default warehouse found');
+    
+    const poData = {
+      company_id: store.company_id,
+      customer_id: store.customer_id || null,
+      warehouse_id: warehouse.id,
+      po_number: `SHOP-TR-${validatedTransfer.id}`,
+      vendor_name: 'Internal Transfer',
+      vendor_id: validatedTransfer.origin_location?.id?.toString(),
+      expected_date: validatedTransfer.expected_at ? new Date(validatedTransfer.expected_at).toISOString().split('T')[0] : null,
+      status: mapShopifyTransferStatus(validatedTransfer.status),
+      notes: `Transfer from ${validatedTransfer.origin_location?.name || 'Unknown'} to ${validatedTransfer.destination_location?.name || 'Unknown'}`,
+      shopify_po_id: validatedTransfer.id,
+      shopify_store_id: store.id,
+      source_type: 'shopify_transfer',
+      metadata: {
+        shopify_created_at: validatedTransfer.created_at,
+        shopify_updated_at: validatedTransfer.updated_at,
+        origin_location: validatedTransfer.origin_location,
+        destination_location: validatedTransfer.destination_location,
+      },
+    };
+    
+    let shipTornadoPoId: string;
+    
+    if (existingMapping) {
+      const { error: updateError } = await supabase
+        .from('purchase_orders')
+        .update(poData)
+        .eq('id', existingMapping.ship_tornado_po_id);
+      
+      if (updateError) throw updateError;
+      shipTornadoPoId = existingMapping.ship_tornado_po_id;
+    } else {
+      const { data: newPO, error: insertError } = await supabase
+        .from('purchase_orders')
+        .insert(poData)
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      shipTornadoPoId = newPO.id;
+      
+      await supabase.from('shopify_po_mappings').insert({
+        company_id: store.company_id,
+        shopify_store_id: store.id,
+        shopify_po_id: validatedTransfer.id,
+        shopify_po_number: validatedTransfer.id,
+        ship_tornado_po_id: shipTornadoPoId,
+        source_type: 'inventory_transfer',
+      });
+    }
+    
+    await syncTransferLineItems(supabase, shipTornadoPoId, validatedTransfer.line_items, store.company_id);
+    console.log(`✅ Successfully processed ${topic} for Transfer:`, validatedTransfer.id);
+  } catch (error) {
+    console.error('Error processing transfer webhook:', error);
+    throw error;
+  }
+}
+
+async function syncPOLineItems(supabase: any, poId: string, lineItems: any[], companyId: string) {
+  for (const lineItem of lineItems) {
+    const { data: matchedItem } = await supabase
+      .from('items')
+      .select('id')
+      .eq('company_id', companyId)
+      .or(`sku.eq.${lineItem.sku || 'NONE'},shopify_variant_id.eq.${lineItem.variant_id || 'NONE'}`)
+      .limit(1)
+      .single();
+    
+    const lineItemData = {
+      po_id: poId,
+      item_id: matchedItem?.id || null,
+      sku: lineItem.sku || lineItem.variant_id?.toString() || 'UNKNOWN',
+      product_name: lineItem.name || lineItem.title || 'Unknown Product',
+      quantity_ordered: lineItem.quantity || 0,
+      quantity_received: lineItem.quantity_received || 0,
+      unit_cost: lineItem.price ? parseFloat(lineItem.price.toString()) : null,
+      uom: 'unit',
+      shopify_line_item_id: lineItem.id?.toString(),
+      metadata: {
+        variant_id: lineItem.variant_id,
+        product_id: lineItem.product_id,
+      },
+    };
+    
+    const { data: existingLineItem } = await supabase
+      .from('po_line_items')
+      .select('id')
+      .eq('po_id', poId)
+      .eq('shopify_line_item_id', lineItem.id?.toString())
+      .single();
+    
+    if (existingLineItem) {
+      await supabase
+        .from('po_line_items')
+        .update(lineItemData)
+        .eq('id', existingLineItem.id);
+    } else {
+      await supabase
+        .from('po_line_items')
+        .insert(lineItemData);
+    }
+  }
+}
+
+async function syncTransferLineItems(supabase: any, poId: string, lineItems: any[], companyId: string) {
+  for (const lineItem of lineItems) {
+    const { data: matchedItem } = await supabase
+      .from('items')
+      .select('id, sku')
+      .eq('company_id', companyId)
+      .eq('shopify_variant_id', lineItem.variant_id?.toString())
+      .limit(1)
+      .single();
+    
+    const lineItemData = {
+      po_id: poId,
+      item_id: matchedItem?.id || null,
+      sku: matchedItem?.sku || lineItem.variant_id?.toString() || 'UNKNOWN',
+      product_name: lineItem.product_title || lineItem.title || 'Unknown Product',
+      quantity_ordered: lineItem.quantity || 0,
+      quantity_received: lineItem.quantity_received || 0,
+      unit_cost: null,
+      uom: 'unit',
+      shopify_line_item_id: lineItem.id?.toString(),
+      metadata: {
+        variant_id: lineItem.variant_id,
+        product_id: lineItem.product_id,
+      },
+    };
+    
+    const { data: existingLineItem } = await supabase
+      .from('po_line_items')
+      .select('id')
+      .eq('po_id', poId)
+      .eq('shopify_line_item_id', lineItem.id?.toString())
+      .single();
+    
+    if (existingLineItem) {
+      await supabase
+        .from('po_line_items')
+        .update(lineItemData)
+        .eq('id', existingLineItem.id);
+    } else {
+      await supabase
+        .from('po_line_items')
+        .insert(lineItemData);
+    }
+  }
+}
+
+function mapShopifyPOStatus(status: string): string {
+  const statusMap: Record<string, string> = {
+    'draft': 'pending',
+    'open': 'pending',
+    'received': 'received',
+    'closed': 'closed',
+    'cancelled': 'closed',
+  };
+  return statusMap[status] || 'pending';
+}
+
+function mapShopifyTransferStatus(status: string): string {
+  const statusMap: Record<string, string> = {
+    'draft': 'pending',
+    'pending': 'pending',
+    'in_transit': 'pending',
+    'received': 'received',
+    'cancelled': 'closed',
+  };
+  return statusMap[status] || 'pending';
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -167,10 +502,32 @@ serve(async (req) => {
 
     console.log('✅ HMAC signature verified successfully');
 
-    // NOTE: orders/create webhook removed - orders now sync on fulfillment request only
-    // See shopify-fulfillment-order-notification function for order creation logic
+    // Route to appropriate handler based on topic
+    switch (topic) {
+      case 'purchase_orders/create':
+      case 'purchase_orders/update':
+        await handlePurchaseOrderWebhook(supabase, webhookData, store, topic);
+        break;
+        
+      case 'inventory_transfers/create':
+      case 'inventory_transfers/update':
+        await handleTransferWebhook(supabase, webhookData, store, topic);
+        break;
+        
+      case 'orders/create':
+      case 'orders/updated':
+        console.log('Order webhook received but not processed - using fulfillment webhooks instead');
+        break;
+        
+      default:
+        console.log('Unhandled webhook topic:', topic);
+    }
     
-    return new Response(JSON.stringify({ message: 'Webhook received' }), {
+    return new Response(JSON.stringify({ 
+      message: 'Webhook processed successfully',
+      topic,
+      storeId: store.id 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
