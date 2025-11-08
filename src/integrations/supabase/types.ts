@@ -1417,6 +1417,7 @@ export type Database = {
           connected_at: string | null
           created_at: string | null
           customer_email: string | null
+          customer_id: string | null
           customer_name: string | null
           customer_reference: string | null
           fulfillment_location_id: string | null
@@ -1438,6 +1439,7 @@ export type Database = {
           connected_at?: string | null
           created_at?: string | null
           customer_email?: string | null
+          customer_id?: string | null
           customer_name?: string | null
           customer_reference?: string | null
           fulfillment_location_id?: string | null
@@ -1459,6 +1461,7 @@ export type Database = {
           connected_at?: string | null
           created_at?: string | null
           customer_email?: string | null
+          customer_id?: string | null
           customer_name?: string | null
           customer_reference?: string | null
           fulfillment_location_id?: string | null
@@ -1480,6 +1483,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_stores_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]

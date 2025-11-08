@@ -24,10 +24,10 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { companyId, storeUrl, accessToken } = await req.json();
+    const { companyId, customerId, customerName, customerReference, storeUrl, accessToken } = await req.json();
 
-    if (!companyId || !storeUrl || !accessToken) {
-      throw new Error('Company ID, store URL, and access token are required');
+    if (!companyId || !customerId || !storeUrl || !accessToken) {
+      throw new Error('Company ID, customer ID, store URL, and access token are required');
     }
 
     // Clean up store URL
@@ -71,31 +71,28 @@ serve(async (req) => {
 
     console.log('Webhooks registered successfully');
 
-    // Update company settings
-    const { data: company } = await supabase
-      .from('companies')
-      .select('settings')
-      .eq('id', companyId)
-      .single();
-
-    const existingSettings = company?.settings || {};
-    
-    const updatedSettings = {
-      ...existingSettings,
-      shopify: {
+    // Create or update shopify_stores record
+    const { error: storeError } = await supabase
+      .from('shopify_stores')
+      .upsert({
+        company_id: companyId,
         store_url: cleanUrl,
+        customer_id: customerId,
+        customer_name: customerName || null,
+        customer_reference: customerReference || null,
         access_token: accessToken,
         webhook_secret: webhookSecret,
-        connected: true,
+        is_active: true,
         connected_at: new Date().toISOString(),
-        last_sync: new Date().toISOString(),
-      },
-    };
+        last_sync_at: new Date().toISOString(),
+      }, {
+        onConflict: 'company_id,store_url',
+      });
 
-    const { error: updateError } = await supabase
-      .from('companies')
-      .update({ settings: updatedSettings })
-      .eq('id', companyId);
+    if (storeError) {
+      console.error('Error saving store:', storeError);
+      throw storeError;
+    }
 
     if (updateError) {
       console.error('Error updating company settings:', updateError);

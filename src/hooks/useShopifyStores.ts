@@ -11,6 +11,7 @@ export interface ShopifyStore {
   is_active: boolean;
   connected_at: string;
   last_sync_at: string | null;
+  customer_id: string | null;
   customer_name: string | null;
   customer_email: string | null;
   customer_reference: string | null;

@@ -24,10 +24,10 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { storeUrl, companyId, customerName, customerEmail, customerReference } = await req.json();
+    const { storeUrl, companyId, customerId, customerName, customerReference } = await req.json();
 
-    if (!storeUrl || !companyId) {
-      throw new Error('Store URL and company ID are required');
+    if (!storeUrl || !companyId || !customerId) {
+      throw new Error('Store URL, company ID, and customer ID are required');
     }
 
     // Clean up store URL
@@ -49,8 +49,8 @@ serve(async (req) => {
         company_id: companyId,
         store_url: cleanUrl,
         oauth_state: state,
+        customer_id: customerId,
         customer_name: customerName || null,
-        customer_email: customerEmail || null,
         customer_reference: customerReference || null,
         is_active: false, // Will be activated after OAuth completion
         access_token: 'pending', // Placeholder, will be updated in callback

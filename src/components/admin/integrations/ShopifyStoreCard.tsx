@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Store, RefreshCw, Unplug, Calendar, Settings, Building2 } from "lucide-react";
+import { Store, RefreshCw, Unplug, Calendar, Settings, Building2, User } from "lucide-react";
 import { ShopifyStore } from "@/hooks/useShopifyStores";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,6 +23,7 @@ export const ShopifyStoreCard = ({
 }: ShopifyStoreCardProps) => {
   const { isSuperAdmin } = useAuth();
   const [companyName, setCompanyName] = useState<string>("");
+  const [customerName, setCustomerName] = useState<string>("");
 
   // Fetch company name for super admins
   useEffect(() => {
@@ -42,6 +43,25 @@ export const ShopifyStoreCard = ({
     
     fetchCompanyName();
   }, [isSuperAdmin, store.company_id]);
+
+  // Fetch customer name if customer_id exists
+  useEffect(() => {
+    const fetchCustomerName = async () => {
+      if (store.customer_id) {
+        const { data } = await supabase
+          .from('customers')
+          .select('name')
+          .eq('id', store.customer_id)
+          .single();
+        
+        if (data) {
+          setCustomerName(data.name);
+        }
+      }
+    };
+    
+    fetchCustomerName();
+  }, [store.customer_id]);
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -67,6 +87,18 @@ export const ShopifyStoreCard = ({
                 Company:
               </span>
               <span className="font-medium">{companyName}</span>
+            </div>
+          )}
+          
+          {customerName && (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <User className="h-3 w-3" />
+                Customer:
+              </span>
+              <Badge variant="outline" className="gap-1">
+                {customerName}
+              </Badge>
             </div>
           )}
           

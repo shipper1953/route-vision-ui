@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Store, Loader2, Key, ExternalLink } from "lucide-react";
+import { Store, Loader2, Key, ExternalLink, User } from "lucide-react";
 
 interface ShopifyConnectionDialogProps {
   open: boolean;
@@ -26,11 +26,10 @@ export const ShopifyConnectionDialog = ({
   const { toast } = useToast();
   const { userProfile, isSuperAdmin } = useAuth();
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string; code?: string }>>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>(companyId || userProfile?.company_id || "");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [storeUrl, setStoreUrl] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [customerReference, setCustomerReference] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -67,6 +66,37 @@ export const ShopifyConnectionDialog = ({
     }
   }, [isSuperAdmin, open, userProfile?.company_id]);
 
+  // Fetch customers when company is selected
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      if (!selectedCompanyId) {
+        setCustomers([]);
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name, code')
+        .eq('company_id', selectedCompanyId)
+        .eq('is_active', true)
+        .order('name');
+      
+      if (data && !error) {
+        setCustomers(data);
+        // Auto-select if only one customer
+        if (data.length === 1) {
+          setSelectedCustomerId(data[0].id);
+        } else {
+          setSelectedCustomerId('');
+        }
+      }
+    };
+    
+    if (selectedCompanyId && open) {
+      fetchCustomers();
+    }
+  }, [selectedCompanyId, open]);
+
   // Update selected company when dialog opens or companyId changes
   useEffect(() => {
     if (open) {
@@ -85,6 +115,15 @@ export const ShopifyConnectionDialog = ({
       return;
     }
 
+    if (!selectedCustomerId) {
+      toast({
+        title: "Customer Required",
+        description: "Please select a customer for this store",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!storeUrl || !accessToken) {
       toast({
         title: "Missing Information",
@@ -98,12 +137,16 @@ export const ShopifyConnectionDialog = ({
 
     try {
       const cleanUrl = storeUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const customer = customers.find(c => c.id === selectedCustomerId);
       
       const { error } = await supabase.functions.invoke('shopify-save-credentials', {
         body: {
           storeUrl: cleanUrl,
           accessToken,
           companyId: selectedCompanyId,
+          customerId: selectedCustomerId,
+          customerName: customer?.name,
+          customerReference: customer?.code,
         },
       });
 
@@ -139,6 +182,15 @@ export const ShopifyConnectionDialog = ({
       return;
     }
 
+    if (!selectedCustomerId) {
+      toast({
+        title: "Customer Required",
+        description: "Please select a customer for this store",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!storeUrl) {
       toast({
         title: "Missing Information",
@@ -151,13 +203,15 @@ export const ShopifyConnectionDialog = ({
     setLoading(true);
 
     try {
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      
       const { data, error } = await supabase.functions.invoke('shopify-oauth-start', {
         body: {
           storeUrl,
           companyId: selectedCompanyId,
-          customerName: customerName || undefined,
-          customerEmail: customerEmail || undefined,
-          customerReference: customerReference || undefined,
+          customerId: selectedCustomerId,
+          customerName: customer?.name,
+          customerReference: customer?.code,
         },
       });
 
@@ -352,6 +406,37 @@ export const ShopifyConnectionDialog = ({
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="customer">
+                Customer <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={selectedCustomerId}
+                onValueChange={setSelectedCustomerId}
+                disabled={loading || !selectedCompanyId}
+              >
+                <SelectTrigger id="customer">
+                  <SelectValue placeholder="Select a customer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.name}
+                      {customer.code && <span className="text-muted-foreground ml-2">({customer.code})</span>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This store's orders will use inventory from this customer
+              </p>
+              {customers.length === 0 && selectedCompanyId && (
+                <p className="text-xs text-destructive">
+                  No customers found. Please create a customer first.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="accessToken">Admin API Access Token</Label>
               <Input
                 id="accessToken"
@@ -379,7 +464,7 @@ export const ShopifyConnectionDialog = ({
 
             <Button
               onClick={handleManualConnect}
-              disabled={loading || !storeUrl || !accessToken}
+              disabled={loading || !storeUrl || !accessToken || !selectedCustomerId}
               className="w-full"
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -403,43 +488,34 @@ export const ShopifyConnectionDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="customerName">Customer/Brand Name (Optional)</Label>
-              <Input
-                id="customerName"
-                placeholder="e.g., Acme Corp"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                disabled={loading}
-              />
+              <Label htmlFor="customer">
+                Customer <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={selectedCustomerId}
+                onValueChange={setSelectedCustomerId}
+                disabled={loading || !selectedCompanyId}
+              >
+                <SelectTrigger id="customer">
+                  <SelectValue placeholder="Select a customer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.name}
+                      {customer.code && <span className="text-muted-foreground ml-2">({customer.code})</span>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="text-xs text-muted-foreground">
-                Name to identify this store in your 3PL operations
+                This store's orders will use inventory from this customer
               </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="customerEmail">Contact Email (Optional)</Label>
-              <Input
-                id="customerEmail"
-                type="email"
-                placeholder="contact@customer.com"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="customerRef">Reference ID (Optional)</Label>
-              <Input
-                id="customerRef"
-                placeholder="CUST-001"
-                value={customerReference}
-                onChange={(e) => setCustomerReference(e.target.value)}
-                disabled={loading}
-              />
-              <p className="text-xs text-muted-foreground">
-                Your internal customer reference number
-              </p>
+              {customers.length === 0 && selectedCompanyId && (
+                <p className="text-xs text-destructive">
+                  No customers found. Please create a customer first.
+                </p>
+              )}
             </div>
 
             <div className="bg-muted/50 p-4 rounded-lg space-y-2">
@@ -453,7 +529,7 @@ export const ShopifyConnectionDialog = ({
 
             <Button
               onClick={handleOAuthConnect}
-              disabled={loading || !storeUrl}
+              disabled={loading || !storeUrl || !selectedCustomerId}
               className="w-full"
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
