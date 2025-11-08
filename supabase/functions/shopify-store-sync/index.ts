@@ -54,6 +54,9 @@ Deno.serve(async (req) => {
         storeId: storeId,
         dateRangeDays: 30,
       },
+      headers: {
+        Authorization: authHeader, // Forward the auth token
+      },
     });
 
     if (error) {
