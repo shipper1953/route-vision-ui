@@ -21,15 +21,26 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
     }
 
     const profileData = data[0];
-    
+
     console.log('Fetched profile with role from user_roles:', profileData.role);
-    
-    // Convert warehouse_ids from Json to string[] with proper type casting
+
+    const warehouseIds = Array.isArray(profileData.warehouse_ids)
+      ? (profileData.warehouse_ids as string[])
+      : [];
+
+    const accessibleCompanies = Array.isArray(profileData.accessible_companies)
+      ? (profileData.accessible_companies as { id: string; name: string }[])
+      : [];
+
     return {
-      ...profileData,
-      warehouse_ids: Array.isArray(profileData.warehouse_ids) 
-        ? (profileData.warehouse_ids as string[])
-        : []
+      id: profileData.id,
+      name: profileData.name,
+      email: profileData.email,
+      role: profileData.role,
+      tenant_id: profileData.tenant_id,
+      company_id: profileData.company_id ?? undefined,
+      warehouse_ids: warehouseIds,
+      accessible_companies: accessibleCompanies
     };
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -44,7 +55,7 @@ export const createUserProfile = async (user: any): Promise<UserProfile | null> 
     // Get active Demo company ID
     const { data: demoCompany, error: companyError } = await supabase
       .from('companies')
-      .select('id')
+      .select('id, tenant_id')
       .eq('name', 'Demo')
       .eq('is_active', true)
       .single();
@@ -74,6 +85,7 @@ export const createUserProfile = async (user: any): Promise<UserProfile | null> 
         email: user.email,
         password: '',
         company_id: demoCompany.id,
+        tenant_id: demoCompany.tenant_id,
         warehouse_ids: demoWarehouse ? [demoWarehouse.id] : []
       }])
       .select()

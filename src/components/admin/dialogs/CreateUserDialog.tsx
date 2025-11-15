@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Company } from "@/types/auth";
 import { Plus } from "lucide-react";
 import { NewUserForm } from "../types/userManagement";
+import { useAuth } from "@/hooks/useAuth";
 
 interface CreateUserDialogProps {
   companies: Company[];
@@ -26,6 +27,7 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
     company_id: 'no_company',
     password: ''
   });
+  const { tenantId } = useAuth();
 
   const generatePassword = () => {
     const password = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
@@ -41,6 +43,11 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
     try {
       setIsCreating(true);
       console.log('Creating user with data:', newUser);
+
+      if (!tenantId) {
+        toast.error('Unable to determine tenant for new user');
+        return;
+      }
       
       // Call the edge function to create the user with service role permissions
       const { data, error } = await supabase.functions.invoke('create-user', {
@@ -50,6 +57,7 @@ export const CreateUserDialog = ({ companies, onUserCreated }: CreateUserDialogP
           name: newUser.name,
           role: newUser.role,
           company_id: newUser.company_id === 'no_company' ? null : newUser.company_id,
+          tenant_id: tenantId,
         },
       });
 

@@ -4,7 +4,7 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AuthContext } from './AuthContext';
-import { UserProfile } from '@/types/auth';
+import { UserCompanyAccess, UserProfile } from '@/types/auth';
 import { createUserProfile, fetchUserProfile, clearAuthStorage } from './authHelpers';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -12,11 +12,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
+  const [availableCompanies, setAvailableCompanies] = useState<UserCompanyAccess[]>([]);
 
   const clearAuthState = () => {
     console.log('Clearing auth state...');
     setUser(null);
     setUserProfile(null);
+    setActiveCompanyId(null);
+    setAvailableCompanies([]);
     setError(null);
     clearAuthStorage();
   };
@@ -49,8 +53,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             const profile = await fetchUserProfile(session.user.id);
             console.log('Fetched user profile:', profile);
-            if (mounted) {
-              setUserProfile(profile);
+            if (mounted && profile) {
+              const normalizedCompanyId = profile.company_id || profile.accessible_companies[0]?.id || null;
+              const normalizedProfile = {
+                ...profile,
+                company_id: normalizedCompanyId || undefined
+              };
+              setUserProfile(normalizedProfile);
+              setAvailableCompanies(profile.accessible_companies);
+              setActiveCompanyId(normalizedCompanyId);
             }
           } catch (error) {
             console.error('Error fetching user profile during init:', error);
@@ -90,8 +101,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             try {
               const profile = await fetchUserProfile(session.user.id);
               console.log('Auth state change - fetched profile:', profile);
-              if (mounted) {
-                setUserProfile(profile);
+              if (mounted && profile) {
+                const normalizedCompanyId = profile.company_id || profile.accessible_companies[0]?.id || null;
+                const normalizedProfile = {
+                  ...profile,
+                  company_id: normalizedCompanyId || undefined
+                };
+                setUserProfile(normalizedProfile);
+                setAvailableCompanies(profile.accessible_companies);
+                setActiveCompanyId(normalizedCompanyId);
               }
             } catch (error) {
               console.error('Error handling user profile:', error);
@@ -103,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         setUser(session.user);
       }
-      
+
       if (mounted) {
         setLoading(false);
       }
@@ -245,6 +263,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isSuperAdmin = userProfile?.role === 'super_admin';
   const isCompanyAdmin = userProfile?.role === 'company_admin';
 
+  const tenantId = userProfile?.tenant_id ?? null;
+
+  const handleSetActiveCompany = (companyId: string) => {
+    if (!companyId) return;
+    const isAllowed = availableCompanies.some(company => company.id === companyId);
+    if (!isAllowed) {
+      console.warn('Attempted to set company outside of accessible scope');
+      return;
+    }
+    setActiveCompanyId(companyId);
+    setUserProfile(prev => (prev ? { ...prev, company_id: companyId } : prev));
+  };
+
   // Add debug logging for role computations
   useEffect(() => {
     console.log('Role computations:', {
@@ -265,6 +296,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isSuperAdmin,
     isCompanyAdmin,
     userProfile,
+    tenantId,
+    availableCompanies,
+    activeCompanyId,
+    setActiveCompany: handleSetActiveCompany,
     loading,
     error,
     login,

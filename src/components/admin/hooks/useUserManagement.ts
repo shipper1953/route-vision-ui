@@ -29,12 +29,14 @@ export const useUserManagement = () => {
         email: user.email,
         name: user.name,
         role: user.role,
+        tenant_id: user.tenant_id,
         company_id: user.company_id || undefined,
-        warehouse_ids: Array.isArray(user.warehouse_ids) 
-          ? user.warehouse_ids 
-          : typeof user.warehouse_ids === 'string' 
+        warehouse_ids: Array.isArray(user.warehouse_ids)
+          ? user.warehouse_ids
+          : typeof user.warehouse_ids === 'string'
             ? JSON.parse(user.warehouse_ids)
-            : []
+            : [],
+        accessible_companies: []
       })) || [];
       
       console.log('Transformed users:', transformedUsers);
@@ -71,7 +73,8 @@ export const useUserManagement = () => {
         settings: company.settings,
         created_at: company.created_at,
         updated_at: company.updated_at,
-        is_active: company.is_active
+        is_active: company.is_active,
+        tenant_id: company.tenant_id
       })) || [];
       
       console.log('Transformed companies:', transformedCompanies);

@@ -13,6 +13,7 @@ interface CreateUserRequest {
   name: string;
   role: 'user' | 'company_admin' | 'super_admin';
   company_id?: string;
+  tenant_id: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -21,7 +22,11 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, password, name, role, company_id }: CreateUserRequest = await req.json();
+    const { email, password, name, role, company_id, tenant_id }: CreateUserRequest = await req.json();
+
+    if (!tenant_id) {
+      throw new Error('tenant_id is required when creating a user');
+    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -32,7 +37,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Creating user with service role:', { email, name, role, company_id });
+    console.log('Creating user with service role:', { email, name, role, company_id, tenant_id });
     
     // Create user using Supabase Auth Admin API with immediate activation
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -64,6 +69,7 @@ const handler = async (req: Request): Promise<Response> => {
           email: email,
           role: role,
           company_id: company_id === 'no_company' ? null : company_id,
+          tenant_id: tenant_id,
           password: '', // Password is managed by Supabase auth
         }, {
           onConflict: 'id'
