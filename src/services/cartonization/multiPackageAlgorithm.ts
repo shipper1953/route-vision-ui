@@ -102,6 +102,13 @@ export class MultiPackageAlgorithm {
       return null;
     }
 
+    const coverageResolved = this.ensureAllItemsPacked(items, packages);
+
+    if (!coverageResolved) {
+      console.log(`❌ Strategy ${strategy} failed: Unable to allocate all items across packages`);
+      return null;
+    }
+
     // Calculate overall metrics
     const totalWeight = packages.reduce((sum, pkg) => sum + pkg.packageWeight, 0);
     const totalVolume = packages.reduce((sum, pkg) => sum + pkg.packageVolume, 0);
@@ -296,7 +303,7 @@ export class MultiPackageAlgorithm {
 
   private findOptimalBoxForGroup(items: Item[], packageNumber: number): PackageRecommendation | null {
     const groupWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-    const groupVolume = items.reduce((sum, item) => 
+    const groupVolume = items.reduce((sum, item) =>
       sum + (item.length * item.width * item.height * item.quantity), 0
     );
 
@@ -333,6 +340,95 @@ export class MultiPackageAlgorithm {
 
     console.log(`❌ Package ${packageNumber}: No suitable box found`);
     return null;
+  }
+
+  private getItemKey(item: Item): string {
+    return item.id || `${item.name}-${item.length}-${item.width}-${item.height}-${item.weight}`;
+  }
+
+  private getRemainingItems(originalItems: Item[], packages: PackageRecommendation[]): Item[] {
+    const quantityMap = new Map<string, { template: Item; remaining: number }>();
+
+    for (const item of originalItems) {
+      const key = this.getItemKey(item);
+      const entry = quantityMap.get(key);
+      if (entry) {
+        entry.remaining += item.quantity;
+      } else {
+        quantityMap.set(key, { template: item, remaining: item.quantity });
+      }
+    }
+
+    for (const pkg of packages) {
+      for (const assigned of pkg.assignedItems) {
+        const key = this.getItemKey(assigned);
+        const entry = quantityMap.get(key);
+        if (entry) {
+          entry.remaining = Math.max(0, entry.remaining - assigned.quantity);
+        }
+      }
+    }
+
+    const remainingItems: Item[] = [];
+
+    quantityMap.forEach(({ template, remaining }) => {
+      if (remaining > 0) {
+        remainingItems.push({ ...template, quantity: remaining });
+      }
+    });
+
+    return remainingItems;
+  }
+
+  private ensureAllItemsPacked(originalItems: Item[], packages: PackageRecommendation[]): boolean {
+    const remainingItems = this.getRemainingItems(originalItems, packages);
+
+    if (!remainingItems.length) {
+      return true;
+    }
+
+    console.log(`⚠️ ${remainingItems.length} item group(s) still need packaging. Adding supplemental packages.`);
+
+    for (const item of remainingItems) {
+      if (!this.packItemWithFallback(item, packages)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private packItemWithFallback(item: Item, packages: PackageRecommendation[]): boolean {
+    const queue: Item[] = [{ ...item }];
+
+    while (queue.length) {
+      const current = queue.shift()!;
+      const packageNumber = packages.length + 1;
+      const packageResult = this.findOptimalBoxForGroup([current], packageNumber);
+
+      if (packageResult) {
+        packages.push({
+          ...packageResult,
+          assignedItems: packageResult.assignedItems.map(assigned => ({ ...assigned }))
+        });
+        continue;
+      }
+
+      if (current.quantity <= 1) {
+        console.log(`❌ Unable to pack remaining item ${current.name} (${current.id || 'no-id'}) in available inventory`);
+        return false;
+      }
+
+      const splitQty = Math.max(1, Math.floor(current.quantity / 2));
+      const remainingQty = current.quantity - splitQty;
+
+      queue.unshift({ ...current, quantity: splitQty });
+      if (remainingQty > 0) {
+        queue.unshift({ ...current, quantity: remainingQty });
+      }
+    }
+
+    return true;
   }
 
   private selectBestResult(
