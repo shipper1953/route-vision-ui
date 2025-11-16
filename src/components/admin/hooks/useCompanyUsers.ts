@@ -24,7 +24,7 @@ export const useCompanyUsers = (companyId?: string) => {
       if (error) throw error;
       
       // Transform database users to UserProfile format
-      const transformedUsers: UserProfile[] = (data as DatabaseUser[])?.map(user => ({
+      const transformedUsers: UserProfile[] = (data as any[])?.map(user => ({
         id: user.id,
         email: user.email,
         name: user.name,
@@ -34,7 +34,8 @@ export const useCompanyUsers = (companyId?: string) => {
           ? user.warehouse_ids 
           : typeof user.warehouse_ids === 'string' 
             ? JSON.parse(user.warehouse_ids)
-            : []
+            : [],
+        created_at: user.created_at
       })) || [];
       
       setUsers(transformedUsers);

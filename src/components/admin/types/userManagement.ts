@@ -13,6 +13,7 @@ export interface DatabaseUser {
   role: 'user' | 'company_admin' | 'super_admin';
   company_id: string | null;
   warehouse_ids: any;
+  created_at: string;
 }
 
 export interface DatabaseCompany {

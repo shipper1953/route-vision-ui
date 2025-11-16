@@ -23,6 +23,7 @@ export interface UserProfile {
   role: 'user' | 'company_admin' | 'super_admin';
   company_id?: string;
   warehouse_ids?: string[];
+  created_at?: string;
 }
 
 export interface Company {
