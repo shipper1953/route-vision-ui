@@ -37,11 +37,11 @@ Deno.serve(async (req) => {
       .eq('item_id', item_id)
       .eq('warehouse_id', warehouse_id)
       .eq('location_id', location_id)
-      .eq('lot_number', lot_number || '')
-      .eq('serial_number', serial_number || '')
-      .single();
+      .is('lot_number', lot_number || null)
+      .is('serial_number', serial_number || null)
+      .maybeSingle();
 
-    if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+    if (fetchError) throw fetchError;
 
     let inventoryId: string;
 
@@ -62,7 +62,8 @@ Deno.serve(async (req) => {
         .from('inventory_levels')
         .update({
           quantity_on_hand: newQty,
-          quantity_available: Math.max(0, newQty - inventory.quantity_allocated)
+          quantity_available: Math.max(0, newQty - inventory.quantity_allocated),
+          updated_at: new Date().toISOString()
         })
         .eq('id', inventory.id);
 
@@ -88,8 +89,11 @@ Deno.serve(async (req) => {
           location_id,
           quantity_on_hand: quantity_change,
           quantity_available: quantity_change,
+          quantity_allocated: 0,
           lot_number,
-          serial_number
+          serial_number,
+          condition: 'good',
+          received_date: new Date().toISOString()
         })
         .select()
         .single();
@@ -98,21 +102,21 @@ Deno.serve(async (req) => {
       inventoryId = newInventory.id;
     }
 
-    // Log the adjustment
+    // Log the adjustment in inventory_transactions
     const { error: logError } = await supabaseClient
-      .from('inventory_adjustments')
+      .from('inventory_transactions')
       .insert({
         company_id,
-        inventory_level_id: inventoryId,
-        item_id,
         warehouse_id,
-        location_id,
-        quantity_change,
-        reason,
+        transaction_type: 'adjust',
+        item_id,
+        to_location_id: location_id,
+        quantity: quantity_change,
+        reason_code: reason,
         notes,
         lot_number,
         serial_number,
-        adjusted_by: user_id
+        performed_by: user_id
       });
 
     if (logError) console.error('Failed to log adjustment:', logError);
