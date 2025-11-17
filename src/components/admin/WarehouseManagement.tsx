@@ -34,7 +34,8 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
       zip: '',
       country: 'US'
     },
-    is_default: false
+    is_default: false,
+    shopify_location_id: ''
   });
 
   useEffect(() => {
@@ -87,7 +88,8 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
           zip: '',
           country: 'US'
         },
-        is_default: false
+        is_default: false,
+        shopify_location_id: ''
       });
       setIsCreateDialogOpen(false);
       toast.success('Warehouse created successfully');
@@ -216,6 +218,21 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                       placeholder="warehouse@company.com"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="shopify-location-id">
+                    Shopify Location ID <span className="text-muted-foreground">(Optional)</span>
+                  </Label>
+                  <Input
+                    id="shopify-location-id"
+                    value={newWarehouse.shopify_location_id}
+                    onChange={(e) => setNewWarehouse({ ...newWarehouse, shopify_location_id: e.target.value })}
+                    placeholder="gid://shopify/Location/123456789"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter your Shopify fulfillment location ID to automatically route POs/Transfers to this warehouse
+                  </p>
                 </div>
                 
                 <div className="space-y-4">
@@ -398,6 +415,21 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                 </div>
               </div>
               
+              <div>
+                <Label htmlFor="edit-shopify-location-id">
+                  Shopify Location ID <span className="text-muted-foreground">(Optional)</span>
+                </Label>
+                <Input
+                  id="edit-shopify-location-id"
+                  value={editingWarehouse.shopify_location_id || ''}
+                  onChange={(e) => setEditingWarehouse({ ...editingWarehouse, shopify_location_id: e.target.value })}
+                  placeholder="gid://shopify/Location/123456789"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter your Shopify fulfillment location ID to automatically route POs/Transfers to this warehouse
+                </p>
+              </div>
+              
               <div className="flex gap-2">
                 <Button onClick={updateWarehouse} className="flex-1">
                   Update Warehouse
@@ -427,6 +459,7 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                 <TableHead>Name</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Address</TableHead>
+                <TableHead>Shopify Location</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -449,6 +482,18 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                       <br />
                       {warehouse.address.city}, {warehouse.address.state} {warehouse.address.zip}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {warehouse.shopify_location_id ? (
+                      <div className="flex items-center gap-1 text-sm">
+                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-mono text-xs text-muted-foreground truncate max-w-[150px]" title={warehouse.shopify_location_id}>
+                          {warehouse.shopify_location_id}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not mapped</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={warehouse.is_default ? 'default' : 'secondary'}>

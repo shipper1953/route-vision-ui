@@ -159,14 +159,36 @@ async function handlePurchaseOrderWebhook(supabase: any, webhookData: any, store
       .eq('shopify_po_id', validatedPO.id)
       .single();
     
-    const { data: warehouse } = await supabase
-      .from('warehouses')
-      .select('id')
-      .eq('company_id', store.company_id)
-      .eq('is_default', true)
-      .single();
+    // Try to find warehouse by Shopify destination location first
+    let warehouse = null;
+    if (validatedPO.destination?.id) {
+      const destinationId = validatedPO.destination.id.toString();
+      const { data: matchedWarehouse } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('company_id', store.company_id)
+        .eq('shopify_location_id', destinationId)
+        .single();
+      
+      if (matchedWarehouse) {
+        warehouse = matchedWarehouse;
+        console.log(`✅ Matched PO destination to warehouse: ${destinationId}`);
+      }
+    }
     
-    if (!warehouse) throw new Error('No default warehouse found');
+    // Fall back to default warehouse if no destination match
+    if (!warehouse) {
+      const { data: defaultWarehouse } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('company_id', store.company_id)
+        .eq('is_default', true)
+        .single();
+      
+      warehouse = defaultWarehouse;
+      if (!warehouse) throw new Error('No default warehouse found');
+      console.log('Using default warehouse (no destination match)');
+    }
     
     const poData = {
       company_id: store.company_id,
@@ -181,9 +203,12 @@ async function handlePurchaseOrderWebhook(supabase: any, webhookData: any, store
       shopify_po_id: validatedPO.id,
       shopify_store_id: store.id,
       source_type: 'shopify_purchase_order',
+      shopify_destination_location_id: validatedPO.destination?.id?.toString() || null,
+      shopify_destination_location_name: validatedPO.destination?.name || null,
       metadata: {
         shopify_created_at: validatedPO.created_at,
         shopify_updated_at: validatedPO.updated_at,
+        shopify_destination: validatedPO.destination || null,
       },
     };
     
@@ -238,14 +263,36 @@ async function handleTransferWebhook(supabase: any, webhookData: any, store: any
       .eq('shopify_po_id', validatedTransfer.id)
       .single();
     
-    const { data: warehouse } = await supabase
-      .from('warehouses')
-      .select('id')
-      .eq('company_id', store.company_id)
-      .eq('is_default', true)
-      .single();
+    // Try to find warehouse by Shopify destination location first
+    let warehouse = null;
+    if (validatedTransfer.destination_location?.id) {
+      const destinationId = validatedTransfer.destination_location.id.toString();
+      const { data: matchedWarehouse } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('company_id', store.company_id)
+        .eq('shopify_location_id', destinationId)
+        .single();
+      
+      if (matchedWarehouse) {
+        warehouse = matchedWarehouse;
+        console.log(`✅ Matched Transfer destination to warehouse: ${destinationId}`);
+      }
+    }
     
-    if (!warehouse) throw new Error('No default warehouse found');
+    // Fall back to default warehouse if no destination match
+    if (!warehouse) {
+      const { data: defaultWarehouse } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('company_id', store.company_id)
+        .eq('is_default', true)
+        .single();
+      
+      warehouse = defaultWarehouse;
+      if (!warehouse) throw new Error('No default warehouse found');
+      console.log('Using default warehouse (no destination match)');
+    }
     
     const poData = {
       company_id: store.company_id,
@@ -260,6 +307,8 @@ async function handleTransferWebhook(supabase: any, webhookData: any, store: any
       shopify_po_id: validatedTransfer.id,
       shopify_store_id: store.id,
       source_type: 'shopify_transfer',
+      shopify_destination_location_id: validatedTransfer.destination_location?.id?.toString() || null,
+      shopify_destination_location_name: validatedTransfer.destination_location?.name || null,
       metadata: {
         shopify_created_at: validatedTransfer.created_at,
         shopify_updated_at: validatedTransfer.updated_at,

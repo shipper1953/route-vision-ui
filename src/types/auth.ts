@@ -57,6 +57,7 @@ export interface Warehouse {
   email?: string;
   address: any;
   is_default: boolean;
+  shopify_location_id?: string;
   created_at: string;
   updated_at: string;
 }
