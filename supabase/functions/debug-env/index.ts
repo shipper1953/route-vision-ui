@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    // SECURITY: Require authentication and super_admin role
+    // SECURITY: Require authentication and admin role (super_admin or company_admin)
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return new Response(
@@ -36,27 +36,33 @@ serve(async (req) => {
       );
     }
 
-    // Check if user has super_admin role
-    const { data: roleCheck, error: roleError } = await supabaseClient.rpc('has_role', {
+    // Check if user has super_admin or company_admin role
+    const { data: isSuperAdmin } = await supabaseClient.rpc('has_role', {
       _user_id: user.id,
       _role: 'super_admin'
     });
 
-    if (roleError || !roleCheck) {
+    const { data: isCompanyAdmin } = await supabaseClient.rpc('has_role', {
+      _user_id: user.id,
+      _role: 'company_admin'
+    });
+
+    if (!isSuperAdmin && !isCompanyAdmin) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized: super_admin role required' }),
+        JSON.stringify({ error: 'Unauthorized: admin role required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
       );
     }
 
-    console.log('Debug endpoint called by super_admin:', user.email);
+    const userRole = isSuperAdmin ? 'super_admin' : 'company_admin';
+    console.log('Debug endpoint called by', userRole, ':', user.email);
     
     const allEnvVars = Deno.env.toObject();
     
     // Filter out sensitive info but show what's available
     const envInfo = Object.keys(allEnvVars).reduce((acc, key) => {
-      if (key.includes('EASYPOST') || key.includes('SUPABASE') || key.includes('STRIPE')) {
-        acc[key] = key.includes('KEY') || key.includes('SECRET') 
+      if (key.includes('EASYPOST') || key.includes('SUPABASE') || key.includes('STRIPE') || key.includes('SHOPIFY')) {
+        acc[key] = key.includes('KEY') || key.includes('SECRET') || key.includes('TOKEN')
           ? (allEnvVars[key] ? `SET (${allEnvVars[key].length} chars)` : 'NOT SET')
           : 'Available';
       }
@@ -64,8 +70,9 @@ serve(async (req) => {
     }, {} as Record<string, string>);
     
     const response = {
-      message: 'Environment diagnostics (super_admin only)',
+      message: 'Environment diagnostics (admin only)',
       user: user.email,
+      role: userRole,
       totalEnvVars: Object.keys(allEnvVars).length,
       relevantVars: envInfo,
       easypostApiKey: {
