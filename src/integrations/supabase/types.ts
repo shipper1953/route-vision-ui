@@ -1260,6 +1260,8 @@ export type Database = {
           metadata: Json | null
           notes: string | null
           po_number: string
+          shopify_destination_location_id: string | null
+          shopify_destination_location_name: string | null
           shopify_po_id: string | null
           shopify_store_id: string | null
           source_type: string | null
@@ -1278,6 +1280,8 @@ export type Database = {
           metadata?: Json | null
           notes?: string | null
           po_number: string
+          shopify_destination_location_id?: string | null
+          shopify_destination_location_name?: string | null
           shopify_po_id?: string | null
           shopify_store_id?: string | null
           source_type?: string | null
@@ -1296,6 +1300,8 @@ export type Database = {
           metadata?: Json | null
           notes?: string | null
           po_number?: string
+          shopify_destination_location_id?: string | null
+          shopify_destination_location_name?: string | null
           shopify_po_id?: string | null
           shopify_store_id?: string | null
           source_type?: string | null
