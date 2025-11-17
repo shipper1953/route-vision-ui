@@ -2509,6 +2509,7 @@ export type Database = {
           is_default: boolean | null
           name: string
           phone: string | null
+          shopify_location_id: string | null
           updated_at: string
         }
         Insert: {
@@ -2520,6 +2521,7 @@ export type Database = {
           is_default?: boolean | null
           name: string
           phone?: string | null
+          shopify_location_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -2531,6 +2533,7 @@ export type Database = {
           is_default?: boolean | null
           name?: string
           phone?: string | null
+          shopify_location_id?: string | null
           updated_at?: string
         }
         Relationships: [
