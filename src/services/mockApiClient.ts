@@ -89,7 +89,7 @@ export async function mockApiClient(url: string, options: RequestInit = {}): Pro
 }
 
 // Optional: Replace global fetch with the mock client during development
-if (process.env.NODE_ENV === 'development') {
+if (import.meta.env.DEV) {
   const originalFetch = window.fetch;
   window.fetch = function(input: RequestInfo | URL, init?: RequestInit) {
     // Fix: Handle different input types correctly

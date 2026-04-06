@@ -1,1 +1,4 @@
 project_id = "wqfefrlnzfkngkihlyij"
+
+[functions.get-all-shipments-admin]
+verify_jwt = false
