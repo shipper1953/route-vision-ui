@@ -71,7 +71,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
       ? supabase
           .from('warehouses')
           .select('id')
-          .eq('company_id', userProfile.company_id)
+          .eq('company_id', companyId)
           .eq('is_default', true)
           .maybeSingle()
       : Promise.resolve({ data: { id: finalWarehouseId }, error: null }),
