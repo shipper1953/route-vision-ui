@@ -15,7 +15,7 @@ export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: s
   const [searchLoading, setSearchLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   
-  const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastReloadRef = useRef<number>(0);
   const MIN_RELOAD_INTERVAL = 1000; // 1 second minimum between reloads
 

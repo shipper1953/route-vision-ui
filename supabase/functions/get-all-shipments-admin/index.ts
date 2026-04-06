@@ -15,6 +15,7 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     
     if (!supabaseServiceKey) {
@@ -28,9 +29,30 @@ serve(async (req) => {
       );
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // Validate the caller's JWT
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    console.log("Fetching ALL shipments using service role...");
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Authenticated user:", user.email, "- Fetching ALL shipments using service role...");
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get ALL shipments using service role to bypass RLS
     const { data: shipmentsData, error: shipmentsError } = await supabaseAdmin
@@ -38,7 +60,7 @@ serve(async (req) => {
       .select('*')
       .order('created_at', { ascending: false });
 
-    console.log("Service role shipments query result:", { data: shipmentsData, error: shipmentsError });
+    console.log("Service role shipments query result:", { count: shipmentsData?.length, error: shipmentsError });
 
     if (shipmentsError) {
       console.error('Error fetching shipments:', shipmentsError);

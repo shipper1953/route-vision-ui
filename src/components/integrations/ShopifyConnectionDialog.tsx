@@ -372,8 +372,8 @@ export const ShopifyConnectionDialog = ({
         }
 
         // Check if popup closed - if it closes and we didn't get message, assume success and refresh
-        let checkInterval: NodeJS.Timeout | null = null;
-        let timeoutId: NodeJS.Timeout | null = null;
+        let checkInterval: ReturnType<typeof setInterval> | null = null;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
         
         checkInterval = setInterval(() => {
           if (popup.closed) {
