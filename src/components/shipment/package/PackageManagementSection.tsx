@@ -349,6 +349,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
     editPackage,
     calculateMultiPackage,
     removePackage,
+    isCalculating,
   } = useMultiPackageCartonization();
 
   // Update selected order items when selection changes
@@ -358,15 +359,16 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
     }
   }, [selectedItems]);
 
-  // Initialize cartonization when selected items change
+  // Initialize cartonization when selected items change AND boxes are loaded
   useEffect(() => {
-    if (selectedOrderItems && selectedOrderItems.length > 0) {
+    if (selectedOrderItems && selectedOrderItems.length > 0 && boxes.length > 0 && !isCalculating) {
       const items = createItemsFromOrderData(selectedOrderItems, masterItems);
       if (items.length > 0) {
+        console.log('🎯 Running cartonization with', items.length, 'items and', boxes.length, 'boxes');
         calculateMultiPackage(items, 'balanced');
       }
     }
-  }, [selectedOrderItems, masterItems, createItemsFromOrderData, calculateMultiPackage]);
+  }, [selectedOrderItems, masterItems, boxes, createItemsFromOrderData, calculateMultiPackage, isCalculating]);
 
   // Expose multi-package parcels and selected boxes to the form
   useEffect(() => {
