@@ -349,6 +349,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
     editPackage,
     calculateMultiPackage,
     removePackage,
+    isCalculating,
   } = useMultiPackageCartonization();
 
   // Update selected order items when selection changes
