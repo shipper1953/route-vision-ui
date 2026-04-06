@@ -14,20 +14,18 @@ export const WarehouseSelectionSection = () => {
   useEffect(() => {
     const fetchWarehouses = async () => {
       setLoading(true);
-
-      if (!userProfile?.company_id) {
-        // No company assigned (e.g., super admin without company) — avoid infinite loading
-        setWarehouses([]);
-        setLoading(false);
-        return;
-      }
       
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('warehouses')
-          .select('*')
-          .eq('company_id', userProfile.company_id)
-          .order('is_default', { ascending: false });
+          .select('*');
+
+        // Super admins without a company see all warehouses; others filter by company
+        if (userProfile?.company_id) {
+          query = query.eq('company_id', userProfile.company_id);
+        }
+
+        const { data, error } = await query.order('is_default', { ascending: false });
 
         if (!error && data) {
           setWarehouses(data);
@@ -39,8 +37,10 @@ export const WarehouseSelectionSection = () => {
       }
     };
 
-    fetchWarehouses();
-  }, [userProfile?.company_id]);
+    if (userProfile) {
+      fetchWarehouses();
+    }
+  }, [userProfile?.company_id, userProfile]);
 
   if (loading) {
     return <div>Loading warehouses...</div>;
