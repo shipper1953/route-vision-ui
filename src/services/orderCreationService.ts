@@ -131,7 +131,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
     value: parseFloat(orderData.value) || 0,
     shipping_address: orderData.shippingAddress,
     user_id: user.id,
-    company_id: userProfile.company_id,
+    company_id: companyId,
     warehouse_id: finalWarehouseId
   };
 
