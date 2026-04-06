@@ -31,13 +31,30 @@ export async function recalculateOrderCartonization(orderId: number): Promise<Re
       return { orderId, success: false, error: 'No items in order' };
     }
 
-    // Fetch item master data for dimensions
-    const { data: masterItems, error: itemsError } = await supabase
-      .from('items')
-      .select('*')
-      .eq('company_id', order.company_id);
+    // Collect item IDs and SKUs from order items for targeted lookup
+    const itemIds = orderItems.map((i: any) => i.itemId).filter(Boolean);
+    const itemSkus = orderItems.map((i: any) => i.sku).filter(Boolean);
 
-    if (itemsError || !masterItems) {
+    // Fetch item master data by ID or SKU (not filtered by company, since super admins
+    // may create orders across companies)
+    let masterItems: any[] = [];
+    if (itemIds.length > 0) {
+      const { data, error: itemsError } = await supabase
+        .from('items')
+        .select('*')
+        .in('id', itemIds);
+      if (!itemsError && data) masterItems = data;
+    }
+    // Fallback: also try SKU match within the order's company
+    if (masterItems.length === 0 && itemSkus.length > 0) {
+      const { data, error: itemsError } = await supabase
+        .from('items')
+        .select('*')
+        .in('sku', itemSkus);
+      if (!itemsError && data) masterItems = data;
+    }
+
+    if (!masterItems || masterItems.length === 0) {
       return { orderId, success: false, error: 'Failed to fetch item master data' };
     }
 
