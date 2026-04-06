@@ -17,12 +17,13 @@ export const useItemMaster = () => {
     }
   }, [userProfile]);
 
-  // Subscribe to Qboid realtime updates
+  // Subscribe to Qboid realtime updates for item dimension changes
   useEffect(() => {
     if (!userProfile) return;
 
+    const channelName = `qboid-item-updates-${Date.now()}`;
     const channel = supabase
-      .channel('qboid-item-updates')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -33,7 +34,6 @@ export const useItemMaster = () => {
         (payload: any) => {
           const eventData = payload.new;
           if (eventData.event_type === 'item_dimensions_updated') {
-            // Refresh items list when an item is updated via Qboid
             fetchItems();
           }
         }
