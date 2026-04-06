@@ -1,10 +1,11 @@
+import { useState, useRef, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
-import { useState, useRef, useEffect } from "react";
 import { Shield, ChevronDown, Building2, Users, Package, Truck, Warehouse, Wallet, Plug } from "lucide-react";
 import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export const CompanyAdminNavItem = () => {
   const location = useLocation();
@@ -13,6 +14,7 @@ export const CompanyAdminNavItem = () => {
   const [isOpen, setIsOpen] = useState(location.pathname.startsWith('/company-admin'));
   const navRef = useRef<HTMLDivElement>(null);
   const isActive = location.pathname.startsWith('/company-admin');
+  const isMobile = useIsMobile();
 
   // Keep menu expanded when on Company Admin pages
   useEffect(() => {
@@ -23,7 +25,9 @@ export const CompanyAdminNavItem = () => {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsCollapsed(true);
+    if (isMobile) {
+      setIsCollapsed(true);
+    }
   };
 
   const getTooltipPosition = () => {

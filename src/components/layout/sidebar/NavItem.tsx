@@ -1,9 +1,10 @@
 
+import { useState, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/hooks/useAuth";
-import { useState, useRef } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface NavItemProps {
   to: string;
@@ -21,6 +22,7 @@ export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false,
   const [isHovered, setIsHovered] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
   const isActive = location.pathname === to;
+  const isMobile = useIsMobile();
   
   // Check permissions
   if (adminOnly && !isAdmin) return null;
@@ -30,7 +32,9 @@ export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false,
     // Prevent event from bubbling up to the sidebar container
     e.stopPropagation();
     // Auto-collapse sidebar on selection
-    setIsCollapsed(true);
+    if (isMobile) {
+      setIsCollapsed(true);
+    }
   };
 
   // Calculate tooltip position
@@ -54,12 +58,12 @@ export const NavItem = ({ to, icon: Icon, label, isCollapsed, adminOnly = false,
       <NavLink 
         to={to} 
         onClick={handleClick}
-        className={({ isActive }) => 
+        className={({ isActive }) =>
           cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+            "flex items-center gap-3 px-3 py-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-accent",
             isCollapsed ? "justify-center" : "",
-            isActive 
-              ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+            isActive
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
               : "text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
           )
         }

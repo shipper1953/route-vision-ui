@@ -3,6 +3,8 @@ import { BinPackingAlgorithm } from './binPacking';
 import { CartonizationUtils } from './utils';
 import { MultiPackageAlgorithm } from './multiPackageAlgorithm';
 
+const CUBIC_INCHES_PER_CUBIC_FOOT = 12 * 12 * 12;
+
 // Re-export types for backward compatibility
 export type { Item, Box, CartonizationParameters, CartonizationResult } from './types';
 
@@ -71,9 +73,10 @@ export class CartonizationEngine {
   private calculateSingleBoxSolution(items: Item[], startTime: number): CartonizationResult | null {
 
     const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-    const totalVolume = items.reduce((sum, item) => 
+    const totalVolume = items.reduce((sum, item) =>
       sum + (item.length * item.width * item.height * item.quantity), 0
     );
+    const totalVolumeCubicFeet = totalVolume / CUBIC_INCHES_PER_CUBIC_FOOT;
 
     console.log(`\n${'='.repeat(80)}`);
     console.log(`🔍 CARTONIZATION ANALYSIS START`);
@@ -83,7 +86,7 @@ export class CartonizationEngine {
       console.log(`   - ${item.name}: ${item.length}×${item.width}×${item.height} (${item.quantity}x) = ${(item.length * item.width * item.height * item.quantity).toFixed(0)} in³`);
     });
     console.log(`📊 Total weight: ${totalWeight.toFixed(2)} lbs`);
-    console.log(`📊 Total volume: ${totalVolume.toFixed(0)} cubic inches`);
+    console.log(`📊 Total volume: ${totalVolume.toFixed(0)} cubic inches (${totalVolumeCubicFeet.toFixed(2)} ft³)`);
     console.log(`${'='.repeat(80)}\n`);
 
     // Filter boxes that can handle the weight
@@ -105,9 +108,13 @@ export class CartonizationEngine {
     // Calculate analysis for each suitable box - SIMPLE VOLUME-BASED UTILIZATION
     const boxAnalysis = suitableBoxes.map(box => {
       const boxVolume = box.length * box.width * box.height;
-      
-      // SIMPLE volume-based utilization calculation
-      const volumeUtilization = (totalVolume / boxVolume) * 100;
+      const boxVolumeCubicFeet = boxVolume / CUBIC_INCHES_PER_CUBIC_FOOT;
+
+      // SIMPLE volume-based utilization calculation using cubic feet to align with warehouse reporting
+      const rawUtilization = boxVolumeCubicFeet > 0
+        ? (totalVolumeCubicFeet / boxVolumeCubicFeet) * 100
+        : 0;
+      const volumeUtilization = Math.min(99, rawUtilization);
       
       console.log(`\n🧪 Testing box: ${box.name} (${box.length}×${box.width}×${box.height}) = ${boxVolume} in³`);
       console.log(`   Volume utilization: ${volumeUtilization.toFixed(1)}%`);
@@ -244,6 +251,7 @@ export class CartonizationEngine {
     rulesApplied.push('Enhanced 3D Bin Packing Algorithm');
     rulesApplied.push('Multi-Orientation Item Fitting');
     rulesApplied.push('Dimensional Weight Calculation');
+    rulesApplied.push('Cubic Foot Utilization Metric');
     rulesApplied.push('Size as Tiebreaker Only');
 
     console.log(`✅ Final recommendation: ${recommendedAnalysis.box.name} with ${recommendedAnalysis.confidence}% confidence`);
@@ -266,8 +274,11 @@ export class CartonizationEngine {
   // Sorting method that prioritizes highest utilization up to 99.9%
   private sortBoxesByOptimization(analyses: any[]): any[] {
     return analyses
-      .filter(a => a.utilization > 0 && a.utilization <= 99.9)
-      .filter(a => a.utilization >= this.parameters.fillRateThreshold)
+      .map(analysis => ({
+        ...analysis,
+        utilization: Math.min(analysis.utilization, 99)
+      }))
+      .filter(a => a.utilization > 0)
       .sort((a, b) => b.utilization - a.utilization); // Highest utilization first, period
   }
 

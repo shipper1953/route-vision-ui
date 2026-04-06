@@ -1,10 +1,11 @@
+import { useState, useRef, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
-import { useState, useRef, useEffect } from "react";
 import { ShoppingCart, ChevronDown, Package, PackagePlus, Boxes } from "lucide-react";
 import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export const OrdersNavItem = () => {
   const location = useLocation();
@@ -13,6 +14,7 @@ export const OrdersNavItem = () => {
   const [isOpen, setIsOpen] = useState(location.pathname.startsWith('/orders'));
   const navRef = useRef<HTMLDivElement>(null);
   const isActive = location.pathname.startsWith('/orders');
+  const isMobile = useIsMobile();
 
   // Keep menu expanded when on Orders pages
   useEffect(() => {
@@ -23,7 +25,9 @@ export const OrdersNavItem = () => {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsCollapsed(true);
+    if (isMobile) {
+      setIsCollapsed(true);
+    }
   };
 
   const getTooltipPosition = () => {
