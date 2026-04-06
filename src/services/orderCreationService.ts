@@ -37,8 +37,23 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
     .eq('id', user.id)
     .single();
 
-  if (profileError || !userProfile?.company_id) {
-    throw new Error("User profile not found or not assigned to a company");
+  if (profileError || !userProfile) {
+    throw new Error("User profile not found");
+  }
+
+  // For super admins without a company, derive company_id from the selected warehouse
+  let companyId = userProfile.company_id;
+  if (!companyId && orderData.warehouseId) {
+    const { data: warehouse } = await supabase
+      .from('warehouses')
+      .select('company_id')
+      .eq('id', orderData.warehouseId)
+      .single();
+    companyId = warehouse?.company_id || null;
+  }
+
+  if (!companyId) {
+    throw new Error("Could not determine company. Please select a warehouse.");
   }
 
   // Determine warehouse ID (use provided, user's first, or company default in parallel)
@@ -56,7 +71,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
       ? supabase
           .from('warehouses')
           .select('id')
-          .eq('company_id', userProfile.company_id)
+          .eq('company_id', companyId)
           .eq('is_default', true)
           .maybeSingle()
       : Promise.resolve({ data: { id: finalWarehouseId }, error: null }),
@@ -116,7 +131,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
     value: parseFloat(orderData.value) || 0,
     shipping_address: orderData.shippingAddress,
     user_id: user.id,
-    company_id: userProfile.company_id,
+    company_id: companyId,
     warehouse_id: finalWarehouseId
   };
 
