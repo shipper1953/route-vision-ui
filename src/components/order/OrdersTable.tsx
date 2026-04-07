@@ -12,13 +12,17 @@ interface OrdersTableProps {
   loading?: boolean;
   initialStatusFilter?: string;
   onStatusFilterChange?: (status: string) => void;
+  initialCustomerFilter?: string;
+  onCustomerFilterChange?: (customer: string) => void;
 }
 
 export const OrdersTable = ({ 
   orders, 
   loading = false,
   initialStatusFilter = "all",
-  onStatusFilterChange
+  onStatusFilterChange,
+  initialCustomerFilter = "all",
+  onCustomerFilterChange
 }: OrdersTableProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
