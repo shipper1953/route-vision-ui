@@ -157,20 +157,15 @@ Deno.serve(async (req) => {
       if (nameExistsError) {
         console.log('Fulfillment service already exists, fetching existing service...');
         
-        // Query to get existing fulfillment service
         const getServiceQuery = `
           query {
             shop {
-              fulfillmentServices(first: 10) {
-                edges {
-                  node {
-                    id
-                    serviceName
-                    location {
-                      id
-                      name
-                    }
-                  }
+              fulfillmentServices {
+                id
+                serviceName
+                location {
+                  id
+                  name
                 }
               }
             }
@@ -190,9 +185,12 @@ Deno.serve(async (req) => {
         );
         
         const getResult = await getResponse.json();
-        const existingService = getResult.data?.shop?.fulfillmentServices?.edges?.find(
-          (edge: any) => edge.node.serviceName === 'Ship Tornado'
-        )?.node;
+        console.log('Fulfillment services query result:', JSON.stringify(getResult));
+        
+        const services = getResult.data?.shop?.fulfillmentServices || [];
+        const existingService = services.find(
+          (svc: any) => svc.serviceName === 'Ship Tornado' || svc.serviceName?.toLowerCase() === 'ship tornado'
+        );
         
         if (existingService) {
           console.log('Found existing Ship Tornado fulfillment service:', existingService.id);
