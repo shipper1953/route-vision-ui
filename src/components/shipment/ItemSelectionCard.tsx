@@ -154,12 +154,19 @@ export const ItemSelectionCard = ({
     selectionMap.forEach((quantity, uniqueKey) => {
       const item = orderItems.find((i, idx) => getUniqueItemKey(i, idx) === uniqueKey);
       if (item) {
+        const dims = item.dimensions || (item.length && item.width && item.height ? {
+          length: item.length,
+          width: item.width,
+          height: item.height,
+          weight: item.weight || 0
+        } : undefined);
         selectedItems.push({
           itemId: item.itemId || item.id,
           name: item.name,
           sku: item.sku,
           quantity: quantity,
-          dimensions: item.dimensions,
+          unitPrice: item.unitPrice ?? item.unit_price,
+          dimensions: dims,
           _uniqueKey: uniqueKey
         });
       }
@@ -171,8 +178,8 @@ export const ItemSelectionCard = ({
   const selectedCount = localSelection.size;
   const totalSelectedQty = Array.from(localSelection.values()).reduce((sum, qty) => sum + qty, 0);
   const estimatedWeight = Array.from(localSelection.entries()).reduce((sum, [uniqueKey, qty]) => {
-    const item = orderItems.find(i => getUniqueItemKey(i) === uniqueKey);
-    const itemWeight = item?.dimensions?.weight || 0;
+    const item = orderItems.find((i, idx) => getUniqueItemKey(i, idx) === uniqueKey);
+    const itemWeight = item?.dimensions?.weight || item?.weight || 0;
     return sum + (itemWeight * qty);
   }, 0);
 
