@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
+import { CustomerSelectionSection } from "@/components/order/CustomerSelectionSection";
 import { CustomerInfoSection } from "@/components/order/CustomerInfoSection";
 import { ShippingAddressSection } from "@/components/order/ShippingAddressSection";
 import { OrderItemsSection } from "@/components/order/OrderItemsSection";
@@ -27,6 +28,7 @@ const CreateOrder = () => {
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     defaultValues: {
+      customerId: "",
       customerName: "",
       customerCompany: "",
       customerEmail: "",
@@ -140,6 +142,7 @@ const CreateOrder = () => {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <CustomerSelectionSection />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <CustomerInfoSection />
                 <ShippingAddressSection />
