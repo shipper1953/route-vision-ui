@@ -54,7 +54,7 @@ export const ShopifyFulfillmentSettings = ({
     setRegistering(true);
     try {
       const { data, error } = await supabase.functions.invoke('shopify-register-fulfillment-service', {
-        body: { companyId },
+        body: { companyId, storeId },
       });
 
       if (error) throw error;
