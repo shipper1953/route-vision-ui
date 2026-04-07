@@ -47,18 +47,6 @@ interface PackageRectangleProps {
   onMoveItem: (fromPackage: number, toPackage: number, itemIndex: number) => void;
 }
 
-interface PackageRectangleProps {
-  package: PackageRecommendation;
-  packageIndex: number;
-  totalPackages: number;
-  availableBoxes: any[];
-  orderItems: any[];
-  onBoxChange: (packageIndex: number, boxId: string) => void;
-  onAddItem: (packageIndex: number, item: any) => void;
-  onRemoveItem: (packageIndex: number, itemIndex: number) => void;
-  onDeletePackage: (packageIndex: number) => void;
-  onMoveItem: (fromPackage: number, toPackage: number, itemIndex: number) => void;
-}
 
 const PackageRectangle: React.FC<PackageRectangleProps> = ({
   package: pkg,
