@@ -617,11 +617,13 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
             totalPackages={multiPackageResult.totalPackages}
             availableBoxes={boxes}
             orderItems={orderItems}
+            weightOverride={weightOverrides[index]}
             onBoxChange={handleBoxChange}
             onAddItem={handleAddItem}
             onRemoveItem={handleRemoveItem}
             onDeletePackage={handleDeletePackage}
             onMoveItem={handleMoveItem}
+            onWeightChange={handleWeightChange}
           />
         ))}
       </div>
