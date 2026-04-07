@@ -61,9 +61,9 @@ export const ShopifyInventorySettings = ({
       
       const { data, error } = await supabase.functions.invoke('shopify-sync-inventory', {
         body: {
-          companyId,
           direction: inventoryConfig.sync_direction,
-          threshold: inventoryConfig.sync_threshold
+          threshold: inventoryConfig.sync_threshold,
+          storeId: storeId || undefined
         }
       });
 
