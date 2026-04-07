@@ -172,12 +172,7 @@ export const ShipmentForm = ({ onLabelPurchased }: ShipmentFormProps) => {
           setLoading={setLoading}
           itemsLoading={itemsLoading}
           hasOrderId={!!form.watch('orderId')}
-          onShipmentCreated={(response, selectedRate, boxData) => {
-            if (boxData) {
-              setSelectedBoxData(boxData);
-            }
-            onShipmentCreated(response, selectedRate, boxData);
-          }}
+          onLabelPurchased={onLabelPurchased}
         />
       </form>
     </FormProvider>
