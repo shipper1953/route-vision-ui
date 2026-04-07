@@ -244,5 +244,6 @@ export const ShopifyProductSettings = ({
         </Alert>
       </CardContent>
     </Card>
+    </div>
   );
 };

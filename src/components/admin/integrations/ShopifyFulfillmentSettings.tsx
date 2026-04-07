@@ -247,5 +247,6 @@ export const ShopifyFulfillmentSettings = ({
         )}
       </CardContent>
     </Card>
+    </div>
   );
 };

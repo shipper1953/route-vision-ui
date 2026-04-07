@@ -236,5 +236,6 @@ export const ShopifyInventorySettings = ({
         </Alert>
       </CardContent>
     </Card>
+    </div>
   );
 };
