@@ -338,6 +338,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   orderId
 }) => {
   const [selectedOrderItems, setSelectedOrderItems] = useState<any[]>([]);
+  const [hasManualEdits, setHasManualEdits] = useState(false);
   const form = useFormContext<ShipmentForm>();
   const { createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
@@ -356,11 +357,13 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   useEffect(() => {
     if (selectedItems && selectedItems.length > 0) {
       setSelectedOrderItems(selectedItems);
+      setHasManualEdits(false); // Reset manual edits flag when items change
     }
   }, [selectedItems]);
 
   // Initialize cartonization when selected items change AND boxes are loaded
   useEffect(() => {
+    if (hasManualEdits) return; // Don't overwrite manual edits
     if (selectedOrderItems && selectedOrderItems.length > 0 && boxes.length > 0 && !isCalculating) {
       const items = createItemsFromOrderData(selectedOrderItems, masterItems);
       if (items.length > 0) {
@@ -368,7 +371,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
         calculateMultiPackage(items, 'balanced');
       }
     }
-  }, [selectedOrderItems, masterItems, boxes, createItemsFromOrderData, calculateMultiPackage, isCalculating]);
+  }, [selectedOrderItems, masterItems, boxes]);
 
   // Expose multi-package parcels and selected boxes to the form
   useEffect(() => {
