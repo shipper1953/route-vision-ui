@@ -40,11 +40,13 @@ interface PackageRectangleProps {
   totalPackages: number;
   availableBoxes: any[];
   orderItems: any[];
+  weightOverride?: number;
   onBoxChange: (packageIndex: number, boxId: string) => void;
   onAddItem: (packageIndex: number, item: any) => void;
   onRemoveItem: (packageIndex: number, itemIndex: number) => void;
   onDeletePackage: (packageIndex: number) => void;
   onMoveItem: (fromPackage: number, toPackage: number, itemIndex: number) => void;
+  onWeightChange: (packageIndex: number, weight: number) => void;
 }
 
 
@@ -54,15 +56,22 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
   totalPackages,
   availableBoxes,
   orderItems,
+  weightOverride,
   onBoxChange,
   onAddItem,
   onRemoveItem,
   onDeletePackage,
-  onMoveItem
+  onMoveItem,
+  onWeightChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [scanInput, setScanInput] = useState('');
+  const [isEditingWeight, setIsEditingWeight] = useState(false);
   const { box, assignedItems, utilization, packageWeight, confidence } = pkg;
+
+  // Auto-calculated weight: item weights + box cost weight estimate (box weight from maxWeight proxy or 0)
+  const calculatedWeight = packageWeight;
+  const displayWeight = weightOverride ?? calculatedWeight;
 
   const handleScanItem = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && scanInput.trim()) {
