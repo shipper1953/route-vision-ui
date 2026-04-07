@@ -1,0 +1,1 @@
+ALTER TABLE public.shopify_stores ADD COLUMN IF NOT EXISTS fulfillment_service_location_id text;

@@ -2221,6 +2221,7 @@ export type Database = {
           fulfillment_location_id: string | null
           fulfillment_location_name: string | null
           fulfillment_service_id: string | null
+          fulfillment_service_location_id: string | null
           id: string
           is_active: boolean | null
           last_sync_at: string | null
@@ -2243,6 +2244,7 @@ export type Database = {
           fulfillment_location_id?: string | null
           fulfillment_location_name?: string | null
           fulfillment_service_id?: string | null
+          fulfillment_service_location_id?: string | null
           id?: string
           is_active?: boolean | null
           last_sync_at?: string | null
@@ -2265,6 +2267,7 @@ export type Database = {
           fulfillment_location_id?: string | null
           fulfillment_location_name?: string | null
           fulfillment_service_id?: string | null
+          fulfillment_service_location_id?: string | null
           id?: string
           is_active?: boolean | null
           last_sync_at?: string | null
