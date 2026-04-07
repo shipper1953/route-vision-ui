@@ -142,6 +142,8 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
             onChange={() => setHasChanges(true)}
             companyId={companyId}
             storeId={activeStoreId || undefined}
+            storeSyncEnabled={activeStore?.fulfillment_sync_enabled ?? true}
+            onStoreSyncToggle={(enabled) => activeStoreId && updateStoreSyncToggle(activeStoreId, 'fulfillment_sync_enabled', enabled)}
           />
         </TabsContent>
 
@@ -154,6 +156,9 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
             }}
             onChange={() => setHasChanges(true)}
             companyId={companyId}
+            storeId={activeStoreId || undefined}
+            storeSyncEnabled={activeStore?.inventory_sync_enabled ?? true}
+            onStoreSyncToggle={(enabled) => activeStoreId && updateStoreSyncToggle(activeStoreId, 'inventory_sync_enabled', enabled)}
           />
         </TabsContent>
 
@@ -167,6 +172,8 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
             onChange={() => setHasChanges(true)}
             companyId={companyId}
             storeId={activeStoreId || undefined}
+            storeSyncEnabled={activeStore?.product_sync_enabled ?? true}
+            onStoreSyncToggle={(enabled) => activeStoreId && updateStoreSyncToggle(activeStoreId, 'product_sync_enabled', enabled)}
           />
         </TabsContent>
 
