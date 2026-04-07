@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/card";
 import { AddressLookup } from "./AddressLookup";
 import { AddressFormGrid } from "./AddressFormGrid";
-import { WarehouseAddressSelector } from "./WarehouseAddressSelector";
 
 interface AddressFormSectionProps {
   type: "from" | "to";
@@ -21,20 +20,16 @@ export const AddressFormSection = ({ type, title, description }: AddressFormSect
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardDescription>
+          {type === "from" 
+            ? "Auto-populated from the warehouse selected on the order. Change the warehouse on the order page."
+            : description
+          }
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {type === "from" ? (
-          <>
-            <WarehouseAddressSelector />
-            <AddressFormGrid prefix={type} />
-          </>
-        ) : (
-          <>
-            <AddressLookup type={type} />
-            <AddressFormGrid prefix={type} />
-          </>
-        )}
+        {type === "to" && <AddressLookup type={type} />}
+        <AddressFormGrid prefix={type} />
       </CardContent>
     </Card>
   );
