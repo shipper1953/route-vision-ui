@@ -57,7 +57,7 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
             <TabsTrigger value="logs">Sync Logs</TabsTrigger>
           </TabsList>
-          {stores.length > 1 && activeTab !== "stores" && <ShopifyStoreSelector />}
+          {stores.length > 0 && !["stores", "logs"].includes(activeTab) && <ShopifyStoreSelector />}
         </div>
 
         <TabsContent value="stores">
