@@ -26,6 +26,7 @@ export const OrdersTable = ({
 }: OrdersTableProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
+  const [customerFilter, setCustomerFilter] = useState<string>(initialCustomerFilter);
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
