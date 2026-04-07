@@ -9,19 +9,26 @@ import { CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { StoreSyncToggleBanner } from "./StoreSyncToggleBanner";
 
 interface ShopifyFulfillmentSettingsProps {
   settings: ShopifySettings;
   onUpdate: (settings: Partial<ShopifySettings>) => void;
   onChange: () => void;
   companyId?: string;
+  storeId?: string;
+  storeSyncEnabled?: boolean;
+  onStoreSyncToggle?: (enabled: boolean) => void;
 }
 
 export const ShopifyFulfillmentSettings = ({ 
   settings, 
   onUpdate, 
   onChange,
-  companyId 
+  companyId,
+  storeId,
+  storeSyncEnabled = true,
+  onStoreSyncToggle,
 }: ShopifyFulfillmentSettingsProps) => {
   const fulfillmentConfig = settings.sync_config.fulfillment;
   const { toast } = useToast();
@@ -52,7 +59,7 @@ export const ShopifyFulfillmentSettings = ({
     setRegistering(true);
     try {
       const { data, error } = await supabase.functions.invoke('shopify-register-fulfillment-service', {
-        body: { companyId },
+        body: { companyId, storeId },
       });
 
       if (error) throw error;
@@ -80,6 +87,14 @@ export const ShopifyFulfillmentSettings = ({
   const isRegistered = !!fulfillmentService?.id;
 
   return (
+    <div className="space-y-4">
+      {onStoreSyncToggle && (
+        <StoreSyncToggleBanner
+          syncType="Fulfillment"
+          enabled={storeSyncEnabled}
+          onToggle={onStoreSyncToggle}
+        />
+      )}
     <Card>
       <CardHeader>
         <CardTitle>Fulfillment Settings</CardTitle>
@@ -232,5 +247,6 @@ export const ShopifyFulfillmentSettings = ({
         )}
       </CardContent>
     </Card>
+    </div>
   );
 };

@@ -80,4 +80,6 @@ export interface OrderData {
   items_total?: number;
   fulfillment_percentage?: number;
   fulfillment_status?: 'unfulfilled' | 'partially_fulfilled' | 'fulfilled';
+  // Warehouse
+  warehouseId?: string;
 }

@@ -242,20 +242,7 @@ serve(async (req) => {
 
     console.log('Shopify OAuth connection successful for company:', companyId);
 
-    // Determine the redirect URL based on referer or use production as fallback
-    const referer = req.headers.get('referer') || '';
-    let appOrigin = 'https://ship-tornado.com';
-    
-    // Extract origin from referer if available
-    if (referer) {
-      try {
-        const refererUrl = new URL(referer);
-        appOrigin = refererUrl.origin;
-      } catch (e) {
-        console.warn('Could not parse referer, using default origin:', e);
-      }
-    }
-    
+    const appOrigin = 'https://ship-tornado.lovable.app';
     const redirectUrl = `${appOrigin}/company-admin?tab=integrations&shopify=connected`;
 
     // Return HTML that communicates with popup opener or redirects
@@ -380,19 +367,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    // Determine the redirect URL based on referer or use production as fallback
-    const referer = req.headers.get('referer') || '';
-    let appOrigin = 'https://ship-tornado.com';
-    
-    if (referer) {
-      try {
-        const refererUrl = new URL(referer);
-        appOrigin = refererUrl.origin;
-      } catch (e) {
-        console.warn('Could not parse referer for error redirect');
-      }
-    }
-    
+    const appOrigin = 'https://ship-tornado.lovable.app';
     const errorRedirectUrl = `${appOrigin}/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}`;
     
     // Return HTML that communicates error to popup opener or redirects

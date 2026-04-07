@@ -20,10 +20,15 @@ export const AddressFormSection = ({ type, title, description }: AddressFormSect
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardDescription>
+          {type === "from" 
+            ? "Auto-populated from the warehouse selected on the order. Change the warehouse on the order page."
+            : description
+          }
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <AddressLookup type={type} />
+        {type === "to" && <AddressLookup type={type} />}
         <AddressFormGrid prefix={type} />
       </CardContent>
     </Card>

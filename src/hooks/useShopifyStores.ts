@@ -16,6 +16,9 @@ export interface ShopifyStore {
   customer_email: string | null;
   customer_reference: string | null;
   fulfillment_service_id: string | null;
+  fulfillment_sync_enabled: boolean;
+  inventory_sync_enabled: boolean;
+  product_sync_enabled: boolean;
   settings: any;
 }
 
@@ -146,6 +149,32 @@ export const useShopifyStores = (companyId?: string) => {
     }
   };
 
+  const updateStoreSyncToggle = async (storeId: string, field: 'fulfillment_sync_enabled' | 'inventory_sync_enabled' | 'product_sync_enabled', value: boolean) => {
+    try {
+      const updatePayload = { [field]: value } as any;
+      const { error } = await supabase
+        .from('shopify_stores')
+        .update(updatePayload)
+        .eq('id', storeId);
+
+      if (error) throw error;
+
+      setStores(prev => prev.map(s => s.id === storeId ? { ...s, [field]: value } : s));
+
+      toast({
+        title: 'Sync setting updated',
+        description: `${field.replace(/_/g, ' ').replace('enabled', '')} ${value ? 'enabled' : 'disabled'}`,
+      });
+    } catch (error: any) {
+      console.error('Error updating sync toggle:', error);
+      toast({
+        title: 'Update Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   useEffect(() => {
     fetchStores();
 
@@ -156,9 +185,11 @@ export const useShopifyStores = (companyId?: string) => {
     }
 
     // Subscribe to real-time updates
+    let channel: ReturnType<typeof supabase.channel> | null = null;
     if (effectiveCompanyId) {
-      const channel = supabase
-        .channel('shopify-stores')
+      const channelName = `shopify-stores-${effectiveCompanyId}-${Date.now()}`;
+      channel = supabase
+        .channel(channelName)
         .on(
           'postgres_changes',
           {
@@ -172,11 +203,13 @@ export const useShopifyStores = (companyId?: string) => {
           }
         )
         .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     }
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [effectiveCompanyId]);
 
   const activeStore = stores.find(s => s.id === activeStoreId) || stores[0] || null;
@@ -191,5 +224,6 @@ export const useShopifyStores = (companyId?: string) => {
     syncStore,
     registerWebhooks,
     setActiveStore,
+    updateStoreSyncToggle,
   };
 };

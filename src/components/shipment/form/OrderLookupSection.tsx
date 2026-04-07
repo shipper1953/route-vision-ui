@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { OrderLookupCard } from "@/components/shipment/OrderLookupCard";
 import { fetchOrderById } from "@/services/orderService";
 import { ShipmentForm } from "@/types/shipment";
+import { supabase } from "@/integrations/supabase/client";
 
 interface OrderLookupSectionProps {
   setOrderLookupComplete: (value: boolean) => void;
@@ -19,6 +20,38 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
   const orderIdFromUrl = searchParams.get("orderId");
   const loadedOrderIdRef = useRef<string | null>(null);
   const isLoadingRef = useRef(false);
+
+  // Helper to fetch warehouse and populate From address fields
+  const populateFromWarehouse = async (warehouseId: string) => {
+    try {
+      const { data: warehouse, error } = await supabase
+        .from('warehouses')
+        .select('name, address, phone, email')
+        .eq('id', warehouseId)
+        .maybeSingle();
+
+      if (error || !warehouse) {
+        console.warn("Could not fetch warehouse for From address:", error);
+        return;
+      }
+
+      const addr = (warehouse.address || {}) as any;
+      form.setValue("fromName", warehouse.name || "");
+      form.setValue("fromCompany", warehouse.name || "");
+      form.setValue("fromStreet1", addr.street1 || "");
+      form.setValue("fromStreet2", addr.street2 || "");
+      form.setValue("fromCity", addr.city || "");
+      form.setValue("fromState", addr.state || "");
+      form.setValue("fromZip", addr.zip || "");
+      form.setValue("fromCountry", addr.country || "US");
+      form.setValue("fromPhone", warehouse.phone || "");
+      form.setValue("fromEmail", warehouse.email || "");
+
+      console.log("✅ From address populated from order's warehouse:", warehouse.name);
+    } catch (err) {
+      console.error("Error populating From warehouse address:", err);
+    }
+  };
   
   // Load order data if orderId is provided in the URL
   useEffect(() => {
@@ -45,7 +78,6 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
         }
         
         console.log("Order loaded from URL:", order);
-        console.log("Order items found in URL load:", order.items);
         
         // Set the orderBarcode field to display the order ID
         form.setValue("orderBarcode", order.id);
@@ -68,6 +100,11 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
         } else {
           console.warn("No valid shipping address found in order");
         }
+
+        // Populate From address from the order's warehouse
+        if (order.warehouseId) {
+          await populateFromWarehouse(order.warehouseId);
+        }
         
         // Set parcel dimensions and weight from cartonization data (preferred) or parcelInfo
         if (order.recommendedBox) {
@@ -83,24 +120,17 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
           form.setValue("width", order.parcelInfo.width || 0);
           form.setValue("height", order.parcelInfo.height || 0);
           form.setValue("weight", order.parcelInfo.weight || 0);
-        } else {
-          console.warn("No valid parcel info or recommended box found in order");
         }
         
         // Set order details
         form.setValue("orderId", order.id);
         form.setValue("requiredDeliveryDate", order.requiredDeliveryDate);
         
-        // Pass order items to parent component - CRITICAL FIX
-        console.log("OrderLookupSection URL load - Raw order.items:", order.items);
-        console.log("OrderLookupSection URL load - Type of order.items:", typeof order.items);
-        console.log("OrderLookupSection URL load - Array.isArray(order.items):", Array.isArray(order.items));
-        
+        // Pass order items to parent component
         if (order.items && Array.isArray(order.items) && order.items.length > 0) {
-          console.log("OrderLookupSection URL load - Setting order items for packaging optimization:", order.items);
+          console.log("Setting order items for packaging optimization:", order.items);
           setOrderItems(order.items);
         } else {
-          console.log("OrderLookupSection URL load - No valid items array found in order, setting empty array");
           setOrderItems([]);
         }
         
@@ -109,7 +139,7 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
       } catch (error) {
         console.error("Error loading order from URL:", error);
         toast.error("Failed to load order information");
-        loadedOrderIdRef.current = null; // Reset on error to allow retry
+        loadedOrderIdRef.current = null;
       } finally {
         setLoading(false);
         isLoadingRef.current = false;
@@ -117,7 +147,7 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
     }
     
     loadOrderFromId();
-  }, [orderIdFromUrl]); // Removed form, setOrderLookupComplete, setOrderItems from dependencies
+  }, [orderIdFromUrl]);
   
   // Reset the loaded order ref when orderIdFromUrl changes to a different order
   useEffect(() => {

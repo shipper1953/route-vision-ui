@@ -180,6 +180,7 @@ export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
       ...supabaseOrder.shipment_data,
       estimatedDeliveryDate: supabaseOrder.estimated_delivery_date,
       actualDeliveryDate: supabaseOrder.actual_delivery_date
-    } : null // Map shipment_data to shipment field with delivery dates from order
+    } : null, // Map shipment_data to shipment field with delivery dates from order
+    warehouseId: supabaseOrder.warehouse_id || undefined,
   };
 };

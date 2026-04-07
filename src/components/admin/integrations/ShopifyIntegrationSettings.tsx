@@ -23,7 +23,7 @@ interface ShopifyIntegrationSettingsProps {
 
 export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSettingsProps) => {
   const navigate = useNavigate();
-  const { stores, activeStoreId } = useShopifyStores(companyId);
+  const { stores, activeStoreId, activeStore, updateStoreSyncToggle } = useShopifyStores(companyId);
   const { settings, loading, saving, updateSettings, refetch } = useShopifySettings(companyId, activeStoreId || undefined);
   const [activeTab, setActiveTab] = useState("stores");
   const [hasChanges, setHasChanges] = useState(false);
@@ -57,7 +57,7 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
             <TabsTrigger value="logs">Sync Logs</TabsTrigger>
           </TabsList>
-          {stores.length > 1 && activeTab !== "stores" && <ShopifyStoreSelector />}
+          {stores.length > 0 && !["stores", "logs"].includes(activeTab) && <ShopifyStoreSelector />}
         </div>
 
         <TabsContent value="stores">
@@ -141,6 +141,9 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
             }}
             onChange={() => setHasChanges(true)}
             companyId={companyId}
+            storeId={activeStoreId || undefined}
+            storeSyncEnabled={activeStore?.fulfillment_sync_enabled ?? true}
+            onStoreSyncToggle={(enabled) => activeStoreId && updateStoreSyncToggle(activeStoreId, 'fulfillment_sync_enabled', enabled)}
           />
         </TabsContent>
 
@@ -153,6 +156,9 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
             }}
             onChange={() => setHasChanges(true)}
             companyId={companyId}
+            storeId={activeStoreId || undefined}
+            storeSyncEnabled={activeStore?.inventory_sync_enabled ?? true}
+            onStoreSyncToggle={(enabled) => activeStoreId && updateStoreSyncToggle(activeStoreId, 'inventory_sync_enabled', enabled)}
           />
         </TabsContent>
 
@@ -166,6 +172,8 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
             onChange={() => setHasChanges(true)}
             companyId={companyId}
             storeId={activeStoreId || undefined}
+            storeSyncEnabled={activeStore?.product_sync_enabled ?? true}
+            onStoreSyncToggle={(enabled) => activeStoreId && updateStoreSyncToggle(activeStoreId, 'product_sync_enabled', enabled)}
           />
         </TabsContent>
 

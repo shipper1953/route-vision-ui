@@ -11,19 +11,26 @@ import { ShopifySettings } from "@/hooks/useShopifySettings";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { StoreSyncToggleBanner } from "./StoreSyncToggleBanner";
 
 interface ShopifyInventorySettingsProps {
   settings: ShopifySettings;
   onUpdate: (settings: Partial<ShopifySettings>) => void;
   onChange: () => void;
   companyId?: string;
+  storeId?: string;
+  storeSyncEnabled?: boolean;
+  onStoreSyncToggle?: (enabled: boolean) => void;
 }
 
 export const ShopifyInventorySettings = ({ 
   settings, 
   onUpdate, 
   onChange,
-  companyId 
+  companyId,
+  storeId,
+  storeSyncEnabled = true,
+  onStoreSyncToggle,
 }: ShopifyInventorySettingsProps) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -82,6 +89,14 @@ export const ShopifyInventorySettings = ({
   };
 
   return (
+    <div className="space-y-4">
+      {onStoreSyncToggle && (
+        <StoreSyncToggleBanner
+          syncType="Inventory"
+          enabled={storeSyncEnabled}
+          onToggle={onStoreSyncToggle}
+        />
+      )}
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -221,5 +236,6 @@ export const ShopifyInventorySettings = ({
         </Alert>
       </CardContent>
     </Card>
+    </div>
   );
 };
