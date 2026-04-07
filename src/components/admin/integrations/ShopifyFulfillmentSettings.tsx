@@ -15,13 +15,15 @@ interface ShopifyFulfillmentSettingsProps {
   onUpdate: (settings: Partial<ShopifySettings>) => void;
   onChange: () => void;
   companyId?: string;
+  storeId?: string;
 }
 
 export const ShopifyFulfillmentSettings = ({ 
   settings, 
   onUpdate, 
   onChange,
-  companyId 
+  companyId,
+  storeId,
 }: ShopifyFulfillmentSettingsProps) => {
   const fulfillmentConfig = settings.sync_config.fulfillment;
   const { toast } = useToast();
