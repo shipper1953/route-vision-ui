@@ -57,6 +57,33 @@ export const OrderLookupCard = ({ setOrderLookupComplete, setOrderItems }: Order
       form.setValue("toZip", order.shippingAddress.zip || "");
       form.setValue("toCountry", order.shippingAddress.country || "US");
     }
+
+    // Populate From address from the order's warehouse
+    if (order.warehouseId) {
+      try {
+        const { data: warehouse } = await supabase
+          .from('warehouses')
+          .select('name, address, phone, email')
+          .eq('id', order.warehouseId)
+          .maybeSingle();
+
+        if (warehouse) {
+          const addr = (warehouse.address || {}) as any;
+          form.setValue("fromName", warehouse.name || "");
+          form.setValue("fromCompany", warehouse.name || "");
+          form.setValue("fromStreet1", addr.street1 || "");
+          form.setValue("fromStreet2", addr.street2 || "");
+          form.setValue("fromCity", addr.city || "");
+          form.setValue("fromState", addr.state || "");
+          form.setValue("fromZip", addr.zip || "");
+          form.setValue("fromCountry", addr.country || "US");
+          form.setValue("fromPhone", warehouse.phone || "");
+          form.setValue("fromEmail", warehouse.email || "");
+        }
+      } catch (err) {
+        console.error("Error fetching warehouse for From address:", err);
+      }
+    }
     
     // Set parcel dimensions and weight if available
     if (order.parcelInfo && Object.keys(order.parcelInfo).length > 0) {
