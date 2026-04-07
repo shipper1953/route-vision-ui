@@ -463,7 +463,13 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   };
 
   const handleDeletePackage = (packageIndex: number) => {
+    setHasManualEdits(true);
     removePackage(packageIndex);
+  };
+
+  const handleAddPackage = () => {
+    setHasManualEdits(true);
+    addManualPackage();
   };
 
   if (!multiPackageResult) {
