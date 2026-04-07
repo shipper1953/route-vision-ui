@@ -293,7 +293,7 @@ export const ShippingOptionsSection = ({
   const sortedRates = getSortedRates();
   const meetsCount = sortedRates.filter((r) => r.meetsDeliveryDate === true).length;
   const doesNotMeetCount = sortedRates.filter((r) => r.meetsDeliveryDate === false).length;
-  const hasMarkup = company && company.markup_value && company.markup_value > 0;
+  
 
   return (
     <div className="space-y-4">
@@ -342,7 +342,6 @@ export const ShippingOptionsSection = ({
                       sortedRate={item}
                       isSelected={selectedRateId === item.rate.id}
                       onSelect={() => setSelectedRateId(item.rate.id)}
-                      hasMarkup={!!hasMarkup}
                     />
                   ))}
               </div>
@@ -365,7 +364,7 @@ export const ShippingOptionsSection = ({
                   sortedRate={item}
                   isSelected={selectedRateId === item.rate.id}
                   onSelect={() => setSelectedRateId(item.rate.id)}
-                  hasMarkup={!!hasMarkup}
+                  
                 />
               ))}
           </div>
@@ -404,16 +403,13 @@ const RateCard = ({
   sortedRate,
   isSelected,
   onSelect,
-  hasMarkup,
 }: {
   sortedRate: SortedRate;
   isSelected: boolean;
   onSelect: () => void;
-  hasMarkup: boolean;
 }) => {
   const { rate } = sortedRate;
   const deliveryDays = rate.delivery_days || rate.est_delivery_days || 0;
-  const markedUp = rate as MarkedUpRate;
 
   return (
     <button
