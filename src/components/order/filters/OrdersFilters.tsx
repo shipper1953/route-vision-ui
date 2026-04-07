@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,12 +9,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+
+interface Customer {
+  id: string;
+  name: string;
+}
 
 interface OrdersFiltersProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
   statusFilter: string;
   onStatusChange: (value: string) => void;
+  customerFilter?: string;
+  onCustomerFilterChange?: (value: string) => void;
   dateFrom?: Date;
   onDateFromChange: (date: Date | undefined) => void;
   dateTo?: Date;
@@ -28,6 +37,8 @@ export const OrdersFilters = ({
   onSearchChange,
   statusFilter,
   onStatusChange,
+  customerFilter = "all",
+  onCustomerFilterChange,
   dateFrom,
   onDateFromChange,
   dateTo,
@@ -35,6 +46,23 @@ export const OrdersFilters = ({
   showAdvancedFilters,
   onToggleAdvancedFilters
 }: OrdersFiltersProps) => {
+  const { userProfile } = useAuth();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      if (!userProfile?.company_id) return;
+      const { data } = await supabase
+        .from('customers')
+        .select('id, name')
+        .eq('company_id', userProfile.company_id)
+        .eq('is_active', true)
+        .order('name');
+      if (data) setCustomers(data);
+    };
+    fetchCustomers();
+  }, [userProfile?.company_id]);
+
   return (
     <div className="space-y-4">
       {/* Search and basic filters */}
@@ -65,6 +93,19 @@ export const OrdersFilters = ({
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+        {onCustomerFilterChange && (
+          <Select value={customerFilter} onValueChange={onCustomerFilterChange}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by customer" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Customers</SelectItem>
+              {customers.map((c) => (
+                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Advanced filters toggle */}

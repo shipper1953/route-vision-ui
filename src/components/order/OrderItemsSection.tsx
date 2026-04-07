@@ -14,6 +14,12 @@ import { Badge } from "@/components/ui/badge";
 export const OrderItemsSection = () => {
   const form = useFormContext<OrderFormValues>();
   const { items } = useItemMaster();
+  const selectedCustomerId = form.watch("customerId");
+  
+  // Filter items by selected customer
+  const availableItems = items.filter(item => 
+    item.isActive && item.customerId === selectedCustomerId
+  );
   
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -51,17 +57,25 @@ export const OrderItemsSection = () => {
             </CardTitle>
             <CardDescription>Select items from your catalog</CardDescription>
           </div>
-          <Button type="button" onClick={addItem} variant="outline" size="sm">
+          <Button type="button" onClick={addItem} variant="outline" size="sm" disabled={!selectedCustomerId}>
             <Plus className="h-4 w-4 mr-2" />
             Add Item
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {fields.length === 0 ? (
+        {!selectedCustomerId ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>Please select a customer first to add items.</p>
+          </div>
+        ) : fields.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>No items added yet. Click "Add Item" to get started.</p>
+            {availableItems.length === 0 && (
+              <p className="text-sm mt-2">No items found for this customer.</p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -96,9 +110,7 @@ export const OrderItemsSection = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {items
-                                .filter(item => item.isActive)
-                                .map((item) => (
+                              {availableItems.map((item) => (
                                   <SelectItem key={item.id} value={item.id}>
                                     <div className="flex flex-col">
                                       <span className="font-medium">{item.name}</span>

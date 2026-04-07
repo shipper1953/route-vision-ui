@@ -12,16 +12,21 @@ interface OrdersTableProps {
   loading?: boolean;
   initialStatusFilter?: string;
   onStatusFilterChange?: (status: string) => void;
+  initialCustomerFilter?: string;
+  onCustomerFilterChange?: (customer: string) => void;
 }
 
 export const OrdersTable = ({ 
   orders, 
   loading = false,
   initialStatusFilter = "all",
-  onStatusFilterChange
+  onStatusFilterChange,
+  initialCustomerFilter = "all",
+  onCustomerFilterChange
 }: OrdersTableProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
+  const [customerFilter, setCustomerFilter] = useState<string>(initialCustomerFilter);
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -38,6 +43,13 @@ export const OrdersTable = ({
     }
   };
 
+  const handleCustomerChange = (newCustomer: string) => {
+    setCustomerFilter(newCustomer);
+    if (onCustomerFilterChange) {
+      onCustomerFilterChange(newCustomer);
+    }
+  };
+
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       const matchesSearch = 
@@ -47,13 +59,15 @@ export const OrdersTable = ({
       
       const matchesStatus = statusFilter === "all" || order.status.toLowerCase() === statusFilter.toLowerCase();
       
+      const matchesCustomer = customerFilter === "all" || order.customerName === customerFilter;
+      
       const orderDate = new Date(order.orderDate);
       const matchesDateFrom = !dateFrom || orderDate >= dateFrom;
       const matchesDateTo = !dateTo || orderDate <= dateTo;
       
-      return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo;
+      return matchesSearch && matchesStatus && matchesCustomer && matchesDateFrom && matchesDateTo;
     });
-  }, [orders, searchTerm, statusFilter, dateFrom, dateTo]);
+  }, [orders, searchTerm, statusFilter, customerFilter, dateFrom, dateTo]);
 
   if (loading) {
     return (
@@ -81,6 +95,8 @@ export const OrdersTable = ({
             onSearchChange={setSearchTerm}
             statusFilter={statusFilter}
             onStatusChange={handleStatusChange}
+            customerFilter={customerFilter}
+            onCustomerFilterChange={handleCustomerChange}
             dateFrom={dateFrom}
             onDateFromChange={setDateFrom}
             dateTo={dateTo}

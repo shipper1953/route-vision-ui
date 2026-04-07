@@ -8,6 +8,7 @@ export const orderItemSchema = z.object({
 });
 
 export const orderFormSchema = z.object({
+  customerId: z.string().min(1, "Customer selection is required"),
   customerName: z.string().min(1, "Customer name is required"),
   customerCompany: z.string().optional(),
   customerEmail: z.string().email().optional().or(z.literal("")),
