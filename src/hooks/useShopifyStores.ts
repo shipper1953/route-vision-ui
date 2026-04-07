@@ -151,9 +151,10 @@ export const useShopifyStores = (companyId?: string) => {
 
   const updateStoreSyncToggle = async (storeId: string, field: 'fulfillment_sync_enabled' | 'inventory_sync_enabled' | 'product_sync_enabled', value: boolean) => {
     try {
+      const updatePayload = { [field]: value } as any;
       const { error } = await supabase
         .from('shopify_stores')
-        .update({ [field]: value })
+        .update(updatePayload)
         .eq('id', storeId);
 
       if (error) throw error;
