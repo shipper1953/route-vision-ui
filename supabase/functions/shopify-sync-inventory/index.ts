@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +12,11 @@ interface InventorySyncRequest {
   direction: 'ship_tornado_to_shopify' | 'shopify_to_ship_tornado' | 'bidirectional';
   threshold?: number;
 }
+
+type AnySupabaseClient = SupabaseClient<any, "public", any>;
+type SyncItem = { id: string; sku: string; shopify_variant_gid: string };
+type WarehouseRecord = { id: string };
+type InventoryLevelRecord = { id: string; quantity_on_hand: number; quantity_available: number };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -117,7 +122,7 @@ serve(async (req) => {
 // ─── Ship Tornado → Shopify ───────────────────────────────────────────────────
 
 async function syncToShopify(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AnySupabaseClient,
   companyId: string,
   store: any,
   storeUrl: string,
@@ -130,7 +135,7 @@ async function syncToShopify(
   let skippedMissingStLocationInShopify = 0;
 
   // Get items that are mapped to this Shopify store and have inventory
-  const { data: items, error: itemsError } = await supabase
+  const { data: itemsData, error: itemsError } = await supabase
     .from('items')
     .select('id, sku, name, shopify_variant_gid')
     .eq('company_id', companyId)
@@ -143,7 +148,9 @@ async function syncToShopify(
     return { updated: 0, errors: 1 };
   }
 
-  if (!items || items.length === 0) {
+  const items = (itemsData || []) as SyncItem[];
+
+  if (items.length === 0) {
     console.log('No mapped items found for this store');
     return { updated: 0, errors: 0 };
   }
@@ -333,7 +340,7 @@ async function syncToShopify(
 // ─── Shopify → Ship Tornado ───────────────────────────────────────────────────
 
 async function syncFromShopify(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AnySupabaseClient,
   companyId: string,
   store: any,
   storeUrl: string,
@@ -380,12 +387,14 @@ async function syncFromShopify(
   let afterCursor: string | null = null;
 
   // Get default warehouse for this company
-  const { data: warehouse } = await supabase
+  const { data: warehouseData } = await supabase
     .from('warehouses')
     .select('id')
     .eq('company_id', companyId)
     .limit(1)
     .single();
+
+  const warehouse = (warehouseData || null) as WarehouseRecord | null;
 
   if (!warehouse) {
     console.error('No warehouse found for company');
@@ -393,7 +402,7 @@ async function syncFromShopify(
   }
 
   while (hasNextPage) {
-    const res = await fetch(
+    const res: Response = await fetch(
       `https://${storeUrl}/admin/api/2025-01/graphql.json`,
       {
         method: 'POST',
@@ -414,7 +423,7 @@ async function syncFromShopify(
       throw new Error('Failed to fetch variants from Shopify');
     }
 
-    const result = await res.json();
+    const result: any = await res.json();
     if (result.errors) {
       throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
     }
@@ -426,7 +435,7 @@ async function syncFromShopify(
 
       try {
         // Find matching item in Ship Tornado
-        const { data: item } = await supabase
+        const { data: itemData } = await supabase
           .from('items')
           .select('id')
           .eq('company_id', companyId)
@@ -434,6 +443,7 @@ async function syncFromShopify(
           .eq('sku', variant.sku)
           .maybeSingle();
 
+        const item = (itemData || null) as { id: string } | null;
         if (!item) continue;
 
         // Only read quantity from the Ship Tornado fulfillment service location
@@ -453,7 +463,7 @@ async function syncFromShopify(
         const shopifyQty = stLocationEdge.node.quantities?.[0]?.quantity ?? 0;
 
         // Get current ST quantity
-        const { data: currentInv } = await supabase
+        const { data: currentInvData } = await supabase
           .from('inventory_levels')
           .select('id, quantity_on_hand, quantity_available')
           .eq('company_id', companyId)
@@ -461,6 +471,7 @@ async function syncFromShopify(
           .eq('warehouse_id', warehouse.id)
           .maybeSingle();
 
+        const currentInv = (currentInvData || null) as InventoryLevelRecord | null;
         const currentQty = currentInv?.quantity_available ?? 0;
 
         if (Math.abs(currentQty - shopifyQty) < threshold) continue;
