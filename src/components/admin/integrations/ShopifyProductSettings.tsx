@@ -104,6 +104,14 @@ export const ShopifyProductSettings = ({
   };
 
   return (
+    <div className="space-y-4">
+      {onStoreSyncToggle && (
+        <StoreSyncToggleBanner
+          syncType="Product"
+          enabled={storeSyncEnabled}
+          onToggle={onStoreSyncToggle}
+        />
+      )}
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">

@@ -87,6 +87,14 @@ export const ShopifyFulfillmentSettings = ({
   const isRegistered = !!fulfillmentService?.id;
 
   return (
+    <div className="space-y-4">
+      {onStoreSyncToggle && (
+        <StoreSyncToggleBanner
+          syncType="Fulfillment"
+          enabled={storeSyncEnabled}
+          onToggle={onStoreSyncToggle}
+        />
+      )}
     <Card>
       <CardHeader>
         <CardTitle>Fulfillment Settings</CardTitle>
