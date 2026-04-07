@@ -460,6 +460,99 @@ export type Database = {
           },
         ]
       }
+      inventory_levels: {
+        Row: {
+          company_id: string
+          condition: string
+          created_at: string
+          customer_id: string | null
+          expiry_date: string | null
+          id: string
+          item_id: string
+          location_id: string | null
+          lot_number: string | null
+          quantity_allocated: number
+          quantity_available: number
+          quantity_on_hand: number
+          received_date: string
+          serial_number: string | null
+          updated_at: string
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          condition?: string
+          created_at?: string
+          customer_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          item_id: string
+          location_id?: string | null
+          lot_number?: string | null
+          quantity_allocated?: number
+          quantity_available?: number
+          quantity_on_hand?: number
+          received_date?: string
+          serial_number?: string | null
+          updated_at?: string
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          condition?: string
+          created_at?: string
+          customer_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          item_id?: string
+          location_id?: string | null
+          lot_number?: string | null
+          quantity_allocated?: number
+          quantity_available?: number
+          quantity_on_hand?: number
+          received_date?: string
+          serial_number?: string | null
+          updated_at?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_levels_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_levels_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_levels_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_levels_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_levels_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           category: string
