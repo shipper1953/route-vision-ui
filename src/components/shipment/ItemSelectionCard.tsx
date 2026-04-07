@@ -116,14 +116,14 @@ export const ItemSelectionCard = ({
   const allItemsShipped = orderItems.every((item, index) => getRemainingQuantity(item, index) <= 0);
 
   // Handle item toggle
-  const handleToggleItem = (item: any) => {
-    const itemKey = getUniqueItemKey(item);
+  const handleToggleItem = (item: any, index: number) => {
+    const itemKey = getUniqueItemKey(item, index);
     const newSelection = new Map(localSelection);
     
     if (newSelection.has(itemKey)) {
       newSelection.delete(itemKey);
     } else {
-      const remaining = getRemainingQuantity(item);
+      const remaining = getRemainingQuantity(item, index);
       newSelection.set(itemKey, Math.min(1, remaining));
     }
     
@@ -132,9 +132,9 @@ export const ItemSelectionCard = ({
   };
 
   // Handle quantity change
-  const handleQuantityChange = (item: any, quantity: number) => {
-    const itemKey = getUniqueItemKey(item);
-    const remaining = getRemainingQuantity(item);
+  const handleQuantityChange = (item: any, quantity: number, index: number) => {
+    const itemKey = getUniqueItemKey(item, index);
+    const remaining = getRemainingQuantity(item, index);
     const validQty = Math.max(0, Math.min(quantity, remaining));
     
     const newSelection = new Map(localSelection);
@@ -152,7 +152,7 @@ export const ItemSelectionCard = ({
   const updateParent = (selectionMap: Map<string, number>) => {
     const selectedItems: SelectedItem[] = [];
     selectionMap.forEach((quantity, uniqueKey) => {
-      const item = orderItems.find(i => getUniqueItemKey(i) === uniqueKey);
+      const item = orderItems.find((i, idx) => getUniqueItemKey(i, idx) === uniqueKey);
       if (item) {
         selectedItems.push({
           itemId: item.itemId || item.id,
@@ -160,7 +160,7 @@ export const ItemSelectionCard = ({
           sku: item.sku,
           quantity: quantity,
           dimensions: item.dimensions,
-          _uniqueKey: uniqueKey // Add unique key for tracking variants
+          _uniqueKey: uniqueKey
         });
       }
     });
