@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +12,11 @@ interface InventorySyncRequest {
   direction: 'ship_tornado_to_shopify' | 'shopify_to_ship_tornado' | 'bidirectional';
   threshold?: number;
 }
+
+type AnySupabaseClient = SupabaseClient<any, "public", any>;
+type SyncItem = { id: string; sku: string; shopify_variant_gid: string };
+type WarehouseRecord = { id: string };
+type InventoryLevelRecord = { id: string; quantity_on_hand: number; quantity_available: number };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -117,7 +122,7 @@ serve(async (req) => {
 // ─── Ship Tornado → Shopify ───────────────────────────────────────────────────
 
 async function syncToShopify(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AnySupabaseClient,
   companyId: string,
   store: any,
   storeUrl: string,
@@ -126,9 +131,11 @@ async function syncToShopify(
   console.log(`Syncing ST → Shopify for store ${store.store_name || store.id}`);
   let updated = 0;
   let errors = 0;
+  let skippedMissingStLocationConfig = 0;
+  let skippedMissingStLocationInShopify = 0;
 
   // Get items that are mapped to this Shopify store and have inventory
-  const { data: items, error: itemsError } = await supabase
+  const { data: itemsData, error: itemsError } = await supabase
     .from('items')
     .select('id, sku, name, shopify_variant_gid')
     .eq('company_id', companyId)
@@ -141,7 +148,9 @@ async function syncToShopify(
     return { updated: 0, errors: 1 };
   }
 
-  if (!items || items.length === 0) {
+  const items = (itemsData || []) as SyncItem[];
+
+  if (items.length === 0) {
     console.log('No mapped items found for this store');
     return { updated: 0, errors: 0 };
   }
@@ -210,7 +219,18 @@ async function syncToShopify(
           }
         );
 
+        if (!variantRes.ok) {
+          errors++;
+          console.error(`Variant lookup HTTP error for ${item.sku}:`, await variantRes.text());
+          return;
+        }
+
         const variantResult = await variantRes.json();
+        if (variantResult.errors?.length) {
+          errors++;
+          console.error(`Variant lookup GraphQL errors for ${item.sku}:`, variantResult.errors);
+          return;
+        }
         const inventoryItem = variantResult.data?.productVariant?.inventoryItem;
 
         if (!inventoryItem?.inventoryLevels?.edges?.length) {
@@ -220,15 +240,18 @@ async function syncToShopify(
 
         // Only sync to the Ship Tornado fulfillment service location
         if (!store.fulfillment_service_location_id) {
+          skippedMissingStLocationConfig++;
           console.log(`No fulfillment service location configured for store, skipping ${item.sku}`);
           return;
         }
 
+        const configuredLocationId = normalizeLocationId(store.fulfillment_service_location_id);
         const targetEdge = inventoryItem.inventoryLevels.edges.find(
-          (e: any) => e.node.location.id === store.fulfillment_service_location_id
+          (e: any) => normalizeLocationId(e.node.location.id) === configuredLocationId
         );
 
         if (!targetEdge) {
+          skippedMissingStLocationInShopify++;
           console.log(`Ship Tornado location not found in Shopify for ${item.sku}, skipping`);
           return;
         }
@@ -276,7 +299,18 @@ async function syncToShopify(
           }
         );
 
+        if (!setRes.ok) {
+          errors++;
+          console.error(`Set quantity HTTP error for ${item.sku}:`, await setRes.text());
+          return;
+        }
+
         const setResult = await setRes.json();
+        if (setResult.errors?.length) {
+          errors++;
+          console.error(`Set quantity GraphQL errors for ${item.sku}:`, setResult.errors);
+          return;
+        }
         const userErrors = setResult.data?.inventorySetQuantities?.userErrors || [];
 
         if (userErrors.length === 0) {
@@ -293,13 +327,20 @@ async function syncToShopify(
     }));
   }
 
+  if (skippedMissingStLocationConfig > 0 || skippedMissingStLocationInShopify > 0) {
+    console.log(
+      `ST → Shopify skips for store ${store.store_name || store.id}: ` +
+      `missing-config=${skippedMissingStLocationConfig}, location-not-found=${skippedMissingStLocationInShopify}`
+    );
+  }
+
   return { updated, errors };
 }
 
 // ─── Shopify → Ship Tornado ───────────────────────────────────────────────────
 
 async function syncFromShopify(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AnySupabaseClient,
   companyId: string,
   store: any,
   storeUrl: string,
@@ -308,6 +349,10 @@ async function syncFromShopify(
   console.log(`Syncing Shopify → ST for store ${store.store_name || store.id}`);
   let updated = 0;
   let errors = 0;
+  let skippedMissingStLocationConfig = 0;
+  let skippedMissingStLocationInShopify = 0;
+
+  const configuredLocationId = normalizeLocationId(store.fulfillment_service_location_id);
 
   // Fetch all variants from Shopify with pagination
   const productsQuery = `
@@ -342,12 +387,14 @@ async function syncFromShopify(
   let afterCursor: string | null = null;
 
   // Get default warehouse for this company
-  const { data: warehouse } = await supabase
+  const { data: warehouseData } = await supabase
     .from('warehouses')
     .select('id')
     .eq('company_id', companyId)
     .limit(1)
     .single();
+
+  const warehouse = (warehouseData || null) as WarehouseRecord | null;
 
   if (!warehouse) {
     console.error('No warehouse found for company');
@@ -355,7 +402,7 @@ async function syncFromShopify(
   }
 
   while (hasNextPage) {
-    const res = await fetch(
+    const res: Response = await fetch(
       `https://${storeUrl}/admin/api/2025-01/graphql.json`,
       {
         method: 'POST',
@@ -376,7 +423,7 @@ async function syncFromShopify(
       throw new Error('Failed to fetch variants from Shopify');
     }
 
-    const result = await res.json();
+    const result: any = await res.json();
     if (result.errors) {
       throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
     }
@@ -388,7 +435,7 @@ async function syncFromShopify(
 
       try {
         // Find matching item in Ship Tornado
-        const { data: item } = await supabase
+        const { data: itemData } = await supabase
           .from('items')
           .select('id')
           .eq('company_id', companyId)
@@ -396,20 +443,27 @@ async function syncFromShopify(
           .eq('sku', variant.sku)
           .maybeSingle();
 
+        const item = (itemData || null) as { id: string } | null;
         if (!item) continue;
 
         // Only read quantity from the Ship Tornado fulfillment service location
-        if (!store.fulfillment_service_location_id) continue;
+        if (!configuredLocationId) {
+          skippedMissingStLocationConfig++;
+          continue;
+        }
 
         const stLocationEdge = (variant.inventoryItem?.inventoryLevels?.edges || [])
-          .find((edge: any) => edge.node.location?.id === store.fulfillment_service_location_id);
+          .find((edge: any) => normalizeLocationId(edge.node.location?.id) === configuredLocationId);
 
-        if (!stLocationEdge) continue; // SKU not stocked at our location
+        if (!stLocationEdge) {
+          skippedMissingStLocationInShopify++;
+          continue; // SKU not stocked at our location
+        }
 
         const shopifyQty = stLocationEdge.node.quantities?.[0]?.quantity ?? 0;
 
         // Get current ST quantity
-        const { data: currentInv } = await supabase
+        const { data: currentInvData } = await supabase
           .from('inventory_levels')
           .select('id, quantity_on_hand, quantity_available')
           .eq('company_id', companyId)
@@ -417,6 +471,7 @@ async function syncFromShopify(
           .eq('warehouse_id', warehouse.id)
           .maybeSingle();
 
+        const currentInv = (currentInvData || null) as InventoryLevelRecord | null;
         const currentQty = currentInv?.quantity_available ?? 0;
 
         if (Math.abs(currentQty - shopifyQty) < threshold) continue;
@@ -472,5 +527,20 @@ async function syncFromShopify(
     afterCursor = result.data.productVariants.pageInfo.endCursor;
   }
 
+  if (skippedMissingStLocationConfig > 0 || skippedMissingStLocationInShopify > 0) {
+    console.log(
+      `Shopify → ST skips for store ${store.store_name || store.id}: ` +
+      `missing-config=${skippedMissingStLocationConfig}, location-not-found=${skippedMissingStLocationInShopify}`
+    );
+  }
+
   return { updated, errors };
+}
+
+function normalizeLocationId(locationId: string | null | undefined): string | null {
+  if (!locationId) return null;
+  const value = String(locationId).trim();
+  if (!value) return null;
+  const match = value.match(/(\d+)$/);
+  return match ? match[1] : value;
 }
