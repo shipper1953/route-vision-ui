@@ -78,9 +78,34 @@ export interface CartonizationResult {
   }>;
   rulesApplied: string[];
   processingTime: number;
+  explanation?: DecisionExplanation;
   // Add multi-package support to existing result
   multiPackageResult?: MultiPackageCartonizationResult;
 }
+
+export interface DecisionExplanation {
+  selectedBox: {
+    id: string;
+    name: string;
+    score: number;
+    volumeUtilization: number;
+    dimensionalWeight: number;
+    cost: number;
+    outerVolume: number;
+  };
+  rejectedCandidates: Array<{
+    id: string;
+    name: string;
+    reason: string;
+    score: number;
+  }>;
+  tieBreakersApplied: string[];
+  reasonCode: string;
+  algorithmVersion: string;
+  optimizationObjective: 'smallest_fit' | 'lowest_landed_cost' | 'multi_package_required' | 'balanced';
+}
+
+export const CARTONIZATION_ALGORITHM_VERSION = '2.1.0';
 
 export interface PackedItem {
   item: Item;

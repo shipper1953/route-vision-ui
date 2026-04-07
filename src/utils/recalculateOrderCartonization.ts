@@ -35,23 +35,28 @@ export async function recalculateOrderCartonization(orderId: number): Promise<Re
     const itemIds = orderItems.map((i: any) => i.itemId).filter(Boolean);
     const itemSkus = orderItems.map((i: any) => i.sku).filter(Boolean);
 
-    // Fetch item master data by ID or SKU (not filtered by company, since super admins
-    // may create orders across companies)
+    // Fetch item master data by ID/SKU scoped to the order company
     let masterItems: any[] = [];
     if (itemIds.length > 0) {
       const { data, error: itemsError } = await supabase
         .from('items')
         .select('*')
+        .eq('company_id', order.company_id)
         .in('id', itemIds);
       if (!itemsError && data) masterItems = data;
     }
-    // Fallback: also try SKU match within the order's company
-    if (masterItems.length === 0 && itemSkus.length > 0) {
+    // Supplement with SKU matches scoped to the order company
+    if (itemSkus.length > 0) {
       const { data, error: itemsError } = await supabase
         .from('items')
         .select('*')
+        .eq('company_id', order.company_id)
         .in('sku', itemSkus);
-      if (!itemsError && data) masterItems = data;
+      if (!itemsError && data) {
+        const byId = new Map<string, any>(masterItems.map(item => [item.id, item]));
+        data.forEach(item => byId.set(item.id, item));
+        masterItems = Array.from(byId.values());
+      }
     }
 
     if (!masterItems || masterItems.length === 0) {
@@ -61,7 +66,8 @@ export async function recalculateOrderCartonization(orderId: number): Promise<Re
     // Enrich order items with dimensions
     const enrichedItems = orderItems
       .map((orderItem: any) => {
-        const masterItem = masterItems.find(m => m.sku === orderItem.sku || m.id === orderItem.itemId);
+        const masterItem = masterItems.find(m => m.id === orderItem.itemId) ||
+          masterItems.find(m => m.sku === orderItem.sku && m.company_id === order.company_id);
         if (masterItem) {
           return {
             id: masterItem.id,

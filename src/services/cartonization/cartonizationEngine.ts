@@ -1,4 +1,4 @@
-import { Item, Box, CartonizationParameters, CartonizationResult, PackedItem, Space, MultiPackageCartonizationResult } from './types';
+import { Item, Box, CartonizationParameters, CartonizationResult, DecisionExplanation, MultiPackageCartonizationResult, CARTONIZATION_ALGORITHM_VERSION } from './types';
 import { BinPackingAlgorithm } from './binPacking';
 import { CartonizationUtils } from './utils';
 import { MultiPackageAlgorithm } from './multiPackageAlgorithm';
@@ -76,7 +76,7 @@ export class CartonizationEngine {
     );
 
     console.log(`\n${'='.repeat(80)}`);
-    console.log(`🔍 CARTONIZATION ANALYSIS START`);
+    console.log(`🔍 CARTONIZATION v${CARTONIZATION_ALGORITHM_VERSION}`);
     console.log(`${'='.repeat(80)}`);
     console.log(`📦 Items to pack: ${items.length} unique items`);
     items.forEach(item => {
@@ -101,6 +101,7 @@ export class CartonizationEngine {
     console.log(`📦 Testing ${suitableBoxes.length} boxes for optimal utilization:`);
 
     const rulesApplied: string[] = [];
+    const rejectedCandidates: DecisionExplanation['rejectedCandidates'] = [];
     
     // Calculate analysis for each suitable box - SIMPLE VOLUME-BASED UTILIZATION
     const boxAnalysis = suitableBoxes.map(box => {
@@ -118,15 +119,26 @@ export class CartonizationEngine {
       
       if (!itemsFit) {
         console.log(`❌ 3D packing failed for ${box.name}: Items do not fit geometrically`);
+        rejectedCandidates.push({
+          id: box.id,
+          name: box.name,
+          reason: 'Items do not fit geometrically (3D packing failed)',
+          score: 0
+        });
       } else {
         console.log(`✅ ${box.name} - Items fit with ${volumeUtilization.toFixed(1)}% volume utilization`);
       }
       
       const dimensionalWeight = CartonizationUtils.calculateDimensionalWeight(box, this.parameters.dimensionalWeightFactor);
       
-      // Calculate confidence: closer to 99.9% = higher confidence
-      // Scale so that 99% utilization ≈ 100% confidence
-      const confidence = itemsFit ? Math.min(100, volumeUtilization * 1.01) : 0;
+      const confidence = itemsFit
+        ? CartonizationUtils.calculateConfidence(
+            volumeUtilization,
+            totalWeight,
+            box,
+            packingResult.packingEfficiency
+          )
+        : 0;
       
       if (itemsFit) {
         console.log(`📈 ${box.name} confidence: ${confidence.toFixed(1)}%`);
@@ -160,62 +172,26 @@ export class CartonizationEngine {
     if (this.parameters.optimizeForCost) {
       rulesApplied.push('Cost Optimization Rule');
     } else {
-      rulesApplied.push('Highest Utilization Rule (up to 99.9%)');
+      rulesApplied.push('Smallest Fit Rule (deterministic tie-breakers)');
     }
 
-    // Apply fill rate threshold rule - use as preference weight, not hard filter
+    // Apply fill rate threshold as a soft preference (not a hard exclusion)
     if (this.parameters.fillRateThreshold > 0) {
       rulesApplied.push(`Fill Rate Preference (${this.parameters.fillRateThreshold}%)`);
-      
-      // Set minimum viable threshold (60%) - below this, boxes are truly unusable
-      const minViableThreshold = 60;
       const preferenceThreshold = this.parameters.fillRateThreshold;
       
-      console.log(`Applying fill rate logic: preference=${preferenceThreshold}%, minViable=${minViableThreshold}%`);
-      
-      // Filter out only truly unusable boxes (below minimum threshold)
-      optimizedBoxes = optimizedBoxes.filter(analysis => {
-        const isViable = analysis.utilization >= minViableThreshold;
-        const meetsPreference = analysis.utilization >= preferenceThreshold;
-        
-        console.log(`Box ${analysis.box.name}: utilization=${analysis.utilization.toFixed(1)}%, viable=${isViable}, meetsPreference=${meetsPreference}`);
-        
-        // Always keep viable boxes, but note preference
-        return isViable;
+
+      console.log(`Applying fill rate preference: ${preferenceThreshold}%`);
+      optimizedBoxes.sort((a, b) => {
+        const aPref = a.utilization >= preferenceThreshold ? 1 : 0;
+        const bPref = b.utilization >= preferenceThreshold ? 1 : 0;
+        if (bPref !== aPref) return bPref - aPref;
+        return b.utilization - a.utilization;
       });
-      
-      // If no boxes meet threshold, use fallback logic for smallest fitting box
-      if (optimizedBoxes.length === 0 && fittingBoxes.length > 0) {
-        console.log("🔄 Using smallest fitting box as fallback");
-        const fallback = fittingBoxes[0]; // Already sorted by size
-        rulesApplied.push("Fallback: smallest fitting box");
-        
-        const fallbackConfidence = Math.max(fallback.confidence - 20, 60);
-        console.log(`🎯 Fallback recommendation: ${fallback.box.name} with ${fallbackConfidence}% confidence`);
-        
-        return {
-          recommendedBox: fallback.box,
-          utilization: fallback.utilization,
-          itemsFit: true,
-          totalWeight,
-          totalVolume,
-          dimensionalWeight: fallback.dimensionalWeight,
-          savings: 0,
-          confidence: fallbackConfidence,
-          alternatives: fittingBoxes.slice(1, 4).map(analysis => ({
-            box: analysis.box,
-            utilization: analysis.utilization,
-            cost: analysis.cost,
-            confidence: analysis.confidence
-          })),
-          rulesApplied: [...rulesApplied, "Fallback: smallest fitting box"],
-          processingTime: Date.now() - startTime
-        };
-      }
     }
 
     if (!optimizedBoxes.length) {
-      console.log('❌ No boxes meet fill rate threshold');
+      console.log('❌ No viable boxes remained after optimization');
       return null;
     }
 
@@ -248,6 +224,33 @@ export class CartonizationEngine {
 
     console.log(`✅ Final recommendation: ${recommendedAnalysis.box.name} with ${recommendedAnalysis.confidence}% confidence`);
 
+    const explanation: DecisionExplanation = {
+      selectedBox: {
+        id: recommendedAnalysis.box.id,
+        name: recommendedAnalysis.box.name,
+        score: recommendedAnalysis.confidence,
+        volumeUtilization: recommendedAnalysis.utilization,
+        dimensionalWeight: recommendedAnalysis.dimensionalWeight,
+        cost: recommendedAnalysis.box.cost,
+        outerVolume: recommendedAnalysis.box.length * recommendedAnalysis.box.width * recommendedAnalysis.box.height
+      },
+      rejectedCandidates: [
+        ...rejectedCandidates,
+        ...optimizedBoxes.slice(1, 8).map(analysis => ({
+          id: analysis.box.id,
+          name: analysis.box.name,
+          reason: `Lower-ranked by deterministic tie-breakers vs ${recommendedAnalysis.box.name}`,
+          score: analysis.confidence
+        }))
+      ],
+      tieBreakersApplied: this.parameters.optimizeForCost
+        ? ['primary: lowest_cost', 'tie1: lowest_dim_weight', 'tie2: smallest_outer_volume', 'tie3: highest_utilization']
+        : ['primary: smallest_outer_volume', 'tie1: lowest_dim_weight', 'tie2: lowest_cost', 'tie3: highest_utilization'],
+      reasonCode: this.parameters.optimizeForCost ? 'cost_optimized' : 'smallest_fit',
+      algorithmVersion: CARTONIZATION_ALGORITHM_VERSION,
+      optimizationObjective: this.parameters.optimizeForCost ? 'lowest_landed_cost' : 'smallest_fit'
+    };
+
     return {
       recommendedBox: recommendedAnalysis.box,
       utilization: recommendedAnalysis.utilization,
@@ -259,16 +262,31 @@ export class CartonizationEngine {
       confidence: recommendedAnalysis.confidence,
       alternatives,
       rulesApplied,
-      processingTime
+      processingTime,
+      explanation
     };
   }
 
-  // Sorting method that prioritizes highest utilization up to 99.9%
+  // Sorting method focused on smallest-fit recommendation with deterministic tie-breakers
   private sortBoxesByOptimization(analyses: any[]): any[] {
     return analyses
-      .filter(a => a.utilization > 0 && a.utilization <= 99.9)
-      .filter(a => a.utilization >= this.parameters.fillRateThreshold)
-      .sort((a, b) => b.utilization - a.utilization); // Highest utilization first, period
+      .filter(a => a.utilization > 0)
+      .sort((a, b) => {
+        const volumeA = a.box.length * a.box.width * a.box.height;
+        const volumeB = b.box.length * b.box.width * b.box.height;
+
+        if (this.parameters.optimizeForCost) {
+          if (a.cost !== b.cost) return a.cost - b.cost;
+          if (a.dimensionalWeight !== b.dimensionalWeight) return a.dimensionalWeight - b.dimensionalWeight;
+          if (volumeA !== volumeB) return volumeA - volumeB;
+          return b.utilization - a.utilization;
+        }
+
+        if (volumeA !== volumeB) return volumeA - volumeB;
+        if (a.dimensionalWeight !== b.dimensionalWeight) return a.dimensionalWeight - b.dimensionalWeight;
+        if (a.cost !== b.cost) return a.cost - b.cost;
+        return b.utilization - a.utilization;
+      });
   }
 
   // Legacy method for backward compatibility
@@ -301,6 +319,22 @@ export class CartonizationEngine {
       })),
       rulesApplied: multiPackageResult.rulesApplied,
       processingTime: multiPackageResult.processingTime,
+      explanation: {
+        selectedBox: {
+          id: primaryPackage.box.id,
+          name: primaryPackage.box.name,
+          score: multiPackageResult.confidence,
+          volumeUtilization: primaryPackage.utilization,
+          dimensionalWeight: primaryPackage.dimensionalWeight,
+          cost: primaryPackage.box.cost,
+          outerVolume: primaryPackage.box.length * primaryPackage.box.width * primaryPackage.box.height
+        },
+        rejectedCandidates: [],
+        tieBreakersApplied: ['multi_package_split'],
+        reasonCode: 'multi_package_required',
+        algorithmVersion: CARTONIZATION_ALGORITHM_VERSION,
+        optimizationObjective: 'multi_package_required'
+      },
       multiPackageResult: multiPackageResult
     };
   }
