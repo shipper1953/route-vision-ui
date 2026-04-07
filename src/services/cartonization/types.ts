@@ -104,11 +104,41 @@ export interface CartonizationResult {
   }>;
   rulesApplied: string[];
   processingTime: number;
-  // Decision explanation for audit trail
   explanation?: DecisionExplanation;
-  // Multi-package support
+  // Add multi-package support to existing result
   multiPackageResult?: MultiPackageCartonizationResult;
 }
+
+export interface DecisionExplanation {
+  selectedBox: {
+    id: string;
+    name: string;
+    score: number;
+    volumeUtilization: number;
+    dimensionalWeight: number;
+    cost: number;
+    outerVolume: number;
+  };
+  rejectedCandidates: Array<{
+    id: string;
+    name: string;
+    reason: string;
+    score: number;
+  }>;
+  tieBreakersApplied: string[];
+  reasonCode: string;
+  algorithmVersion: string;
+  policyVersion?: string;
+  optimizationObjective:
+    | 'smallest_fit'
+    | 'lowest_landed_cost'
+    | 'multi_package_required'
+    | 'balanced'
+    | 'minimize_packages'
+    | 'minimize_cost';
+}
+
+export const CARTONIZATION_ALGORITHM_VERSION = '2.1.0';
 
 export interface PackedItem {
   item: Item;
