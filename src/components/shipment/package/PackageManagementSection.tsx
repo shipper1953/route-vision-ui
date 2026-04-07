@@ -515,6 +515,11 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
     addManualPackage();
   };
 
+  const handleWeightChange = (packageIndex: number, weight: number) => {
+    setHasManualEdits(true);
+    setWeightOverrides(prev => ({ ...prev, [packageIndex]: weight }));
+  };
+
   if (!multiPackageResult) {
     return (
       <div className="space-y-6">
