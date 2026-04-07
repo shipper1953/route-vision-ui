@@ -163,9 +163,11 @@ export const ShipmentFormTabs = ({
             selectedItems={selectedItems}
             loading={loading}
             setLoading={setLoading}
-            onShipmentCreated={onShipmentCreated}
+            onLabelPurchased={onLabelPurchased}
+            onRatesFetched={onRatesFetched}
             itemsLoading={itemsLoading}
             hasOrderId={hasOrderId}
+            orderId={orderId}
           />
         </div>
       )}
