@@ -293,7 +293,7 @@ export const ShippingOptionsSection = ({
   const sortedRates = getSortedRates();
   const meetsCount = sortedRates.filter((r) => r.meetsDeliveryDate === true).length;
   const doesNotMeetCount = sortedRates.filter((r) => r.meetsDeliveryDate === false).length;
-  const hasMarkup = company && company.markup_value && company.markup_value > 0;
+  
 
   return (
     <div className="space-y-4">
@@ -307,13 +307,6 @@ export const ShippingOptionsSection = ({
               </CardTitle>
               <CardDescription>
                 {sortedRates.length} rates found
-                {hasMarkup && (
-                  <span className="ml-2">
-                    • Markup: {company.markup_type === "percentage"
-                      ? `${company.markup_value}%`
-                      : `$${company.markup_value?.toFixed(2)}`}
-                  </span>
-                )}
                 {requiredDeliveryDate && (
                   <span>
                     {" "}• Required by{" "}
@@ -349,7 +342,6 @@ export const ShippingOptionsSection = ({
                       sortedRate={item}
                       isSelected={selectedRateId === item.rate.id}
                       onSelect={() => setSelectedRateId(item.rate.id)}
-                      hasMarkup={!!hasMarkup}
                     />
                   ))}
               </div>
@@ -372,7 +364,7 @@ export const ShippingOptionsSection = ({
                   sortedRate={item}
                   isSelected={selectedRateId === item.rate.id}
                   onSelect={() => setSelectedRateId(item.rate.id)}
-                  hasMarkup={!!hasMarkup}
+                  
                 />
               ))}
           </div>
@@ -411,16 +403,13 @@ const RateCard = ({
   sortedRate,
   isSelected,
   onSelect,
-  hasMarkup,
 }: {
   sortedRate: SortedRate;
   isSelected: boolean;
   onSelect: () => void;
-  hasMarkup: boolean;
 }) => {
   const { rate } = sortedRate;
   const deliveryDays = rate.delivery_days || rate.est_delivery_days || 0;
-  const markedUp = rate as MarkedUpRate;
 
   return (
     <button
@@ -482,11 +471,6 @@ const RateCard = ({
           <DollarSign className="h-4 w-4 text-muted-foreground" />
           <span className="text-xl font-bold">{parseFloat(rate.rate).toFixed(2)}</span>
         </div>
-        {hasMarkup && markedUp.markup_applied > 0 && (
-          <div className="text-xs text-muted-foreground">
-            Carrier: ${parseFloat(markedUp.original_rate).toFixed(2)}
-          </div>
-        )}
       </div>
     </button>
   );
