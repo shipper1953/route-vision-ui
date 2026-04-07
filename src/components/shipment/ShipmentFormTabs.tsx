@@ -157,17 +157,14 @@ export const ShipmentFormTabs = ({
 
       {currentStep === "options" && (
         <div className="space-y-6">
-          <ShippingOptionsSection />
-          {onShipmentCreated && setLoading && (
-            <ShipmentFormSubmission
-              loading={loading}
-              setLoading={setLoading}
-              selectedItems={selectedItems}
-              itemsLoading={itemsLoading}
-              hasOrderId={hasOrderId}
-              onShipmentCreated={onShipmentCreated}
-            />
-          )}
+          <ShippingOptionsSection
+            selectedItems={selectedItems}
+            loading={loading}
+            setLoading={setLoading}
+            onShipmentCreated={onShipmentCreated}
+            itemsLoading={itemsLoading}
+            hasOrderId={hasOrderId}
+          />
         </div>
       )}
 
