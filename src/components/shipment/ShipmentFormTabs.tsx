@@ -44,7 +44,8 @@ export const ShipmentFormTabs = ({
   setLoading,
   itemsLoading = false,
   hasOrderId = false,
-  onShipmentCreated,
+  onLabelPurchased,
+  onRatesFetched,
 }: ShipmentFormTabsProps) => {
   const [currentStep, setCurrentStep] = useState<StepKey>("addresses");
   const currentIndex = STEPS.findIndex(s => s.key === currentStep);
