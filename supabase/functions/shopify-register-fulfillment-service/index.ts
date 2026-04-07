@@ -210,7 +210,9 @@ Deno.serve(async (req) => {
               .from('shopify_stores')
               .update({ 
                 fulfillment_service_id: existingService.id,
-                fulfillment_service_location_id: existingService.location.id,
+                fulfillment_service_location_id: existingService.location?.id || null,
+                fulfillment_location_id: existingService.location?.id || null,
+                fulfillment_location_name: existingService.location?.name || null,
               })
               .eq('id', actualStoreId);
           }
