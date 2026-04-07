@@ -90,12 +90,20 @@ export const ShipmentForm = ({ onLabelPurchased }: ShipmentFormProps) => {
           const alreadyShipped = itemsAlreadyShipped[itemId] || 0;
           const remainingQty = (item.quantity || 0) - alreadyShipped;
           
+          const dims = item.dimensions || (item.length && item.width && item.height ? {
+            length: item.length,
+            width: item.width,
+            height: item.height,
+            weight: item.weight || 0
+          } : undefined);
+          
           return {
             itemId,
             name: item.name,
             sku: item.sku,
             quantity: remainingQty,
-            dimensions: item.dimensions
+            unitPrice: item.unitPrice ?? item.unit_price,
+            dimensions: dims
           };
         });
       
