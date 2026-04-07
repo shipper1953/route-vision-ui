@@ -57,6 +57,7 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
 
   const wmsSubmenuItems = [
     { label: "Dashboard", to: "/wms/dashboard" },
+    { label: "Warehouses", to: "/wms/warehouses" },
     { label: "Customers", to: "/wms/customers" },
     { label: "Purchase Orders", to: "/wms/purchase-orders" },
     ...(hasReceiving ? [{ label: "Receiving", to: "/wms/receiving" }] : []),
@@ -135,6 +136,12 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
           icon={Warehouse} 
           label="Dashboard" 
           to="/wms/dashboard" 
+          isCollapsed={false}
+        />
+        <NavItem 
+          icon={Warehouse} 
+          label="Warehouses" 
+          to="/wms/warehouses" 
           isCollapsed={false}
         />
         <NavItem 
