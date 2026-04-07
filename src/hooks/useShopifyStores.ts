@@ -223,5 +223,6 @@ export const useShopifyStores = (companyId?: string) => {
     syncStore,
     registerWebhooks,
     setActiveStore,
+    updateStoreSyncToggle,
   };
 };
