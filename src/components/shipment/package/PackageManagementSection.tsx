@@ -431,6 +431,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
 
   const handleAddItem = (packageIndex: number, item: any) => {
     if (multiPackageResult) {
+      setHasManualEdits(true);
       const currentPackage = multiPackageResult.packages[packageIndex];
       const updatedItems = [...currentPackage.assignedItems, item];
       editPackage(packageIndex, { assignedItems: updatedItems });
@@ -439,6 +440,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
 
   const handleRemoveItem = (packageIndex: number, itemIndex: number) => {
     if (multiPackageResult) {
+      setHasManualEdits(true);
       const currentPackage = multiPackageResult.packages[packageIndex];
       const updatedItems = currentPackage.assignedItems.filter((_, idx) => idx !== itemIndex);
       editPackage(packageIndex, { assignedItems: updatedItems });
@@ -447,15 +449,14 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
 
   const handleMoveItem = (fromPackage: number, toPackage: number, itemIndex: number) => {
     if (multiPackageResult) {
+      setHasManualEdits(true);
       const sourcePackage = multiPackageResult.packages[fromPackage];
       const targetPackage = multiPackageResult.packages[toPackage];
       const item = sourcePackage.assignedItems[itemIndex];
       
-      // Remove from source
       const sourceItems = sourcePackage.assignedItems.filter((_, idx) => idx !== itemIndex);
       editPackage(fromPackage, { assignedItems: sourceItems });
       
-      // Add to target
       const targetItems = [...targetPackage.assignedItems, item];
       editPackage(toPackage, { assignedItems: targetItems });
     }
