@@ -97,15 +97,23 @@ export const ItemSelectionCard = ({
     fetchShippedItems();
   }, [orderId]);
 
+  // Get shipped quantity, checking both new and legacy key formats
+  const getShippedQuantity = (item: any, index?: number) => {
+    const newKey = getUniqueItemKey(item, index);
+    // Check new key format first, then legacy format without price/index
+    const baseId = item.itemId || item.id;
+    const legacyKey = `${baseId}__${item.name || ''}__${item.sku || ''}`;
+    return shippedItemsFromDB.get(newKey) || shippedItemsFromDB.get(legacyKey) || 0;
+  };
+
   // Calculate remaining quantity for each item
-  const getRemainingQuantity = (item: any) => {
-    const itemKey = getUniqueItemKey(item);
-    const alreadyShipped = shippedItemsFromDB.get(itemKey) || 0;
+  const getRemainingQuantity = (item: any, index?: number) => {
+    const alreadyShipped = getShippedQuantity(item, index);
     return item.quantity - alreadyShipped;
   };
 
   // Check if all items are fully shipped
-  const allItemsShipped = orderItems.every(item => getRemainingQuantity(item) <= 0);
+  const allItemsShipped = orderItems.every((item, index) => getRemainingQuantity(item, index) <= 0);
 
   // Handle item toggle
   const handleToggleItem = (item: any) => {
@@ -196,12 +204,12 @@ export const ItemSelectionCard = ({
         {!allItemsShipped && (
           <>
             <div className="space-y-3">
-              {orderItems.map((item) => {
-                const itemKey = getUniqueItemKey(item);
-                const remaining = getRemainingQuantity(item);
+              {orderItems.map((item, index) => {
+                const itemKey = getUniqueItemKey(item, index);
+                const remaining = getRemainingQuantity(item, index);
                 const isSelected = localSelection.has(itemKey);
                 const selectedQty = localSelection.get(itemKey) || 0;
-                const alreadyShipped = shippedItemsFromDB.get(itemKey) || 0;
+                const alreadyShipped = getShippedQuantity(item, index);
 
                 if (remaining <= 0) {
                   return (
