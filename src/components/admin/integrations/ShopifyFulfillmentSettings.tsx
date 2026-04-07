@@ -9,6 +9,7 @@ import { CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { StoreSyncToggleBanner } from "./StoreSyncToggleBanner";
 
 interface ShopifyFulfillmentSettingsProps {
   settings: ShopifySettings;
@@ -16,6 +17,8 @@ interface ShopifyFulfillmentSettingsProps {
   onChange: () => void;
   companyId?: string;
   storeId?: string;
+  storeSyncEnabled?: boolean;
+  onStoreSyncToggle?: (enabled: boolean) => void;
 }
 
 export const ShopifyFulfillmentSettings = ({ 
@@ -24,6 +27,8 @@ export const ShopifyFulfillmentSettings = ({
   onChange,
   companyId,
   storeId,
+  storeSyncEnabled = true,
+  onStoreSyncToggle,
 }: ShopifyFulfillmentSettingsProps) => {
   const fulfillmentConfig = settings.sync_config.fulfillment;
   const { toast } = useToast();

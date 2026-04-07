@@ -9,6 +9,7 @@ import { ShopifySettings } from "@/hooks/useShopifySettings";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Download, AlertCircle, CheckCircle2 } from "lucide-react";
+import { StoreSyncToggleBanner } from "./StoreSyncToggleBanner";
 
 interface ShopifyProductSettingsProps {
   settings: ShopifySettings;
@@ -16,6 +17,8 @@ interface ShopifyProductSettingsProps {
   onChange: () => void;
   companyId?: string;
   storeId?: string;
+  storeSyncEnabled?: boolean;
+  onStoreSyncToggle?: (enabled: boolean) => void;
 }
 
 export const ShopifyProductSettings = ({ 
@@ -23,7 +26,9 @@ export const ShopifyProductSettings = ({
   onUpdate, 
   onChange,
   companyId,
-  storeId
+  storeId,
+  storeSyncEnabled = true,
+  onStoreSyncToggle,
 }: ShopifyProductSettingsProps) => {
   const [isImporting, setIsImporting] = useState(false);
   const [lastImport, setLastImport] = useState<Date | null>(null);
