@@ -136,7 +136,7 @@ serve(async (req) => {
         updatedCount++;
 
       } catch (itemError) {
-        const errorMsg = `Error processing order_shipment ${orderShipment.id}: ${itemError.message}`;
+        const errorMsg = `Error processing order_shipment ${orderShipment.id}: ${(itemError as Error).message}`;
         console.error(errorMsg);
         errors.push(errorMsg);
       }
@@ -167,7 +167,7 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: (error as Error).message,
         success: false
       }),
       {

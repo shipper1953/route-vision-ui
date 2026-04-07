@@ -150,7 +150,7 @@ serve(async (req) => {
       console.log('📥 Request body parsed:', JSON.stringify(requestBody, null, 2))
     } catch (parseError) {
       console.error('❌ Failed to parse request body:', parseError)
-      return createErrorResponse('Invalid JSON in request body', parseError.message, 400)
+      return createErrorResponse('Invalid JSON in request body', (parseError as Error).message, 400)
     }
     
     const { shipmentData } = requestBody
@@ -173,9 +173,9 @@ serve(async (req) => {
   } catch (err) {
     console.error('💥 === ERROR IN CREATE SHIPPO SHIPMENT FUNCTION ===')
     console.error('Error type:', typeof err)
-    console.error('Error constructor:', err.constructor?.name)
-    console.error('Error message:', err.message)
-    console.error('Error stack:', err.stack)
+    console.error('Error constructor:', (err as any).constructor?.name)
+    console.error('Error message:', (err as Error).message)
+    console.error('Error stack:', (err as Error).stack)
     
     console.log('🔴 Returning generic error response')
     return createErrorResponse('Internal server error', err.message, 500)

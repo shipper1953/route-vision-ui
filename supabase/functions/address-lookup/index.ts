@@ -87,9 +87,9 @@ serve(async (req) => {
       { headers: corsHeaders }
     );
   } catch (error) {
-    console.error('Error in address-lookup function:', error.message);
+    console.error('Error in address-lookup function:', (error as Error).message);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({ error: 'Internal server error', details: (error as Error).message }),
       { headers: corsHeaders, status: 500 }
     );
   }
