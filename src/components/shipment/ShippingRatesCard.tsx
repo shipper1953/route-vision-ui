@@ -3,6 +3,8 @@ import {
   Card, 
   CardContent
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SmartRate, Rate } from "@/services/easypost";
 import { CombinedRateResponse } from "@/services/rateShoppingService";
 import { ShippingRatesCardHeader } from "./ShippingRatesCardHeader";
@@ -15,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Company, CompanyAddress } from "@/types/auth";
 import { applyMarkupToRates, MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
+import { AlertTriangle, Zap, DollarSign, Star } from "lucide-react";
 
 interface ShippingRatesCardProps {
   shipmentResponse: CombinedRateResponse;
@@ -25,7 +28,6 @@ interface ShippingRatesCardProps {
   onBuyLabel: (shipmentId: string, rateId: string) => Promise<any>;
 }
 
-// Transform database company data to our Company type
 const transformCompanyData = (dbCompany: any): Company => {
   return {
     id: dbCompany.id,
@@ -54,100 +56,125 @@ export const ShippingRatesCard = ({
   const [company, setCompany] = useState<Company | null>(null);
   const [markedUpRates, setMarkedUpRates] = useState<(MarkedUpRate | MarkedUpSmartRate)[]>([]);
   
-  // Get form context from parent component
   const form = useFormContext();
+  const decisionMetadata = shipmentResponse?.decisionMetadata;
+  const ranked = decisionMetadata?.rankedRecommendations;
   
-  // Debug log to see what's coming back from the API
-  console.log("ShippingRatesCard received response:", shipmentResponse);
-  console.log("Available smartrates:", shipmentResponse?.smartRates?.length || 0);
-  console.log("Available rates:", shipmentResponse?.rates?.length || 0);
-  console.log("EasyPost rates:", shipmentResponse?.rates?.filter(r => r.provider === 'easypost').length || 0);
-  console.log("Shippo rates:", shipmentResponse?.rates?.filter(r => r.provider === 'shippo').length || 0);
-  
-  // Use either smartrates or regular rates (fallback) if available
   const availableRates = shipmentResponse?.smartRates?.length ? 
     shipmentResponse.smartRates : 
     (shipmentResponse?.rates?.length ? shipmentResponse.rates : []);
 
-  // Fetch company data for markup calculation
   useEffect(() => {
     const fetchCompany = async () => {
       if (!userProfile?.company_id) return;
-      
       try {
         const { data, error } = await supabase
           .from('companies')
           .select('*')
           .eq('id', userProfile.company_id)
           .single();
-
         if (error) throw error;
-        
-        // Transform the database data to match our Company type
-        const transformedCompany = transformCompanyData(data);
-        setCompany(transformedCompany);
+        setCompany(transformCompanyData(data));
       } catch (error) {
         console.error('Error fetching company for markup calculation:', error);
       }
     };
-
     fetchCompany();
   }, [userProfile?.company_id]);
 
-  // Apply markup to rates when company data or rates change
   useEffect(() => {
     if (availableRates.length > 0) {
       const ratesWithMarkup = applyMarkupToRates(availableRates, company);
       setMarkedUpRates(ratesWithMarkup);
-      console.log('Applied markup to rates:', ratesWithMarkup);
-      
-      // Immediately update selected rate if it exists and doesn't have markup
       if (selectedRate && !('original_rate' in selectedRate)) {
         const markedUpVersion = ratesWithMarkup.find(rate => rate.id === selectedRate.id);
-        if (markedUpVersion) {
-          console.log('Immediately replacing selected rate with marked up version:', markedUpVersion);
-          setSelectedRate(markedUpVersion);
-        }
+        if (markedUpVersion) setSelectedRate(markedUpVersion);
       }
     }
   }, [availableRates, company, selectedRate, setSelectedRate]);
 
-  // Alert user if no rates are available and ensure selected rate is marked up
   useEffect(() => {
     if (!availableRates.length) {
       toast.error("No shipping rates available. Please check the shipping details and try again.");
     } else if (markedUpRates.length > 0) {
-      // If we have a selected rate that doesn't have markup applied, replace it with the marked up version
       if (selectedRate && !('original_rate' in selectedRate)) {
         const markedUpVersion = markedUpRates.find(rate => rate.id === selectedRate.id);
-        if (markedUpVersion) {
-          console.log('Replacing original rate with marked up version:', markedUpVersion);
-          setSelectedRate(markedUpVersion);
-        }
-      }
-      // If we have rates and a recommended rate is available but not selected, select it
-      else if (recommendedRate && !selectedRate) {
-        // Find the marked up version of the recommended rate
+        if (markedUpVersion) setSelectedRate(markedUpVersion);
+      } else if (recommendedRate && !selectedRate) {
         const markedUpRecommended = markedUpRates.find(rate => rate.id === recommendedRate.id);
-        if (markedUpRecommended) {
-          setSelectedRate(markedUpRecommended);
-        }
+        if (markedUpRecommended) setSelectedRate(markedUpRecommended);
       }
     }
   }, [availableRates.length, recommendedRate, selectedRate, setSelectedRate, markedUpRates]);
   
-  // If there's no form context, render without FormProvider
   return (
     <Card>
       <ShippingRatesCardHeader />
       
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Degraded mode warning */}
+        {decisionMetadata?.degradedMode && (
+          <Alert className="border-yellow-500 bg-yellow-50 text-yellow-900">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <span className="font-medium">Degraded mode:</span> {decisionMetadata.degradedProviders.join(', ')} unavailable. 
+              Rates shown are from available providers only.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Ranked recommendation quick-select badges */}
+        {ranked && (ranked.cheapest || ranked.fastest || ranked.bestValue) && (
+          <div className="flex flex-wrap gap-2">
+            {ranked.cheapest && (
+              <Badge 
+                variant="outline" 
+                className="cursor-pointer border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
+                onClick={() => {
+                  const rate = markedUpRates.find(r => r.id === ranked.cheapest?.rateId);
+                  if (rate) setSelectedRate(rate);
+                }}
+              >
+                <DollarSign className="h-3 w-3 mr-1" />
+                Cheapest: {ranked.cheapest.carrier} ${ranked.cheapest.rate.toFixed(2)}
+              </Badge>
+            )}
+            {ranked.fastest && (
+              <Badge 
+                variant="outline" 
+                className="cursor-pointer border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                onClick={() => {
+                  const rate = markedUpRates.find(r => r.id === ranked.fastest?.rateId);
+                  if (rate) setSelectedRate(rate);
+                }}
+              >
+                <Zap className="h-3 w-3 mr-1" />
+                Fastest: {ranked.fastest.carrier} {ranked.fastest.estimatedDays ? `${ranked.fastest.estimatedDays}d` : ''}
+              </Badge>
+            )}
+            {ranked.bestValue && (
+              <Badge 
+                variant="outline" 
+                className="cursor-pointer border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
+                onClick={() => {
+                  const rate = markedUpRates.find(r => r.id === ranked.bestValue?.rateId);
+                  if (rate) setSelectedRate(rate);
+                }}
+              >
+                <Star className="h-3 w-3 mr-1" />
+                Best Value: {ranked.bestValue.carrier} ${ranked.bestValue.rate.toFixed(2)}
+              </Badge>
+            )}
+          </div>
+        )}
+
         {markedUpRates.length > 0 ? (
           <RatesList 
             rates={markedUpRates as (SmartRate | Rate)[]}
             selectedRate={selectedRate}
             recommendedRate={recommendedRate}
             setSelectedRate={setSelectedRate}
+            rankedRecommendations={ranked}
           />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
