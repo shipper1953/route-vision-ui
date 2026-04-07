@@ -168,12 +168,8 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
             quantityShipped
           }))}
           orderId={form.watch('orderId')}
-        />
-        
-        <ShipmentFormSubmission 
           loading={loading}
           setLoading={setLoading}
-          selectedItems={selectedItems}
           itemsLoading={itemsLoading}
           hasOrderId={!!form.watch('orderId')}
           onShipmentCreated={(response, selectedRate, boxData) => {
