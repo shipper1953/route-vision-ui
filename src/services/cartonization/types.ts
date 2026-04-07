@@ -1,4 +1,4 @@
-export const CARTONIZATION_ALGORITHM_VERSION = '2.0.0';
+export const CARTONIZATION_ALGORITHM_VERSION = '2.1.0';
 
 export interface Item {
   id: string;
@@ -59,7 +59,7 @@ export interface DecisionExplanation {
   reasonCode: string;
   algorithmVersion: string;
   policyVersion?: string;
-  optimizationObjective: string;
+  optimizationObjective: 'smallest_fit' | 'lowest_landed_cost' | 'multi_package_required' | 'balanced';
 }
 
 export interface PackageRecommendation {

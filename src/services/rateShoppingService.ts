@@ -120,9 +120,13 @@ export class RateShoppingService {
       });
     }
 
-    // Sort combined rates by price
-    combinedRates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate));
-    combinedSmartRates.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate));
+    // Sort combined rates by price (guard against invalid/empty rate values)
+    const getRateValue = (rate: { rate: string }) => {
+      const parsed = Number.parseFloat(rate.rate);
+      return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+    };
+    combinedRates.sort((a, b) => getRateValue(a) - getRateValue(b));
+    combinedSmartRates.sort((a, b) => getRateValue(a) - getRateValue(b));
 
     // Calculate ranked recommendations
     const rankedRecommendations = this.calculateRankedRecommendations(combinedRates);
