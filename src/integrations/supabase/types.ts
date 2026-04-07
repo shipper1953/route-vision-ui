@@ -413,6 +413,53 @@ export type Database = {
           },
         ]
       }
+      decision_policy_versions: {
+        Row: {
+          company_id: string
+          config: Json
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          policy_type: string
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          company_id: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          policy_type: string
+          updated_at?: string
+          version_number?: number
+        }
+        Update: {
+          company_id?: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          policy_type?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_policy_versions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           category: string
@@ -1542,6 +1589,148 @@ export type Database = {
         }
         Relationships: []
       }
+      shipment_decisions: {
+        Row: {
+          algorithm_version: string
+          company_id: string
+          confidence: number | null
+          created_at: string
+          created_by: string | null
+          decision_type: string
+          degraded_mode: boolean
+          degraded_providers: string[] | null
+          explanation: Json | null
+          id: string
+          inputs_json: Json
+          order_id: number | null
+          outputs_json: Json
+          overridden: boolean
+          override_category: string | null
+          override_reason: string | null
+          policy_version_id: string | null
+          processing_time_ms: number | null
+          reason_code: string | null
+          shipment_id: number | null
+        }
+        Insert: {
+          algorithm_version?: string
+          company_id: string
+          confidence?: number | null
+          created_at?: string
+          created_by?: string | null
+          decision_type: string
+          degraded_mode?: boolean
+          degraded_providers?: string[] | null
+          explanation?: Json | null
+          id?: string
+          inputs_json?: Json
+          order_id?: number | null
+          outputs_json?: Json
+          overridden?: boolean
+          override_category?: string | null
+          override_reason?: string | null
+          policy_version_id?: string | null
+          processing_time_ms?: number | null
+          reason_code?: string | null
+          shipment_id?: number | null
+        }
+        Update: {
+          algorithm_version?: string
+          company_id?: string
+          confidence?: number | null
+          created_at?: string
+          created_by?: string | null
+          decision_type?: string
+          degraded_mode?: boolean
+          degraded_providers?: string[] | null
+          explanation?: Json | null
+          id?: string
+          inputs_json?: Json
+          order_id?: number | null
+          outputs_json?: Json
+          overridden?: boolean
+          override_category?: string | null
+          override_reason?: string | null
+          policy_version_id?: string | null
+          processing_time_ms?: number | null
+          reason_code?: string | null
+          shipment_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_decisions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_decisions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_decisions_policy_version_id_fkey"
+            columns: ["policy_version_id"]
+            isOneToOne: false
+            referencedRelation: "decision_policy_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_decisions_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipment_override_reasons: {
+        Row: {
+          applies_to: string
+          code: string
+          company_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          applies_to?: string
+          code: string
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          applies_to?: string
+          code?: string
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_override_reasons_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipment_quotes: {
         Row: {
           carrier: string
@@ -2137,6 +2326,126 @@ export type Database = {
             columns: ["shopify_store_id"]
             isOneToOne: false
             referencedRelation: "shopify_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_packaging_policies: {
+        Row: {
+          company_id: string
+          created_at: string
+          custom_rules: Json | null
+          fragility_rules: Json | null
+          id: string
+          is_active: boolean
+          max_void_ratio: number | null
+          optimization_objective: string
+          policy_version_id: string | null
+          tie_breaker_order: Json
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          custom_rules?: Json | null
+          fragility_rules?: Json | null
+          id?: string
+          is_active?: boolean
+          max_void_ratio?: number | null
+          optimization_objective?: string
+          policy_version_id?: string | null
+          tie_breaker_order?: Json
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          custom_rules?: Json | null
+          fragility_rules?: Json | null
+          id?: string
+          is_active?: boolean
+          max_void_ratio?: number | null
+          optimization_objective?: string
+          policy_version_id?: string | null
+          tie_breaker_order?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_packaging_policies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_packaging_policies_policy_version_id_fkey"
+            columns: ["policy_version_id"]
+            isOneToOne: false
+            referencedRelation: "decision_policy_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_rate_policies: {
+        Row: {
+          allowed_carriers: string[] | null
+          company_id: string
+          created_at: string
+          denied_services: string[] | null
+          id: string
+          insurance_threshold: number | null
+          is_active: boolean
+          max_transit_days: number | null
+          min_ontime_score: number | null
+          policy_version_id: string | null
+          preferred_objective: string
+          signature_threshold: number | null
+          updated_at: string
+        }
+        Insert: {
+          allowed_carriers?: string[] | null
+          company_id: string
+          created_at?: string
+          denied_services?: string[] | null
+          id?: string
+          insurance_threshold?: number | null
+          is_active?: boolean
+          max_transit_days?: number | null
+          min_ontime_score?: number | null
+          policy_version_id?: string | null
+          preferred_objective?: string
+          signature_threshold?: number | null
+          updated_at?: string
+        }
+        Update: {
+          allowed_carriers?: string[] | null
+          company_id?: string
+          created_at?: string
+          denied_services?: string[] | null
+          id?: string
+          insurance_threshold?: number | null
+          is_active?: boolean
+          max_transit_days?: number | null
+          min_ontime_score?: number | null
+          policy_version_id?: string | null
+          preferred_objective?: string
+          signature_threshold?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_rate_policies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_rate_policies_policy_version_id_fkey"
+            columns: ["policy_version_id"]
+            isOneToOne: false
+            referencedRelation: "decision_policy_versions"
             referencedColumns: ["id"]
           },
         ]
