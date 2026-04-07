@@ -135,7 +135,7 @@ export const ShipmentFormTabs = ({
               <AlertDescription>
                 <div className="mt-2 space-y-1">
                   {selectedItems.map(item => (
-                    <div key={item.itemId || item.id} className="flex justify-between text-sm">
+                    <div key={item.itemId} className="flex justify-between text-sm">
                       <span>{item.name} ({item.sku})</span>
                       <span className="font-medium">Qty: {item.quantity}</span>
                     </div>
