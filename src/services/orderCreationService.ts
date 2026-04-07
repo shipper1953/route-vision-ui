@@ -158,7 +158,7 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
       const { data: boxes, error: boxError } = await supabase
         .from('boxes')
         .select('id, name, sku, length, width, height, max_weight, cost, in_stock, min_stock, max_stock, box_type')
-        .eq('company_id', userProfile.company_id)
+        .eq('company_id', companyId)
         .eq('is_active', true)
         .gt('in_stock', 0);
 
