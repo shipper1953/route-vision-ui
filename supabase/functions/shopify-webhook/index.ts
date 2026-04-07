@@ -799,7 +799,7 @@ serve(async (req) => {
         
       case 'orders/create':
       case 'orders/updated':
-        console.log('Order webhook received but not processed - using fulfillment webhooks instead');
+        await handleOrderWebhook(supabase, validatedOrder || webhookData, store, topic);
         break;
         
       default:
