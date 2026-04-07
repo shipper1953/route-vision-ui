@@ -158,7 +158,7 @@ export const useShopifyStores = (companyId?: string) => {
     // Subscribe to real-time updates
     if (effectiveCompanyId) {
       const channel = supabase
-        .channel('shopify-stores')
+        .channel(`shopify-stores-changes-${effectiveCompanyId}`)
         .on(
           'postgres_changes',
           {
