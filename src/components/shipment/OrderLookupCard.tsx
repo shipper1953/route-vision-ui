@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { supabase } from "@/integrations/supabase/client";
 import { Barcode, Search, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { fetchOrderById } from "@/services/orderService";
