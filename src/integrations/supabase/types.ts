@@ -2222,10 +2222,13 @@ export type Database = {
           fulfillment_location_name: string | null
           fulfillment_service_id: string | null
           fulfillment_service_location_id: string | null
+          fulfillment_sync_enabled: boolean
           id: string
+          inventory_sync_enabled: boolean
           is_active: boolean | null
           last_sync_at: string | null
           oauth_state: string | null
+          product_sync_enabled: boolean
           settings: Json | null
           store_name: string | null
           store_url: string
@@ -2245,10 +2248,13 @@ export type Database = {
           fulfillment_location_name?: string | null
           fulfillment_service_id?: string | null
           fulfillment_service_location_id?: string | null
+          fulfillment_sync_enabled?: boolean
           id?: string
+          inventory_sync_enabled?: boolean
           is_active?: boolean | null
           last_sync_at?: string | null
           oauth_state?: string | null
+          product_sync_enabled?: boolean
           settings?: Json | null
           store_name?: string | null
           store_url: string
@@ -2268,10 +2274,13 @@ export type Database = {
           fulfillment_location_name?: string | null
           fulfillment_service_id?: string | null
           fulfillment_service_location_id?: string | null
+          fulfillment_sync_enabled?: boolean
           id?: string
+          inventory_sync_enabled?: boolean
           is_active?: boolean | null
           last_sync_at?: string | null
           oauth_state?: string | null
+          product_sync_enabled?: boolean
           settings?: Json | null
           store_name?: string | null
           store_url?: string

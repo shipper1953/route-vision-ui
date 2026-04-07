@@ -16,6 +16,9 @@ export interface ShopifyStore {
   customer_email: string | null;
   customer_reference: string | null;
   fulfillment_service_id: string | null;
+  fulfillment_sync_enabled: boolean;
+  inventory_sync_enabled: boolean;
+  product_sync_enabled: boolean;
   settings: any;
 }
 
@@ -146,6 +149,31 @@ export const useShopifyStores = (companyId?: string) => {
     }
   };
 
+  const updateStoreSyncToggle = async (storeId: string, field: 'fulfillment_sync_enabled' | 'inventory_sync_enabled' | 'product_sync_enabled', value: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('shopify_stores')
+        .update({ [field]: value })
+        .eq('id', storeId);
+
+      if (error) throw error;
+
+      setStores(prev => prev.map(s => s.id === storeId ? { ...s, [field]: value } : s));
+
+      toast({
+        title: 'Sync setting updated',
+        description: `${field.replace(/_/g, ' ').replace('enabled', '')} ${value ? 'enabled' : 'disabled'}`,
+      });
+    } catch (error: any) {
+      console.error('Error updating sync toggle:', error);
+      toast({
+        title: 'Update Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   useEffect(() => {
     fetchStores();
 
@@ -195,5 +223,6 @@ export const useShopifyStores = (companyId?: string) => {
     syncStore,
     registerWebhooks,
     setActiveStore,
+    updateStoreSyncToggle,
   };
 };
