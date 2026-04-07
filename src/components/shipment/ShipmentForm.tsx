@@ -6,7 +6,6 @@ import { ShipmentFormTabs } from "@/components/shipment/ShipmentFormTabs";
 import { SmartRate, Rate } from "@/services/easypost";
 import { CombinedRateResponse } from "@/services/rateShoppingService";
 import { shipmentSchema, ShipmentForm as ShipmentFormType } from "@/types/shipment";
-import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
 import { OrderLookupSection } from "./form/OrderLookupSection";
 import { ShipmentFormSubmission } from "./form/ShipmentFormSubmission";
 import { SelectedItem } from "@/types/fulfillment";
@@ -24,7 +23,6 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [itemsAlreadyShipped, setItemsAlreadyShipped] = useState<{ [itemId: string]: number }>({});
   const [itemsLoading, setItemsLoading] = useState(false);
-  const { getDefaultShippingAddress, warehouseAddress } = useDefaultAddressValues();
   
   const form = useForm<ShipmentFormType>({
     resolver: zodResolver(shipmentSchema),
