@@ -95,7 +95,7 @@ export const useRecommendedBox = (orderItems: any[], orderId?: number) => {
                 reasonCode: rec.reason_code,
                 algorithmVersion: serverResult.metadata.algorithm_version,
                 policyVersion: serverResult.metadata.policy_version_id || undefined,
-                optimizationObjective: serverResult.metadata.optimization_objective,
+                optimizationObjective: serverResult.metadata.optimization_objective as 'smallest_fit' | 'lowest_landed_cost' | 'multi_package_required' | 'balanced',
               },
             });
 
