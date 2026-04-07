@@ -543,6 +543,7 @@ export type Database = {
       }
       order_cartonization: {
         Row: {
+          algorithm_version: string | null
           box_weight: number | null
           calculation_timestamp: string | null
           confidence: number | null
@@ -552,8 +553,11 @@ export type Database = {
           optimization_objective: string | null
           order_id: number
           packages: Json | null
+          policy_version_id: string | null
           recommended_box_data: Json | null
           recommended_box_id: string | null
+          rejected_candidates: Json | null
+          score_breakdown: Json | null
           splitting_strategy: string | null
           total_packages: number | null
           total_weight: number | null
@@ -561,6 +565,7 @@ export type Database = {
           utilization: number | null
         }
         Insert: {
+          algorithm_version?: string | null
           box_weight?: number | null
           calculation_timestamp?: string | null
           confidence?: number | null
@@ -570,8 +575,11 @@ export type Database = {
           optimization_objective?: string | null
           order_id: number
           packages?: Json | null
+          policy_version_id?: string | null
           recommended_box_data?: Json | null
           recommended_box_id?: string | null
+          rejected_candidates?: Json | null
+          score_breakdown?: Json | null
           splitting_strategy?: string | null
           total_packages?: number | null
           total_weight?: number | null
@@ -579,6 +587,7 @@ export type Database = {
           utilization?: number | null
         }
         Update: {
+          algorithm_version?: string | null
           box_weight?: number | null
           calculation_timestamp?: string | null
           confidence?: number | null
@@ -588,8 +597,11 @@ export type Database = {
           optimization_objective?: string | null
           order_id?: number
           packages?: Json | null
+          policy_version_id?: string | null
           recommended_box_data?: Json | null
           recommended_box_id?: string | null
+          rejected_candidates?: Json | null
+          score_breakdown?: Json | null
           splitting_strategy?: string | null
           total_packages?: number | null
           total_weight?: number | null
@@ -602,6 +614,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: true
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_cartonization_policy_version_id_fkey"
+            columns: ["policy_version_id"]
+            isOneToOne: false
+            referencedRelation: "decision_policy_versions"
             referencedColumns: ["id"]
           },
           {
