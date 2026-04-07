@@ -218,12 +218,22 @@ async function syncToShopify(
           return;
         }
 
-        // Use the fulfillment location or first available location
-        const targetLocation = store.fulfillment_service_location_id
-          ? inventoryItem.inventoryLevels.edges.find(
-              (e: any) => e.node.location.id === store.fulfillment_service_location_id
-            )?.node || inventoryItem.inventoryLevels.edges[0].node
-          : inventoryItem.inventoryLevels.edges[0].node;
+        // Only sync to the Ship Tornado fulfillment service location
+        if (!store.fulfillment_service_location_id) {
+          console.log(`No fulfillment service location configured for store, skipping ${item.sku}`);
+          return;
+        }
+
+        const targetEdge = inventoryItem.inventoryLevels.edges.find(
+          (e: any) => e.node.location.id === store.fulfillment_service_location_id
+        );
+
+        if (!targetEdge) {
+          console.log(`Ship Tornado location not found in Shopify for ${item.sku}, skipping`);
+          return;
+        }
+
+        const targetLocation = targetEdge.node;
 
         const currentQty = targetLocation.quantities?.[0]?.quantity ?? 0;
 
@@ -388,12 +398,15 @@ async function syncFromShopify(
 
         if (!item) continue;
 
-        // Sum available across all Shopify locations
-        const shopifyQty = (variant.inventoryItem?.inventoryLevels?.edges || [])
-          .reduce((sum: number, edge: any) => {
-            const qty = edge.node.quantities?.[0]?.quantity ?? 0;
-            return sum + qty;
-          }, 0);
+        // Only read quantity from the Ship Tornado fulfillment service location
+        if (!store.fulfillment_service_location_id) continue;
+
+        const stLocationEdge = (variant.inventoryItem?.inventoryLevels?.edges || [])
+          .find((edge: any) => edge.node.location?.id === store.fulfillment_service_location_id);
+
+        if (!stLocationEdge) continue; // SKU not stocked at our location
+
+        const shopifyQty = stLocationEdge.node.quantities?.[0]?.quantity ?? 0;
 
         // Get current ST quantity
         const { data: currentInv } = await supabase
