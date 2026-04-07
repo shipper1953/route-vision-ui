@@ -238,7 +238,7 @@ export const ItemSelectionCard = ({
                     <div className="flex items-center gap-3 flex-1">
                       <Checkbox
                         checked={isSelected}
-                        onCheckedChange={() => handleToggleItem(item)}
+                        onCheckedChange={() => handleToggleItem(item, index)}
                       />
                       <div className="flex-1">
                         <div className="font-medium text-sm">{item.name}</div>
@@ -263,7 +263,7 @@ export const ItemSelectionCard = ({
                               min={1}
                               max={remaining}
                               value={selectedQty}
-                              onChange={(e) => handleQuantityChange(item, parseInt(e.target.value) || 0)}
+                              onChange={(e) => handleQuantityChange(item, parseInt(e.target.value) || 0, index)}
                               className="w-16 h-8 text-sm"
                             />
                             <span className="text-xs text-muted-foreground">of {remaining}</span>
