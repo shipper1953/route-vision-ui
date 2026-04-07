@@ -35,7 +35,7 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
         return;
       }
 
-      const addr = warehouse.address || {};
+      const addr = (warehouse.address || {}) as any;
       form.setValue("fromName", warehouse.name || "");
       form.setValue("fromCompany", warehouse.name || "");
       form.setValue("fromStreet1", addr.street1 || "");
