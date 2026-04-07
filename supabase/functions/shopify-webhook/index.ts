@@ -12,7 +12,7 @@ function sanitizeString(str: string | null | undefined, maxLength: number = 255)
 const ShopifyOrderSchema = z.object({
   id: z.union([z.number(), z.string()]).transform(String),
   order_number: z.union([z.number(), z.string()]).transform(String),
-  email: z.string().email().max(255).optional().nullable(),
+  email: z.string().max(255).optional().nullable().transform(val => val === '' ? null : val),
   financial_status: z.string().max(50).optional(),
   fulfillment_status: z.string().max(50).optional().nullable(),
   total_price: z.union([z.string(), z.number()]).transform(val => 
