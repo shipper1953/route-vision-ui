@@ -12,10 +12,10 @@ import { SelectedItem } from "@/types/fulfillment";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ShipmentFormProps {
-  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
+  onLabelPurchased?: (result: any) => void;
 }
 
-export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
+export const ShipmentForm = ({ onLabelPurchased }: ShipmentFormProps) => {
   const [loading, setLoading] = useState(false);
   const [orderLookupComplete, setOrderLookupComplete] = useState(false);
   const [orderItems, setOrderItems] = useState<any[]>([]);
