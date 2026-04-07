@@ -145,6 +145,244 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-hmac-sha256, x-shopify-shop-domain, x-shopify-topic',
 };
 
+// Helper: process order webhook into orders table and accept fulfillment requests
+async function handleOrderWebhook(supabase: any, order: any, store: any, topic: string) {
+  console.log(`Processing ${topic} for order:`, order.id, order.order_number);
+
+  const companyId = store.company_id;
+  const shopifyStoreId = store.id;
+
+  // Get default warehouse
+  const { data: warehouse } = await supabase
+    .from('warehouses')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('is_default', true)
+    .single();
+
+  if (!warehouse) {
+    throw new Error('No default warehouse found for company');
+  }
+
+  // Build line items array
+  const lineItems = (order.line_items || []).map((li: any) => ({
+    name: sanitizeString(li.title || li.name, 255) || 'Unknown',
+    sku: sanitizeString(li.sku, 100) || '',
+    quantity: li.quantity || 1,
+    price: typeof li.price === 'string' ? parseFloat(li.price) : (li.price || 0),
+    product_id: li.product_id?.toString() || null,
+    variant_id: li.variant_id?.toString() || null,
+    requires_shipping: li.requires_shipping !== false,
+    grams: li.grams || 0,
+  }));
+
+  // Build shipping address
+  const shippingAddr = order.shipping_address ? {
+    name: sanitizeString(`${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim(), 200),
+    company: sanitizeString(order.shipping_address.company, 255),
+    address1: sanitizeString(order.shipping_address.address1, 255),
+    address2: sanitizeString(order.shipping_address.address2, 255),
+    city: sanitizeString(order.shipping_address.city, 100),
+    state: sanitizeString(order.shipping_address.province_code || order.shipping_address.province, 100),
+    zip: sanitizeString(order.shipping_address.zip, 20),
+    country: sanitizeString(order.shipping_address.country_code || order.shipping_address.country, 100),
+    phone: sanitizeString(order.shipping_address.phone, 20),
+  } : null;
+
+  // Determine order status
+  const fulfillmentStatus = order.fulfillment_status || 'unfulfilled';
+  let status = 'processing';
+  if (fulfillmentStatus === 'fulfilled') status = 'shipped';
+  else if (fulfillmentStatus === 'partially_fulfilled') status = 'partially_fulfilled';
+  else if (order.cancelled_at) status = 'cancelled';
+
+  const customerName = order.customer
+    ? sanitizeString(`${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim(), 200)
+    : sanitizeString(shippingAddr?.name, 200);
+
+  const orderData = {
+    order_id: `SHOP-${order.order_number || order.id}`,
+    company_id: companyId,
+    shopify_store_id: shopifyStoreId,
+    warehouse_id: warehouse.id,
+    customer_name: customerName || 'Unknown',
+    customer_email: sanitizeString(order.email || order.customer?.email, 255),
+    customer_phone: sanitizeString(order.customer?.phone || shippingAddr?.phone, 20),
+    customer_company: sanitizeString(order.customer?.company || shippingAddr?.company, 255),
+    shipping_address: shippingAddr,
+    items: lineItems,
+    value: typeof order.total_price === 'string' ? parseFloat(order.total_price) : (order.total_price || 0),
+    status,
+    fulfillment_status: fulfillmentStatus,
+    items_total: lineItems.reduce((sum: number, li: any) => sum + (li.quantity || 0), 0),
+    items_shipped: 0,
+    fulfillment_percentage: 0,
+    order_date: order.created_at ? new Date(order.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+  };
+
+  // Upsert order (check if it already exists by shopify order id)
+  const shopifyOrderId = `SHOP-${order.order_number || order.id}`;
+  const { data: existingOrder } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('order_id', shopifyOrderId)
+    .eq('company_id', companyId)
+    .single();
+
+  if (existingOrder) {
+    if (topic === 'orders/updated') {
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          status: orderData.status,
+          fulfillment_status: orderData.fulfillment_status,
+          items: orderData.items,
+          value: orderData.value,
+          shipping_address: orderData.shipping_address,
+          customer_name: orderData.customer_name,
+          customer_email: orderData.customer_email,
+          customer_phone: orderData.customer_phone,
+          customer_company: orderData.customer_company,
+        })
+        .eq('id', existingOrder.id);
+
+      if (updateError) {
+        console.error('Error updating order:', updateError);
+        throw updateError;
+      }
+      console.log('✅ Updated existing order:', existingOrder.id);
+    } else {
+      console.log('Order already exists, skipping insert:', shopifyOrderId);
+    }
+  } else {
+    const { data: newOrder, error: insertError } = await supabase
+      .from('orders')
+      .insert(orderData)
+      .select('id')
+      .single();
+
+    if (insertError) {
+      console.error('Error inserting order:', insertError);
+      throw insertError;
+    }
+    console.log('✅ Created new order:', newOrder.id, 'from Shopify order', order.order_number);
+  }
+
+  // Auto-accept fulfillment requests if fulfillment service is registered
+  if (store.fulfillment_service_id && topic === 'orders/create') {
+    try {
+      await acceptFulfillmentRequests(store, order.id.toString());
+    } catch (ffError) {
+      // Log but don't fail the whole webhook
+      console.error('Failed to auto-accept fulfillment request (non-fatal):', ffError);
+    }
+  }
+}
+
+// Accept fulfillment requests for an order via Shopify Fulfillment Order API
+async function acceptFulfillmentRequests(store: any, shopifyOrderId: string) {
+  const accessToken = store.access_token;
+  const storeUrl = store.store_url?.replace(/\/$/, '');
+
+  if (!accessToken || !storeUrl) {
+    console.log('Missing store credentials, skipping fulfillment request acceptance');
+    return;
+  }
+
+  const apiUrl = `https://${storeUrl}/admin/api/2025-01/graphql.json`;
+
+  // Step 1: Get fulfillment orders for this order
+  const getFulfillmentOrdersQuery = `
+    query getFulfillmentOrders($orderId: ID!) {
+      order(id: $orderId) {
+        fulfillmentOrders(first: 10) {
+          nodes {
+            id
+            status
+            assignedLocation {
+              location {
+                id
+              }
+            }
+            fulfillmentOrderMerchantRequests(first: 5, kind: FULFILLMENT_REQUEST) {
+              nodes {
+                id
+                kind
+                message
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const orderGid = `gid://shopify/Order/${shopifyOrderId}`;
+  
+  const getResponse = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': accessToken,
+    },
+    body: JSON.stringify({
+      query: getFulfillmentOrdersQuery,
+      variables: { orderId: orderGid },
+    }),
+  });
+
+  const getResult = await getResponse.json();
+  const fulfillmentOrders = getResult?.data?.order?.fulfillmentOrders?.nodes || [];
+
+  console.log(`Found ${fulfillmentOrders.length} fulfillment orders for Shopify order ${shopifyOrderId}`);
+
+  // Step 2: Accept any pending fulfillment requests assigned to our location
+  for (const fo of fulfillmentOrders) {
+    // Only accept if status indicates a request is pending
+    if (fo.status === 'OPEN' || fo.status === 'UNSUBMITTED') {
+      // Try to accept the fulfillment request
+      const acceptMutation = `
+        mutation fulfillmentOrderAcceptFulfillmentRequest($id: ID!, $message: String) {
+          fulfillmentOrderAcceptFulfillmentRequest(id: $id, message: $message) {
+            fulfillmentOrder {
+              id
+              status
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const acceptResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': accessToken,
+        },
+        body: JSON.stringify({
+          query: acceptMutation,
+          variables: {
+            id: fo.id,
+            message: 'Auto-accepted by Ship Tornado',
+          },
+        }),
+      });
+
+      const acceptResult = await acceptResponse.json();
+      const userErrors = acceptResult?.data?.fulfillmentOrderAcceptFulfillmentRequest?.userErrors || [];
+      
+      if (userErrors.length > 0) {
+        console.log(`Fulfillment request acceptance info for ${fo.id}:`, userErrors.map((e: any) => e.message).join(', '));
+      } else {
+        console.log(`✅ Auto-accepted fulfillment request for fulfillment order: ${fo.id}`);
+      }
+    }
+  }
+}
+
 // Helper functions for webhook processing
 async function handlePurchaseOrderWebhook(supabase: any, webhookData: any, store: any, topic: string) {
   console.log(`Processing ${topic} for PO:`, webhookData.id);
@@ -159,7 +397,6 @@ async function handlePurchaseOrderWebhook(supabase: any, webhookData: any, store
       .eq('shopify_po_id', validatedPO.id)
       .single();
     
-    // Try to find warehouse by Shopify destination location first
     let warehouse = null;
     if (validatedPO.destination?.id) {
       const destinationId = validatedPO.destination.id.toString();
@@ -176,7 +413,6 @@ async function handlePurchaseOrderWebhook(supabase: any, webhookData: any, store
       }
     }
     
-    // Fall back to default warehouse if no destination match
     if (!warehouse) {
       const { data: defaultWarehouse } = await supabase
         .from('warehouses')
@@ -263,7 +499,6 @@ async function handleTransferWebhook(supabase: any, webhookData: any, store: any
       .eq('shopify_po_id', validatedTransfer.id)
       .single();
     
-    // Try to find warehouse by Shopify destination location first
     let warehouse = null;
     if (validatedTransfer.destination_location?.id) {
       const destinationId = validatedTransfer.destination_location.id.toString();
@@ -280,7 +515,6 @@ async function handleTransferWebhook(supabase: any, webhookData: any, store: any
       }
     }
     
-    // Fall back to default warehouse if no destination match
     if (!warehouse) {
       const { data: defaultWarehouse } = await supabase
         .from('warehouses')
@@ -565,7 +799,7 @@ serve(async (req) => {
         
       case 'orders/create':
       case 'orders/updated':
-        console.log('Order webhook received but not processed - using fulfillment webhooks instead');
+        await handleOrderWebhook(supabase, validatedOrder || webhookData, store, topic);
         break;
         
       default:
