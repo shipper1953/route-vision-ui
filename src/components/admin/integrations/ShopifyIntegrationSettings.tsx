@@ -141,6 +141,7 @@ export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSett
             }}
             onChange={() => setHasChanges(true)}
             companyId={companyId}
+            storeId={activeStoreId || undefined}
           />
         </TabsContent>
 
