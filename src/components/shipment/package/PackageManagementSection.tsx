@@ -416,13 +416,17 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   useEffect(() => {
     if (multiPackageResult) {
       try {
-        const parcels = multiPackageResult.packages.map((pkg) => ({
-          length: pkg.box.length,
-          width: pkg.box.width,
-          height: pkg.box.height,
-          weight: Math.max(1, Math.round((pkg as any).packageWeight || 1)),
-          items: pkg.assignedItems || [], // Include assigned items in each package
-        }));
+        const parcels = multiPackageResult.packages.map((pkg, index) => {
+          const autoWeight = Math.max(1, Math.round((pkg as any).packageWeight || 1));
+          const finalWeight = weightOverrides[index] ?? autoWeight;
+          return {
+            length: pkg.box.length,
+            width: pkg.box.width,
+            height: pkg.box.height,
+            weight: finalWeight,
+            items: pkg.assignedItems || [],
+          };
+        });
         (form as any).setValue('multiParcels', parcels);
         
         // Store selected boxes information
@@ -454,7 +458,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
         console.warn('Failed to prepare multiParcels:', e);
       }
     }
-  }, [multiPackageResult, form]);
+  }, [multiPackageResult, weightOverrides, form]);
 
   const handleBoxChange = (packageIndex: number, boxId: string) => {
     const newBox = boxes.find(b => b.id === boxId);
