@@ -40,11 +40,13 @@ interface PackageRectangleProps {
   totalPackages: number;
   availableBoxes: any[];
   orderItems: any[];
+  weightOverride?: number;
   onBoxChange: (packageIndex: number, boxId: string) => void;
   onAddItem: (packageIndex: number, item: any) => void;
   onRemoveItem: (packageIndex: number, itemIndex: number) => void;
   onDeletePackage: (packageIndex: number) => void;
   onMoveItem: (fromPackage: number, toPackage: number, itemIndex: number) => void;
+  onWeightChange: (packageIndex: number, weight: number) => void;
 }
 
 
@@ -54,15 +56,22 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
   totalPackages,
   availableBoxes,
   orderItems,
+  weightOverride,
   onBoxChange,
   onAddItem,
   onRemoveItem,
   onDeletePackage,
-  onMoveItem
+  onMoveItem,
+  onWeightChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [scanInput, setScanInput] = useState('');
+  const [isEditingWeight, setIsEditingWeight] = useState(false);
   const { box, assignedItems, utilization, packageWeight, confidence } = pkg;
+
+  // Auto-calculated weight: item weights + box cost weight estimate (box weight from maxWeight proxy or 0)
+  const calculatedWeight = packageWeight;
+  const displayWeight = weightOverride ?? calculatedWeight;
 
   const handleScanItem = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && scanInput.trim()) {
@@ -175,7 +184,47 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
                 <Weight className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Weight</span>
               </div>
-              <div className="text-lg font-bold">{packageWeight.toFixed(1)} lbs</div>
+              {isEditingWeight ? (
+                <div className="flex items-center justify-center gap-1">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    className="w-20 h-8 text-center text-lg font-bold"
+                    defaultValue={displayWeight.toFixed(1)}
+                    autoFocus
+                    onBlur={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val) && val > 0) {
+                        onWeightChange(packageIndex, val);
+                      }
+                      setIsEditingWeight(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(val) && val > 0) {
+                          onWeightChange(packageIndex, val);
+                        }
+                        setIsEditingWeight(false);
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-muted-foreground">lbs</span>
+                </div>
+              ) : (
+                <div 
+                  className="text-lg font-bold cursor-pointer hover:text-primary transition-colors"
+                  onClick={() => setIsEditingWeight(true)}
+                  title="Click to edit weight"
+                >
+                  {displayWeight.toFixed(1)} lbs
+                  {weightOverride != null && weightOverride !== calculatedWeight && (
+                    <div className="text-xs text-muted-foreground font-normal">
+                      (auto: {calculatedWeight.toFixed(1)})
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             <div className="text-center">
@@ -327,6 +376,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
 }) => {
   const [selectedOrderItems, setSelectedOrderItems] = useState<any[]>([]);
   const [hasManualEdits, setHasManualEdits] = useState(false);
+  const [weightOverrides, setWeightOverrides] = useState<Record<number, number>>({});
   const form = useFormContext<ShipmentForm>();
   const { createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
@@ -345,7 +395,8 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   useEffect(() => {
     if (selectedItems && selectedItems.length > 0) {
       setSelectedOrderItems(selectedItems);
-      setHasManualEdits(false); // Reset manual edits flag when items change
+      setHasManualEdits(false);
+      setWeightOverrides({}); // Reset weight overrides when items change
     }
   }, [selectedItems]);
 
@@ -365,13 +416,17 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   useEffect(() => {
     if (multiPackageResult) {
       try {
-        const parcels = multiPackageResult.packages.map((pkg) => ({
-          length: pkg.box.length,
-          width: pkg.box.width,
-          height: pkg.box.height,
-          weight: Math.max(1, Math.round((pkg as any).packageWeight || 1)),
-          items: pkg.assignedItems || [], // Include assigned items in each package
-        }));
+        const parcels = multiPackageResult.packages.map((pkg, index) => {
+          const autoWeight = Math.max(1, Math.round((pkg as any).packageWeight || 1));
+          const finalWeight = weightOverrides[index] ?? autoWeight;
+          return {
+            length: pkg.box.length,
+            width: pkg.box.width,
+            height: pkg.box.height,
+            weight: finalWeight,
+            items: pkg.assignedItems || [],
+          };
+        });
         (form as any).setValue('multiParcels', parcels);
         
         // Store selected boxes information
@@ -403,7 +458,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
         console.warn('Failed to prepare multiParcels:', e);
       }
     }
-  }, [multiPackageResult, form]);
+  }, [multiPackageResult, weightOverrides, form]);
 
   const handleBoxChange = (packageIndex: number, boxId: string) => {
     const newBox = boxes.find(b => b.id === boxId);
@@ -458,6 +513,11 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   const handleAddPackage = () => {
     setHasManualEdits(true);
     addManualPackage();
+  };
+
+  const handleWeightChange = (packageIndex: number, weight: number) => {
+    setHasManualEdits(true);
+    setWeightOverrides(prev => ({ ...prev, [packageIndex]: weight }));
   };
 
   if (!multiPackageResult) {
@@ -538,7 +598,11 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
         
         <div className="flex items-center gap-3">
           <div className="text-sm text-muted-foreground">
-            {multiPackageResult.totalPackages} packages • {multiPackageResult.totalWeight.toFixed(1)} lbs total
+            {multiPackageResult.totalPackages} packages • {
+              multiPackageResult.packages.reduce((sum, pkg, i) => 
+                sum + (weightOverrides[i] ?? pkg.packageWeight), 0
+              ).toFixed(1)
+            } lbs total
           </div>
           <Button onClick={handleAddPackage} variant="outline" size="sm">
             <Plus className="h-4 w-4 mr-2" />
@@ -557,11 +621,13 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
             totalPackages={multiPackageResult.totalPackages}
             availableBoxes={boxes}
             orderItems={orderItems}
+            weightOverride={weightOverrides[index]}
             onBoxChange={handleBoxChange}
             onAddItem={handleAddItem}
             onRemoveItem={handleRemoveItem}
             onDeletePackage={handleDeletePackage}
             onMoveItem={handleMoveItem}
+            onWeightChange={handleWeightChange}
           />
         ))}
       </div>
