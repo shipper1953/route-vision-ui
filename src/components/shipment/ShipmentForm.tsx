@@ -61,30 +61,8 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
     }
   });
 
-  // Update form with warehouse address when it loads
-  useEffect(() => {
-    if (warehouseAddress?.address) {
-      console.log("Warehouse address available, setting form values:", warehouseAddress);
-      const defaultAddress = getDefaultShippingAddress();
-      console.log("Default shipping address to set:", defaultAddress);
-      
-      // Set each field individually to ensure proper form updates
-      form.setValue("fromName", defaultAddress.fromName);
-      form.setValue("fromCompany", defaultAddress.fromCompany);
-      form.setValue("fromStreet1", defaultAddress.fromStreet1);
-      form.setValue("fromStreet2", defaultAddress.fromStreet2);
-      form.setValue("fromCity", defaultAddress.fromCity);
-      form.setValue("fromState", defaultAddress.fromState);
-      form.setValue("fromZip", defaultAddress.fromZip);
-      form.setValue("fromCountry", defaultAddress.fromCountry);
-      form.setValue("fromPhone", defaultAddress.fromPhone);
-      form.setValue("fromEmail", defaultAddress.fromEmail);
-      
-      console.log("Form values after setting warehouse address:", form.getValues());
-    } else {
-      console.log("Warehouse address not yet available:", warehouseAddress);
-    }
-  }, [warehouseAddress]); // Removed form and getDefaultShippingAddress from dependencies
+  // Note: From address is now populated by WarehouseAddressSelector component
+  // which provides a dropdown to switch warehouses and auto-fills the fields
 
   // Debug log to track orderItems state changes
   useEffect(() => {
