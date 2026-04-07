@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { AddressFormSection } from "@/components/shipment/AddressFormSection";
 import { PackageDetailsSection } from "@/components/shipment/PackageDetailsSection";
 import { ShippingOptionsSection } from "@/components/shipment/ShippingOptionsSection";
-import { ShipmentFormSubmission } from "@/components/shipment/form/ShipmentFormSubmission";
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Package, ChevronRight, ChevronLeft, MapPin, Settings, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -157,17 +157,14 @@ export const ShipmentFormTabs = ({
 
       {currentStep === "options" && (
         <div className="space-y-6">
-          <ShippingOptionsSection />
-          {onShipmentCreated && setLoading && (
-            <ShipmentFormSubmission
-              loading={loading}
-              setLoading={setLoading}
-              selectedItems={selectedItems}
-              itemsLoading={itemsLoading}
-              hasOrderId={hasOrderId}
-              onShipmentCreated={onShipmentCreated}
-            />
-          )}
+          <ShippingOptionsSection
+            selectedItems={selectedItems}
+            loading={loading}
+            setLoading={setLoading}
+            onShipmentCreated={onShipmentCreated}
+            itemsLoading={itemsLoading}
+            hasOrderId={hasOrderId}
+          />
         </div>
       )}
 
