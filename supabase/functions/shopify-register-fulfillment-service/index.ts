@@ -248,6 +248,8 @@ Deno.serve(async (req) => {
         .update({ 
           fulfillment_service_id: fulfillmentService.id,
           fulfillment_service_location_id: fulfillmentService.location.id,
+          fulfillment_location_id: fulfillmentService.location.id,
+          fulfillment_location_name: fulfillmentService.location.name,
         })
         .eq('id', actualStoreId);
 
