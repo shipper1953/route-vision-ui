@@ -156,9 +156,11 @@ export const useShopifyStores = (companyId?: string) => {
     }
 
     // Subscribe to real-time updates
+    let channel: ReturnType<typeof supabase.channel> | null = null;
     if (effectiveCompanyId) {
-      const channel = supabase
-        .channel(`shopify-stores-changes-${effectiveCompanyId}`)
+      const channelName = `shopify-stores-${effectiveCompanyId}-${Date.now()}`;
+      channel = supabase
+        .channel(channelName)
         .on(
           'postgres_changes',
           {
@@ -172,11 +174,13 @@ export const useShopifyStores = (companyId?: string) => {
           }
         )
         .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     }
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [effectiveCompanyId]);
 
   const activeStore = stores.find(s => s.id === activeStoreId) || stores[0] || null;
