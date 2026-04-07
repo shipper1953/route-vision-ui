@@ -22,7 +22,8 @@ interface ShipmentFormTabsProps {
   setLoading?: (loading: boolean) => void;
   itemsLoading?: boolean;
   hasOrderId?: boolean;
-  onShipmentCreated?: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
+  onLabelPurchased?: (result: any) => void;
+  onRatesFetched?: (response: CombinedRateResponse) => void;
 }
 
 const STEPS = [
