@@ -23,7 +23,6 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [itemsAlreadyShipped, setItemsAlreadyShipped] = useState<{ [itemId: string]: number }>({});
   const [itemsLoading, setItemsLoading] = useState(false);
-  const { getDefaultShippingAddress, warehouseAddress } = useDefaultAddressValues();
   
   const form = useForm<ShipmentFormType>({
     resolver: zodResolver(shipmentSchema),
