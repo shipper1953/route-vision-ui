@@ -598,7 +598,11 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
         
         <div className="flex items-center gap-3">
           <div className="text-sm text-muted-foreground">
-            {multiPackageResult.totalPackages} packages • {multiPackageResult.totalWeight.toFixed(1)} lbs total
+            {multiPackageResult.totalPackages} packages • {
+              multiPackageResult.packages.reduce((sum, pkg, i) => 
+                sum + (weightOverrides[i] ?? pkg.packageWeight), 0
+              ).toFixed(1)
+            } lbs total
           </div>
           <Button onClick={handleAddPackage} variant="outline" size="sm">
             <Plus className="h-4 w-4 mr-2" />
