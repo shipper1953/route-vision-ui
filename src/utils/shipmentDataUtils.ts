@@ -120,7 +120,7 @@ export const saveShipmentToSupabase = async (labelData: any): Promise<void> => {
       service: labelData.selected_rate?.service || 'Standard',
       status: 'purchased',
       label_url: labelData.postage_label?.label_url,
-      weight: String(parseFloat(labelData.parcel?.weight) || 0), // Convert to string
+      weight: String(parseFloat(labelData.parcel?.weight) || 0),
       cost: parseFloat(labelData.selected_rate?.rate) || 0,
       package_dimensions: JSON.stringify({
         length: labelData.parcel?.length || 0,
@@ -132,13 +132,17 @@ export const saveShipmentToSupabase = async (labelData: any): Promise<void> => {
         weight_unit: labelData.parcel?.weight_unit || 'oz'
       }),
       user_id: user.user.id,
-      order_id: labelData.reference || null, // Link to order if available
-      tracking_url: labelData.tracker?.public_url
+      order_id: labelData.reference || null,
+      tracking_url: labelData.tracker?.public_url,
+      estimated_delivery_date: labelData.selected_rate?.delivery_date || 
+        (labelData.selected_rate?.delivery_days 
+          ? new Date(Date.now() + labelData.selected_rate.delivery_days * 86400000).toISOString() 
+          : null),
     };
 
     const { data, error } = await supabase
       .from('shipments')
-      .upsert(shipmentData, {
+      .upsert(shipmentData as any, {
         onConflict: 'easypost_id',
         ignoreDuplicates: false
       });

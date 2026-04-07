@@ -47,18 +47,6 @@ interface PackageRectangleProps {
   onMoveItem: (fromPackage: number, toPackage: number, itemIndex: number) => void;
 }
 
-interface PackageRectangleProps {
-  package: PackageRecommendation;
-  packageIndex: number;
-  totalPackages: number;
-  availableBoxes: any[];
-  orderItems: any[];
-  onBoxChange: (packageIndex: number, boxId: string) => void;
-  onAddItem: (packageIndex: number, item: any) => void;
-  onRemoveItem: (packageIndex: number, itemIndex: number) => void;
-  onDeletePackage: (packageIndex: number) => void;
-  onMoveItem: (fromPackage: number, toPackage: number, itemIndex: number) => void;
-}
 
 const PackageRectangle: React.FC<PackageRectangleProps> = ({
   package: pkg,
@@ -338,6 +326,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   orderId
 }) => {
   const [selectedOrderItems, setSelectedOrderItems] = useState<any[]>([]);
+  const [hasManualEdits, setHasManualEdits] = useState(false);
   const form = useFormContext<ShipmentForm>();
   const { createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
@@ -349,24 +338,28 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
     editPackage,
     calculateMultiPackage,
     removePackage,
+    isCalculating,
   } = useMultiPackageCartonization();
 
   // Update selected order items when selection changes
   useEffect(() => {
     if (selectedItems && selectedItems.length > 0) {
       setSelectedOrderItems(selectedItems);
+      setHasManualEdits(false); // Reset manual edits flag when items change
     }
   }, [selectedItems]);
 
-  // Initialize cartonization when selected items change
+  // Initialize cartonization when selected items change AND boxes are loaded
   useEffect(() => {
-    if (selectedOrderItems && selectedOrderItems.length > 0) {
+    if (hasManualEdits) return; // Don't overwrite manual edits
+    if (selectedOrderItems && selectedOrderItems.length > 0 && boxes.length > 0 && !isCalculating) {
       const items = createItemsFromOrderData(selectedOrderItems, masterItems);
       if (items.length > 0) {
+        console.log('🎯 Running cartonization with', items.length, 'items and', boxes.length, 'boxes');
         calculateMultiPackage(items, 'balanced');
       }
     }
-  }, [selectedOrderItems, masterItems, createItemsFromOrderData, calculateMultiPackage]);
+  }, [selectedOrderItems, masterItems, boxes]);
 
   // Expose multi-package parcels and selected boxes to the form
   useEffect(() => {
@@ -415,16 +408,18 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   const handleBoxChange = (packageIndex: number, boxId: string) => {
     const newBox = boxes.find(b => b.id === boxId);
     if (newBox && multiPackageResult) {
-      const updatedPackage = {
-        ...multiPackageResult.packages[packageIndex],
+      setHasManualEdits(true);
+      const currentPkg = multiPackageResult.packages[packageIndex];
+      editPackage(packageIndex, {
+        ...currentPkg,
         box: newBox
-      };
-      editPackage(packageIndex, updatedPackage);
+      });
     }
   };
 
   const handleAddItem = (packageIndex: number, item: any) => {
     if (multiPackageResult) {
+      setHasManualEdits(true);
       const currentPackage = multiPackageResult.packages[packageIndex];
       const updatedItems = [...currentPackage.assignedItems, item];
       editPackage(packageIndex, { assignedItems: updatedItems });
@@ -433,6 +428,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
 
   const handleRemoveItem = (packageIndex: number, itemIndex: number) => {
     if (multiPackageResult) {
+      setHasManualEdits(true);
       const currentPackage = multiPackageResult.packages[packageIndex];
       const updatedItems = currentPackage.assignedItems.filter((_, idx) => idx !== itemIndex);
       editPackage(packageIndex, { assignedItems: updatedItems });
@@ -441,22 +437,27 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
 
   const handleMoveItem = (fromPackage: number, toPackage: number, itemIndex: number) => {
     if (multiPackageResult) {
+      setHasManualEdits(true);
       const sourcePackage = multiPackageResult.packages[fromPackage];
       const targetPackage = multiPackageResult.packages[toPackage];
       const item = sourcePackage.assignedItems[itemIndex];
       
-      // Remove from source
       const sourceItems = sourcePackage.assignedItems.filter((_, idx) => idx !== itemIndex);
       editPackage(fromPackage, { assignedItems: sourceItems });
       
-      // Add to target
       const targetItems = [...targetPackage.assignedItems, item];
       editPackage(toPackage, { assignedItems: targetItems });
     }
   };
 
   const handleDeletePackage = (packageIndex: number) => {
+    setHasManualEdits(true);
     removePackage(packageIndex);
+  };
+
+  const handleAddPackage = () => {
+    setHasManualEdits(true);
+    addManualPackage();
   };
 
   if (!multiPackageResult) {
@@ -539,7 +540,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
           <div className="text-sm text-muted-foreground">
             {multiPackageResult.totalPackages} packages • {multiPackageResult.totalWeight.toFixed(1)} lbs total
           </div>
-          <Button onClick={addManualPackage} variant="outline" size="sm">
+          <Button onClick={handleAddPackage} variant="outline" size="sm">
             <Plus className="h-4 w-4 mr-2" />
             Add Package
           </Button>

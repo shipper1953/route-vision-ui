@@ -1,3 +1,5 @@
+export const CARTONIZATION_ALGORITHM_VERSION = '2.1.0';
+
 export interface Item {
   id: string;
   name: string;
@@ -34,6 +36,30 @@ export interface CartonizationParameters {
   allowPartialFill: boolean;
   optimizeForCost: boolean;
   optimizeForSpace: boolean;
+}
+
+/** Explains why a particular box was chosen or rejected */
+export interface DecisionExplanation {
+  selectedBox: {
+    id: string;
+    name: string;
+    score: number;
+    volumeUtilization: number;
+    dimensionalWeight: number;
+    cost: number;
+    outerVolume: number;
+  };
+  rejectedCandidates: Array<{
+    id: string;
+    name: string;
+    reason: string;
+    score: number;
+  }>;
+  tieBreakersApplied: string[];
+  reasonCode: string;
+  algorithmVersion: string;
+  policyVersion?: string;
+  optimizationObjective: 'smallest_fit' | 'lowest_landed_cost' | 'multi_package_required' | 'balanced';
 }
 
 export interface PackageRecommendation {
@@ -139,4 +165,43 @@ export interface PackingResult {
   packedItems: PackedItem[];
   usedVolume: number;
   packingEfficiency: number;
+}
+
+/** Ranked rate recommendation categories */
+export interface RankedRateRecommendations {
+  cheapest: RankedRate | null;
+  fastest: RankedRate | null;
+  bestValue: RankedRate | null;
+  recommended: RankedRate | null;
+  recommendedReasonCode: string;
+}
+
+export interface RankedRate {
+  rateId: string;
+  carrier: string;
+  service: string;
+  rate: number;
+  estimatedDays: number | null;
+  provider: string;
+  category: 'cheapest' | 'fastest' | 'best_value';
+  score: number;
+}
+
+/** Provider health status for degraded mode */
+export interface ProviderStatus {
+  provider: string;
+  available: boolean;
+  error?: string;
+  latencyMs?: number;
+}
+
+export interface RateDecisionMetadata {
+  degradedMode: boolean;
+  degradedProviders: string[];
+  providerStatuses: ProviderStatus[];
+  algorithmVersion: string;
+  policyVersionId?: string;
+  rankedRecommendations: RankedRateRecommendations;
+  totalRatesReturned: number;
+  processingTimeMs: number;
 }

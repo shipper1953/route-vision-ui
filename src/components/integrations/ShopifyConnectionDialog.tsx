@@ -462,7 +462,7 @@ export const ShopifyConnectionDialog = ({
             </Select>
           ) : (
             <Input
-              value={companies.find(c => c.id === selectedCompanyId)?.name || userProfile?.company_id ? 'Loading...' : 'No company'}
+              value={companies.length > 0 ? (companies.find(c => c.id === selectedCompanyId)?.name || 'No company') : 'Loading...'}
               disabled
               className="bg-muted"
             />

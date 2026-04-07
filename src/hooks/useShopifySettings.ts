@@ -237,20 +237,58 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
 
     setSaving(true);
     try {
-      const { error } = await supabase.functions.invoke('shopify-settings-update', {
-        body: {
-          companyId,
-          settings: newSettings,
-        },
-      });
+      if (storeId) {
+        // Save store-specific settings directly to shopify_stores table
+        const { data: storeData, error: fetchError } = await supabase
+          .from('shopify_stores')
+          .select('settings')
+          .eq('id', storeId)
+          .single();
 
-      if (error) throw error;
+        if (fetchError) throw fetchError;
+
+        const currentStoreSettings = (storeData?.settings as any) || {};
+        const updatedStoreSettings = {
+          ...currentStoreSettings,
+          sync_config: {
+            ...(currentStoreSettings.sync_config || {}),
+            ...(newSettings.sync_config || {}),
+          },
+          features: {
+            ...(currentStoreSettings.features || {}),
+            ...(newSettings.features || {}),
+          },
+          mappings: {
+            ...(currentStoreSettings.mappings || {}),
+            ...(newSettings.mappings || {}),
+          },
+        };
+
+        const { error: updateError } = await supabase
+          .from('shopify_stores')
+          .update({ settings: updatedStoreSettings })
+          .eq('id', storeId);
+
+        if (updateError) throw updateError;
+      } else {
+        // Save company-level defaults via edge function
+        const { error } = await supabase.functions.invoke('shopify-settings-update', {
+          body: {
+            companyId,
+            settings: newSettings,
+          },
+        });
+
+        if (error) throw error;
+      }
 
       await fetchSettings();
       
       toast({
         title: 'Settings Saved',
-        description: 'Shopify integration settings updated successfully',
+        description: storeId 
+          ? 'Store sync settings updated successfully' 
+          : 'Shopify integration settings updated successfully',
       });
     } catch (error: any) {
       console.error('Error updating settings:', error);

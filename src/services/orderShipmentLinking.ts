@@ -106,12 +106,16 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
       
       console.log(`🔄 Updating order ${foundOrder.id} (order_id: ${foundOrder.order_id}) with shipment ${shipmentIdNumber}`);
       
+      const updateData = { 
+        shipment_id: shipmentIdNumber,
+        status: 'shipped' as string,
+        estimated_delivery_date: shipmentInfo.estimatedDeliveryDate || null,
+        actual_delivery_date: shipmentInfo.actualDeliveryDate || null,
+      };
+
       const { data: updatedOrder, error: updateError } = await supabase
         .from('orders')
-        .update({ 
-          shipment_id: shipmentIdNumber,
-          status: 'shipped'
-        })
+        .update(updateData)
         .eq('id', foundOrder.id)
         .select('id, order_id, status, shipment_id');
       

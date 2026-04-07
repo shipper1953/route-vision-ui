@@ -194,6 +194,36 @@ Deno.serve(async (req) => {
 
       console.log(`Updated shipment ${shipment.id} with delivery information from EasyPost webhook`);
       
+      // Propagate delivery dates and status to linked orders
+      const orderUpdate: Record<string, any> = {};
+      if (estimatedDeliveryDate) orderUpdate.estimated_delivery_date = estimatedDeliveryDate;
+      if (actualDeliveryDate) orderUpdate.actual_delivery_date = actualDeliveryDate;
+      if (status === 'delivered') orderUpdate.status = 'delivered';
+
+      if (Object.keys(orderUpdate).length > 0) {
+        // Update orders linked via shipment_id
+        const { data: linkedOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('shipment_id', shipment.id);
+
+        for (const order of linkedOrders || []) {
+          await supabase.from('orders').update(orderUpdate).eq('id', order.id);
+          console.log(`✅ Propagated delivery info to order ${order.id}`);
+        }
+
+        // Update orders linked via order_shipments junction
+        const { data: junctionOrders } = await supabase
+          .from('order_shipments')
+          .select('order_id')
+          .eq('shipment_id', shipment.id);
+
+        for (const jo of junctionOrders || []) {
+          await supabase.from('orders').update(orderUpdate).eq('id', jo.order_id);
+          console.log(`✅ Propagated delivery info to order ${jo.order_id} via junction`);
+        }
+      }
+
       // Trigger notifications for status changes
       if (status === 'out_for_delivery' && shipment.status !== 'out_for_delivery') {
         await triggerNotification(supabase, shipment.id, 'out_for_delivery');

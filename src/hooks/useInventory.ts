@@ -8,6 +8,7 @@ export interface InventoryItem {
   item_id: string;
   warehouse_id: string;
   location_id: string;
+  customer_id?: string;
   quantity_available: number;
   quantity_allocated: number;
   quantity_on_hand: number;
@@ -20,6 +21,7 @@ export interface InventoryItem {
   item_name?: string;
   item_sku?: string;
   location_name?: string;
+  customer_name?: string;
 }
 
 export interface InventoryAdjustment {
@@ -44,20 +46,25 @@ export const useInventory = () => {
     }
   }, [userProfile?.company_id]);
 
-  const fetchInventory = async (warehouseId?: string) => {
+  const fetchInventory = async (warehouseId?: string, customerId?: string) => {
     setLoading(true);
     try {
       let query = supabase
-        .from('inventory_levels' as any)
+        .from('inventory_levels')
         .select(`
           *,
           items:item_id (name, sku),
-          warehouse_locations:location_id (name)
+          warehouse_locations:location_id (name),
+          customers:customer_id (name)
         `)
         .eq('company_id', userProfile?.company_id);
 
       if (warehouseId) {
         query = query.eq('warehouse_id', warehouseId);
+      }
+
+      if (customerId) {
+        query = query.eq('customer_id', customerId);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -69,6 +76,7 @@ export const useInventory = () => {
         item_id: item.item_id,
         warehouse_id: item.warehouse_id,
         location_id: item.location_id,
+        customer_id: item.customer_id,
         quantity_available: item.quantity_available,
         quantity_allocated: item.quantity_allocated,
         quantity_on_hand: item.quantity_on_hand,
@@ -79,8 +87,9 @@ export const useInventory = () => {
         condition: item.condition,
         item_name: item.items?.name,
         item_sku: item.items?.sku,
-        location_name: item.warehouse_locations?.name
-      })) as unknown as InventoryItem[];
+        location_name: item.warehouse_locations?.name,
+        customer_name: item.customers?.name,
+      })) as InventoryItem[];
 
       setInventory(mappedInventory);
     } catch (error) {
@@ -120,7 +129,7 @@ export const useInventory = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('inventory_levels' as any)
+        .from('inventory_levels')
         .select(`
           *,
           items:item_id (name, sku)

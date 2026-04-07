@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
       : null;
     
     const latestDelivery = deliveryEstimates.length > 0
-      ? calculateDeliveryDate(Math.max(...deliveryEstimates.map(e => e.days)))
+      ? calculateDeliveryDate(Math.max(...deliveryEstimates.map((e: any) => e.days)))
       : null;
 
     // Calculate cutoff countdown

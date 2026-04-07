@@ -15,7 +15,7 @@ const AddressSchema = z.object({
   zip: z.string().min(5).max(10),
   country: z.string().length(2).default('US'),
   phone: z.string().max(20).optional(),
-  email: z.string().email().max(255).optional()
+  email: z.string().max(255).optional().transform(v => v === '' ? undefined : v).pipe(z.string().email().optional())
 })
 
 // Parcel schema

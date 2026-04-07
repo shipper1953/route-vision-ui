@@ -157,20 +157,15 @@ Deno.serve(async (req) => {
       if (nameExistsError) {
         console.log('Fulfillment service already exists, fetching existing service...');
         
-        // Query to get existing fulfillment service
         const getServiceQuery = `
           query {
             shop {
-              fulfillmentServices(first: 10) {
-                edges {
-                  node {
-                    id
-                    serviceName
-                    location {
-                      id
-                      name
-                    }
-                  }
+              fulfillmentServices {
+                id
+                serviceName
+                location {
+                  id
+                  name
                 }
               }
             }
@@ -190,9 +185,12 @@ Deno.serve(async (req) => {
         );
         
         const getResult = await getResponse.json();
-        const existingService = getResult.data?.shop?.fulfillmentServices?.edges?.find(
-          (edge: any) => edge.node.serviceName === 'Ship Tornado'
-        )?.node;
+        console.log('Fulfillment services query result:', JSON.stringify(getResult));
+        
+        const services = getResult.data?.shop?.fulfillmentServices || [];
+        const existingService = services.find(
+          (svc: any) => svc.serviceName === 'Ship Tornado' || svc.serviceName?.toLowerCase() === 'ship tornado'
+        );
         
         if (existingService) {
           console.log('Found existing Ship Tornado fulfillment service:', existingService.id);
@@ -212,7 +210,9 @@ Deno.serve(async (req) => {
               .from('shopify_stores')
               .update({ 
                 fulfillment_service_id: existingService.id,
-                fulfillment_service_location_id: existingService.location.id,
+                fulfillment_service_location_id: existingService.location?.id || null,
+                fulfillment_location_id: existingService.location?.id || null,
+                fulfillment_location_name: existingService.location?.name || null,
               })
               .eq('id', actualStoreId);
           }
@@ -248,6 +248,8 @@ Deno.serve(async (req) => {
         .update({ 
           fulfillment_service_id: fulfillmentService.id,
           fulfillment_service_location_id: fulfillmentService.location.id,
+          fulfillment_location_id: fulfillmentService.location.id,
+          fulfillment_location_name: fulfillmentService.location.name,
         })
         .eq('id', actualStoreId);
 
