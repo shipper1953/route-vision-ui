@@ -420,11 +420,12 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   const handleBoxChange = (packageIndex: number, boxId: string) => {
     const newBox = boxes.find(b => b.id === boxId);
     if (newBox && multiPackageResult) {
-      const updatedPackage = {
-        ...multiPackageResult.packages[packageIndex],
+      setHasManualEdits(true);
+      const currentPkg = multiPackageResult.packages[packageIndex];
+      editPackage(packageIndex, {
+        ...currentPkg,
         box: newBox
-      };
-      editPackage(packageIndex, updatedPackage);
+      });
     }
   };
 
