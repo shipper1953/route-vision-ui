@@ -184,7 +184,47 @@ const PackageRectangle: React.FC<PackageRectangleProps> = ({
                 <Weight className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Weight</span>
               </div>
-              <div className="text-lg font-bold">{packageWeight.toFixed(1)} lbs</div>
+              {isEditingWeight ? (
+                <div className="flex items-center justify-center gap-1">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    className="w-20 h-8 text-center text-lg font-bold"
+                    defaultValue={displayWeight.toFixed(1)}
+                    autoFocus
+                    onBlur={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val) && val > 0) {
+                        onWeightChange(packageIndex, val);
+                      }
+                      setIsEditingWeight(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(val) && val > 0) {
+                          onWeightChange(packageIndex, val);
+                        }
+                        setIsEditingWeight(false);
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-muted-foreground">lbs</span>
+                </div>
+              ) : (
+                <div 
+                  className="text-lg font-bold cursor-pointer hover:text-primary transition-colors"
+                  onClick={() => setIsEditingWeight(true)}
+                  title="Click to edit weight"
+                >
+                  {displayWeight.toFixed(1)} lbs
+                  {weightOverride != null && weightOverride !== calculatedWeight && (
+                    <div className="text-xs text-muted-foreground font-normal">
+                      (auto: {calculatedWeight.toFixed(1)})
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             <div className="text-center">
