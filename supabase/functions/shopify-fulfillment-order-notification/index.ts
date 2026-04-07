@@ -10,13 +10,14 @@ interface FulfillmentServiceCallback {
 }
 
 async function fetchAssignedFulfillmentOrders(
-  shopifySettings: { store_url: string; access_token: string }
+  shopifySettings: { store_url: string; access_token: string; fulfillment_service_location_id?: string | null }
 ) {
   const query = `
-    query {
+    query getAssignedFulfillmentOrders($locationIds: [ID!]) {
       assignedFulfillmentOrders(
         first: 50
         assignmentStatus: FULFILLMENT_REQUESTED
+        locationIds: $locationIds
       ) {
         edges {
           node {
@@ -24,6 +25,11 @@ async function fetchAssignedFulfillmentOrders(
             orderId
             status
             requestStatus
+            assignedLocation {
+              location {
+                id
+              }
+            }
             order {
               id
               name
@@ -128,7 +134,14 @@ async function fetchAssignedFulfillmentOrders(
         'Content-Type': 'application/json',
         'X-Shopify-Access-Token': shopifySettings.access_token,
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({
+        query,
+        variables: {
+          locationIds: shopifySettings.fulfillment_service_location_id
+            ? [shopifySettings.fulfillment_service_location_id]
+            : null,
+        },
+      }),
     }
   );
 
@@ -225,6 +238,12 @@ function convertStateToCode(stateName: string | null | undefined): string {
 function sanitizeString(str: string | null | undefined, maxLength: number = 255): string | null {
   if (!str) return null;
   return str.trim().slice(0, maxLength);
+}
+
+function normalizeShopifyId(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = value.toString();
+  return normalized.includes('/') ? normalized.split('/').pop() || normalized : normalized;
 }
 
 // Utility function to add business days (skip weekends)
@@ -434,22 +453,27 @@ Deno.serve(async (req) => {
 
     console.log('✅ Fulfillment request callback validated');
 
-    // Find company by shop domain
-    const { data: companies } = await supabase
-      .from('companies')
-      .select('id, settings')
-      .ilike('settings->shopify->>store_url', `%${shopDomain}%`);
+    const { data: store, error: storeError } = await supabase
+      .from('shopify_stores')
+      .select('id, company_id, store_url, access_token, fulfillment_service_location_id')
+      .eq('store_url', shopDomain)
+      .eq('is_active', true)
+      .single();
 
-    if (!companies || companies.length === 0) {
-      console.error('No company found for shop:', shopDomain);
+    if (storeError || !store) {
+      console.error('No active Shopify store found for shop:', shopDomain, storeError);
       return new Response(
-        JSON.stringify({ error: 'Company not found' }),
+        JSON.stringify({ error: 'Active Shopify store not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const company = companies[0];
-    const shopifySettings = company.settings?.shopify;
+    const company = { id: store.company_id };
+    const shopifySettings = {
+      store_url: store.store_url,
+      access_token: store.access_token,
+      fulfillment_service_location_id: store.fulfillment_service_location_id,
+    };
 
     if (!shopifySettings?.access_token) {
       console.error('Missing Shopify credentials');
@@ -598,6 +622,7 @@ Deno.serve(async (req) => {
         required_delivery_date: addBusinessDays(new Date(fo.order.createdAt), 5).toISOString().split('T')[0],
         status: 'ready_to_ship',
         company_id: company.id,
+        shopify_store_id: store.id,
         warehouse_id: warehouse?.id || null,
         user_id: null,
       };
@@ -629,8 +654,9 @@ Deno.serve(async (req) => {
       await supabase.from('shopify_order_mappings').insert({
         company_id: company.id,
         ship_tornado_order_id: newOrder.id,
-        shopify_order_id: shopifyOrderId,
+        shopify_order_id: normalizeShopifyId(shopifyOrderId) || shopifyOrderId,
         shopify_order_number: shopifyOrderNumber,
+        shopify_store_id: store.id,
         sync_status: 'synced',
       });
 
