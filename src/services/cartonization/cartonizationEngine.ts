@@ -220,7 +220,7 @@ export class CartonizationEngine {
     rulesApplied.push('Enhanced 3D Bin Packing Algorithm');
     rulesApplied.push('Multi-Orientation Item Fitting');
     rulesApplied.push('Dimensional Weight Calculation');
-    rulesApplied.push('Size as Tiebreaker Only');
+    rulesApplied.push('Deterministic Smallest-Fit Tie-Breaking');
 
     console.log(`✅ Final recommendation: ${recommendedAnalysis.box.name} with ${recommendedAnalysis.confidence}% confidence`);
 
@@ -333,7 +333,7 @@ export class CartonizationEngine {
         tieBreakersApplied: ['multi_package_split'],
         reasonCode: 'multi_package_required',
         algorithmVersion: CARTONIZATION_ALGORITHM_VERSION,
-        optimizationObjective: 'multi_package_required'
+        optimizationObjective: multiPackageResult.optimizationObjective
       },
       multiPackageResult: multiPackageResult
     };
