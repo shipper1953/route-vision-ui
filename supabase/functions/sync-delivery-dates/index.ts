@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     // Get all shipments that need delivery status updates
     const { data: shipments, error: shipmentsError } = await supabase
       .from('shipments')
-      .select('id, easypost_id, tracking_number, estimated_delivery_date, actual_delivery_date')
+      .select('id, easypost_id, tracking_number, estimated_delivery_date, actual_delivery_date, status')
       .not('easypost_id', 'is', null)
       .neq('status', 'delivered');
 
