@@ -106,18 +106,12 @@ export async function linkShipmentToOrder(orderId: string | number, shipmentInfo
       
       console.log(`🔄 Updating order ${foundOrder.id} (order_id: ${foundOrder.order_id}) with shipment ${shipmentIdNumber}`);
       
-      const updateData: Record<string, any> = { 
+      const updateData = { 
         shipment_id: shipmentIdNumber,
-        status: 'shipped'
+        status: 'shipped' as string,
+        estimated_delivery_date: shipmentInfo.estimatedDeliveryDate || null,
+        actual_delivery_date: shipmentInfo.actualDeliveryDate || null,
       };
-      
-      // Include delivery dates if available
-      if (shipmentInfo.estimatedDeliveryDate) {
-        updateData.estimated_delivery_date = shipmentInfo.estimatedDeliveryDate;
-      }
-      if (shipmentInfo.actualDeliveryDate) {
-        updateData.actual_delivery_date = shipmentInfo.actualDeliveryDate;
-      }
 
       const { data: updatedOrder, error: updateError } = await supabase
         .from('orders')
