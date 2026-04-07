@@ -25,12 +25,13 @@ export const ItemSelectionCard = ({
   const [localSelection, setLocalSelection] = useState<Map<string, number>>(new Map());
   const [shippedItemsFromDB, setShippedItemsFromDB] = useState<Map<string, number>>(new Map());
 
-  // Create a unique key combining itemId, name, and sku to handle variants with same itemId
-  const getUniqueItemKey = (item: any): string => {
+  // Create a unique key combining itemId, name, sku, and unitPrice to handle duplicate line items
+  const getUniqueItemKey = (item: any, index?: number): string => {
     const baseId = item.itemId || item.id;
     const name = item.name || '';
     const sku = item.sku || '';
-    return `${baseId}__${name}__${sku}`;
+    const price = item.unitPrice ?? '';
+    return `${baseId}__${name}__${sku}__${price}${index !== undefined ? `__idx${index}` : ''}`;
   };
 
   // Fetch already shipped items from database
