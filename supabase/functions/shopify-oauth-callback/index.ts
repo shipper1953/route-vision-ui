@@ -367,19 +367,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    // Determine the redirect URL based on referer or use production as fallback
-    const referer = req.headers.get('referer') || '';
-    let appOrigin = 'https://ship-tornado.com';
-    
-    if (referer) {
-      try {
-        const refererUrl = new URL(referer);
-        appOrigin = refererUrl.origin;
-      } catch (e) {
-        console.warn('Could not parse referer for error redirect');
-      }
-    }
-    
+    const appOrigin = 'https://ship-tornado.lovable.app';
     const errorRedirectUrl = `${appOrigin}/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}`;
     
     // Return HTML that communicates error to popup opener or redirects
