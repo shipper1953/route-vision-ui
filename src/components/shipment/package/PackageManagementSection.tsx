@@ -376,6 +376,7 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
 }) => {
   const [selectedOrderItems, setSelectedOrderItems] = useState<any[]>([]);
   const [hasManualEdits, setHasManualEdits] = useState(false);
+  const [weightOverrides, setWeightOverrides] = useState<Record<number, number>>({});
   const form = useFormContext<ShipmentForm>();
   const { createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
@@ -394,7 +395,8 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
   useEffect(() => {
     if (selectedItems && selectedItems.length > 0) {
       setSelectedOrderItems(selectedItems);
-      setHasManualEdits(false); // Reset manual edits flag when items change
+      setHasManualEdits(false);
+      setWeightOverrides({}); // Reset weight overrides when items change
     }
   }, [selectedItems]);
 
