@@ -145,12 +145,248 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-hmac-sha256, x-shopify-shop-domain, x-shopify-topic',
 };
 
+function normalizeShopifyId(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = value.toString();
+  return normalized.includes('/') ? normalized.split('/').pop() || normalized : normalized;
+}
+
+async function shopifyGraphQL(store: any, query: string, variables: Record<string, unknown> = {}) {
+  const storeUrl = store.store_url?.replace(/\/$/, '');
+  const accessToken = store.access_token;
+
+  if (!storeUrl || !accessToken) {
+    throw new Error('Missing Shopify store credentials');
+  }
+
+  const response = await fetch(`https://${storeUrl}/admin/api/2025-01/graphql.json`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': accessToken,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shopify GraphQL error: ${response.status} ${response.statusText}`);
+  }
+
+  const result = await response.json();
+
+  if (result.errors?.length) {
+    throw new Error(result.errors.map((error: any) => error.message).join(', '));
+  }
+
+  return result.data;
+}
+
+async function getOrderFulfillmentOrders(store: any, shopifyOrderId: string, maxAttempts = 3) {
+  const query = `
+    query getFulfillmentOrders($orderId: ID!) {
+      order(id: $orderId) {
+        fulfillmentOrders(first: 20) {
+          nodes {
+            id
+            status
+            requestStatus
+            assignedLocation {
+              location {
+                id
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const orderGid = `gid://shopify/Order/${shopifyOrderId}`;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const data = await shopifyGraphQL(store, query, { orderId: orderGid });
+    const fulfillmentOrders = data?.order?.fulfillmentOrders?.nodes || [];
+
+    if (fulfillmentOrders.length > 0 || attempt === maxAttempts) {
+      return fulfillmentOrders;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+
+  return [];
+}
+
+async function resolveUniqueOrderId(
+  supabase: any,
+  companyId: string,
+  preferredOrderId: string,
+  shopifyOrderId: string,
+  excludeOrderId?: number,
+) {
+  let query = supabase
+    .from('orders')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('order_id', preferredOrderId)
+    .limit(1);
+
+  if (excludeOrderId) {
+    query = query.neq('id', excludeOrderId);
+  }
+
+  const { data: conflictingOrder } = await query.maybeSingle();
+
+  if (!conflictingOrder) {
+    return preferredOrderId;
+  }
+
+  return `${preferredOrderId}-${shopifyOrderId.slice(-6)}`;
+}
+
+async function routeAndRequestFulfillmentOrders(store: any, shopifyOrderId: string) {
+  if (!store.fulfillment_service_id || !store.fulfillment_service_location_id) {
+    console.log('Fulfillment service is not fully configured, skipping auto-routing');
+    return;
+  }
+
+  const fulfillmentOrders = await getOrderFulfillmentOrders(store, shopifyOrderId);
+  console.log(`Found ${fulfillmentOrders.length} fulfillment orders for Shopify order ${shopifyOrderId}`);
+
+  const closedStatuses = new Set(['CLOSED', 'CANCELLED', 'INCOMPLETE']);
+
+  for (const fulfillmentOrder of fulfillmentOrders) {
+    if (closedStatuses.has(fulfillmentOrder.status)) {
+      continue;
+    }
+
+    let activeFulfillmentOrder = fulfillmentOrder;
+    const assignedLocationId = activeFulfillmentOrder.assignedLocation?.location?.id || null;
+
+    if (
+      assignedLocationId !== store.fulfillment_service_location_id &&
+      (!activeFulfillmentOrder.requestStatus || activeFulfillmentOrder.requestStatus === 'UNSUBMITTED')
+    ) {
+      const moveMutation = `
+        mutation fulfillmentOrderMove($id: ID!, $newLocationId: ID!) {
+          fulfillmentOrderMove(id: $id, newLocationId: $newLocationId) {
+            movedFulfillmentOrder {
+              id
+              status
+              requestStatus
+              assignedLocation {
+                location {
+                  id
+                  name
+                }
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const moveResult = await shopifyGraphQL(store, moveMutation, {
+        id: activeFulfillmentOrder.id,
+        newLocationId: store.fulfillment_service_location_id,
+      });
+
+      const moveErrors = moveResult?.fulfillmentOrderMove?.userErrors || [];
+      if (moveErrors.length > 0) {
+        console.log(`Unable to move fulfillment order ${activeFulfillmentOrder.id}:`, moveErrors.map((error: any) => error.message).join(', '));
+      } else if (moveResult?.fulfillmentOrderMove?.movedFulfillmentOrder) {
+        activeFulfillmentOrder = moveResult.fulfillmentOrderMove.movedFulfillmentOrder;
+        console.log(`✅ Moved fulfillment order ${activeFulfillmentOrder.id} to Ship Tornado location`);
+      }
+    }
+
+    const currentLocationId = activeFulfillmentOrder.assignedLocation?.location?.id || null;
+    if (currentLocationId !== store.fulfillment_service_location_id) {
+      console.log(`Skipping fulfillment order ${activeFulfillmentOrder.id} because it is still assigned elsewhere`);
+      continue;
+    }
+
+    if (!activeFulfillmentOrder.requestStatus || activeFulfillmentOrder.requestStatus === 'UNSUBMITTED') {
+      const submitMutation = `
+        mutation fulfillmentOrderSubmitFulfillmentRequest($id: ID!) {
+          fulfillmentOrderSubmitFulfillmentRequest(id: $id) {
+            submittedFulfillmentOrder {
+              id
+              status
+              requestStatus
+              assignedLocation {
+                location {
+                  id
+                }
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const submitResult = await shopifyGraphQL(store, submitMutation, { id: activeFulfillmentOrder.id });
+      const submitErrors = submitResult?.fulfillmentOrderSubmitFulfillmentRequest?.userErrors || [];
+
+      if (submitErrors.length > 0) {
+        console.log(`Unable to request fulfillment for ${activeFulfillmentOrder.id}:`, submitErrors.map((error: any) => error.message).join(', '));
+      } else if (submitResult?.fulfillmentOrderSubmitFulfillmentRequest?.submittedFulfillmentOrder) {
+        activeFulfillmentOrder = submitResult.fulfillmentOrderSubmitFulfillmentRequest.submittedFulfillmentOrder;
+        console.log(`✅ Submitted fulfillment request for ${activeFulfillmentOrder.id}`);
+      }
+    }
+
+    if (
+      activeFulfillmentOrder.requestStatus &&
+      activeFulfillmentOrder.requestStatus !== 'ACCEPTED' &&
+      !closedStatuses.has(activeFulfillmentOrder.status)
+    ) {
+      const acceptMutation = `
+        mutation fulfillmentOrderAcceptFulfillmentRequest($id: ID!, $message: String) {
+          fulfillmentOrderAcceptFulfillmentRequest(id: $id, message: $message) {
+            fulfillmentOrder {
+              id
+              status
+              requestStatus
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const acceptResult = await shopifyGraphQL(store, acceptMutation, {
+        id: activeFulfillmentOrder.id,
+        message: 'Auto-accepted by Ship Tornado',
+      });
+
+      const acceptErrors = acceptResult?.fulfillmentOrderAcceptFulfillmentRequest?.userErrors || [];
+      if (acceptErrors.length > 0) {
+        console.log(`Fulfillment request acceptance info for ${activeFulfillmentOrder.id}:`, acceptErrors.map((error: any) => error.message).join(', '));
+      } else {
+        console.log(`✅ Auto-accepted fulfillment request for fulfillment order: ${activeFulfillmentOrder.id}`);
+      }
+    }
+  }
+}
+
 // Helper: process order webhook into orders table and accept fulfillment requests
 async function handleOrderWebhook(supabase: any, order: any, store: any, topic: string) {
   console.log(`Processing ${topic} for order:`, order.id, order.order_number);
 
   const companyId = store.company_id;
   const shopifyStoreId = store.id;
+  const normalizedShopifyOrderId = normalizeShopifyId(order.id) || order.id.toString();
+  const preferredOrderId = `SHOP-${order.order_number || normalizedShopifyOrderId}`;
 
   // Get default warehouse
   const { data: warehouse } = await supabase
@@ -201,7 +437,7 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
     : sanitizeString(shippingAddr?.name, 200);
 
   const orderData = {
-    order_id: `SHOP-${order.order_number || order.id}`,
+    order_id: preferredOrderId,
     company_id: companyId,
     shopify_store_id: shopifyStoreId,
     warehouse_id: warehouse.id,
@@ -220,44 +456,60 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
     order_date: order.created_at ? new Date(order.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
   };
 
-  // Upsert order (check if it already exists by shopify order id)
-  const shopifyOrderId = `SHOP-${order.order_number || order.id}`;
-  const { data: existingOrder } = await supabase
-    .from('orders')
-    .select('id')
-    .eq('order_id', shopifyOrderId)
+  const { data: existingMapping } = await supabase
+    .from('shopify_order_mappings')
+    .select('id, ship_tornado_order_id')
     .eq('company_id', companyId)
-    .single();
+    .eq('shopify_store_id', shopifyStoreId)
+    .eq('shopify_order_id', normalizedShopifyOrderId)
+    .maybeSingle();
 
-  if (existingOrder) {
-    if (topic === 'orders/updated') {
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({
-          status: orderData.status,
-          fulfillment_status: orderData.fulfillment_status,
-          items: orderData.items,
-          value: orderData.value,
-          shipping_address: orderData.shipping_address,
-          customer_name: orderData.customer_name,
-          customer_email: orderData.customer_email,
-          customer_phone: orderData.customer_phone,
-          customer_company: orderData.customer_company,
-        })
-        .eq('id', existingOrder.id);
+  if (existingMapping) {
+    const resolvedOrderId = await resolveUniqueOrderId(
+      supabase,
+      companyId,
+      preferredOrderId,
+      normalizedShopifyOrderId,
+      existingMapping.ship_tornado_order_id,
+    );
 
-      if (updateError) {
-        console.error('Error updating order:', updateError);
-        throw updateError;
-      }
-      console.log('✅ Updated existing order:', existingOrder.id);
-    } else {
-      console.log('Order already exists, skipping insert:', shopifyOrderId);
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        ...orderData,
+        order_id: resolvedOrderId,
+      })
+      .eq('id', existingMapping.ship_tornado_order_id);
+
+    if (updateError) {
+      console.error('Error updating order:', updateError);
+      throw updateError;
     }
+
+    await supabase
+      .from('shopify_order_mappings')
+      .update({
+        shopify_order_number: order.order_number?.toString() || null,
+        sync_status: 'synced',
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq('id', existingMapping.id);
+
+    console.log('✅ Updated mapped Shopify order:', existingMapping.ship_tornado_order_id);
   } else {
+    const resolvedOrderId = await resolveUniqueOrderId(
+      supabase,
+      companyId,
+      preferredOrderId,
+      normalizedShopifyOrderId,
+    );
+
     const { data: newOrder, error: insertError } = await supabase
       .from('orders')
-      .insert(orderData)
+      .insert({
+        ...orderData,
+        order_id: resolvedOrderId,
+      })
       .select('id')
       .single();
 
@@ -265,120 +517,31 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
       console.error('Error inserting order:', insertError);
       throw insertError;
     }
+
+    const { error: mappingError } = await supabase
+      .from('shopify_order_mappings')
+      .insert({
+        company_id: companyId,
+        ship_tornado_order_id: newOrder.id,
+        shopify_order_id: normalizedShopifyOrderId,
+        shopify_order_number: order.order_number?.toString() || null,
+        shopify_store_id: shopifyStoreId,
+        sync_status: 'synced',
+      });
+
+    if (mappingError) {
+      console.error('Error creating Shopify order mapping:', mappingError);
+      throw mappingError;
+    }
+
     console.log('✅ Created new order:', newOrder.id, 'from Shopify order', order.order_number);
   }
 
-  // Auto-accept fulfillment requests if fulfillment service is registered
-  if (store.fulfillment_service_id && topic === 'orders/create') {
+  if (store.fulfillment_service_id && store.fulfillment_service_location_id) {
     try {
-      await acceptFulfillmentRequests(store, order.id.toString());
+      await routeAndRequestFulfillmentOrders(store, normalizedShopifyOrderId);
     } catch (ffError) {
-      // Log but don't fail the whole webhook
-      console.error('Failed to auto-accept fulfillment request (non-fatal):', ffError);
-    }
-  }
-}
-
-// Accept fulfillment requests for an order via Shopify Fulfillment Order API
-async function acceptFulfillmentRequests(store: any, shopifyOrderId: string) {
-  const accessToken = store.access_token;
-  const storeUrl = store.store_url?.replace(/\/$/, '');
-
-  if (!accessToken || !storeUrl) {
-    console.log('Missing store credentials, skipping fulfillment request acceptance');
-    return;
-  }
-
-  const apiUrl = `https://${storeUrl}/admin/api/2025-01/graphql.json`;
-
-  // Step 1: Get fulfillment orders for this order
-  const getFulfillmentOrdersQuery = `
-    query getFulfillmentOrders($orderId: ID!) {
-      order(id: $orderId) {
-        fulfillmentOrders(first: 10) {
-          nodes {
-            id
-            status
-            assignedLocation {
-              location {
-                id
-              }
-            }
-            fulfillmentOrderMerchantRequests(first: 5, kind: FULFILLMENT_REQUEST) {
-              nodes {
-                id
-                kind
-                message
-              }
-            }
-          }
-        }
-      }
-    }
-  `;
-
-  const orderGid = `gid://shopify/Order/${shopifyOrderId}`;
-  
-  const getResponse = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Shopify-Access-Token': accessToken,
-    },
-    body: JSON.stringify({
-      query: getFulfillmentOrdersQuery,
-      variables: { orderId: orderGid },
-    }),
-  });
-
-  const getResult = await getResponse.json();
-  const fulfillmentOrders = getResult?.data?.order?.fulfillmentOrders?.nodes || [];
-
-  console.log(`Found ${fulfillmentOrders.length} fulfillment orders for Shopify order ${shopifyOrderId}`);
-
-  // Step 2: Accept any pending fulfillment requests assigned to our location
-  for (const fo of fulfillmentOrders) {
-    // Only accept if status indicates a request is pending
-    if (fo.status === 'OPEN' || fo.status === 'UNSUBMITTED') {
-      // Try to accept the fulfillment request
-      const acceptMutation = `
-        mutation fulfillmentOrderAcceptFulfillmentRequest($id: ID!, $message: String) {
-          fulfillmentOrderAcceptFulfillmentRequest(id: $id, message: $message) {
-            fulfillmentOrder {
-              id
-              status
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `;
-
-      const acceptResponse = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': accessToken,
-        },
-        body: JSON.stringify({
-          query: acceptMutation,
-          variables: {
-            id: fo.id,
-            message: 'Auto-accepted by Ship Tornado',
-          },
-        }),
-      });
-
-      const acceptResult = await acceptResponse.json();
-      const userErrors = acceptResult?.data?.fulfillmentOrderAcceptFulfillmentRequest?.userErrors || [];
-      
-      if (userErrors.length > 0) {
-        console.log(`Fulfillment request acceptance info for ${fo.id}:`, userErrors.map((e: any) => e.message).join(', '));
-      } else {
-        console.log(`✅ Auto-accepted fulfillment request for fulfillment order: ${fo.id}`);
-      }
+      console.error('Failed to auto-route/request fulfillment (non-fatal):', ffError);
     }
   }
 }
