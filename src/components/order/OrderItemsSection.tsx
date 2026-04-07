@@ -14,6 +14,12 @@ import { Badge } from "@/components/ui/badge";
 export const OrderItemsSection = () => {
   const form = useFormContext<OrderFormValues>();
   const { items } = useItemMaster();
+  const selectedCustomerId = form.watch("customerId");
+  
+  // Filter items by selected customer
+  const availableItems = items.filter(item => 
+    item.isActive && item.customerId === selectedCustomerId
+  );
   
   const { fields, append, remove } = useFieldArray({
     control: form.control,
