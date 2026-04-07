@@ -242,20 +242,7 @@ serve(async (req) => {
 
     console.log('Shopify OAuth connection successful for company:', companyId);
 
-    // Determine the redirect URL based on referer or use production as fallback
-    const referer = req.headers.get('referer') || '';
-    let appOrigin = 'https://ship-tornado.com';
-    
-    // Extract origin from referer if available
-    if (referer) {
-      try {
-        const refererUrl = new URL(referer);
-        appOrigin = refererUrl.origin;
-      } catch (e) {
-        console.warn('Could not parse referer, using default origin:', e);
-      }
-    }
-    
+    const appOrigin = 'https://ship-tornado.lovable.app';
     const redirectUrl = `${appOrigin}/company-admin?tab=integrations&shopify=connected`;
 
     // Return HTML that communicates with popup opener or redirects
