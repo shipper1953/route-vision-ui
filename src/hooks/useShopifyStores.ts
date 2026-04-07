@@ -16,6 +16,9 @@ export interface ShopifyStore {
   customer_email: string | null;
   customer_reference: string | null;
   fulfillment_service_id: string | null;
+  fulfillment_sync_enabled: boolean;
+  inventory_sync_enabled: boolean;
+  product_sync_enabled: boolean;
   settings: any;
 }
 
