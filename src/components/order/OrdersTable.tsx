@@ -43,6 +43,13 @@ export const OrdersTable = ({
     }
   };
 
+  const handleCustomerChange = (newCustomer: string) => {
+    setCustomerFilter(newCustomer);
+    if (onCustomerFilterChange) {
+      onCustomerFilterChange(newCustomer);
+    }
+  };
+
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       const matchesSearch = 
@@ -52,13 +59,15 @@ export const OrdersTable = ({
       
       const matchesStatus = statusFilter === "all" || order.status.toLowerCase() === statusFilter.toLowerCase();
       
+      const matchesCustomer = customerFilter === "all" || order.customerName === customerFilter;
+      
       const orderDate = new Date(order.orderDate);
       const matchesDateFrom = !dateFrom || orderDate >= dateFrom;
       const matchesDateTo = !dateTo || orderDate <= dateTo;
       
-      return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo;
+      return matchesSearch && matchesStatus && matchesCustomer && matchesDateFrom && matchesDateTo;
     });
-  }, [orders, searchTerm, statusFilter, dateFrom, dateTo]);
+  }, [orders, searchTerm, statusFilter, customerFilter, dateFrom, dateTo]);
 
   if (loading) {
     return (
@@ -86,6 +95,8 @@ export const OrdersTable = ({
             onSearchChange={setSearchTerm}
             statusFilter={statusFilter}
             onStatusChange={handleStatusChange}
+            customerFilter={customerFilter}
+            onCustomerFilterChange={handleCustomerChange}
             dateFrom={dateFrom}
             onDateFromChange={setDateFrom}
             dateTo={dateTo}
