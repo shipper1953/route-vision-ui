@@ -59,7 +59,7 @@ export interface DecisionExplanation {
   reasonCode: string;
   algorithmVersion: string;
   policyVersion?: string;
-  optimizationObjective: 'smallest_fit' | 'lowest_landed_cost' | 'multi_package_required' | 'balanced';
+  optimizationObjective: 'smallest_fit' | 'lowest_landed_cost' | 'multi_package_required' | 'balanced' | 'minimize_packages' | 'minimize_cost';
 }
 
 export interface PackageRecommendation {
@@ -109,36 +109,6 @@ export interface CartonizationResult {
   multiPackageResult?: MultiPackageCartonizationResult;
 }
 
-export interface DecisionExplanation {
-  selectedBox: {
-    id: string;
-    name: string;
-    score: number;
-    volumeUtilization: number;
-    dimensionalWeight: number;
-    cost: number;
-    outerVolume: number;
-  };
-  rejectedCandidates: Array<{
-    id: string;
-    name: string;
-    reason: string;
-    score: number;
-  }>;
-  tieBreakersApplied: string[];
-  reasonCode: string;
-  algorithmVersion: string;
-  policyVersion?: string;
-  optimizationObjective:
-    | 'smallest_fit'
-    | 'lowest_landed_cost'
-    | 'multi_package_required'
-    | 'balanced'
-    | 'minimize_packages'
-    | 'minimize_cost';
-}
-
-export const CARTONIZATION_ALGORITHM_VERSION = '2.1.0';
 
 export interface PackedItem {
   item: Item;
