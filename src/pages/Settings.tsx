@@ -10,6 +10,7 @@ import { PackagingAlgorithm } from "@/components/cartonization/PackagingAlgorith
 import { BoxRecommendations } from "@/components/cartonization/BoxRecommendations";
 import { HistoricalBoxUsageSimplified } from "@/components/packaging/HistoricalBoxUsageSimplified";
 import { PrintNodeSettings } from "@/components/settings/PrintNodeSettings";
+import { PackagingPolicySettings } from "@/components/settings/PackagingPolicySettings";
 import { useCartonization } from "@/hooks/useCartonization";
 
 interface PendingBoxData {
@@ -59,7 +60,7 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto gap-1 p-1">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 h-auto gap-1 p-1">
             <TabsTrigger value="historical-usage" className="text-xs sm:text-sm whitespace-nowrap px-2 py-2">
               Historical
             </TabsTrigger>
@@ -77,6 +78,9 @@ const Settings = () => {
             </TabsTrigger>
             <TabsTrigger value="printer" className="text-xs sm:text-sm whitespace-nowrap px-2 py-2">
               Printer
+            </TabsTrigger>
+            <TabsTrigger value="packaging-policy" className="text-xs sm:text-sm whitespace-nowrap px-2 py-2">
+              Policy
             </TabsTrigger>
           </TabsList>
           
@@ -111,6 +115,10 @@ const Settings = () => {
           
           <TabsContent value="printer" className="space-y-4">
             <PrintNodeSettings />
+          </TabsContent>
+          
+          <TabsContent value="packaging-policy" className="space-y-4">
+            <PackagingPolicySettings />
           </TabsContent>
         </Tabs>
       </div>
