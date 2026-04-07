@@ -44,7 +44,7 @@ export const useShipmentSubmission = ({
         }
         
         // Validate at least one item with dimensions
-        const itemsWithDimensions = selectedItems.filter(item => item.dimensions || (item.length && item.width && item.height));
+        const itemsWithDimensions = selectedItems.filter(item => item.dimensions || (item as any).length);
         if (itemsWithDimensions.length === 0) {
           toast.error('Cannot create shipment: No items have dimensions. Please add dimensions to items in Item Master.');
           setLoading(false);
