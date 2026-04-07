@@ -25,12 +25,13 @@ export const ItemSelectionCard = ({
   const [localSelection, setLocalSelection] = useState<Map<string, number>>(new Map());
   const [shippedItemsFromDB, setShippedItemsFromDB] = useState<Map<string, number>>(new Map());
 
-  // Create a unique key combining itemId, name, and sku to handle variants with same itemId
-  const getUniqueItemKey = (item: any): string => {
+  // Create a unique key combining itemId, name, sku, and unitPrice to handle duplicate line items
+  const getUniqueItemKey = (item: any, index?: number): string => {
     const baseId = item.itemId || item.id;
     const name = item.name || '';
     const sku = item.sku || '';
-    return `${baseId}__${name}__${sku}`;
+    const price = item.unitPrice ?? '';
+    return `${baseId}__${name}__${sku}__${price}${index !== undefined ? `__idx${index}` : ''}`;
   };
 
   // Fetch already shipped items from database
@@ -96,25 +97,33 @@ export const ItemSelectionCard = ({
     fetchShippedItems();
   }, [orderId]);
 
+  // Get shipped quantity, checking both new and legacy key formats
+  const getShippedQuantity = (item: any, index?: number) => {
+    const newKey = getUniqueItemKey(item, index);
+    // Check new key format first, then legacy format without price/index
+    const baseId = item.itemId || item.id;
+    const legacyKey = `${baseId}__${item.name || ''}__${item.sku || ''}`;
+    return shippedItemsFromDB.get(newKey) || shippedItemsFromDB.get(legacyKey) || 0;
+  };
+
   // Calculate remaining quantity for each item
-  const getRemainingQuantity = (item: any) => {
-    const itemKey = getUniqueItemKey(item);
-    const alreadyShipped = shippedItemsFromDB.get(itemKey) || 0;
+  const getRemainingQuantity = (item: any, index?: number) => {
+    const alreadyShipped = getShippedQuantity(item, index);
     return item.quantity - alreadyShipped;
   };
 
   // Check if all items are fully shipped
-  const allItemsShipped = orderItems.every(item => getRemainingQuantity(item) <= 0);
+  const allItemsShipped = orderItems.every((item, index) => getRemainingQuantity(item, index) <= 0);
 
   // Handle item toggle
-  const handleToggleItem = (item: any) => {
-    const itemKey = getUniqueItemKey(item);
+  const handleToggleItem = (item: any, index: number) => {
+    const itemKey = getUniqueItemKey(item, index);
     const newSelection = new Map(localSelection);
     
     if (newSelection.has(itemKey)) {
       newSelection.delete(itemKey);
     } else {
-      const remaining = getRemainingQuantity(item);
+      const remaining = getRemainingQuantity(item, index);
       newSelection.set(itemKey, Math.min(1, remaining));
     }
     
@@ -123,9 +132,9 @@ export const ItemSelectionCard = ({
   };
 
   // Handle quantity change
-  const handleQuantityChange = (item: any, quantity: number) => {
-    const itemKey = getUniqueItemKey(item);
-    const remaining = getRemainingQuantity(item);
+  const handleQuantityChange = (item: any, quantity: number, index: number) => {
+    const itemKey = getUniqueItemKey(item, index);
+    const remaining = getRemainingQuantity(item, index);
     const validQty = Math.max(0, Math.min(quantity, remaining));
     
     const newSelection = new Map(localSelection);
@@ -143,7 +152,7 @@ export const ItemSelectionCard = ({
   const updateParent = (selectionMap: Map<string, number>) => {
     const selectedItems: SelectedItem[] = [];
     selectionMap.forEach((quantity, uniqueKey) => {
-      const item = orderItems.find(i => getUniqueItemKey(i) === uniqueKey);
+      const item = orderItems.find((i, idx) => getUniqueItemKey(i, idx) === uniqueKey);
       if (item) {
         selectedItems.push({
           itemId: item.itemId || item.id,
@@ -151,7 +160,7 @@ export const ItemSelectionCard = ({
           sku: item.sku,
           quantity: quantity,
           dimensions: item.dimensions,
-          _uniqueKey: uniqueKey // Add unique key for tracking variants
+          _uniqueKey: uniqueKey
         });
       }
     });
@@ -195,12 +204,12 @@ export const ItemSelectionCard = ({
         {!allItemsShipped && (
           <>
             <div className="space-y-3">
-              {orderItems.map((item) => {
-                const itemKey = getUniqueItemKey(item);
-                const remaining = getRemainingQuantity(item);
+              {orderItems.map((item, index) => {
+                const itemKey = getUniqueItemKey(item, index);
+                const remaining = getRemainingQuantity(item, index);
                 const isSelected = localSelection.has(itemKey);
                 const selectedQty = localSelection.get(itemKey) || 0;
-                const alreadyShipped = shippedItemsFromDB.get(itemKey) || 0;
+                const alreadyShipped = getShippedQuantity(item, index);
 
                 if (remaining <= 0) {
                   return (
@@ -229,7 +238,7 @@ export const ItemSelectionCard = ({
                     <div className="flex items-center gap-3 flex-1">
                       <Checkbox
                         checked={isSelected}
-                        onCheckedChange={() => handleToggleItem(item)}
+                        onCheckedChange={() => handleToggleItem(item, index)}
                       />
                       <div className="flex-1">
                         <div className="font-medium text-sm">{item.name}</div>
@@ -254,7 +263,7 @@ export const ItemSelectionCard = ({
                               min={1}
                               max={remaining}
                               value={selectedQty}
-                              onChange={(e) => handleQuantityChange(item, parseInt(e.target.value) || 0)}
+                              onChange={(e) => handleQuantityChange(item, parseInt(e.target.value) || 0, index)}
                               className="w-16 h-8 text-sm"
                             />
                             <span className="text-xs text-muted-foreground">of {remaining}</span>
