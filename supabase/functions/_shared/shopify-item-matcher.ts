@@ -65,7 +65,7 @@ export async function ensureItemExists(
   if (lineItem.variant_id) {
     const query = supabase
       .from('items')
-      .select('id, sku, name, length, width, height, weight')
+      .select('id, sku, name, length, width, height, weight, shopify_variant_id, shopify_product_id, shopify_store_id')
       .eq('company_id', companyId)
       .eq('shopify_variant_id', lineItem.variant_id.toString());
     
@@ -108,7 +108,7 @@ export async function ensureItemExists(
   if (lineItem.product_id) {
     const query = supabase
       .from('items')
-      .select('id, sku, name, length, width, height, weight')
+      .select('id, sku, name, length, width, height, weight, shopify_variant_id, shopify_product_id, shopify_store_id')
       .eq('company_id', companyId)
       .eq('shopify_product_id', lineItem.product_id.toString());
     
@@ -161,7 +161,7 @@ export async function ensureItemExists(
   if (lineItem.sku) {
     const query = supabase
       .from('items')
-      .select('id, sku, name, length, width, height, weight')
+      .select('id, sku, name, length, width, height, weight, shopify_variant_id, shopify_product_id, shopify_store_id')
       .eq('company_id', companyId)
       .eq('sku', lineItem.sku);
     

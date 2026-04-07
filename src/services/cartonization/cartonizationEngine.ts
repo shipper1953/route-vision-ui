@@ -333,7 +333,7 @@ export class CartonizationEngine {
         tieBreakersApplied: ['multi_package_split'],
         reasonCode: 'multi_package_required',
         algorithmVersion: CARTONIZATION_ALGORITHM_VERSION,
-        optimizationObjective: multiPackageResult.optimizationObjective
+        optimizationObjective: 'multi_package_required' as const
       },
       multiPackageResult: multiPackageResult
     };

@@ -156,6 +156,58 @@ Deno.serve(async (req) => {
           if (updateError) {
             console.error(`Failed to update shipment ${shipment.id}:`, updateError);
           } else {
+            // Also propagate delivery dates and status to linked orders
+            const { data: linkedOrders } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('shipment_id', shipment.id);
+
+            if (linkedOrders && linkedOrders.length > 0) {
+              const orderUpdate: Record<string, any> = {};
+              if (estimatedDeliveryDate) orderUpdate.estimated_delivery_date = estimatedDeliveryDate;
+              if (actualDeliveryDate) orderUpdate.actual_delivery_date = actualDeliveryDate;
+              if (status === 'delivered') orderUpdate.status = 'delivered';
+
+              for (const order of linkedOrders) {
+                const { error: orderUpdateError } = await supabase
+                  .from('orders')
+                  .update(orderUpdate)
+                  .eq('id', order.id);
+
+                if (orderUpdateError) {
+                  console.error(`Failed to update order ${order.id}:`, orderUpdateError);
+                } else {
+                  console.log(`✅ Propagated delivery info to order ${order.id}`);
+                }
+              }
+            }
+
+            // Also check order_shipments junction table
+            const { data: junctionOrders } = await supabase
+              .from('order_shipments')
+              .select('order_id')
+              .eq('shipment_id', shipment.id);
+
+            if (junctionOrders && junctionOrders.length > 0) {
+              const orderUpdate: Record<string, any> = {};
+              if (estimatedDeliveryDate) orderUpdate.estimated_delivery_date = estimatedDeliveryDate;
+              if (actualDeliveryDate) orderUpdate.actual_delivery_date = actualDeliveryDate;
+              if (status === 'delivered') orderUpdate.status = 'delivered';
+
+              for (const jo of junctionOrders) {
+                const { error: joUpdateError } = await supabase
+                  .from('orders')
+                  .update(orderUpdate)
+                  .eq('id', jo.order_id);
+
+                if (joUpdateError) {
+                  console.error(`Failed to update order ${jo.order_id} via junction:`, joUpdateError);
+                } else {
+                  console.log(`✅ Propagated delivery info to order ${jo.order_id} via junction`);
+                }
+              }
+            }
+
             updates.push({
               shipment_id: shipment.id,
               easypost_id: shipment.easypost_id,
