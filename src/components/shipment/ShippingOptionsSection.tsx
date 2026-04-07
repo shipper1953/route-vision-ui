@@ -10,6 +10,12 @@ import { CombinedRate, CombinedRateResponse } from "@/services/rateShoppingServi
 import { SmartRate, Rate } from "@/services/easypost";
 import { SelectedItem } from "@/types/fulfillment";
 import { useShipmentSubmission } from "./form/hooks/useShipmentSubmission";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Company, CompanyAddress } from "@/types/auth";
+import { applyMarkupToRates, MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
+import { LabelService } from "@/services/easypost/labelService";
+import { toast } from "sonner";
 import { 
   Check, 
   Clock, 
@@ -18,21 +24,25 @@ import {
   Truck, 
   Package,
   CalendarCheck,
-  CalendarX
+  CalendarX,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { addDays, format, parseISO, isAfter, isBefore, isEqual } from "date-fns";
+import { addDays, format, parseISO, isBefore, isEqual } from "date-fns";
 
 interface ShippingOptionsSectionProps {
   selectedItems?: SelectedItem[];
   loading?: boolean;
   setLoading?: (loading: boolean) => void;
-  onShipmentCreated?: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
+  onRatesFetched?: (response: CombinedRateResponse) => void;
+  onLabelPurchased?: (result: any) => void;
   itemsLoading?: boolean;
   hasOrderId?: boolean;
+  orderId?: string;
 }
 
-interface SortedRate extends CombinedRate {
+interface SortedRate {
+  rate: MarkedUpRate | MarkedUpSmartRate;
   meetsDeliveryDate: boolean | null;
   estimatedDeliveryDate: Date | null;
 }
@@ -41,39 +51,67 @@ export const ShippingOptionsSection = ({
   selectedItems,
   loading: externalLoading = false,
   setLoading: externalSetLoading,
-  onShipmentCreated,
+  onRatesFetched,
+  onLabelPurchased,
   itemsLoading = false,
   hasOrderId = false,
+  orderId,
 }: ShippingOptionsSectionProps) => {
   const form = useFormContext<ShipmentForm>();
+  const { userProfile } = useAuth();
   const [rateResponse, setRateResponse] = useState<CombinedRateResponse | null>(null);
   const [fetchingRates, setFetchingRates] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedRateId, setSelectedRateId] = useState<string | null>(null);
   const [hasFetched, setHasFetched] = useState(false);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [purchasingLabel, setPurchasingLabel] = useState(false);
 
   const setLoading = externalSetLoading || (() => {});
+
+  // Fetch company markup settings
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (!userProfile?.company_id) return;
+      const { data, error } = await supabase
+        .from("companies")
+        .select("*")
+        .eq("id", userProfile.company_id)
+        .maybeSingle();
+      if (data && !error) {
+        setCompany({
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          address: data.address as unknown as CompanyAddress | undefined,
+          settings: data.settings,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          is_active: data.is_active,
+          markup_type: (data.markup_type as "percentage" | "fixed") || "percentage",
+          markup_value: data.markup_value || 0,
+        });
+      }
+    };
+    fetchCompany();
+  }, [userProfile?.company_id]);
 
   const { handleFormSubmit } = useShipmentSubmission({
     loading: externalLoading,
     setLoading,
     selectedItems,
-    onShipmentCreated: (response, selectedRate, selectedBoxData) => {
-      // Store the response to display rates
+    onShipmentCreated: (response) => {
       setRateResponse(response);
       setFetchingRates(false);
       setHasFetched(true);
-
-      // Auto-select recommended rate if provided
-      if (selectedRate) {
-        setSelectedRateId(selectedRate.id);
-      }
+      onRatesFetched?.(response);
     },
   });
 
   // Auto-fetch rates on mount
   useEffect(() => {
-    if (!hasFetched && !fetchingRates && onShipmentCreated) {
+    if (!hasFetched && !fetchingRates) {
       fetchRates();
     }
   }, []);
@@ -95,73 +133,104 @@ export const ShippingOptionsSection = ({
   const getSortedRates = (): SortedRate[] => {
     if (!rateResponse?.rates) return [];
 
+    // Apply markup
+    const markedUp = applyMarkupToRates(rateResponse.rates, company);
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const ratesWithMeta: SortedRate[] = rateResponse.rates.map((rate) => {
+    const ratesWithMeta: SortedRate[] = markedUp.map((rate) => {
       const deliveryDays = rate.delivery_days || rate.est_delivery_days || 0;
-      const estimatedDeliveryDate = deliveryDays > 0
-        ? addDays(today, deliveryDays)
-        : rate.delivery_date
-          ? parseISO(rate.delivery_date)
-          : null;
+      const estimatedDeliveryDate =
+        deliveryDays > 0
+          ? addDays(today, deliveryDays)
+          : rate.delivery_date
+            ? parseISO(rate.delivery_date)
+            : null;
 
       let meetsDeliveryDate: boolean | null = null;
       if (requiredDeliveryDate && estimatedDeliveryDate) {
         const reqDate = parseISO(requiredDeliveryDate);
-        meetsDeliveryDate = isBefore(estimatedDeliveryDate, reqDate) || isEqual(estimatedDeliveryDate, reqDate);
+        meetsDeliveryDate =
+          isBefore(estimatedDeliveryDate, reqDate) || isEqual(estimatedDeliveryDate, reqDate);
       }
 
-      return {
-        ...rate,
-        meetsDeliveryDate,
-        estimatedDeliveryDate,
-      };
+      return { rate, meetsDeliveryDate, estimatedDeliveryDate };
     });
 
-    // Sort: meets delivery date first, then by price
     return ratesWithMeta.sort((a, b) => {
-      // If we have a required delivery date, prioritize rates that meet it
       if (a.meetsDeliveryDate !== null && b.meetsDeliveryDate !== null) {
         if (a.meetsDeliveryDate && !b.meetsDeliveryDate) return -1;
         if (!a.meetsDeliveryDate && b.meetsDeliveryDate) return 1;
       }
-      // Then sort by price
-      return parseFloat(a.rate) - parseFloat(b.rate);
+      return parseFloat(a.rate.rate) - parseFloat(b.rate.rate);
     });
   };
 
-  const handleSelectRate = (rate: SortedRate) => {
-    setSelectedRateId(rate.id);
-  };
-
-  const handleConfirmRate = () => {
-    if (!selectedRateId || !rateResponse || !onShipmentCreated) return;
+  const handleConfirmAndBuy = async () => {
+    if (!selectedRateId || !rateResponse) return;
 
     const selectedRate = rateResponse.rates.find((r) => r.id === selectedRateId);
     if (!selectedRate) return;
 
-    const data = form.getValues();
-    const selectedBoxData = {
-      selectedBoxId: data.selectedBoxId,
-      selectedBoxSku: data.selectedBoxSku || data.selectedBoxName,
-      selectedBoxName: data.selectedBoxName,
-      selectedBoxes: data.selectedBoxes,
-      selectedItems: selectedItems,
-      packageMetadata: {
-        packageIndex: 0,
-        items: selectedItems,
-        boxData: {
-          name: data.selectedBoxName || "Unknown",
-          length: data.length || 0,
-          width: data.width || 0,
-          height: data.height || 0,
-        },
-        weight: data.weight || 0,
-      },
-    };
+    setPurchasingLabel(true);
+    try {
+      // Determine shipment ID based on provider
+      let shipmentId = rateResponse.id;
+      const provider = (selectedRate as any).provider;
 
-    onShipmentCreated(rateResponse, selectedRate as any, selectedBoxData);
+      if (provider === "easypost" && rateResponse.easypost_shipment?.id) {
+        shipmentId = rateResponse.easypost_shipment.id;
+      } else if (provider === "shippo" && rateResponse.shippo_shipment?.object_id) {
+        shipmentId = rateResponse.shippo_shipment.object_id;
+      }
+
+      const data = form.getValues();
+
+      // Find the marked-up rate to get original cost
+      const markedUpRate = applyMarkupToRates([selectedRate], company)[0];
+      const originalCost = parseFloat(markedUpRate.original_rate);
+      const markedUpCost = parseFloat(markedUpRate.rate);
+
+      const selectedBoxData = {
+        selectedBoxId: data.selectedBoxId,
+        selectedBoxSku: data.selectedBoxSku || data.selectedBoxName,
+        selectedBoxName: data.selectedBoxName,
+        selectedBoxes: data.selectedBoxes,
+        selectedItems: selectedItems,
+        packageMetadata: {
+          packageIndex: 0,
+          items: selectedItems,
+          boxData: {
+            name: data.selectedBoxName || "Unknown",
+            length: data.length || 0,
+            width: data.width || 0,
+            height: data.height || 0,
+          },
+          weight: data.weight || 0,
+        },
+      };
+
+      const labelService = new LabelService("");
+      const result = await labelService.purchaseLabel(
+        shipmentId,
+        selectedRate.id,
+        orderId || null,
+        provider,
+        selectedBoxData,
+        selectedItems,
+        originalCost,
+        markedUpCost
+      );
+
+      toast.success("Shipping label purchased successfully!");
+      onLabelPurchased?.(result);
+    } catch (error) {
+      console.error("Error purchasing label:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to purchase label");
+    } finally {
+      setPurchasingLabel(false);
+    }
   };
 
   // Loading state
@@ -173,9 +242,7 @@ export const ShippingOptionsSection = ({
             <LoadingSpinner size={32} />
             <div className="text-center">
               <h3 className="font-semibold text-lg">Fetching Shipping Rates</h3>
-              <p className="text-muted-foreground text-sm">
-                Getting rates from multiple carriers...
-              </p>
+              <p className="text-muted-foreground text-sm">Getting rates from multiple carriers...</p>
             </div>
           </div>
         </CardContent>
@@ -194,16 +261,13 @@ export const ShippingOptionsSection = ({
               <h3 className="font-semibold text-lg">Failed to Fetch Rates</h3>
               <p className="text-muted-foreground text-sm">{fetchError}</p>
             </div>
-            <Button onClick={fetchRates} variant="outline">
-              Try Again
-            </Button>
+            <Button onClick={fetchRates} variant="outline">Try Again</Button>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // No rates yet
   if (!rateResponse || !rateResponse.rates?.length) {
     if (hasFetched) {
       return (
@@ -217,9 +281,7 @@ export const ShippingOptionsSection = ({
                   No shipping rates were returned. Please check your addresses and package details.
                 </p>
               </div>
-              <Button onClick={fetchRates} variant="outline">
-                Retry
-              </Button>
+              <Button onClick={fetchRates} variant="outline">Retry</Button>
             </div>
           </CardContent>
         </Card>
@@ -231,6 +293,7 @@ export const ShippingOptionsSection = ({
   const sortedRates = getSortedRates();
   const meetsCount = sortedRates.filter((r) => r.meetsDeliveryDate === true).length;
   const doesNotMeetCount = sortedRates.filter((r) => r.meetsDeliveryDate === false).length;
+  const hasMarkup = company && company.markup_value && company.markup_value > 0;
 
   return (
     <div className="space-y-4">
@@ -244,6 +307,13 @@ export const ShippingOptionsSection = ({
               </CardTitle>
               <CardDescription>
                 {sortedRates.length} rates found
+                {hasMarkup && (
+                  <span className="ml-2">
+                    • Markup: {company.markup_type === "percentage"
+                      ? `${company.markup_value}%`
+                      : `$${company.markup_value?.toFixed(2)}`}
+                  </span>
+                )}
                 {requiredDeliveryDate && (
                   <span>
                     {" "}• Required by{" "}
@@ -259,9 +329,7 @@ export const ShippingOptionsSection = ({
                 )}
               </CardDescription>
             </div>
-            <Button onClick={fetchRates} variant="ghost" size="sm">
-              Refresh Rates
-            </Button>
+            <Button onClick={fetchRates} variant="ghost" size="sm">Refresh Rates</Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -275,19 +343,19 @@ export const ShippingOptionsSection = ({
               <div className="space-y-2">
                 {sortedRates
                   .filter((r) => r.meetsDeliveryDate === true)
-                  .map((rate) => (
+                  .map((item) => (
                     <RateCard
-                      key={rate.id}
-                      rate={rate}
-                      isSelected={selectedRateId === rate.id}
-                      onSelect={() => handleSelectRate(rate)}
+                      key={item.rate.id}
+                      sortedRate={item}
+                      isSelected={selectedRateId === item.rate.id}
+                      onSelect={() => setSelectedRateId(item.rate.id)}
+                      hasMarkup={!!hasMarkup}
                     />
                   ))}
               </div>
             </div>
           )}
 
-          {/* Separator if both groups exist */}
           {requiredDeliveryDate && meetsCount > 0 && doesNotMeetCount > 0 && (
             <div className="flex items-center gap-2 my-3 text-sm font-medium text-yellow-700">
               <CalendarX className="h-4 w-4" />
@@ -295,28 +363,42 @@ export const ShippingOptionsSection = ({
             </div>
           )}
 
-          {/* Rates that don't meet delivery date or no delivery date set */}
           <div className="space-y-2">
             {sortedRates
               .filter((r) => r.meetsDeliveryDate !== true)
-              .map((rate) => (
+              .map((item) => (
                 <RateCard
-                  key={rate.id}
-                  rate={rate}
-                  isSelected={selectedRateId === rate.id}
-                  onSelect={() => handleSelectRate(rate)}
+                  key={item.rate.id}
+                  sortedRate={item}
+                  isSelected={selectedRateId === item.rate.id}
+                  onSelect={() => setSelectedRateId(item.rate.id)}
+                  hasMarkup={!!hasMarkup}
                 />
               ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* Confirm selection */}
-      {selectedRateId && onShipmentCreated && (
+      {/* Confirm & Buy */}
+      {selectedRateId && (
         <div className="flex justify-end">
-          <Button onClick={handleConfirmRate} size="lg" className="gap-2">
-            <Check className="h-4 w-4" />
-            Confirm & Create Shipment
+          <Button
+            onClick={handleConfirmAndBuy}
+            size="lg"
+            className="gap-2"
+            disabled={purchasingLabel}
+          >
+            {purchasingLabel ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Purchasing Label...
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4" />
+                Buy Label & Create Shipment
+              </>
+            )}
           </Button>
         </div>
       )}
@@ -324,17 +406,21 @@ export const ShippingOptionsSection = ({
   );
 };
 
-// Individual rate card component
+// Individual rate card
 const RateCard = ({
-  rate,
+  sortedRate,
   isSelected,
   onSelect,
+  hasMarkup,
 }: {
-  rate: SortedRate;
+  sortedRate: SortedRate;
   isSelected: boolean;
   onSelect: () => void;
+  hasMarkup: boolean;
 }) => {
+  const { rate } = sortedRate;
   const deliveryDays = rate.delivery_days || rate.est_delivery_days || 0;
+  const markedUp = rate as MarkedUpRate;
 
   return (
     <button
@@ -348,7 +434,6 @@ const RateCard = ({
       )}
     >
       <div className="flex items-center gap-4">
-        {/* Selection indicator */}
         <div
           className={cn(
             "w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0",
@@ -358,15 +443,14 @@ const RateCard = ({
           {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
         </div>
 
-        {/* Carrier & Service */}
         <div>
           <div className="flex items-center gap-2">
             <span className="font-semibold">{rate.carrier}</span>
             <span className="text-muted-foreground">•</span>
             <span className="text-sm">{rate.service}</span>
-            {rate.provider && (
+            {(rate as any).provider && (
               <Badge variant="secondary" className="text-xs">
-                {rate.provider}
+                {(rate as any).provider}
               </Badge>
             )}
           </div>
@@ -377,30 +461,32 @@ const RateCard = ({
                 {deliveryDays} {deliveryDays === 1 ? "day" : "days"}
               </span>
             )}
-            {rate.estimatedDeliveryDate && (
+            {sortedRate.estimatedDeliveryDate && (
               <span className="flex items-center gap-1">
                 <Package className="h-3 w-3" />
-                Est. {format(rate.estimatedDeliveryDate, "MMM d")}
+                Est. {format(sortedRate.estimatedDeliveryDate, "MMM d")}
               </span>
             )}
-            {rate.meetsDeliveryDate === true && (
-              <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
-                ✓ On time
-              </Badge>
+            {sortedRate.meetsDeliveryDate === true && (
+              <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">✓ On time</Badge>
             )}
-            {rate.meetsDeliveryDate === false && (
-              <Badge variant="outline" className="border-yellow-400 text-yellow-700 text-xs">
-                May be late
-              </Badge>
+            {sortedRate.meetsDeliveryDate === false && (
+              <Badge variant="outline" className="border-yellow-400 text-yellow-700 text-xs">May be late</Badge>
             )}
           </div>
         </div>
       </div>
 
-      {/* Price */}
-      <div className="flex items-center gap-1 text-right">
-        <DollarSign className="h-4 w-4 text-muted-foreground" />
-        <span className="text-xl font-bold">{parseFloat(rate.rate).toFixed(2)}</span>
+      <div className="text-right">
+        <div className="flex items-center gap-1">
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xl font-bold">{parseFloat(rate.rate).toFixed(2)}</span>
+        </div>
+        {hasMarkup && markedUp.markup_applied > 0 && (
+          <div className="text-xs text-muted-foreground">
+            Carrier: ${parseFloat(markedUp.original_rate).toFixed(2)}
+          </div>
+        )}
       </div>
     </button>
   );

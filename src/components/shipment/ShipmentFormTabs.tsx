@@ -22,7 +22,8 @@ interface ShipmentFormTabsProps {
   setLoading?: (loading: boolean) => void;
   itemsLoading?: boolean;
   hasOrderId?: boolean;
-  onShipmentCreated?: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
+  onLabelPurchased?: (result: any) => void;
+  onRatesFetched?: (response: CombinedRateResponse) => void;
 }
 
 const STEPS = [
@@ -43,7 +44,8 @@ export const ShipmentFormTabs = ({
   setLoading,
   itemsLoading = false,
   hasOrderId = false,
-  onShipmentCreated,
+  onLabelPurchased,
+  onRatesFetched,
 }: ShipmentFormTabsProps) => {
   const [currentStep, setCurrentStep] = useState<StepKey>("addresses");
   const currentIndex = STEPS.findIndex(s => s.key === currentStep);
@@ -161,9 +163,11 @@ export const ShipmentFormTabs = ({
             selectedItems={selectedItems}
             loading={loading}
             setLoading={setLoading}
-            onShipmentCreated={onShipmentCreated}
+            onLabelPurchased={onLabelPurchased}
+            onRatesFetched={onRatesFetched}
             itemsLoading={itemsLoading}
             hasOrderId={hasOrderId}
+            orderId={orderId}
           />
         </div>
       )}

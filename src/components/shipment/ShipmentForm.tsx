@@ -3,19 +3,16 @@ import { useState, useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ShipmentFormTabs } from "@/components/shipment/ShipmentFormTabs";
-import { SmartRate, Rate } from "@/services/easypost";
-import { CombinedRateResponse } from "@/services/rateShoppingService";
 import { shipmentSchema, ShipmentForm as ShipmentFormType } from "@/types/shipment";
 import { OrderLookupSection } from "./form/OrderLookupSection";
-import { ShipmentFormSubmission } from "./form/ShipmentFormSubmission";
 import { SelectedItem } from "@/types/fulfillment";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ShipmentFormProps {
-  onShipmentCreated: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
+  onLabelPurchased?: (result: any) => void;
 }
 
-export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
+export const ShipmentForm = ({ onLabelPurchased }: ShipmentFormProps) => {
   const [loading, setLoading] = useState(false);
   const [orderLookupComplete, setOrderLookupComplete] = useState(false);
   const [orderItems, setOrderItems] = useState<any[]>([]);
@@ -172,12 +169,7 @@ export const ShipmentForm = ({ onShipmentCreated }: ShipmentFormProps) => {
           setLoading={setLoading}
           itemsLoading={itemsLoading}
           hasOrderId={!!form.watch('orderId')}
-          onShipmentCreated={(response, selectedRate, boxData) => {
-            if (boxData) {
-              setSelectedBoxData(boxData);
-            }
-            onShipmentCreated(response, selectedRate, boxData);
-          }}
+          onLabelPurchased={onLabelPurchased}
         />
       </form>
     </FormProvider>
