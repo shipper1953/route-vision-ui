@@ -4,16 +4,25 @@ import { Button } from "@/components/ui/button";
 import { AddressFormSection } from "@/components/shipment/AddressFormSection";
 import { PackageDetailsSection } from "@/components/shipment/PackageDetailsSection";
 import { ShippingOptionsSection } from "@/components/shipment/ShippingOptionsSection";
+import { ShipmentFormSubmission } from "@/components/shipment/form/ShipmentFormSubmission";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Package, ChevronRight, ChevronLeft, MapPin, Settings, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CombinedRateResponse } from "@/services/rateShoppingService";
+import { SmartRate, Rate } from "@/services/easypost";
+import { SelectedItem } from "@/types/fulfillment";
 
 interface ShipmentFormTabsProps {
   orderItems?: any[];
-  selectedItems?: any[];
+  selectedItems?: SelectedItem[];
   onItemsSelected?: (items: any[]) => void;
   itemsAlreadyShipped?: Array<{ itemId: string; quantityShipped: number }>;
   orderId?: string;
+  loading?: boolean;
+  setLoading?: (loading: boolean) => void;
+  itemsLoading?: boolean;
+  hasOrderId?: boolean;
+  onShipmentCreated?: (response: CombinedRateResponse, selectedRate: SmartRate | Rate | null, selectedBoxData?: any) => void;
 }
 
 const STEPS = [
@@ -29,7 +38,12 @@ export const ShipmentFormTabs = ({
   selectedItems = [], 
   onItemsSelected, 
   itemsAlreadyShipped = [],
-  orderId 
+  orderId,
+  loading = false,
+  setLoading,
+  itemsLoading = false,
+  hasOrderId = false,
+  onShipmentCreated,
 }: ShipmentFormTabsProps) => {
   const [currentStep, setCurrentStep] = useState<StepKey>("addresses");
   const currentIndex = STEPS.findIndex(s => s.key === currentStep);
@@ -46,10 +60,8 @@ export const ShipmentFormTabs = ({
     }
   };
 
-  // Allow clicking completed steps
   const goToStep = (stepKey: StepKey) => {
     const targetIndex = STEPS.findIndex(s => s.key === stepKey);
-    // Allow going to any previously visited step or the next step
     if (targetIndex <= currentIndex + 1) {
       setCurrentStep(stepKey);
     }
@@ -123,7 +135,7 @@ export const ShipmentFormTabs = ({
               <AlertDescription>
                 <div className="mt-2 space-y-1">
                   {selectedItems.map(item => (
-                    <div key={item.itemId || item.id} className="flex justify-between text-sm">
+                    <div key={item.itemId} className="flex justify-between text-sm">
                       <span>{item.name} ({item.sku})</span>
                       <span className="font-medium">Qty: {item.quantity}</span>
                     </div>
@@ -146,6 +158,16 @@ export const ShipmentFormTabs = ({
       {currentStep === "options" && (
         <div className="space-y-6">
           <ShippingOptionsSection />
+          {onShipmentCreated && setLoading && (
+            <ShipmentFormSubmission
+              loading={loading}
+              setLoading={setLoading}
+              selectedItems={selectedItems}
+              itemsLoading={itemsLoading}
+              hasOrderId={hasOrderId}
+              onShipmentCreated={onShipmentCreated}
+            />
+          )}
         </div>
       )}
 
