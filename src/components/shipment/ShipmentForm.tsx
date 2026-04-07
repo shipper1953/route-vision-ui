@@ -3,11 +3,8 @@ import { useState, useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ShipmentFormTabs } from "@/components/shipment/ShipmentFormTabs";
-import { SmartRate, Rate } from "@/services/easypost";
-import { CombinedRateResponse } from "@/services/rateShoppingService";
 import { shipmentSchema, ShipmentForm as ShipmentFormType } from "@/types/shipment";
 import { OrderLookupSection } from "./form/OrderLookupSection";
-import { ShipmentFormSubmission } from "./form/ShipmentFormSubmission";
 import { SelectedItem } from "@/types/fulfillment";
 import { supabase } from "@/integrations/supabase/client";
 
