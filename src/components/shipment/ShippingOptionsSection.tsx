@@ -307,13 +307,6 @@ export const ShippingOptionsSection = ({
               </CardTitle>
               <CardDescription>
                 {sortedRates.length} rates found
-                {hasMarkup && (
-                  <span className="ml-2">
-                    • Markup: {company.markup_type === "percentage"
-                      ? `${company.markup_value}%`
-                      : `$${company.markup_value?.toFixed(2)}`}
-                  </span>
-                )}
                 {requiredDeliveryDate && (
                   <span>
                     {" "}• Required by{" "}
@@ -482,11 +475,6 @@ const RateCard = ({
           <DollarSign className="h-4 w-4 text-muted-foreground" />
           <span className="text-xl font-bold">{parseFloat(rate.rate).toFixed(2)}</span>
         </div>
-        {hasMarkup && markedUp.markup_applied > 0 && (
-          <div className="text-xs text-muted-foreground">
-            Carrier: ${parseFloat(markedUp.original_rate).toFixed(2)}
-          </div>
-        )}
       </div>
     </button>
   );
