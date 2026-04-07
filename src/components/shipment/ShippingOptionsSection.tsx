@@ -84,7 +84,7 @@ export const ShippingOptionsSection = ({
           name: data.name,
           email: data.email,
           phone: data.phone,
-          address: data.address as CompanyAddress | undefined,
+          address: data.address as unknown as CompanyAddress | undefined,
           settings: data.settings,
           created_at: data.created_at,
           updated_at: data.updated_at,
