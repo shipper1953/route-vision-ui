@@ -138,7 +138,7 @@ export const saveShipmentToSupabase = async (labelData: any): Promise<void> => {
 
     const { data, error } = await supabase
       .from('shipments')
-      .upsert(shipmentData, {
+      .upsert(shipmentData as any, {
         onConflict: 'easypost_id',
         ignoreDuplicates: false
       });
