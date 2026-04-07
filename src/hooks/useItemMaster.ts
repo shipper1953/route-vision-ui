@@ -21,10 +21,9 @@ export const useItemMaster = () => {
   useEffect(() => {
     if (!userProfile) return;
 
-    const channelName = `qboid-item-updates-${Date.now()}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
+    const channelName = `qboid-item-updates-${crypto.randomUUID()}`;
+    const channel = supabase.channel(channelName);
+    channel.on(
         'postgres_changes',
         {
           event: 'INSERT',
