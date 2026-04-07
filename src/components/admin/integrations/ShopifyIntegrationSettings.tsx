@@ -23,7 +23,7 @@ interface ShopifyIntegrationSettingsProps {
 
 export const ShopifyIntegrationSettings = ({ companyId }: ShopifyIntegrationSettingsProps) => {
   const navigate = useNavigate();
-  const { stores, activeStoreId } = useShopifyStores(companyId);
+  const { stores, activeStoreId, activeStore, updateStoreSyncToggle } = useShopifyStores(companyId);
   const { settings, loading, saving, updateSettings, refetch } = useShopifySettings(companyId, activeStoreId || undefined);
   const [activeTab, setActiveTab] = useState("stores");
   const [hasChanges, setHasChanges] = useState(false);
