@@ -963,6 +963,20 @@ serve(async (req) => {
         
         await linkShipmentToOrder(supabase, orderId.toString(), finalShipmentId, enhancedMetadata);
         
+        // Update order status to shipped
+        const numericId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
+        if (!isNaN(numericId)) {
+          const { error: statusError } = await supabase
+            .from('orders')
+            .update({ status: 'shipped' })
+            .eq('id', numericId);
+          if (statusError) {
+            console.warn('⚠️ Failed to update order status to shipped:', statusError);
+          } else {
+            console.log(`✅ Updated order ${numericId} status to shipped`);
+          }
+        }
+        
         const numericOrderId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
         const { data: orderData } = await supabase
           .from('orders')
