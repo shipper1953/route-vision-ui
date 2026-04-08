@@ -46,17 +46,56 @@ export const OrderShipmentsDetailCard = ({ order }: OrderShipmentsDetailCardProp
   const getRemainingItems = (): OrderItem[] => {
     if (!Array.isArray(order.items)) return [];
     
-    const shippedItems = new Map<string, number>();
+    // Build shipped quantities keyed by SKU+name for reliable matching
+    const shippedBySku = new Map<string, number>();
+    const shippedByName = new Map<string, number>();
+    const shippedById = new Map<string, number>();
+    
     shipments.forEach(shipment => {
       shipment.items.forEach(item => {
-        const current = shippedItems.get(item.itemId) || 0;
-        shippedItems.set(item.itemId, current + item.quantity);
+        if (item.sku) {
+          shippedBySku.set(item.sku, (shippedBySku.get(item.sku) || 0) + item.quantity);
+        }
+        if (item.name) {
+          shippedByName.set(item.name, (shippedByName.get(item.name) || 0) + item.quantity);
+        }
+        if (item.itemId) {
+          shippedById.set(item.itemId, (shippedById.get(item.itemId) || 0) + item.quantity);
+        }
       });
     });
 
+    // Track consumed quantities to avoid double-counting
+    const consumedBySku = new Map<string, number>();
+    const consumedByName = new Map<string, number>();
+    const consumedById = new Map<string, number>();
+
     const remaining: OrderItem[] = [];
     order.items.forEach(item => {
-      const shipped = shippedItems.get(item.itemId) || 0;
+      const orderItem = item as any;
+      const sku = orderItem.sku || '';
+      const name = orderItem.name || '';
+      const itemId = orderItem.itemId || orderItem.id || '';
+      
+      // Try matching by SKU first, then name, then itemId
+      let shipped = 0;
+      if (sku && shippedBySku.has(sku)) {
+        const totalShipped = shippedBySku.get(sku) || 0;
+        const alreadyConsumed = consumedBySku.get(sku) || 0;
+        shipped = Math.min(item.quantity, totalShipped - alreadyConsumed);
+        consumedBySku.set(sku, alreadyConsumed + shipped);
+      } else if (name && shippedByName.has(name)) {
+        const totalShipped = shippedByName.get(name) || 0;
+        const alreadyConsumed = consumedByName.get(name) || 0;
+        shipped = Math.min(item.quantity, totalShipped - alreadyConsumed);
+        consumedByName.set(name, alreadyConsumed + shipped);
+      } else if (itemId && shippedById.has(itemId)) {
+        const totalShipped = shippedById.get(itemId) || 0;
+        const alreadyConsumed = consumedById.get(itemId) || 0;
+        shipped = Math.min(item.quantity, totalShipped - alreadyConsumed);
+        consumedById.set(itemId, alreadyConsumed + shipped);
+      }
+      
       const remainingQty = item.quantity - shipped;
       if (remainingQty > 0) {
         remaining.push({ ...item, quantity: remainingQty });
