@@ -87,18 +87,19 @@ serve(async (req) => {
 
       const storeUrl = store.store_url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-      // Sync Ship Tornado → Shopify
-      if (direction === 'ship_tornado_to_shopify' || direction === 'bidirectional') {
-        const result = await syncToShopify(supabase, companyId, store, storeUrl, threshold);
-        allStats.toShopify.updated += result.updated;
-        allStats.toShopify.errors += result.errors;
-      }
-
       // Sync Shopify → Ship Tornado
       if (direction === 'shopify_to_ship_tornado' || direction === 'bidirectional') {
         const result = await syncFromShopify(supabase, companyId, store, storeUrl, threshold);
         allStats.fromShopify.updated += result.updated;
         allStats.fromShopify.errors += result.errors;
+      }
+
+      // Sync Ship Tornado → Shopify
+      // For bidirectional runs, pull from Shopify first so ST can true-up before any push.
+      if (direction === 'ship_tornado_to_shopify' || direction === 'bidirectional') {
+        const result = await syncToShopify(supabase, companyId, store, storeUrl, threshold);
+        allStats.toShopify.updated += result.updated;
+        allStats.toShopify.errors += result.errors;
       }
     }
 
@@ -434,14 +435,25 @@ async function syncFromShopify(
       if (!variant.sku) continue;
 
       try {
-        // Find matching item in Ship Tornado
-        const { data: itemData } = await supabase
+        // Find matching item in Ship Tornado (prefer variant GID mapping, fallback to SKU)
+        let { data: itemData } = await supabase
           .from('items')
           .select('id')
           .eq('company_id', companyId)
           .eq('shopify_store_id', store.id)
-          .eq('sku', variant.sku)
+          .eq('shopify_variant_gid', variant.id)
           .maybeSingle();
+
+        if (!itemData) {
+          const fallback = await supabase
+            .from('items')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('shopify_store_id', store.id)
+            .eq('sku', variant.sku)
+            .maybeSingle();
+          itemData = fallback.data;
+        }
 
         const item = (itemData || null) as { id: string } | null;
         if (!item) continue;
@@ -463,36 +475,49 @@ async function syncFromShopify(
         const shopifyQty = stLocationEdge.node.quantities?.[0]?.quantity ?? 0;
 
         // Get current ST quantity
-        const { data: currentInvData } = await supabase
+        const { data: currentInvData, error: currentInvError } = await supabase
           .from('inventory_levels')
-          .select('id, quantity_on_hand, quantity_available')
+          .select('id, quantity_on_hand, quantity_available, quantity_allocated, received_date')
           .eq('company_id', companyId)
           .eq('item_id', item.id)
           .eq('warehouse_id', warehouse.id)
-          .maybeSingle();
+          .order('received_date', { ascending: true });
 
-        const currentInv = (currentInvData || null) as InventoryLevelRecord | null;
-        const currentQty = currentInv?.quantity_available ?? 0;
+        if (currentInvError) {
+          errors++;
+          console.error(`Failed to load current inventory for ${variant.sku}:`, currentInvError);
+          continue;
+        }
+
+        const currentLevels = (currentInvData || []) as Array<InventoryLevelRecord & { quantity_allocated?: number; received_date?: string }>;
+        const currentQty = currentLevels.reduce((sum, row) => sum + (row.quantity_available || 0), 0);
+        const totalAllocated = currentLevels.reduce((sum, row) => sum + (row.quantity_allocated || 0), 0);
 
         if (Math.abs(currentQty - shopifyQty) < threshold) continue;
 
-        if (currentInv) {
-          // Update existing
+        if (currentLevels.length > 0) {
+          // Update existing inventory by adjusting the first level to absorb the delta.
+          const primaryLevel = currentLevels[0];
+          const delta = shopifyQty - currentQty;
+          const newOnHand = Math.max(0, (primaryLevel.quantity_on_hand || 0) + delta);
+          const newAvailable = Math.max(0, (primaryLevel.quantity_available || 0) + delta);
+
           const { error: updateError } = await supabase
             .from('inventory_levels')
             .update({
-              quantity_on_hand: shopifyQty,
-              quantity_available: shopifyQty - (currentInv.quantity_on_hand - currentInv.quantity_available),
+              quantity_on_hand: newOnHand,
+              quantity_available: newAvailable,
+              quantity_allocated: primaryLevel.quantity_allocated || 0,
               updated_at: new Date().toISOString()
             })
-            .eq('id', currentInv.id);
+            .eq('id', primaryLevel.id);
 
           if (updateError) {
             errors++;
             console.error(`Failed to update ${variant.sku}:`, updateError);
           } else {
             updated++;
-            console.log(`✅ ${variant.sku}: ${currentQty} → ${shopifyQty}`);
+            console.log(`✅ ${variant.sku}: available ${currentQty} → ${shopifyQty} (allocated preserved total=${totalAllocated})`);
           }
         } else {
           // Insert new record

@@ -39,7 +39,7 @@ export interface ShopifySettings {
     };
     inventory: {
       enabled: boolean;
-      sync_direction: 'ship_tornado_to_shopify' | 'bidirectional';
+      sync_direction: 'ship_tornado_to_shopify' | 'shopify_to_ship_tornado' | 'bidirectional';
       sync_frequency: 'real_time' | 'hourly' | 'daily';
       sync_threshold: number;
       low_stock_alert: boolean;
