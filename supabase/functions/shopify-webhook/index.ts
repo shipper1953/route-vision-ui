@@ -427,9 +427,9 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
 
   // Determine order status
   const fulfillmentStatus = order.fulfillment_status || 'unfulfilled';
-  let status = 'processing';
+  let status = 'ready_to_ship';
   if (fulfillmentStatus === 'fulfilled') status = 'shipped';
-  else if (fulfillmentStatus === 'partially_fulfilled') status = 'partially_fulfilled';
+  else if (fulfillmentStatus === 'partially_fulfilled') status = 'partially_shipped';
   else if (order.cancelled_at) status = 'cancelled';
 
   const customerName = order.customer

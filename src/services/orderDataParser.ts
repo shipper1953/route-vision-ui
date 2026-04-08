@@ -162,16 +162,28 @@ export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
     console.log("Parsed items for order:", supabaseOrder.id, parsedItems);
   }
 
+  const normalizedStatus = (() => {
+    const rawStatus = supabaseOrder.status || "ready_to_ship";
+    if (rawStatus === 'processing' || rawStatus === 'pending') return 'ready_to_ship';
+    if (rawStatus === 'partially_fulfilled') return 'partially_shipped';
+    return rawStatus;
+  })();
+
   return {
     id: String(supabaseOrder.id), // Always convert to string for consistency
     orderId: supabaseOrder.order_id || "", // Shopify order number
+    shopifyOrderId: supabaseOrder.shopify_order_id || undefined,
+    shopifyOrderNumber: supabaseOrder.shopify_order_number || supabaseOrder.order_id || "",
+    shopifyOrderUrl: supabaseOrder.shopify_store_url && supabaseOrder.shopify_order_id
+      ? `https://${supabaseOrder.shopify_store_url}/admin/orders/${supabaseOrder.shopify_order_id}`
+      : undefined,
     customerName: supabaseOrder.customer_name || "",
     customerCompany: supabaseOrder.customer_company || "",
     customerPhone: supabaseOrder.customer_phone || "",
     customerEmail: supabaseOrder.customer_email || "",
     orderDate: supabaseOrder.order_date || new Date().toISOString(),
     requiredDeliveryDate: supabaseOrder.required_delivery_date || "",
-    status: supabaseOrder.status || "pending",
+    status: normalizedStatus,
     items: parsedItems,
     value: supabaseOrder.value || "0.00",
     shippingAddress: parseShippingAddress(supabaseOrder.shipping_address),
@@ -182,5 +194,7 @@ export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
       actualDeliveryDate: supabaseOrder.actual_delivery_date
     } : null, // Map shipment_data to shipment field with delivery dates from order
     warehouseId: supabaseOrder.warehouse_id || undefined,
+    estimatedDeliveryDate: supabaseOrder.estimated_delivery_date || undefined,
+    actualDeliveryDate: supabaseOrder.actual_delivery_date || undefined,
   };
 };
