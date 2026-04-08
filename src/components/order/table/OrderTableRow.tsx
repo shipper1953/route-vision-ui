@@ -29,6 +29,7 @@ interface ShipmentInfo {
   carrier: string;
   service: string;
   trackingNumber: string;
+  status?: string;
   trackingUrl?: string;
   estimatedDeliveryDate?: string;
   actualDeliveryDate?: string;
@@ -83,6 +84,13 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   useEffect(() => {
     const fetchAllShipments = async () => {
       try {
+        const getShipmentRecord = (shipmentData: any) => {
+          if (Array.isArray(shipmentData)) {
+            return shipmentData[0] || null;
+          }
+          return shipmentData || null;
+        };
+
         // First try to get from order_shipments table (for multi-package orders)
         const { data: orderShipments, error: osError } = await supabase
           .from('order_shipments')
@@ -109,15 +117,16 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
 
         if (!osError && orderShipments?.length > 0) {
           const shipmentInfos: ShipmentInfo[] = orderShipments.map((os) => ({
-            id: (os.shipments as any)?.easypost_id || (os.shipments as any)?.id?.toString() || '',
-            carrier: (os.shipments as any)?.carrier || 'Unknown',
-            service: (os.shipments as any)?.service || 'Unknown',
-            trackingNumber: (os.shipments as any)?.tracking_number || 'N/A',
-            trackingUrl: (os.shipments as any)?.tracking_url || '',
-            estimatedDeliveryDate: (os.shipments as any)?.estimated_delivery_date || '',
-            actualDeliveryDate: (os.shipments as any)?.actual_delivery_date || '',
-            cost: (os.shipments as any)?.cost || 0,
-            labelUrl: (os.shipments as any)?.label_url || '',
+            id: getShipmentRecord(os.shipments)?.easypost_id || getShipmentRecord(os.shipments)?.id?.toString() || '',
+            carrier: getShipmentRecord(os.shipments)?.carrier || 'Unknown',
+            service: getShipmentRecord(os.shipments)?.service || 'Unknown',
+            status: getShipmentRecord(os.shipments)?.status || undefined,
+            trackingNumber: getShipmentRecord(os.shipments)?.tracking_number || 'N/A',
+            trackingUrl: getShipmentRecord(os.shipments)?.tracking_url || '',
+            estimatedDeliveryDate: getShipmentRecord(os.shipments)?.estimated_delivery_date || '',
+            actualDeliveryDate: getShipmentRecord(os.shipments)?.actual_delivery_date || '',
+            cost: getShipmentRecord(os.shipments)?.cost || 0,
+            labelUrl: getShipmentRecord(os.shipments)?.label_url || '',
             packageIndex: os.package_index || 0
           }));
           setAllShipments(shipmentInfos);
@@ -130,6 +139,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
             id: order.shipment.id || '',
             carrier: order.shipment.carrier || 'Unknown',
             service: order.shipment.service || 'Unknown',
+            status: undefined,
             trackingNumber: order.shipment.trackingNumber || 'N/A',
             trackingUrl: order.shipment.trackingUrl || '',
             estimatedDeliveryDate: order.shipment.estimatedDeliveryDate || '',
@@ -150,6 +160,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
               id: shippingAddress.easypostShipmentId || '',
               carrier: shippingAddress.carrier || 'Unknown',
               service: shippingAddress.service || 'Unknown',
+              status: shippingAddress.status || undefined,
               trackingNumber: shippingAddress.trackingNumber || 'N/A',
               trackingUrl: shippingAddress.trackingUrl || '',
               estimatedDeliveryDate: shippingAddress.estimatedDeliveryDate || '',
@@ -241,7 +252,13 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
 
   const earliestEstimatedDelivery = getEarliestEstimatedDelivery();
   const latestActualDelivery = getLatestActualDelivery();
-  const displayStatus = order.status.replace(/_/g, ' ');
+  const hasDeliveredShipment = allShipments.some(
+    (shipment) =>
+      shipment.actualDeliveryDate ||
+      shipment.status?.toLowerCase() === 'delivered'
+  );
+  const effectiveStatus = hasDeliveredShipment ? 'delivered' : order.status;
+  const displayStatus = effectiveStatus.replace(/_/g, ' ');
   const displayShopifyOrderNumber = order.shopifyOrderNumber || order.orderId || '-';
 
   return (
@@ -275,7 +292,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
       <TableCell>{order.value}</TableCell>
       <TableCell>
         <div className="flex flex-col gap-1">
-          <Badge variant={getStatusBadgeVariant(order.status)}>
+          <Badge variant={getStatusBadgeVariant(effectiveStatus)}>
             {displayStatus}
           </Badge>
           {(order.fulfillment_status === 'partially_fulfilled' || order.status === 'partially_shipped' ||
@@ -430,9 +447,9 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
               </TooltipContent>
             </Tooltip>
 
-            {order.status !== 'shipped' && 
-             order.status !== 'delivered' && 
-             order.status !== 'partially_shipped' && (
+            {effectiveStatus !== 'shipped' && 
+             effectiveStatus !== 'delivered' && 
+             effectiveStatus !== 'partially_shipped' && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -464,7 +481,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
               </TooltipContent>
             </Tooltip>
 
-            {order.status !== 'shipped' && order.status !== 'delivered' && order.status !== 'partially_shipped' && (
+            {effectiveStatus !== 'shipped' && effectiveStatus !== 'delivered' && effectiveStatus !== 'partially_shipped' && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
