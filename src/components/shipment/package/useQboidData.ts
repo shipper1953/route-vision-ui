@@ -60,8 +60,8 @@ export const useQboidData = () => {
             form.setValue('toCompany', order.customerCompany || order.customer_company || '');
             form.setValue('toPhone', order.customerPhone || order.customer_phone || '');
             form.setValue('toEmail', order.customerEmail || order.customer_email || '');
-            form.setValue('toStreet1', addr.street1 || '');
-            form.setValue('toStreet2', addr.street2 || '');
+            form.setValue('toStreet1', addr.street1 || addr.address1 || '');
+            form.setValue('toStreet2', addr.street2 || addr.address2 || '');
             form.setValue('toCity', addr.city || '');
             form.setValue('toState', addr.state || '');
             form.setValue('toZip', addr.zip || '');
