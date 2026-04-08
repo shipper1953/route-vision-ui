@@ -467,7 +467,7 @@ async function handleFulfillmentServiceFlow(
         url: trackingUrl,
         company: carrier
       },
-      notifyCustomer: store.sync_config?.fulfillment?.notify_customer !== false
+      notifyCustomer: true
     }
   };
 
@@ -642,7 +642,7 @@ async function handleLegacyFlow(
         url: trackingUrl,
         company: carrier
       },
-      notifyCustomer: store.sync_config?.fulfillment?.notify_customer !== false
+      notifyCustomer: true
     }
   };
 
