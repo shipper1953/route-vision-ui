@@ -111,7 +111,7 @@ serve(async (req) => {
     if (storeId) {
       const { data: storeData, error: storeError } = await supabase
         .from('shopify_stores')
-        .select('store_url, access_token, fulfillment_service_location_id, sync_config')
+        .select('store_url, access_token, fulfillment_service_location_id')
         .eq('id', storeId)
         .single();
       console.log('Store lookup result:', storeData ? `Found: ${storeData.store_url}` : 'Not found', 'Error:', storeError?.message);
