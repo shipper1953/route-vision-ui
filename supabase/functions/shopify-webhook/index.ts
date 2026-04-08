@@ -245,6 +245,86 @@ async function resolveUniqueOrderId(
   return `${preferredOrderId}-${shopifyOrderId.slice(-6)}`;
 }
 
+async function reserveInventoryForOrder(
+  supabase: any,
+  params: {
+    companyId: string;
+    warehouseId: string;
+    orderRef: string;
+    lineItems: Array<{ sku?: string; quantity?: number }>;
+  },
+) {
+  const { companyId, warehouseId, orderRef, lineItems } = params;
+
+  for (const lineItem of lineItems) {
+    const sku = sanitizeString(lineItem.sku, 100);
+    const requestedQty = Number(lineItem.quantity || 0);
+
+    if (!sku || requestedQty <= 0) {
+      continue;
+    }
+
+    const { data: item } = await supabase
+      .from('items')
+      .select('id, sku')
+      .eq('company_id', companyId)
+      .eq('sku', sku)
+      .maybeSingle();
+
+    if (!item?.id) {
+      console.warn(`⚠️ [${orderRef}] No item mapping found for SKU "${sku}", skipping inventory reservation`);
+      continue;
+    }
+
+    const { data: levels, error: levelsError } = await supabase
+      .from('inventory_levels')
+      .select('id, quantity_on_hand, quantity_available, quantity_allocated, received_date')
+      .eq('company_id', companyId)
+      .eq('warehouse_id', warehouseId)
+      .eq('item_id', item.id)
+      .gt('quantity_available', 0)
+      .order('received_date', { ascending: true });
+
+    if (levelsError) {
+      console.error(`❌ [${orderRef}] Failed to load inventory levels for SKU "${sku}":`, levelsError);
+      continue;
+    }
+
+    let remainingToReserve = requestedQty;
+
+    for (const level of levels || []) {
+      if (remainingToReserve <= 0) break;
+
+      const reserveQty = Math.min(level.quantity_available || 0, remainingToReserve);
+      if (reserveQty <= 0) continue;
+
+      const newAllocated = (level.quantity_allocated || 0) + reserveQty;
+      const newAvailable = Math.max(0, (level.quantity_available || 0) - reserveQty);
+
+      const { error: updateError } = await supabase
+        .from('inventory_levels')
+        .update({
+          quantity_allocated: newAllocated,
+          quantity_available: newAvailable,
+        })
+        .eq('id', level.id);
+
+      if (updateError) {
+        console.error(`❌ [${orderRef}] Failed reserving ${reserveQty} units of SKU "${sku}" on level ${level.id}:`, updateError);
+        continue;
+      }
+
+      remainingToReserve -= reserveQty;
+    }
+
+    if (remainingToReserve > 0) {
+      console.warn(`⚠️ [${orderRef}] Insufficient available inventory for SKU "${sku}". Requested ${requestedQty}, reserved ${requestedQty - remainingToReserve}.`);
+    } else {
+      console.log(`✅ [${orderRef}] Reserved ${requestedQty} units for SKU "${sku}"`);
+    }
+  }
+}
+
 async function routeAndRequestFulfillmentOrders(store: any, shopifyOrderId: string) {
   if (!store.fulfillment_service_id || !store.fulfillment_service_location_id) {
     console.log('Fulfillment service is not fully configured, skipping auto-routing');
@@ -536,6 +616,16 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
     }
 
     console.log('✅ Created new order:', newOrder.id, 'from Shopify order', order.order_number);
+
+    await reserveInventoryForOrder(supabase, {
+      companyId,
+      warehouseId: warehouse.id,
+      orderRef: resolvedOrderId,
+      lineItems: lineItems.map((li: any) => ({
+        sku: li.sku,
+        quantity: li.quantity,
+      })),
+    });
   }
 
   if (store.fulfillment_service_id && store.fulfillment_service_location_id) {
