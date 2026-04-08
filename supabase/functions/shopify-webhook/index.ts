@@ -509,6 +509,7 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
       .insert({
         ...orderData,
         order_id: resolvedOrderId,
+        required_delivery_date: addBusinessDays(new Date(), 5).toISOString().split('T')[0],
       })
       .select('id')
       .single();
