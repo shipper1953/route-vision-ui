@@ -62,7 +62,8 @@ export const ShopifyInventorySettings = ({
       const { data, error } = await supabase.functions.invoke('shopify-sync-inventory', {
         body: {
           direction,
-          threshold: inventoryConfig.sync_threshold,
+          // Manual sync buttons should force a true-up regardless of threshold.
+          threshold: 0,
           storeId: storeId || undefined
         }
       });

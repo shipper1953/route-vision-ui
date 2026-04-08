@@ -455,24 +455,42 @@ async function syncFromShopify(
           itemData = fallback.data;
         }
 
+        // Additional fallback for legacy items not scoped to a Shopify store.
+        if (!itemData) {
+          const legacyFallback = await supabase
+            .from('items')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('sku', variant.sku)
+            .maybeSingle();
+          itemData = legacyFallback.data;
+        }
+
         const item = (itemData || null) as { id: string } | null;
         if (!item) continue;
 
-        // Only read quantity from the Ship Tornado fulfillment service location
-        if (!configuredLocationId) {
+        const inventoryEdges = variant.inventoryItem?.inventoryLevels?.edges || [];
+        let shopifyQty = 0;
+
+        // Preferred: location-specific quantity for configured ST location.
+        if (configuredLocationId) {
+          const stLocationEdge = inventoryEdges
+            .find((edge: any) => normalizeLocationId(edge.node.location?.id) === configuredLocationId);
+
+          if (!stLocationEdge) {
+            skippedMissingStLocationInShopify++;
+            continue; // SKU not stocked at our configured location
+          }
+
+          shopifyQty = stLocationEdge.node.quantities?.[0]?.quantity ?? 0;
+        } else {
+          // Fallback: aggregate across all Shopify locations when no explicit location is configured.
           skippedMissingStLocationConfig++;
-          continue;
+          shopifyQty = inventoryEdges.reduce(
+            (sum: number, edge: any) => sum + (edge.node.quantities?.[0]?.quantity ?? 0),
+            0
+          );
         }
-
-        const stLocationEdge = (variant.inventoryItem?.inventoryLevels?.edges || [])
-          .find((edge: any) => normalizeLocationId(edge.node.location?.id) === configuredLocationId);
-
-        if (!stLocationEdge) {
-          skippedMissingStLocationInShopify++;
-          continue; // SKU not stocked at our location
-        }
-
-        const shopifyQty = stLocationEdge.node.quantities?.[0]?.quantity ?? 0;
 
         // Get current ST quantity
         const { data: currentInvData, error: currentInvError } = await supabase
@@ -555,7 +573,7 @@ async function syncFromShopify(
   if (skippedMissingStLocationConfig > 0 || skippedMissingStLocationInShopify > 0) {
     console.log(
       `Shopify → ST skips for store ${store.store_name || store.id}: ` +
-      `missing-config=${skippedMissingStLocationConfig}, location-not-found=${skippedMissingStLocationInShopify}`
+      `missing-config(fallback-used)=${skippedMissingStLocationConfig}, location-not-found=${skippedMissingStLocationInShopify}`
     );
   }
 
