@@ -595,7 +595,7 @@ async function saveShipmentToDatabase(
       tracking_number: purchaseResponse.tracking_code,
       carrier: purchaseResponse.selected_rate?.carrier,
       service: purchaseResponse.selected_rate?.service,
-      status: 'purchased',
+      status: 'shipped',
       label_url: purchaseResponse.postage_label?.label_url,
       label_zpl: zplContent,
       tracking_url: purchaseResponse.tracker?.public_url,
