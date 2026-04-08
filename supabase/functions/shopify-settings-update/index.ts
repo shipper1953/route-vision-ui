@@ -50,6 +50,22 @@ serve(async (req) => {
         sync_config: {
           ...(currentSettings.shopify?.sync_config || {}),
           ...(settings.sync_config || {}),
+          orders: {
+            ...(currentSettings.shopify?.sync_config?.orders || {}),
+            ...(settings.sync_config?.orders || {}),
+          },
+          fulfillment: {
+            ...(currentSettings.shopify?.sync_config?.fulfillment || {}),
+            ...(settings.sync_config?.fulfillment || {}),
+          },
+          inventory: {
+            ...(currentSettings.shopify?.sync_config?.inventory || {}),
+            ...(settings.sync_config?.inventory || {}),
+          },
+          products: {
+            ...(currentSettings.shopify?.sync_config?.products || {}),
+            ...(settings.sync_config?.products || {}),
+          },
         },
         features: {
           ...(currentSettings.shopify?.features || {}),

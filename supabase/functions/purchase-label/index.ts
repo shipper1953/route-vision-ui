@@ -827,6 +827,112 @@ async function linkShipmentToOrder(
   return orderUpdateSuccess;
 }
 
+async function reduceInventoryOnShipment(
+  supabaseClient: any,
+  params: {
+    orderId: number;
+    shippedItems?: Array<any>;
+  },
+) {
+  const { orderId, shippedItems = [] } = params;
+  const { data: orderData, error: orderError } = await supabaseClient
+    .from('orders')
+    .select('company_id, warehouse_id, items')
+    .eq('id', orderId)
+    .maybeSingle();
+
+  if (orderError || !orderData) {
+    console.warn(`⚠️ Unable to load order ${orderId} for shipment inventory deduction`, orderError);
+    return;
+  }
+
+  const sourceItems = shippedItems.length > 0 ? shippedItems : (Array.isArray(orderData.items) ? orderData.items : []);
+  const qtyByItemId = new Map<string, number>();
+  const qtyBySku = new Map<string, number>();
+
+  for (const item of sourceItems) {
+    const qty = Number(item?.quantity || item?.qty || 0);
+    if (qty <= 0) continue;
+
+    const itemId = item?.itemId || item?.id || null;
+    const sku = typeof item?.sku === 'string' ? item.sku : null;
+
+    if (itemId) {
+      qtyByItemId.set(itemId, (qtyByItemId.get(itemId) || 0) + qty);
+    } else if (sku) {
+      qtyBySku.set(sku, (qtyBySku.get(sku) || 0) + qty);
+    }
+  }
+
+  if (qtyBySku.size > 0) {
+    const skus = Array.from(qtyBySku.keys());
+    const { data: skuItems } = await supabaseClient
+      .from('items')
+      .select('id, sku')
+      .eq('company_id', orderData.company_id)
+      .in('sku', skus);
+
+    for (const mappedItem of skuItems || []) {
+      const skuQty = qtyBySku.get(mappedItem.sku) || 0;
+      if (skuQty > 0) {
+        qtyByItemId.set(mappedItem.id, (qtyByItemId.get(mappedItem.id) || 0) + skuQty);
+      }
+    }
+  }
+
+  for (const [itemId, shipQty] of qtyByItemId.entries()) {
+    let remainingToShip = shipQty;
+
+    const { data: levels, error: levelsError } = await supabaseClient
+      .from('inventory_levels')
+      .select('id, quantity_on_hand, quantity_available, quantity_allocated, received_date')
+      .eq('company_id', orderData.company_id)
+      .eq('warehouse_id', orderData.warehouse_id)
+      .eq('item_id', itemId)
+      .gt('quantity_on_hand', 0)
+      .order('received_date', { ascending: true });
+
+    if (levelsError) {
+      console.error(`❌ Failed loading inventory for shipped item ${itemId}:`, levelsError);
+      continue;
+    }
+
+    for (const level of levels || []) {
+      if (remainingToShip <= 0) break;
+
+      const shipFromLevel = Math.min(level.quantity_on_hand || 0, remainingToShip);
+      if (shipFromLevel <= 0) continue;
+
+      const newOnHand = Math.max(0, (level.quantity_on_hand || 0) - shipFromLevel);
+      const deallocateQty = Math.min(level.quantity_allocated || 0, shipFromLevel);
+      const newAllocated = Math.max(0, (level.quantity_allocated || 0) - deallocateQty);
+      const newAvailable = Math.max(0, newOnHand - newAllocated);
+
+      const { error: updateError } = await supabaseClient
+        .from('inventory_levels')
+        .update({
+          quantity_on_hand: newOnHand,
+          quantity_allocated: newAllocated,
+          quantity_available: newAvailable,
+        })
+        .eq('id', level.id);
+
+      if (updateError) {
+        console.error(`❌ Failed deducting shipped inventory on level ${level.id}:`, updateError);
+        continue;
+      }
+
+      remainingToShip -= shipFromLevel;
+    }
+
+    if (remainingToShip > 0) {
+      console.warn(`⚠️ Shipment deduction short for item ${itemId}. Requested ${shipQty}, deducted ${shipQty - remainingToShip}.`);
+    } else {
+      console.log(`✅ Deducted ${shipQty} shipped units for item ${itemId}`);
+    }
+  }
+}
+
 // ========== MAIN HANDLER ==========
 
 serve(async (req) => {
@@ -987,6 +1093,11 @@ serve(async (req) => {
         // Update order status to shipped
         const numericId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
         if (!isNaN(numericId)) {
+          await reduceInventoryOnShipment(supabase, {
+            orderId: numericId,
+            shippedItems: enhancedMetadata?.items || [],
+          });
+
           const { error: statusError } = await supabase
             .from('orders')
             .update({ status: 'shipped' })
