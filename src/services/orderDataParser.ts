@@ -143,8 +143,8 @@ export const parseShippingAddress = (addressData: any) => {
   }
 
   return {
-    street1: addressData.street1 || "",
-    street2: addressData.street2 || "",
+    street1: addressData.street1 || addressData.address1 || "",
+    street2: addressData.street2 || addressData.address2 || "",
     city: addressData.city || "",
     state: addressData.state || "",
     zip: addressData.zip || "",

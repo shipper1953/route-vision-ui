@@ -416,8 +416,8 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
   const shippingAddr = order.shipping_address ? {
     name: sanitizeString(`${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim(), 200),
     company: sanitizeString(order.shipping_address.company, 255),
-    address1: sanitizeString(order.shipping_address.address1, 255),
-    address2: sanitizeString(order.shipping_address.address2, 255),
+    street1: sanitizeString(order.shipping_address.address1, 255),
+    street2: sanitizeString(order.shipping_address.address2, 255),
     city: sanitizeString(order.shipping_address.city, 100),
     state: sanitizeString(order.shipping_address.province_code || order.shipping_address.province, 100),
     zip: sanitizeString(order.shipping_address.zip, 20),
