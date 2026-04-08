@@ -123,7 +123,7 @@ serve(async (req) => {
       console.log('Store not found by ID, trying company_id fallback...', order.company_id);
       const { data: storeData, error: fallbackError } = await supabase
         .from('shopify_stores')
-        .select('store_url, access_token, fulfillment_service_location_id, sync_config')
+        .select('store_url, access_token, fulfillment_service_location_id')
         .eq('company_id', order.company_id)
         .not('access_token', 'is', null)
         .limit(1)
