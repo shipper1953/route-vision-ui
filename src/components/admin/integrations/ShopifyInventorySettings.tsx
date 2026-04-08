@@ -32,7 +32,7 @@ export const ShopifyInventorySettings = ({
   storeSyncEnabled = true,
   onStoreSyncToggle,
 }: ShopifyInventorySettingsProps) => {
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncInProgress, setSyncInProgress] = useState<null | 'shopify_to_ship_tornado' | 'ship_tornado_to_shopify'>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const inventoryConfig = settings.sync_config.inventory;
 
@@ -49,19 +49,19 @@ export const ShopifyInventorySettings = ({
     onChange();
   };
 
-  const handleSyncNow = async () => {
+  const handleSyncNow = async (direction: 'shopify_to_ship_tornado' | 'ship_tornado_to_shopify') => {
     if (!companyId) {
       toast.error('Company ID not found');
       return;
     }
 
-    setIsSyncing(true);
+    setSyncInProgress(direction);
     try {
-      console.log('Starting inventory sync...');
+      console.log('Starting inventory sync...', { direction });
       
       const { data, error } = await supabase.functions.invoke('shopify-sync-inventory', {
         body: {
-          direction: inventoryConfig.sync_direction,
+          direction,
           threshold: inventoryConfig.sync_threshold,
           storeId: storeId || undefined
         }
@@ -75,7 +75,11 @@ export const ShopifyInventorySettings = ({
       setLastSync(new Date());
       
       if (data.success) {
-        toast.success(`Inventory synced: ${data.stats.toShopify.updated + data.stats.fromShopify.updated} items updated`);
+        if (direction === 'shopify_to_ship_tornado') {
+          toast.success(`Synced from Shopify: ${data.stats.fromShopify.updated} items updated`);
+        } else {
+          toast.success(`Synced to Shopify: ${data.stats.toShopify.updated} items updated`);
+        }
       } else {
         toast.error('Inventory sync failed');
       }
@@ -84,7 +88,7 @@ export const ShopifyInventorySettings = ({
       console.error('Sync error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to sync inventory');
     } finally {
-      setIsSyncing(false);
+      setSyncInProgress(null);
     }
   };
 
@@ -106,24 +110,44 @@ export const ShopifyInventorySettings = ({
               Sync inventory levels between Ship Tornado and Shopify
             </CardDescription>
           </div>
-          <Button 
-            onClick={handleSyncNow} 
-            disabled={!inventoryConfig.enabled || isSyncing}
-            variant="outline"
-            size="sm"
-          >
-            {isSyncing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Sync Now
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => handleSyncNow('shopify_to_ship_tornado')} 
+              disabled={!inventoryConfig.enabled || syncInProgress !== null}
+              variant="outline"
+              size="sm"
+            >
+              {syncInProgress === 'shopify_to_ship_tornado' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync from Shopify
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={() => handleSyncNow('ship_tornado_to_shopify')} 
+              disabled={!inventoryConfig.enabled || syncInProgress !== null}
+              variant="outline"
+              size="sm"
+            >
+              {syncInProgress === 'ship_tornado_to_shopify' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync to Shopify
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -195,6 +219,9 @@ export const ShopifyInventorySettings = ({
           </Select>
           <p className="text-xs text-muted-foreground">
             Real-time requires webhook configuration
+          </p>
+          <p className="text-xs text-muted-foreground">
+            This direction controls automatic sync behavior for order-driven inventory updates and adjustments. Manual buttons above always run the selected one-way sync.
           </p>
         </div>
 
