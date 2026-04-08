@@ -91,8 +91,8 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
         // Properly map shipping address fields from the order
         if (order.shippingAddress && Object.keys(order.shippingAddress).length > 0) {
           console.log("Setting shipping address from order:", order.shippingAddress);
-          form.setValue("toStreet1", order.shippingAddress.street1 || "");
-          form.setValue("toStreet2", order.shippingAddress.street2 || "");
+          form.setValue("toStreet1", order.shippingAddress.street1 || order.shippingAddress.address1 || "");
+          form.setValue("toStreet2", order.shippingAddress.street2 || order.shippingAddress.address2 || "");
           form.setValue("toCity", order.shippingAddress.city || "");
           form.setValue("toState", order.shippingAddress.state || "");
           form.setValue("toZip", order.shippingAddress.zip || "");

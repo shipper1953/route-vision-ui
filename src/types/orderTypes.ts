@@ -2,8 +2,10 @@
 // Order data type definitions
 
 export interface OrderAddress {
-  street1: string;
+  street1?: string;
   street2?: string;
+  address1?: string;
+  address2?: string;
   city: string;
   state: string;
   zip: string;
