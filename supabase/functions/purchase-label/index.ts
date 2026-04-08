@@ -112,6 +112,18 @@ async function processWalletPayment(companyId: string, labelCost: number, userId
   console.log(`✅ Deducted $${labelCost.toFixed(2)} from wallet. New balance: $${result.new_balance.toFixed(2)}`);
 }
 
+function parsePositiveAmount(value: unknown): number | null {
+  const parsed = typeof value === 'string' || typeof value === 'number'
+    ? parseFloat(String(value))
+    : NaN;
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
 // ========== EASYPOST SERVICE ==========
 
 async function fetchZplContent(zplUrl: string, apiKey: string): Promise<string | null> {
@@ -910,9 +922,18 @@ serve(async (req) => {
         companyIdForWallet = userProfile.company_id;
       }
 
-      const labelCost = provider === 'shippo' 
-        ? parseFloat(purchaseResponse.rate?.amount || '0')
-        : parseFloat(purchaseResponse.selected_rate?.rate || '0');
+      const carrierCost = provider === 'shippo'
+        ? parsePositiveAmount(purchaseResponse.rate?.amount || purchaseResponse.amount)
+        : parsePositiveAmount(purchaseResponse.selected_rate?.rate);
+      const markedUpLabelCost = parsePositiveAmount(markedUpCost);
+      const labelCost = markedUpLabelCost ?? carrierCost ?? 0;
+
+      console.log('💳 Wallet charge amount resolved', {
+        provider: provider || 'easypost',
+        markedUpLabelCost,
+        carrierCost,
+        chargedAmount: labelCost
+      });
       
       const purchaseResponseId = provider === 'shippo' 
         ? purchaseResponse.object_id 
