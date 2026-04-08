@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
 import { useDefaultAddressValues } from "@/hooks/useDefaultAddressValues";
 import { useEffect } from "react";
+import { getDefaultRequiredDeliveryDate } from "@/utils/businessDays";
 
 const CreateOrder = () => {
   const { isAuthenticated, loading, userProfile } = useAuth();
@@ -33,7 +34,7 @@ const CreateOrder = () => {
       customerCompany: "",
       customerEmail: "",
       customerPhone: "",
-      requiredDeliveryDate: undefined,
+      requiredDeliveryDate: getDefaultRequiredDeliveryDate(),
       orderItems: [],
       items: 0,
       value: 0,
@@ -81,11 +82,9 @@ const CreateOrder = () => {
           form.setValue("orderItems", formattedItems);
         }
         
-        // Set default delivery date if not provided (3 days from today)
+        // Set default delivery date if not provided (5 business days from today)
         if (!orderData.requiredDeliveryDate) {
-          const defaultDate = new Date();
-          defaultDate.setDate(defaultDate.getDate() + 3);
-          form.setValue("requiredDeliveryDate", defaultDate);
+          form.setValue("requiredDeliveryDate", getDefaultRequiredDeliveryDate());
         }
       } catch (error) {
         console.error("Failed to parse copied order data:", error);

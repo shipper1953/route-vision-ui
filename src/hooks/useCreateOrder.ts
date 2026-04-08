@@ -6,6 +6,7 @@ import { OrderFormValues } from "@/types/order";
 import { createOrder } from "@/services/orderCreationService";
 import { useAuth } from "@/hooks/useAuth";
 import { useItemMaster } from "@/hooks/useItemMaster";
+import { getDefaultRequiredDeliveryDate } from "@/utils/businessDays";
 
 export const useCreateOrder = () => {
   const navigate = useNavigate();
@@ -34,7 +35,8 @@ export const useCreateOrder = () => {
     
     try {
       // Format the date for the API
-      const formattedDate = data.requiredDeliveryDate.toISOString().split('T')[0];
+      const requiredDeliveryDate = data.requiredDeliveryDate ?? getDefaultRequiredDeliveryDate();
+      const formattedDate = requiredDeliveryDate.toISOString().split('T')[0];
       
       // Calculate total items count and value
       const totalItems = data.orderItems.reduce((sum, item) => sum + item.quantity, 0);
