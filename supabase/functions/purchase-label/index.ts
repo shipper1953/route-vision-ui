@@ -541,7 +541,7 @@ async function saveShipmentToDatabase(
       tracking_number: purchaseResponse.tracking_number,
       carrier: purchaseResponse.rate?.provider || purchaseResponse.carrier_account || 'Unknown',
       service: purchaseResponse.rate?.servicelevel?.name || purchaseResponse.servicelevel?.name || 'Unknown',
-      status: 'purchased',
+      status: 'shipped',
       label_url: purchaseResponse.label_url,
       label_zpl: purchaseResponse.label_zpl || null,
       tracking_url: purchaseResponse.tracking_url_provider,
@@ -595,7 +595,7 @@ async function saveShipmentToDatabase(
       tracking_number: purchaseResponse.tracking_code,
       carrier: purchaseResponse.selected_rate?.carrier,
       service: purchaseResponse.selected_rate?.service,
-      status: 'purchased',
+      status: 'shipped',
       label_url: purchaseResponse.postage_label?.label_url,
       label_zpl: zplContent,
       tracking_url: purchaseResponse.tracker?.public_url,
@@ -962,6 +962,20 @@ serve(async (req) => {
         }
         
         await linkShipmentToOrder(supabase, orderId.toString(), finalShipmentId, enhancedMetadata);
+        
+        // Update order status to shipped
+        const numericId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
+        if (!isNaN(numericId)) {
+          const { error: statusError } = await supabase
+            .from('orders')
+            .update({ status: 'shipped' })
+            .eq('id', numericId);
+          if (statusError) {
+            console.warn('⚠️ Failed to update order status to shipped:', statusError);
+          } else {
+            console.log(`✅ Updated order ${numericId} status to shipped`);
+          }
+        }
         
         const numericOrderId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
         const { data: orderData } = await supabase
