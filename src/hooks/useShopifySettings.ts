@@ -172,7 +172,23 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
             } : undefined,
             sync_config: {
               ...DEFAULT_SETTINGS.sync_config,
-              ...storeSettings.sync_config,
+              ...(storeSettings.sync_config || {}),
+              orders: {
+                ...DEFAULT_SETTINGS.sync_config.orders,
+                ...(storeSettings.sync_config?.orders || {}),
+              },
+              fulfillment: {
+                ...DEFAULT_SETTINGS.sync_config.fulfillment,
+                ...(storeSettings.sync_config?.fulfillment || {}),
+              },
+              inventory: {
+                ...DEFAULT_SETTINGS.sync_config.inventory,
+                ...(storeSettings.sync_config?.inventory || {}),
+              },
+              products: {
+                ...DEFAULT_SETTINGS.sync_config.products,
+                ...(storeSettings.sync_config?.products || {}),
+              },
             },
             features: {
               ...DEFAULT_SETTINGS.features,
@@ -207,7 +223,23 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
             fulfillment_service: shopifySettings.fulfillment_service,
             sync_config: {
               ...DEFAULT_SETTINGS.sync_config,
-              ...shopifySettings.sync_config,
+              ...(shopifySettings.sync_config || {}),
+              orders: {
+                ...DEFAULT_SETTINGS.sync_config.orders,
+                ...(shopifySettings.sync_config?.orders || {}),
+              },
+              fulfillment: {
+                ...DEFAULT_SETTINGS.sync_config.fulfillment,
+                ...(shopifySettings.sync_config?.fulfillment || {}),
+              },
+              inventory: {
+                ...DEFAULT_SETTINGS.sync_config.inventory,
+                ...(shopifySettings.sync_config?.inventory || {}),
+              },
+              products: {
+                ...DEFAULT_SETTINGS.sync_config.products,
+                ...(shopifySettings.sync_config?.products || {}),
+              },
             },
             features: {
               ...DEFAULT_SETTINGS.features,
@@ -253,6 +285,22 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
           sync_config: {
             ...(currentStoreSettings.sync_config || {}),
             ...(newSettings.sync_config || {}),
+            orders: {
+              ...(currentStoreSettings.sync_config?.orders || {}),
+              ...(newSettings.sync_config?.orders || {}),
+            },
+            fulfillment: {
+              ...(currentStoreSettings.sync_config?.fulfillment || {}),
+              ...(newSettings.sync_config?.fulfillment || {}),
+            },
+            inventory: {
+              ...(currentStoreSettings.sync_config?.inventory || {}),
+              ...(newSettings.sync_config?.inventory || {}),
+            },
+            products: {
+              ...(currentStoreSettings.sync_config?.products || {}),
+              ...(newSettings.sync_config?.products || {}),
+            },
           },
           features: {
             ...(currentStoreSettings.features || {}),
