@@ -14,7 +14,6 @@ import { getStatusBadgeVariant } from "../helpers/statusHelper";
 import { recalculateOrderCartonization } from "@/utils/recalculateOrderCartonization";
 import { toast } from "sonner";
 import { FulfillmentBadge } from "../FulfillmentBadge";
-import { OrderStatus } from "../OrderStatus";
 
 interface CartonizationData {
   recommendedBox: any;
@@ -166,8 +165,8 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
       }
     };
 
-    // Only fetch shipments for shipped/delivered orders
-    if (order.status === 'shipped' || order.status === 'delivered') {
+    // Only fetch shipments for shipped/delivered/partially shipped orders
+    if (order.status === 'shipped' || order.status === 'delivered' || order.status === 'partially_shipped') {
       fetchAllShipments();
     }
   }, [order.id, order.status, order.shipment, order.shippingAddress]);
@@ -242,10 +241,27 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
 
   const earliestEstimatedDelivery = getEarliestEstimatedDelivery();
   const latestActualDelivery = getLatestActualDelivery();
+  const displayStatus = order.status.replace(/_/g, ' ');
+  const displayShopifyOrderNumber = order.shopifyOrderNumber || order.orderId || '-';
 
   return (
     <TableRow key={order.id}>
       <TableCell className="font-medium">{order.id}</TableCell>
+      <TableCell>
+        {order.shopifyOrderUrl ? (
+          <a
+            href={order.shopifyOrderUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline inline-flex items-center gap-1"
+          >
+            {displayShopifyOrderNumber}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        ) : (
+          <span>{displayShopifyOrderNumber}</span>
+        )}
+      </TableCell>
       <TableCell>
         <div>
           <div className="font-medium">{order.customerName}</div>
@@ -260,9 +276,9 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
       <TableCell>
         <div className="flex flex-col gap-1">
           <Badge variant={getStatusBadgeVariant(order.status)}>
-            {order.status.replace('_', ' ')}
+            {displayStatus}
           </Badge>
-          {(order.fulfillment_status === 'partially_fulfilled' || 
+          {(order.fulfillment_status === 'partially_fulfilled' || order.status === 'partially_shipped' ||
             (order.items_total && order.items_shipped !== undefined && order.items_shipped < order.items_total)) && (
             <FulfillmentBadge
               itemsShipped={order.items_shipped || 0}
@@ -276,17 +292,21 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
       <TableCell>
         {earliestEstimatedDelivery 
           ? format(earliestEstimatedDelivery, "MMM dd, yyyy")
+          : order.estimatedDeliveryDate
+            ? format(new Date(order.estimatedDeliveryDate), "MMM dd, yyyy")
           : "-"
         }
       </TableCell>
       <TableCell>
         {latestActualDelivery 
           ? format(latestActualDelivery, "MMM dd, yyyy")
+          : order.actualDeliveryDate
+            ? format(new Date(order.actualDeliveryDate), "MMM dd, yyyy")
           : "-"
         }
       </TableCell>
       <TableCell>
-        {(order.status === 'shipped' || order.status === 'delivered') && allShipments.length > 0 ? (
+        {(order.status === 'shipped' || order.status === 'delivered' || order.status === 'partially_shipped') && allShipments.length > 0 ? (
           <div className="space-y-2 max-w-xs">
             {allShipments.length > 1 ? (
               <div>
@@ -412,7 +432,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
 
             {order.status !== 'shipped' && 
              order.status !== 'delivered' && 
-             order.status !== 'partially_fulfilled' && (
+             order.status !== 'partially_shipped' && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -444,7 +464,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
               </TooltipContent>
             </Tooltip>
 
-            {order.status !== 'shipped' && order.status !== 'delivered' && (
+            {order.status !== 'shipped' && order.status !== 'delivered' && order.status !== 'partially_shipped' && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

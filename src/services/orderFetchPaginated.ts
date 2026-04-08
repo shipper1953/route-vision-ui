@@ -33,6 +33,7 @@ export async function fetchOrdersPaginated(
         status, order_date, required_delivery_date, value, items, shipping_address,
         qboid_dimensions, user_id, company_id, warehouse_id, created_at,
         estimated_delivery_date, actual_delivery_date, shipment_id,
+        shopify_store_id,
         items_shipped, items_total, fulfillment_percentage, fulfillment_status
       `, { count: 'exact' });
     
@@ -45,7 +46,7 @@ export async function fetchOrdersPaginated(
     // Add status filter if provided and not "all"
     if (statusFilter && statusFilter !== 'all') {
       // Handle partial fulfillment filter separately
-      if (statusFilter === 'partially_fulfilled') {
+      if (statusFilter === 'partially_shipped') {
         query = query.eq('fulfillment_status', 'partially_fulfilled');
       } else {
         query = query.eq('status', statusFilter);

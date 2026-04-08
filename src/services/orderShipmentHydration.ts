@@ -14,6 +14,13 @@ export async function hydrateOrdersWithShipments(orders: any[], includeQboid: bo
   if (orders.length === 0) return [];
 
   const numericOrderIds = orders.map(order => order.id);
+  const shopifyStoreIds = Array.from(
+    new Set(
+      orders
+        .map(order => order.shopify_store_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    )
+  );
   const directShipmentIdSet = new Set(
     orders
       .map(order => order.shipment_id)
@@ -51,11 +58,27 @@ export async function hydrateOrdersWithShipments(orders: any[], includeQboid: bo
       })()
     : Promise.resolve({ data: null, error: null });
 
+  const shopifyMappingsPromise = numericOrderIds.length
+    ? supabase
+        .from('shopify_order_mappings')
+        .select('ship_tornado_order_id, shopify_order_id, shopify_order_number')
+        .in('ship_tornado_order_id', numericOrderIds)
+    : Promise.resolve({ data: [], error: null });
+
+  const shopifyStoresPromise = shopifyStoreIds.length
+    ? supabase
+        .from('shopify_stores')
+        .select('id, store_url')
+        .in('id', shopifyStoreIds)
+    : Promise.resolve({ data: [], error: null });
+
   // Execute all queries in parallel
-  const [orderShipmentResult, directShipmentsResult, qboidResult] = await Promise.all([
+  const [orderShipmentResult, directShipmentsResult, qboidResult, shopifyMappingsResult, shopifyStoresResult] = await Promise.all([
     orderShipmentPromise,
     directShipmentsPromise,
-    qboidPromise
+    qboidPromise,
+    shopifyMappingsPromise,
+    shopifyStoresPromise
   ]);
 
   if (orderShipmentResult.error) {
@@ -103,6 +126,24 @@ export async function hydrateOrdersWithShipments(orders: any[], includeQboid: bo
     }
   });
 
+  const shopifyMappingByOrderId = new Map<number, { shopify_order_id: string; shopify_order_number: string | null }>();
+  (shopifyMappingsResult.data ?? []).forEach((mapping: any) => {
+    shopifyMappingByOrderId.set(mapping.ship_tornado_order_id, {
+      shopify_order_id: mapping.shopify_order_id,
+      shopify_order_number: mapping.shopify_order_number
+    });
+  });
+
+  const shopifyStoreUrlById = new Map<string, string>();
+  (shopifyStoresResult.data ?? []).forEach((store: any) => {
+    if (store.id && store.store_url) {
+      shopifyStoreUrlById.set(
+        store.id,
+        String(store.store_url).replace(/^https?:\/\//, '').replace(/\/$/, '')
+      );
+    }
+  });
+
   // OPTIMIZATION: Build qboid map if data was fetched
   const qboidMap = new Map<string, any>();
   if (includeQboid && qboidResult?.data) {
@@ -132,6 +173,9 @@ export async function hydrateOrdersWithShipments(orders: any[], includeQboid: bo
 
     const enhancedOrder = {
       ...order,
+      shopify_order_id: shopifyMappingByOrderId.get(order.id)?.shopify_order_id || null,
+      shopify_order_number: shopifyMappingByOrderId.get(order.id)?.shopify_order_number || null,
+      shopify_store_url: order.shopify_store_id ? shopifyStoreUrlById.get(order.shopify_store_id) || null : null,
       shipment_data: shipmentFromOrder
         ? {
             id: shipmentFromOrder.easypost_id || String(shipmentFromOrder.id),

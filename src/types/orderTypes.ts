@@ -49,6 +49,9 @@ export interface OrderItem {
 export interface OrderData {
   id: string;
   orderId?: string; // Shopify order number or external order ID
+  shopifyOrderId?: string;
+  shopifyOrderNumber?: string;
+  shopifyOrderUrl?: string;
   customerName: string;
   customerCompany?: string;
   customerPhone?: string;
@@ -84,4 +87,6 @@ export interface OrderData {
   fulfillment_status?: 'unfulfilled' | 'partially_fulfilled' | 'fulfilled';
   // Warehouse
   warehouseId?: string;
+  estimatedDeliveryDate?: string;
+  actualDeliveryDate?: string;
 }

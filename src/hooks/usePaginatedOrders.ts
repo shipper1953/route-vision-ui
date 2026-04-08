@@ -5,6 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: string = 'all') => {
+  const normalizedInitialStatusFilter = initialStatusFilter === 'processing'
+    ? 'ready_to_ship'
+    : initialStatusFilter;
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -13,7 +16,7 @@ export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: s
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
+  const [statusFilter, setStatusFilter] = useState(normalizedInitialStatusFilter);
   
   const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastReloadRef = useRef<number>(0);
@@ -52,7 +55,7 @@ export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: s
 
   // Initial load
   useEffect(() => {
-    loadOrders(1, '', initialStatusFilter);
+    loadOrders(1, '', normalizedInitialStatusFilter);
   }, []);
 
   // Search with debouncing

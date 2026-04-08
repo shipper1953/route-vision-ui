@@ -20,7 +20,7 @@ export async function fetchOrders(): Promise<OrderData[]> {
         id, order_id, customer_name, customer_company, customer_email, customer_phone,
         status, order_date, required_delivery_date, value, items, shipping_address,
         qboid_dimensions, user_id, company_id, warehouse_id, created_at,
-        estimated_delivery_date, actual_delivery_date, shipment_id
+        estimated_delivery_date, actual_delivery_date, shipment_id, shopify_store_id
       `)
       .order('id', { ascending: false })
       .limit(500);

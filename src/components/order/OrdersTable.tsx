@@ -55,6 +55,7 @@ export const OrdersTable = ({
       const matchesSearch = 
         order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.shopifyOrderNumber && order.shopifyOrderNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (order.customerEmail && order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesStatus = statusFilter === "all" || order.status.toLowerCase() === statusFilter.toLowerCase();
@@ -111,6 +112,7 @@ export const OrdersTable = ({
               <TableHeader>
                 <TableRow>
                   <TableHead>Order ID</TableHead>
+                  <TableHead>Shopify #</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Items</TableHead>
@@ -125,7 +127,7 @@ export const OrdersTable = ({
               <TableBody>
                 {filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       No orders found
                     </TableCell>
                   </TableRow>
