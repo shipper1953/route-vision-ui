@@ -105,27 +105,30 @@ serve(async (req) => {
 
     // Get Shopify store credentials from shopify_stores table
     const storeId = mapping.shopify_store_id || order.shopify_store_id;
+    console.log('Looking up store with ID:', storeId, 'company_id:', order.company_id);
     
     let store: any = null;
     if (storeId) {
-      const { data: storeData } = await supabase
+      const { data: storeData, error: storeError } = await supabase
         .from('shopify_stores')
         .select('store_url, access_token, fulfillment_service_location_id, sync_config')
         .eq('id', storeId)
         .single();
+      console.log('Store lookup result:', storeData ? `Found: ${storeData.store_url}` : 'Not found', 'Error:', storeError?.message);
       store = storeData;
     }
     
     // Fallback: find store by company_id
     if (!store?.access_token) {
-      console.log('Store not found by ID, trying company_id fallback...');
-      const { data: storeData } = await supabase
+      console.log('Store not found by ID, trying company_id fallback...', order.company_id);
+      const { data: storeData, error: fallbackError } = await supabase
         .from('shopify_stores')
         .select('store_url, access_token, fulfillment_service_location_id, sync_config')
         .eq('company_id', order.company_id)
         .not('access_token', 'is', null)
         .limit(1)
         .maybeSingle();
+      console.log('Fallback result:', storeData ? `Found: ${storeData.store_url}` : 'Not found', 'Error:', fallbackError?.message);
       store = storeData;
     }
 
