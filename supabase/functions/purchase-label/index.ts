@@ -541,7 +541,7 @@ async function saveShipmentToDatabase(
       tracking_number: purchaseResponse.tracking_number,
       carrier: purchaseResponse.rate?.provider || purchaseResponse.carrier_account || 'Unknown',
       service: purchaseResponse.rate?.servicelevel?.name || purchaseResponse.servicelevel?.name || 'Unknown',
-      status: 'purchased',
+      status: 'shipped',
       label_url: purchaseResponse.label_url,
       label_zpl: purchaseResponse.label_zpl || null,
       tracking_url: purchaseResponse.tracking_url_provider,
