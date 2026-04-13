@@ -37,7 +37,8 @@ export const ItemMasterNavItem = () => {
 
   const submenuItems = [
     { icon: Plus, label: "Create Item", to: "/item-master/create" },
-    { icon: List, label: "Items", to: "/item-master" }
+    { icon: List, label: "Items", to: "/item-master" },
+    { icon: Package, label: "Inventory", to: "/item-master/inventory" }
   ];
 
   return (
