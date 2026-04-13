@@ -236,6 +236,9 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
   const updateSettings = async (newSettings: Partial<ShopifySettings>) => {
     if (!companyId) return;
 
+    // Optimistically update local state so toggles don't flicker
+    setSettings(prev => deepMergeConfig(prev, newSettings));
+
     setSaving(true);
     try {
       if (storeId) {
@@ -252,8 +255,6 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
         const updatedStoreSettings = {
           ...currentStoreSettings,
           sync_config: {
-            ...(currentStoreSettings.sync_config || {}),
-            ...(newSettings.sync_config || {}),
             orders: {
               ...(currentStoreSettings.sync_config?.orders || {}),
               ...(newSettings.sync_config?.orders || {}),
@@ -299,6 +300,7 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
         if (error) throw error;
       }
 
+      // Re-fetch to confirm DB state (no flicker since optimistic update already applied)
       await fetchSettings();
       
       toast({
