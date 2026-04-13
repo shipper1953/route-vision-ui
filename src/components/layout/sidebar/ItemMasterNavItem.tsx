@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/SidebarContext";
 import { useState, useRef, useEffect } from "react";
-import { Database, ChevronDown, Plus, List } from "lucide-react";
+import { Database, ChevronDown, Plus, List, Package } from "lucide-react";
 import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -37,7 +37,8 @@ export const ItemMasterNavItem = () => {
 
   const submenuItems = [
     { icon: Plus, label: "Create Item", to: "/item-master/create" },
-    { icon: List, label: "Items", to: "/item-master" }
+    { icon: List, label: "Items", to: "/item-master" },
+    { icon: Package, label: "Inventory", to: "/item-master/inventory" }
   ];
 
   return (

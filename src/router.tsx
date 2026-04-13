@@ -125,6 +125,10 @@ const router = createBrowserRouter([
       path: "/item-master/create",
       element: <LazyRoute Component={ItemMaster} />,
     },
+    {
+      path: "/item-master/inventory",
+      element: <LazyRoute Component={WmsInventory} />,
+    },
   {
     path: "/users",
     element: <LazyRoute Component={Users} />,
