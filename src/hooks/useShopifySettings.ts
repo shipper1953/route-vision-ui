@@ -136,6 +136,24 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const deepMergeConfig = (defaults: ShopifySettings, stored: any): ShopifySettings => {
+    const syncConfig = stored.sync_config || {};
+    return {
+      ...defaults,
+      ...stored,
+      connection: stored.connection || defaults.connection,
+      fulfillment_service: stored.fulfillment_service ?? defaults.fulfillment_service,
+      sync_config: {
+        orders: { ...defaults.sync_config.orders, ...(syncConfig.orders || {}) },
+        fulfillment: { ...defaults.sync_config.fulfillment, ...(syncConfig.fulfillment || {}) },
+        inventory: { ...defaults.sync_config.inventory, ...(syncConfig.inventory || {}) },
+        products: { ...defaults.sync_config.products, ...(syncConfig.products || {}) },
+      },
+      features: { ...defaults.features, ...(stored.features || {}) },
+      mappings: { ...defaults.mappings, ...(stored.mappings || {}) },
+    };
+  };
+
   const fetchSettings = async () => {
     if (!companyId) {
       setLoading(false);
@@ -144,7 +162,6 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
 
     try {
       if (storeId) {
-        // Fetch store-specific settings from shopify_stores table
         const { data: storeData, error: storeError } = await supabase
           .from('shopify_stores')
           .select('*')
@@ -155,8 +172,8 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
 
         if (storeData) {
           const storeSettings = (storeData.settings as any) || {};
-          setSettings({
-            ...DEFAULT_SETTINGS,
+          
+          const mergedSettings = deepMergeConfig(DEFAULT_SETTINGS, {
             connection: {
               store_url: storeData.store_url || '',
               connected: storeData.is_active || false,
@@ -170,38 +187,14 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
               registered_at: storeData.connected_at,
               enabled: true,
             } : undefined,
-            sync_config: {
-              ...DEFAULT_SETTINGS.sync_config,
-              ...(storeSettings.sync_config || {}),
-              orders: {
-                ...DEFAULT_SETTINGS.sync_config.orders,
-                ...(storeSettings.sync_config?.orders || {}),
-              },
-              fulfillment: {
-                ...DEFAULT_SETTINGS.sync_config.fulfillment,
-                ...(storeSettings.sync_config?.fulfillment || {}),
-              },
-              inventory: {
-                ...DEFAULT_SETTINGS.sync_config.inventory,
-                ...(storeSettings.sync_config?.inventory || {}),
-              },
-              products: {
-                ...DEFAULT_SETTINGS.sync_config.products,
-                ...(storeSettings.sync_config?.products || {}),
-              },
-            },
-            features: {
-              ...DEFAULT_SETTINGS.features,
-              ...storeSettings.features,
-            },
-            mappings: {
-              ...DEFAULT_SETTINGS.mappings,
-              ...storeSettings.mappings,
-            },
+            sync_config: storeSettings.sync_config,
+            features: storeSettings.features,
+            mappings: storeSettings.mappings,
           });
+
+          setSettings(mergedSettings);
         }
       } else {
-        // Fetch company-level defaults (backward compatibility)
         const { data, error } = await supabase
           .from('companies')
           .select('settings')
@@ -212,8 +205,7 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
 
         const shopifySettings = (data?.settings as any)?.shopify;
         if (shopifySettings) {
-          setSettings({
-            ...DEFAULT_SETTINGS,
+          const mergedSettings = deepMergeConfig(DEFAULT_SETTINGS, {
             connection: {
               store_url: shopifySettings.store_url || '',
               connected: shopifySettings.connected || false,
@@ -221,35 +213,12 @@ export const useShopifySettings = (companyId?: string, storeId?: string) => {
               last_sync: shopifySettings.last_sync,
             },
             fulfillment_service: shopifySettings.fulfillment_service,
-            sync_config: {
-              ...DEFAULT_SETTINGS.sync_config,
-              ...(shopifySettings.sync_config || {}),
-              orders: {
-                ...DEFAULT_SETTINGS.sync_config.orders,
-                ...(shopifySettings.sync_config?.orders || {}),
-              },
-              fulfillment: {
-                ...DEFAULT_SETTINGS.sync_config.fulfillment,
-                ...(shopifySettings.sync_config?.fulfillment || {}),
-              },
-              inventory: {
-                ...DEFAULT_SETTINGS.sync_config.inventory,
-                ...(shopifySettings.sync_config?.inventory || {}),
-              },
-              products: {
-                ...DEFAULT_SETTINGS.sync_config.products,
-                ...(shopifySettings.sync_config?.products || {}),
-              },
-            },
-            features: {
-              ...DEFAULT_SETTINGS.features,
-              ...shopifySettings.features,
-            },
-            mappings: {
-              ...DEFAULT_SETTINGS.mappings,
-              ...shopifySettings.mappings,
-            },
+            sync_config: shopifySettings.sync_config,
+            features: shopifySettings.features,
+            mappings: shopifySettings.mappings,
           });
+
+          setSettings(mergedSettings);
         }
       }
     } catch (error) {
