@@ -643,8 +643,8 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                     {warehouse.shopify_location_id ? (
                       <div className="flex items-center gap-1 text-sm">
                         <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-mono text-xs text-muted-foreground truncate max-w-[150px]" title={warehouse.shopify_location_id}>
-                          {warehouse.shopify_location_id}
+                        <span className="text-sm">
+                          {shopifyLocations.find(l => l.id === warehouse.shopify_location_id)?.name || warehouse.shopify_location_id}
                         </span>
                       </div>
                     ) : (
