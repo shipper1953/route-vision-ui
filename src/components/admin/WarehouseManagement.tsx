@@ -57,6 +57,23 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
     is_default: false,
     shopify_location_id: ''
   });
+  const [shopifyLocations, setShopifyLocations] = useState<ShopifyLocation[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+
+  const fetchShopifyLocations = useCallback(async (targetCompanyId?: string) => {
+    setLoadingLocations(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('shopify-list-locations', {
+        body: { companyId: targetCompanyId }
+      });
+      if (error) throw error;
+      setShopifyLocations(data?.locations || []);
+    } catch (err) {
+      console.error('Error fetching Shopify locations:', err);
+    } finally {
+      setLoadingLocations(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (isSuperAdmin) {
