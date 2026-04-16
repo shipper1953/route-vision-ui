@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Warehouse, Company } from "@/types/auth";
-import { Plus, Edit, MapPin, Building2 } from "lucide-react";
+import { Plus, Edit, MapPin, Building2, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+
+interface ShopifyLocation {
+  id: string;
+  name: string;
+  storeId: string;
+  storeName: string;
+  isActive: boolean;
+}
 
 interface WarehouseManagementProps {
   companyId?: string;
