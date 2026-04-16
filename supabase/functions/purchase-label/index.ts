@@ -72,7 +72,7 @@ function createSuccessResponse(data: any): Response {
 
 // ========== WALLET SERVICE ==========
 
-async function processWalletPayment(companyId: string, labelCost: number, userId: string, purchaseResponseId: string) {
+async function processWalletPayment(companyId: string, labelCost: number, userId: string, purchaseResponseId: string, orderId?: number | string | null) {
   if (labelCost <= 0) {
     console.log('No payment processing needed - cost is zero');
     return;
@@ -84,13 +84,17 @@ async function processWalletPayment(companyId: string, labelCost: number, userId
     { auth: { persistSession: false } }
   );
 
+  const description = orderId 
+    ? `Shipping label purchase - Order #${orderId}` 
+    : 'Shipping label purchase';
+
   const { data, error } = await supabaseService.rpc('deduct_from_wallet', {
     p_wallet_id: null,
     p_company_id: companyId,
     p_amount: labelCost,
     p_user_id: userId,
     p_reference_id: purchaseResponseId,
-    p_description: 'Shipping label purchase'
+    p_description: description
   });
 
   if (error) {
@@ -1031,7 +1035,30 @@ serve(async (req) => {
       const carrierCost = provider === 'shippo'
         ? parsePositiveAmount(purchaseResponse.rate?.amount || purchaseResponse.amount)
         : parsePositiveAmount(purchaseResponse.selected_rate?.rate);
-      const markedUpLabelCost = parsePositiveAmount(markedUpCost);
+      let markedUpLabelCost = parsePositiveAmount(markedUpCost);
+      
+      // Server-side markup fallback: if no marked-up cost was provided, compute it from company settings
+      if (markedUpLabelCost === null && carrierCost !== null && companyIdForWallet) {
+        try {
+          const { data: companyData } = await supabase
+            .from('companies')
+            .select('markup_type, markup_value')
+            .eq('id', companyIdForWallet)
+            .maybeSingle();
+          
+          if (companyData?.markup_value && companyData.markup_value > 0) {
+            if (companyData.markup_type === 'percentage') {
+              markedUpLabelCost = carrierCost + (carrierCost * companyData.markup_value / 100);
+            } else if (companyData.markup_type === 'fixed') {
+              markedUpLabelCost = carrierCost + companyData.markup_value;
+            }
+            console.log('📊 Server-side markup applied:', { carrierCost, markup: companyData.markup_value, type: companyData.markup_type, markedUpLabelCost });
+          }
+        } catch (markupErr) {
+          console.error('Failed to fetch company markup, using carrier cost:', markupErr);
+        }
+      }
+      
       const labelCost = markedUpLabelCost ?? carrierCost ?? 0;
 
       console.log('💳 Wallet charge amount resolved', {
@@ -1045,7 +1072,7 @@ serve(async (req) => {
         ? purchaseResponse.object_id 
         : purchaseResponse.id;
 
-      await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId);
+      await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId, orderId);
       
     } catch (walletError) {
       console.error('❌ Wallet processing failed:', walletError)

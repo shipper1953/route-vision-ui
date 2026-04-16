@@ -52,8 +52,16 @@ export const useShipment = (initialOrderId?: string | null) => {
       
       const labelService = new LabelService('');
       
-      // Call the edge function with orderId, provider, selected box data, and selected items
-      const result = await labelService.purchaseLabel(actualShipmentId, rateId, initialOrderId, selectedRate?.provider, selectedBoxData, selectedItems);
+      // Extract original and marked-up costs from the selected rate
+      const originalCost = selectedRate?.original_rate 
+        ? parseFloat(selectedRate.original_rate) 
+        : parseFloat(selectedRate?.rate || '0');
+      const markedUpCost = parseFloat(selectedRate?.rate || '0');
+      
+      console.log('💰 Cost data for label purchase:', { originalCost, markedUpCost });
+      
+      // Call the edge function with orderId, provider, selected box data, selected items, and cost data
+      const result = await labelService.purchaseLabel(actualShipmentId, rateId, initialOrderId, selectedRate?.provider, selectedBoxData, selectedItems, originalCost, markedUpCost);
       
       console.log('Label purchase result:', result);
       await logEvent('label_purchased', {
