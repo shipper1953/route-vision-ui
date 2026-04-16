@@ -544,17 +544,35 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                 </div>
               </div>
               <div>
-                <Label htmlFor="edit-shopify-location-id">
-                  Shopify Location ID <span className="text-muted-foreground">(Optional)</span>
+                <Label>
+                  Shopify Location <span className="text-muted-foreground">(Optional)</span>
                 </Label>
-                <Input
-                  id="edit-shopify-location-id"
-                  value={editingWarehouse.shopify_location_id || ''}
-                  onChange={(e) => setEditingWarehouse({ ...editingWarehouse, shopify_location_id: e.target.value })}
-                  placeholder="gid://shopify/Location/123456789"
-                />
+                {loadingLocations ? (
+                  <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading locations...
+                  </div>
+                ) : shopifyLocations.length > 0 ? (
+                  <Select
+                    value={editingWarehouse.shopify_location_id || 'none'}
+                    onValueChange={(val) => setEditingWarehouse({ ...editingWarehouse, shopify_location_id: val === 'none' ? '' : val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a Shopify location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not mapped</SelectItem>
+                      {shopifyLocations.filter(l => l.isActive).map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.name} ({loc.storeName})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No Shopify stores connected</p>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Enter your Shopify fulfillment location ID to automatically route POs/Transfers to this warehouse
+                  Map this warehouse to a Shopify location for inventory sync
                 </p>
               </div>
               <div className="flex gap-2">
