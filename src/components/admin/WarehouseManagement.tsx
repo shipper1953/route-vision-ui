@@ -84,6 +84,12 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
     }
   }, [companyId, isSuperAdmin]);
 
+  // Fetch Shopify locations when company context is available
+  useEffect(() => {
+    const cid = isSuperAdmin ? undefined : companyId;
+    fetchShopifyLocations(cid);
+  }, [companyId, isSuperAdmin, fetchShopifyLocations]);
+
   const fetchCompanies = async () => {
     try {
       const { data, error } = await supabase
