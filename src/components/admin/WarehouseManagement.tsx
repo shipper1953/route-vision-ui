@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Warehouse, Company } from "@/types/auth";
-import { Plus, Edit, MapPin, Building2 } from "lucide-react";
+import { Plus, Edit, MapPin, Building2, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+
+interface ShopifyLocation {
+  id: string;
+  name: string;
+  storeId: string;
+  storeName: string;
+  isActive: boolean;
+}
 
 interface WarehouseManagementProps {
   companyId?: string;
@@ -49,6 +57,23 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
     is_default: false,
     shopify_location_id: ''
   });
+  const [shopifyLocations, setShopifyLocations] = useState<ShopifyLocation[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+
+  const fetchShopifyLocations = useCallback(async (targetCompanyId?: string) => {
+    setLoadingLocations(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('shopify-list-locations', {
+        body: { companyId: targetCompanyId }
+      });
+      if (error) throw error;
+      setShopifyLocations(data?.locations || []);
+    } catch (err) {
+      console.error('Error fetching Shopify locations:', err);
+    } finally {
+      setLoadingLocations(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -58,6 +83,12 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
       fetchWarehouses();
     }
   }, [companyId, isSuperAdmin]);
+
+  // Fetch Shopify locations when company context is available
+  useEffect(() => {
+    const cid = isSuperAdmin ? undefined : companyId;
+    fetchShopifyLocations(cid);
+  }, [companyId, isSuperAdmin, fetchShopifyLocations]);
 
   const fetchCompanies = async () => {
     try {
@@ -304,17 +335,35 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="shopify-location-id">
-                      Shopify Location ID <span className="text-muted-foreground">(Optional)</span>
+                    <Label>
+                      Shopify Location <span className="text-muted-foreground">(Optional)</span>
                     </Label>
-                    <Input
-                      id="shopify-location-id"
-                      value={newWarehouse.shopify_location_id}
-                      onChange={(e) => setNewWarehouse({ ...newWarehouse, shopify_location_id: e.target.value })}
-                      placeholder="gid://shopify/Location/123456789"
-                    />
+                    {loadingLocations ? (
+                      <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading locations...
+                      </div>
+                    ) : shopifyLocations.length > 0 ? (
+                      <Select
+                        value={newWarehouse.shopify_location_id || 'none'}
+                        onValueChange={(val) => setNewWarehouse({ ...newWarehouse, shopify_location_id: val === 'none' ? '' : val })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a Shopify location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Not mapped</SelectItem>
+                          {shopifyLocations.filter(l => l.isActive).map((loc) => (
+                            <SelectItem key={loc.id} value={loc.id}>
+                              {loc.name} ({loc.storeName})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No Shopify stores connected</p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-1">
-                      Enter your Shopify fulfillment location ID to automatically route POs/Transfers to this warehouse
+                      Map this warehouse to a Shopify location for inventory sync
                     </p>
                   </div>
                   <div className="space-y-4">
@@ -495,17 +544,35 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                 </div>
               </div>
               <div>
-                <Label htmlFor="edit-shopify-location-id">
-                  Shopify Location ID <span className="text-muted-foreground">(Optional)</span>
+                <Label>
+                  Shopify Location <span className="text-muted-foreground">(Optional)</span>
                 </Label>
-                <Input
-                  id="edit-shopify-location-id"
-                  value={editingWarehouse.shopify_location_id || ''}
-                  onChange={(e) => setEditingWarehouse({ ...editingWarehouse, shopify_location_id: e.target.value })}
-                  placeholder="gid://shopify/Location/123456789"
-                />
+                {loadingLocations ? (
+                  <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading locations...
+                  </div>
+                ) : shopifyLocations.length > 0 ? (
+                  <Select
+                    value={editingWarehouse.shopify_location_id || 'none'}
+                    onValueChange={(val) => setEditingWarehouse({ ...editingWarehouse, shopify_location_id: val === 'none' ? '' : val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a Shopify location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not mapped</SelectItem>
+                      {shopifyLocations.filter(l => l.isActive).map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.name} ({loc.storeName})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No Shopify stores connected</p>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Enter your Shopify fulfillment location ID to automatically route POs/Transfers to this warehouse
+                  Map this warehouse to a Shopify location for inventory sync
                 </p>
               </div>
               <div className="flex gap-2">
@@ -576,8 +643,8 @@ export const WarehouseManagement = ({ companyId }: WarehouseManagementProps) => 
                     {warehouse.shopify_location_id ? (
                       <div className="flex items-center gap-1 text-sm">
                         <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-mono text-xs text-muted-foreground truncate max-w-[150px]" title={warehouse.shopify_location_id}>
-                          {warehouse.shopify_location_id}
+                        <span className="text-sm">
+                          {shopifyLocations.find(l => l.id === warehouse.shopify_location_id)?.name || warehouse.shopify_location_id}
                         </span>
                       </div>
                     ) : (
