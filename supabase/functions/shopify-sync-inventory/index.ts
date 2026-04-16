@@ -472,25 +472,22 @@ async function syncFromShopify(
         const inventoryEdges = variant.inventoryItem?.inventoryLevels?.edges || [];
         let shopifyQty = 0;
 
-        // Preferred: location-specific quantity for configured ST location.
-        if (configuredLocationId) {
-          const stLocationEdge = inventoryEdges
-            .find((edge: any) => normalizeLocationId(edge.node.location?.id) === configuredLocationId);
-
-          if (!stLocationEdge) {
-            skippedMissingStLocationInShopify++;
-            continue; // SKU not stocked at our configured location
-          }
-
-          shopifyQty = stLocationEdge.node.quantities?.[0]?.quantity ?? 0;
-        } else {
-          // Fallback: aggregate across all Shopify locations when no explicit location is configured.
+        // Only sync inventory from the configured Ship Tornado location
+        if (!configuredLocationId) {
           skippedMissingStLocationConfig++;
-          shopifyQty = inventoryEdges.reduce(
-            (sum: number, edge: any) => sum + (edge.node.quantities?.[0]?.quantity ?? 0),
-            0
-          );
+          console.log(`Skipping ${variant.sku}: no Ship Tornado location configured for store`);
+          continue;
         }
+
+        const stLocationEdge = inventoryEdges
+          .find((edge: any) => normalizeLocationId(edge.node.location?.id) === configuredLocationId);
+
+        if (!stLocationEdge) {
+          skippedMissingStLocationInShopify++;
+          continue; // SKU not stocked at our configured location
+        }
+
+        shopifyQty = stLocationEdge.node.quantities?.[0]?.quantity ?? 0;
 
         // Get current ST quantity
         const { data: currentInvData, error: currentInvError } = await supabase
