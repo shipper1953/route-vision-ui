@@ -35,6 +35,15 @@ serve(async (req) => {
     const to = shipmentData.to_address;
     const parcel = shipmentData.parcel;
 
+    // Easyship expects metric units in the request body (kg/cm).
+    // shipping_settings.units controls the response display, not the request payload.
+    const LB_TO_KG = 0.453592;
+    const IN_TO_CM = 2.54;
+    const weightKg = Number((parcel.weight * LB_TO_KG).toFixed(3));
+    const lengthCm = Number((parcel.length * IN_TO_CM).toFixed(2));
+    const widthCm = Number((parcel.width * IN_TO_CM).toFixed(2));
+    const heightCm = Number((parcel.height * IN_TO_CM).toFixed(2));
+
     // Easyship rate request payload (v2024-09)
     // Docs: https://developers.easyship.com/reference/rates_request
     const payload = {
