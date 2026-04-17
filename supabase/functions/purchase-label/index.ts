@@ -1179,7 +1179,7 @@ serve(async (req) => {
         selectedBox,
         originalCost,
         markedUpCost,
-        provider === 'shippo' ? shippoApiKey : apiKey
+        provider === 'shippo' ? shippoApiKey : provider === 'easyship' ? easyshipApiKey : apiKey
       )
       finalShipmentId = result.finalShipmentId;
     } catch (saveError) {
