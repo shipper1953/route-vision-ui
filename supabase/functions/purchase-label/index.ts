@@ -1158,7 +1158,9 @@ serve(async (req) => {
       
       const purchaseResponseId = provider === 'shippo' 
         ? purchaseResponse.object_id 
-        : purchaseResponse.id;
+        : provider === 'easyship'
+          ? purchaseResponse.easyship_shipment_id
+          : purchaseResponse.id;
 
       await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId, orderId);
       
