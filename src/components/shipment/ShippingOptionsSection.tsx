@@ -163,13 +163,15 @@ export const ShippingOptionsSection = ({
       return { rate, meetsDeliveryDate, estimatedDeliveryDate };
     });
 
-    // Sort with delivery-date compliance first when a required date exists,
-    // then cheapest within each group.
+    // Sort order for Create Shipment:
+    // 1) Rates that can meet the required delivery date come first.
+    // 2) Within that order, lower cost comes first.
+    // 3) If costs tie, earlier estimated delivery date comes first.
     return ratesWithMeta.sort((a, b) => {
       if (requiredDeliveryDate) {
-        const rank = (value: boolean | null) => (value === true ? 0 : 1);
-        const rankDiff = rank(a.meetsDeliveryDate) - rank(b.meetsDeliveryDate);
-        if (rankDiff !== 0) return rankDiff;
+        const deadlinePriority = (value: boolean | null) => (value === true ? 0 : 1);
+        const priorityDiff = deadlinePriority(a.meetsDeliveryDate) - deadlinePriority(b.meetsDeliveryDate);
+        if (priorityDiff !== 0) return priorityDiff;
       }
 
       const priceDiff = parseFloat(a.rate.rate) - parseFloat(b.rate.rate);
@@ -309,8 +311,6 @@ export const ShippingOptionsSection = ({
 
   const sortedRates = getSortedRates();
   const meetsCount = sortedRates.filter((r) => r.meetsDeliveryDate === true).length;
-  const doesNotMeetCount = sortedRates.filter((r) => r.meetsDeliveryDate === false).length;
-  
 
   return (
     <div className="space-y-4">
@@ -335,6 +335,9 @@ export const ShippingOptionsSection = ({
                         {meetsCount} meet deadline
                       </Badge>
                     )}
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      Sorted: on-time first, then lowest cost
+                    </Badge>
                   </span>
                 )}
               </CardDescription>
