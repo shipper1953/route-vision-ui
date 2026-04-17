@@ -26,7 +26,12 @@ Deno.serve(async (req) => {
     }
 
     if (!providedToken || providedToken !== expectedToken) {
-      console.warn('Easyship webhook: invalid or missing token');
+      console.warn('Easyship webhook: invalid or missing token', {
+        provided_len: providedToken?.length ?? 0,
+        provided_prefix: providedToken?.slice(0, 4) ?? null,
+        expected_len: expectedToken.length,
+        expected_prefix: expectedToken.slice(0, 4),
+      });
       return new Response('Unauthorized', { status: 401, headers: corsHeaders });
     }
 
