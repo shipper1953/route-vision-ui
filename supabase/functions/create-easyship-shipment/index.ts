@@ -72,6 +72,9 @@ serve(async (req) => {
           },
           items: [
             {
+              description: 'Merchandise',
+              category: 'others',
+              quantity: 1,
               actual_weight: parcel.weight,
               declared_currency: 'USD',
               declared_customs_value: 1,
@@ -80,10 +83,6 @@ serve(async (req) => {
                 width: parcel.width,
                 height: parcel.height,
               },
-              quantity: 1,
-              description: 'Merchandise',
-              hs_code: '999999',
-              item_category_id: 'others',
             },
           ],
         },
