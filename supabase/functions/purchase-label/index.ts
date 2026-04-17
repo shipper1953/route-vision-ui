@@ -1303,11 +1303,31 @@ serve(async (req) => {
     
     return createSuccessResponse({
       shipmentId: finalShipmentId,
-      trackingNumber: provider === 'shippo' ? purchaseResponse.tracking_number : purchaseResponse.tracking_code,
-      labelUrl: provider === 'shippo' ? purchaseResponse.label_url : purchaseResponse.postage_label?.label_url,
-      trackingUrl: provider === 'shippo' ? purchaseResponse.tracking_url_provider : purchaseResponse.tracker?.public_url,
-      carrier: provider === 'shippo' ? purchaseResponse.rate?.provider : purchaseResponse.selected_rate?.carrier,
-      service: provider === 'shippo' ? purchaseResponse.rate?.servicelevel?.name : purchaseResponse.selected_rate?.service,
+      trackingNumber: provider === 'shippo'
+        ? purchaseResponse.tracking_number
+        : provider === 'easyship'
+          ? purchaseResponse.tracking_number
+          : purchaseResponse.tracking_code,
+      labelUrl: provider === 'shippo'
+        ? purchaseResponse.label_url
+        : provider === 'easyship'
+          ? purchaseResponse.label_url
+          : purchaseResponse.postage_label?.label_url,
+      trackingUrl: provider === 'shippo'
+        ? purchaseResponse.tracking_url_provider
+        : provider === 'easyship'
+          ? purchaseResponse.tracking_url
+          : purchaseResponse.tracker?.public_url,
+      carrier: provider === 'shippo'
+        ? purchaseResponse.rate?.provider
+        : provider === 'easyship'
+          ? purchaseResponse.courier_name
+          : purchaseResponse.selected_rate?.carrier,
+      service: provider === 'shippo'
+        ? purchaseResponse.rate?.servicelevel?.name
+        : provider === 'easyship'
+          ? purchaseResponse.service_name
+          : purchaseResponse.selected_rate?.service,
       provider: provider || 'easypost'
     })
 
