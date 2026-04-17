@@ -98,6 +98,10 @@ serve(async (req) => {
         },
       ],
       incoterms: 'DDU',
+      courier_settings: {
+        show_courier_logo_url: true,
+        apply_shipping_rules: true,
+      },
       shipping_settings: {
         units: {
           weight: 'kg',
@@ -105,6 +109,9 @@ serve(async (req) => {
         },
         output_currency: 'USD',
       },
+      // Skip tax/duty lookup for domestic shipments (faster + avoids unnecessary calculations)
+      calculate_tax_and_duties:
+        (from.country || 'US').toUpperCase() !== (to.country || 'US').toUpperCase(),
     };
 
     console.log('📡 Easyship rates request:', JSON.stringify(payload).slice(0, 500));
