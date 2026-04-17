@@ -28,7 +28,7 @@ import {
   Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { addDays, format, parseISO, isBefore, isEqual } from "date-fns";
+import { addBusinessDays, format, parseISO, isBefore, isEqual } from "date-fns";
 
 interface ShippingOptionsSectionProps {
   selectedItems?: SelectedItem[];
@@ -143,7 +143,7 @@ export const ShippingOptionsSection = ({
       const deliveryDays = rate.delivery_days || rate.est_delivery_days || 0;
       const estimatedDeliveryDate =
         deliveryDays > 0
-          ? addDays(today, deliveryDays)
+          ? addBusinessDays(today, deliveryDays)
           : rate.delivery_date
             ? parseISO(rate.delivery_date)
             : null;
@@ -163,12 +163,25 @@ export const ShippingOptionsSection = ({
       return { rate, meetsDeliveryDate, estimatedDeliveryDate };
     });
 
-    // Sort purely by price (cheapest first) regardless of provider or deadline.
-    // Deadline grouping is handled by the UI splitting `meets` vs `does not meet` sections,
-    // and within each section rates remain cheapest-first.
-    return ratesWithMeta.sort(
-      (a, b) => parseFloat(a.rate.rate) - parseFloat(b.rate.rate)
-    );
+    // Sort with delivery-date compliance first when a required date exists,
+    // then cheapest within each group.
+    return ratesWithMeta.sort((a, b) => {
+      if (requiredDeliveryDate) {
+        const rank = (value: boolean | null) => (value === true ? 0 : 1);
+        const rankDiff = rank(a.meetsDeliveryDate) - rank(b.meetsDeliveryDate);
+        if (rankDiff !== 0) return rankDiff;
+      }
+
+      const priceDiff = parseFloat(a.rate.rate) - parseFloat(b.rate.rate);
+      if (priceDiff !== 0) return priceDiff;
+
+      if (a.estimatedDeliveryDate && b.estimatedDeliveryDate) {
+        return a.estimatedDeliveryDate.getTime() - b.estimatedDeliveryDate.getTime();
+      }
+      if (a.estimatedDeliveryDate) return -1;
+      if (b.estimatedDeliveryDate) return 1;
+      return 0;
+    });
   };
 
   const handleConfirmAndBuy = async () => {
