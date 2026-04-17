@@ -467,6 +467,82 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
   return responseData
 }
 
+async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierId: string, apiKey: string, shipmentPayload?: any) {
+  console.log('🌐 === PURCHASING EASYSHIP LABEL ===')
+  console.log('🌐 Easyship Shipment ID:', easyshipShipmentId)
+  console.log('🌐 Courier ID (rate):', courierId)
+
+  // Easyship flow: if we don't already have a stored shipment, create one with selected courier, then buy label.
+  // The simplest reliable path with the v2024-09 API is to POST /shipments with selected_courier_id, then POST /shipments/{id}/label
+
+  let shipmentId = easyshipShipmentId;
+
+  if (!shipmentId && shipmentPayload) {
+    console.log('📦 Creating Easyship shipment before label purchase...');
+    const createRes = await fetch('https://public-api.easyship.com/2024-09/shipments', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        ...shipmentPayload,
+        selected_courier_id: courierId,
+      }),
+    });
+    const createText = await createRes.text();
+    let createData: any;
+    try { createData = JSON.parse(createText); } catch { createData = { raw: createText }; }
+    if (!createRes.ok) {
+      console.error('❌ Easyship shipment create failed:', createData);
+      throw new Error(createData.error?.message || createData.message || `Easyship create failed: ${createRes.status}`);
+    }
+    shipmentId = createData.shipment?.easyship_shipment_id || createData.easyship_shipment_id;
+  }
+
+  if (!shipmentId) {
+    throw new Error('No Easyship shipment ID available for label purchase');
+  }
+
+  // Buy label
+  const labelRes = await fetch(`https://public-api.easyship.com/2024-09/shipments/${shipmentId}/labels`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({ courier_id: courierId, format: 'pdf' }),
+  });
+  const labelText = await labelRes.text();
+  let labelData: any;
+  try { labelData = JSON.parse(labelText); } catch { labelData = { raw: labelText }; }
+
+  if (!labelRes.ok) {
+    console.error('❌ Easyship label purchase failed:', labelData);
+    throw new Error(labelData.error?.message || labelData.message || `Easyship label failed: ${labelRes.status}`);
+  }
+
+  const shipment = labelData.shipment || labelData;
+  const label = shipment.label || labelData.label || {};
+
+  const normalized = {
+    easyship_shipment_id: shipment.easyship_shipment_id || shipmentId,
+    tracking_number: label.tracking_number || shipment.tracking_number,
+    tracking_url: label.tracking_page_url || shipment.tracking_page_url,
+    label_url: label.label_url || label.url,
+    courier_name: shipment.courier_name || label.courier_name,
+    service_name: shipment.service_name || label.service_name,
+    total_charge: shipment.total_actual_charge || shipment.total_charge,
+    currency: shipment.currency || 'USD',
+    raw: labelData,
+  };
+
+  console.log('✅ Easyship label purchased:', normalized.tracking_number);
+  return normalized;
+}
+
 // ========== SHIPMENT SERVICE ==========
 
 async function saveShipmentToDatabase(
