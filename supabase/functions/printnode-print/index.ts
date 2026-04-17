@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('PRINTNODE_API_KEY');
+    const apiKey = Deno.env.get('PRINTNODE_API_KEY')?.trim();
     if (!apiKey) {
       throw new Error('PrintNode API key not configured');
     }
@@ -52,8 +52,8 @@ Deno.serve(async (req) => {
       throw new Error('Missing action parameter');
     }
 
-    // Base64 encode the API key for basic auth
-    const authHeader = `Basic ${btoa(apiKey)}`;
+    // Base64 encode the API key for basic auth (PrintNode uses key as username, blank password)
+    const authHeader = `Basic ${btoa(apiKey + ':')}`;
 
     if (action === 'list-printers') {
       // Get list of printers
@@ -64,7 +64,19 @@ Deno.serve(async (req) => {
       });
 
       if (!response.ok) {
-        throw new Error(`PrintNode API error: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('PrintNode list-printers error:', response.status, errorText);
+        const hint = response.status === 403 || response.status === 401
+          ? ' Check that PRINTNODE_API_KEY is a valid API key (from PrintNode → Account → API Keys), not an account password or integration key, and that the account is active.'
+          : '';
+        return new Response(JSON.stringify({
+          error: `PrintNode API error: ${response.statusText}${hint}`,
+          details: errorText,
+          status: response.status,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       const printers: PrintNodePrinter[] = await response.json();
