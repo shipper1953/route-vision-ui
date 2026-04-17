@@ -1,3 +1,4 @@
+import { addBusinessDays } from "date-fns";
 
 import { ShipmentResponse, SmartRate, Rate } from "@/services/easypost";
 import { toast } from "sonner";
@@ -69,8 +70,7 @@ export function findRecommendedRateByDate(response: ShipmentResponse, requiredDa
       if (rate.delivery_days === undefined) return false;
       
       // Estimate delivery date by adding business days
-      const estimatedDeliveryDate = new Date(currentDate);
-      estimatedDeliveryDate.setDate(estimatedDeliveryDate.getDate() + rate.delivery_days);
+      const estimatedDeliveryDate = addBusinessDays(currentDate, rate.delivery_days);
       
       const isViable = estimatedDeliveryDate <= requiredDate;
       console.log(`Standard Rate ${rate.carrier} ${rate.service}: estimated delivery ${estimatedDeliveryDate.toDateString()}, viable: ${isViable}`);

@@ -28,7 +28,7 @@ import {
   Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { addDays, format, parseISO, isBefore, isEqual } from "date-fns";
+import { addBusinessDays, format, parseISO, isBefore, isEqual } from "date-fns";
 
 interface ShippingOptionsSectionProps {
   selectedItems?: SelectedItem[];
@@ -46,6 +46,11 @@ interface SortedRate {
   meetsDeliveryDate: boolean | null;
   estimatedDeliveryDate: Date | null;
 }
+
+const getSafeRateAmount = (value: string): number => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+};
 
 export const ShippingOptionsSection = ({
   selectedItems,
@@ -143,7 +148,7 @@ export const ShippingOptionsSection = ({
       const deliveryDays = rate.delivery_days || rate.est_delivery_days || 0;
       const estimatedDeliveryDate =
         deliveryDays > 0
-          ? addDays(today, deliveryDays)
+          ? addBusinessDays(today, deliveryDays)
           : rate.delivery_date
             ? parseISO(rate.delivery_date)
             : null;
@@ -163,12 +168,29 @@ export const ShippingOptionsSection = ({
       return { rate, meetsDeliveryDate, estimatedDeliveryDate };
     });
 
-    // Sort purely by price (cheapest first) regardless of provider or deadline.
-    // Deadline grouping is handled by the UI splitting `meets` vs `does not meet` sections,
-    // and within each section rates remain cheapest-first.
-    return ratesWithMeta.sort(
-      (a, b) => parseFloat(a.rate.rate) - parseFloat(b.rate.rate)
-    );
+    // Sort order for Create Shipment:
+    // 1) Rates that can meet the required delivery date come first.
+    // 2) Within that order, lower cost comes first.
+    // 3) If costs tie, earlier estimated delivery date comes first.
+    return ratesWithMeta.sort((a, b) => {
+      if (requiredDeliveryDate) {
+        const deadlinePriority = (value: boolean | null) => (value === true ? 0 : 1);
+        const priorityDiff = deadlinePriority(a.meetsDeliveryDate) - deadlinePriority(b.meetsDeliveryDate);
+        if (priorityDiff !== 0) return priorityDiff;
+      }
+
+      const priceDiff = getSafeRateAmount(a.rate.rate) - getSafeRateAmount(b.rate.rate);
+      if (priceDiff !== 0) return priceDiff;
+
+      if (a.estimatedDeliveryDate && b.estimatedDeliveryDate) {
+        const dateDiff = a.estimatedDeliveryDate.getTime() - b.estimatedDeliveryDate.getTime();
+        if (dateDiff !== 0) return dateDiff;
+      }
+      if (a.estimatedDeliveryDate) return -1;
+      if (b.estimatedDeliveryDate) return 1;
+
+      return a.rate.id.localeCompare(b.rate.id);
+    });
   };
 
   const handleConfirmAndBuy = async () => {
@@ -296,8 +318,6 @@ export const ShippingOptionsSection = ({
 
   const sortedRates = getSortedRates();
   const meetsCount = sortedRates.filter((r) => r.meetsDeliveryDate === true).length;
-  const doesNotMeetCount = sortedRates.filter((r) => r.meetsDeliveryDate === false).length;
-  
 
   return (
     <div className="space-y-4">
@@ -322,6 +342,9 @@ export const ShippingOptionsSection = ({
                         {meetsCount} meet deadline
                       </Badge>
                     )}
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      Sorted: on-time first, then lowest cost
+                    </Badge>
                   </span>
                 )}
               </CardDescription>
