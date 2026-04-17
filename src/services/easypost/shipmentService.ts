@@ -18,29 +18,51 @@ export class ShipmentService {
     this.useEdgeFunctions = !apiKey;
   }
 
+  private convertShipmentWeightToOunces(shipmentData: ShipmentRequest): ShipmentRequest {
+    const pounds = shipmentData?.parcel?.weight;
+    const parsedWeight = Number.parseFloat(String(pounds));
+
+    if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+      return shipmentData;
+    }
+
+    // UI/package flows capture weight in pounds, while EasyPost parcel weight expects ounces.
+    const weightInOunces = parsedWeight * 16;
+
+    return {
+      ...shipmentData,
+      parcel: {
+        ...shipmentData.parcel,
+        weight: weightInOunces,
+      },
+    };
+  }
+
   async createShipment(shipmentData: ShipmentRequest): Promise<ShipmentResponse> {
     try {
       console.log('Creating shipment with data:', shipmentData);
 
+      const easyPostShipmentData = this.convertShipmentWeightToOunces(shipmentData);
+
       // Standard rate configuration
-      if (!shipmentData.options) {
-        shipmentData.options = {};
+      if (!easyPostShipmentData.options) {
+        easyPostShipmentData.options = {};
       }
 
       // Add standard options
-      shipmentData.options.currency = 'USD';
-      shipmentData.options.delivery_confirmation = 'NO_SIGNATURE';
+      easyPostShipmentData.options.currency = 'USD';
+      easyPostShipmentData.options.delivery_confirmation = 'NO_SIGNATURE';
 
       console.log('Standard rate configuration:', {
-        currency: shipmentData.options.currency,
-        options: shipmentData.options
+        currency: easyPostShipmentData.options.currency,
+        options: easyPostShipmentData.options
       });
 
       if (this.useEdgeFunctions) {
-        return this.createShipmentViaEdgeFunction(shipmentData);
+        return this.createShipmentViaEdgeFunction(easyPostShipmentData);
       }
 
-      return this.createShipmentDirectly(shipmentData);
+      return this.createShipmentDirectly(easyPostShipmentData);
     } catch (error) {
       console.error('Error creating shipment:', error);
       
