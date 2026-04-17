@@ -467,6 +467,82 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
   return responseData
 }
 
+async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierId: string, apiKey: string, shipmentPayload?: any) {
+  console.log('🌐 === PURCHASING EASYSHIP LABEL ===')
+  console.log('🌐 Easyship Shipment ID:', easyshipShipmentId)
+  console.log('🌐 Courier ID (rate):', courierId)
+
+  // Easyship flow: if we don't already have a stored shipment, create one with selected courier, then buy label.
+  // The simplest reliable path with the v2024-09 API is to POST /shipments with selected_courier_id, then POST /shipments/{id}/label
+
+  let shipmentId = easyshipShipmentId;
+
+  if (!shipmentId && shipmentPayload) {
+    console.log('📦 Creating Easyship shipment before label purchase...');
+    const createRes = await fetch('https://public-api.easyship.com/2024-09/shipments', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        ...shipmentPayload,
+        selected_courier_id: courierId,
+      }),
+    });
+    const createText = await createRes.text();
+    let createData: any;
+    try { createData = JSON.parse(createText); } catch { createData = { raw: createText }; }
+    if (!createRes.ok) {
+      console.error('❌ Easyship shipment create failed:', createData);
+      throw new Error(createData.error?.message || createData.message || `Easyship create failed: ${createRes.status}`);
+    }
+    shipmentId = createData.shipment?.easyship_shipment_id || createData.easyship_shipment_id;
+  }
+
+  if (!shipmentId) {
+    throw new Error('No Easyship shipment ID available for label purchase');
+  }
+
+  // Buy label
+  const labelRes = await fetch(`https://public-api.easyship.com/2024-09/shipments/${shipmentId}/labels`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({ courier_id: courierId, format: 'pdf' }),
+  });
+  const labelText = await labelRes.text();
+  let labelData: any;
+  try { labelData = JSON.parse(labelText); } catch { labelData = { raw: labelText }; }
+
+  if (!labelRes.ok) {
+    console.error('❌ Easyship label purchase failed:', labelData);
+    throw new Error(labelData.error?.message || labelData.message || `Easyship label failed: ${labelRes.status}`);
+  }
+
+  const shipment = labelData.shipment || labelData;
+  const label = shipment.label || labelData.label || {};
+
+  const normalized = {
+    easyship_shipment_id: shipment.easyship_shipment_id || shipmentId,
+    tracking_number: label.tracking_number || shipment.tracking_number,
+    tracking_url: label.tracking_page_url || shipment.tracking_page_url,
+    label_url: label.label_url || label.url,
+    courier_name: shipment.courier_name || label.courier_name,
+    service_name: shipment.service_name || label.service_name,
+    total_charge: shipment.total_actual_charge || shipment.total_charge,
+    currency: shipment.currency || 'USD',
+    raw: labelData,
+  };
+
+  console.log('✅ Easyship label purchased:', normalized.tracking_number);
+  return normalized;
+}
+
 // ========== SHIPMENT SERVICE ==========
 
 async function saveShipmentToDatabase(
@@ -544,7 +620,28 @@ async function saveShipmentToDatabase(
   let finalOriginalCost = originalCost;
   let finalMarkedUpCost = markedUpCost;
   
-  if (provider === 'shippo') {
+  if (provider === 'easyship') {
+    const apiCost = parseFloat(String(purchaseResponse.total_charge || '0'));
+    if (finalOriginalCost === null || finalOriginalCost === undefined) finalOriginalCost = apiCost;
+    if (finalMarkedUpCost === null || finalMarkedUpCost === undefined) finalMarkedUpCost = apiCost;
+    shipmentData = {
+      easypost_id: purchaseResponse.easyship_shipment_id,
+      tracking_number: purchaseResponse.tracking_number,
+      carrier: purchaseResponse.courier_name || 'Easyship',
+      service: purchaseResponse.service_name || purchaseResponse.courier_name || 'Standard',
+      status: 'shipped',
+      label_url: purchaseResponse.label_url,
+      label_zpl: null,
+      tracking_url: purchaseResponse.tracking_url,
+      original_cost: finalOriginalCost,
+      cost: finalMarkedUpCost,
+      user_id: userId,
+      company_id: companyId,
+      warehouse_id: warehouseId,
+      actual_package_sku: selectedBox?.selectedBoxSku || selectedBox?.selectedBoxName || null,
+      actual_package_master_id: selectedBox?.selectedBoxId || selectedBox?.boxId || null,
+    };
+  } else if (provider === 'shippo') {
     const apiCost = parseFloat(purchaseResponse.rate?.amount || purchaseResponse.amount || '0');
     if (finalOriginalCost === null || finalOriginalCost === undefined) {
       finalOriginalCost = apiCost;
@@ -949,6 +1046,7 @@ serve(async (req) => {
   try {
     const apiKey = Deno.env.get('EASYPOST_API_KEY')
     const shippoApiKey = Deno.env.get('SHIPPO_API_KEY')
+    const easyshipApiKey = Deno.env.get('EASYSHIP_API_KEY')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
@@ -961,7 +1059,7 @@ serve(async (req) => {
       const rawBody = await req.text()
       requestBody = JSON.parse(rawBody)
     } catch (parseError) {
-      return createErrorResponse('Invalid JSON in request body', parseError.message, 400)
+      return createErrorResponse('Invalid JSON in request body', parseError instanceof Error ? parseError.message : String(parseError), 400)
     }
     
     const { 
@@ -973,7 +1071,8 @@ serve(async (req) => {
       originalCost = null,
       markedUpCost = null,
       packageMetadata = null,
-      selectedItems = null
+      selectedItems = null,
+      easyshipShipmentPayload = null
     } = requestBody
     
     if (!shipmentId || !rateId) {
@@ -989,6 +1088,14 @@ serve(async (req) => {
           return createErrorResponse('Shippo API key not configured', null, 500)
         }
         purchaseResponse = await purchaseShippoLabel(shipmentId, rateId, shippoApiKey)
+      } else if (provider === 'easyship') {
+        if (!easyshipApiKey) {
+          return createErrorResponse('Easyship API key not configured', null, 500)
+        }
+        // For Easyship, shipmentId may be the synthetic id from rate fetch (no upstream shipment yet).
+        // rateId == courier_id. easyshipShipmentPayload is the original rate request body (optional).
+        const easyshipShipmentId = shipmentId.startsWith('easyship_') ? null : shipmentId;
+        purchaseResponse = await purchaseEasyshipLabel(easyshipShipmentId, rateId, easyshipApiKey, easyshipShipmentPayload)
       } else {
         purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
         const zplContent = await tryGetZplLabel(shipmentId, apiKey)
@@ -998,7 +1105,7 @@ serve(async (req) => {
       }
     } catch (labelError) {
       console.error('❌ Label purchase failed:', labelError)
-      return createErrorResponse('Failed to purchase label', labelError.message, 500)
+      return createErrorResponse('Failed to purchase label', labelError instanceof Error ? labelError.message : String(labelError), 500)
     }
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
@@ -1034,7 +1141,9 @@ serve(async (req) => {
 
       const carrierCost = provider === 'shippo'
         ? parsePositiveAmount(purchaseResponse.rate?.amount || purchaseResponse.amount)
-        : parsePositiveAmount(purchaseResponse.selected_rate?.rate);
+        : provider === 'easyship'
+          ? parsePositiveAmount(purchaseResponse.total_charge)
+          : parsePositiveAmount(purchaseResponse.selected_rate?.rate);
       let markedUpLabelCost = parsePositiveAmount(markedUpCost);
       
       // Server-side markup fallback: if no marked-up cost was provided, compute it from company settings
@@ -1070,7 +1179,9 @@ serve(async (req) => {
       
       const purchaseResponseId = provider === 'shippo' 
         ? purchaseResponse.object_id 
-        : purchaseResponse.id;
+        : provider === 'easyship'
+          ? purchaseResponse.easyship_shipment_id
+          : purchaseResponse.id;
 
       await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId, orderId);
       
@@ -1089,7 +1200,7 @@ serve(async (req) => {
         selectedBox,
         originalCost,
         markedUpCost,
-        provider === 'shippo' ? shippoApiKey : apiKey
+        provider === 'shippo' ? shippoApiKey : provider === 'easyship' ? easyshipApiKey : apiKey
       )
       finalShipmentId = result.finalShipmentId;
     } catch (saveError) {
@@ -1192,11 +1303,31 @@ serve(async (req) => {
     
     return createSuccessResponse({
       shipmentId: finalShipmentId,
-      trackingNumber: provider === 'shippo' ? purchaseResponse.tracking_number : purchaseResponse.tracking_code,
-      labelUrl: provider === 'shippo' ? purchaseResponse.label_url : purchaseResponse.postage_label?.label_url,
-      trackingUrl: provider === 'shippo' ? purchaseResponse.tracking_url_provider : purchaseResponse.tracker?.public_url,
-      carrier: provider === 'shippo' ? purchaseResponse.rate?.provider : purchaseResponse.selected_rate?.carrier,
-      service: provider === 'shippo' ? purchaseResponse.rate?.servicelevel?.name : purchaseResponse.selected_rate?.service,
+      trackingNumber: provider === 'shippo'
+        ? purchaseResponse.tracking_number
+        : provider === 'easyship'
+          ? purchaseResponse.tracking_number
+          : purchaseResponse.tracking_code,
+      labelUrl: provider === 'shippo'
+        ? purchaseResponse.label_url
+        : provider === 'easyship'
+          ? purchaseResponse.label_url
+          : purchaseResponse.postage_label?.label_url,
+      trackingUrl: provider === 'shippo'
+        ? purchaseResponse.tracking_url_provider
+        : provider === 'easyship'
+          ? purchaseResponse.tracking_url
+          : purchaseResponse.tracker?.public_url,
+      carrier: provider === 'shippo'
+        ? purchaseResponse.rate?.provider
+        : provider === 'easyship'
+          ? purchaseResponse.courier_name
+          : purchaseResponse.selected_rate?.carrier,
+      service: provider === 'shippo'
+        ? purchaseResponse.rate?.servicelevel?.name
+        : provider === 'easyship'
+          ? purchaseResponse.service_name
+          : purchaseResponse.selected_rate?.service,
       provider: provider || 'easypost'
     })
 
