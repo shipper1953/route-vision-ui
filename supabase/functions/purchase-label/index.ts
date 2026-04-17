@@ -1025,6 +1025,7 @@ serve(async (req) => {
   try {
     const apiKey = Deno.env.get('EASYPOST_API_KEY')
     const shippoApiKey = Deno.env.get('SHIPPO_API_KEY')
+    const easyshipApiKey = Deno.env.get('EASYSHIP_API_KEY')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
@@ -1037,7 +1038,7 @@ serve(async (req) => {
       const rawBody = await req.text()
       requestBody = JSON.parse(rawBody)
     } catch (parseError) {
-      return createErrorResponse('Invalid JSON in request body', parseError.message, 400)
+      return createErrorResponse('Invalid JSON in request body', parseError instanceof Error ? parseError.message : String(parseError), 400)
     }
     
     const { 
@@ -1049,7 +1050,8 @@ serve(async (req) => {
       originalCost = null,
       markedUpCost = null,
       packageMetadata = null,
-      selectedItems = null
+      selectedItems = null,
+      easyshipShipmentPayload = null
     } = requestBody
     
     if (!shipmentId || !rateId) {
@@ -1065,6 +1067,14 @@ serve(async (req) => {
           return createErrorResponse('Shippo API key not configured', null, 500)
         }
         purchaseResponse = await purchaseShippoLabel(shipmentId, rateId, shippoApiKey)
+      } else if (provider === 'easyship') {
+        if (!easyshipApiKey) {
+          return createErrorResponse('Easyship API key not configured', null, 500)
+        }
+        // For Easyship, shipmentId may be the synthetic id from rate fetch (no upstream shipment yet).
+        // rateId == courier_id. easyshipShipmentPayload is the original rate request body (optional).
+        const easyshipShipmentId = shipmentId.startsWith('easyship_') ? null : shipmentId;
+        purchaseResponse = await purchaseEasyshipLabel(easyshipShipmentId, rateId, easyshipApiKey, easyshipShipmentPayload)
       } else {
         purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
         const zplContent = await tryGetZplLabel(shipmentId, apiKey)
@@ -1074,7 +1084,7 @@ serve(async (req) => {
       }
     } catch (labelError) {
       console.error('❌ Label purchase failed:', labelError)
-      return createErrorResponse('Failed to purchase label', labelError.message, 500)
+      return createErrorResponse('Failed to purchase label', labelError instanceof Error ? labelError.message : String(labelError), 500)
     }
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
