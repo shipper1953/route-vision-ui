@@ -47,6 +47,11 @@ interface SortedRate {
   estimatedDeliveryDate: Date | null;
 }
 
+const getSafeRateAmount = (value: string): number => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+};
+
 export const ShippingOptionsSection = ({
   selectedItems,
   loading: externalLoading = false,
@@ -174,15 +179,17 @@ export const ShippingOptionsSection = ({
         if (priorityDiff !== 0) return priorityDiff;
       }
 
-      const priceDiff = parseFloat(a.rate.rate) - parseFloat(b.rate.rate);
+      const priceDiff = getSafeRateAmount(a.rate.rate) - getSafeRateAmount(b.rate.rate);
       if (priceDiff !== 0) return priceDiff;
 
       if (a.estimatedDeliveryDate && b.estimatedDeliveryDate) {
-        return a.estimatedDeliveryDate.getTime() - b.estimatedDeliveryDate.getTime();
+        const dateDiff = a.estimatedDeliveryDate.getTime() - b.estimatedDeliveryDate.getTime();
+        if (dateDiff !== 0) return dateDiff;
       }
       if (a.estimatedDeliveryDate) return -1;
       if (b.estimatedDeliveryDate) return 1;
-      return 0;
+
+      return a.rate.id.localeCompare(b.rate.id);
     });
   };
 
