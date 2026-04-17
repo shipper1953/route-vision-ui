@@ -1120,7 +1120,9 @@ serve(async (req) => {
 
       const carrierCost = provider === 'shippo'
         ? parsePositiveAmount(purchaseResponse.rate?.amount || purchaseResponse.amount)
-        : parsePositiveAmount(purchaseResponse.selected_rate?.rate);
+        : provider === 'easyship'
+          ? parsePositiveAmount(purchaseResponse.total_charge)
+          : parsePositiveAmount(purchaseResponse.selected_rate?.rate);
       let markedUpLabelCost = parsePositiveAmount(markedUpCost);
       
       // Server-side markup fallback: if no marked-up cost was provided, compute it from company settings
