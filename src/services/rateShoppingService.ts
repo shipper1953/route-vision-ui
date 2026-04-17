@@ -53,6 +53,7 @@ export class RateShoppingService {
     const combinedSmartRates: CombinedSmartRate[] = [];
     let easypost_shipment = null;
     let shippo_shipment = null;
+    let easyship_shipment = null;
 
     // Process EasyPost results
     if (results[0].status === 'fulfilled') {
@@ -125,6 +126,43 @@ export class RateShoppingService {
       });
     }
 
+    // Process Easyship results
+    if (results[2].status === 'fulfilled') {
+      const easyshipResponse = results[2].value;
+      easyship_shipment = easyshipResponse;
+
+      if (easyshipResponse.rates) {
+        const easyshipRates = easyshipResponse.rates.map((rate: EasyshipRate) => ({
+          id: rate.object_id,
+          carrier: rate.courier_name,
+          service: rate.service_name || rate.courier_name,
+          rate: String(rate.total_charge),
+          currency: rate.currency || 'USD',
+          delivery_days: rate.delivery_days ?? rate.max_delivery_time ?? rate.min_delivery_time,
+          delivery_date: null,
+          delivery_date_guaranteed: false,
+          est_delivery_days: rate.max_delivery_time ?? rate.min_delivery_time,
+          provider: 'easyship' as const,
+          original_rate: rate,
+          // Carry shipment id so the purchase flow can pass it back
+          easyship_shipment_id: easyshipResponse.object_id,
+        } as CombinedRate));
+        combinedRates.push(...easyshipRates);
+      }
+
+      providerStatuses.push({ provider: 'easyship', available: true, latencyMs: Date.now() - startTime });
+      console.log('✅ Easyship rates fetched:', easyshipResponse.rates?.length || 0);
+    } else {
+      console.warn('⚠️ Easyship rates failed:', results[2].reason);
+      degradedProviders.push('easyship');
+      providerStatuses.push({
+        provider: 'easyship',
+        available: false,
+        error: String(results[2].reason),
+        latencyMs: Date.now() - startTime
+      });
+    }
+
     // Sort combined rates by price (guard against invalid/empty rate values)
     const getRateValue = (rate: { rate: string }) => {
       const parsed = Number.parseFloat(rate.rate);
@@ -166,6 +204,7 @@ export class RateShoppingService {
       smartRates: combinedSmartRates.length > 0 ? combinedSmartRates : undefined,
       easypost_shipment,
       shippo_shipment,
+      easyship_shipment,
       decisionMetadata
     };
   }
