@@ -1,15 +1,16 @@
 import { ShipmentService } from "./easypost/shipmentService";
 import { ShippoService, ShippoRate } from "./shippo/shippoService";
+import { EasyshipService, EasyshipRate } from "./easyship/easyshipService";
 import { ShipmentRequest, Rate, SmartRate } from "@/types/easypost";
 import { RankedRateRecommendations, RankedRate, ProviderStatus, RateDecisionMetadata } from "./cartonization/types";
 
 export interface CombinedRate extends Rate {
-  provider: 'easypost' | 'shippo';
+  provider: 'easypost' | 'shippo' | 'easyship';
   original_rate?: any;
 }
 
 export interface CombinedSmartRate extends SmartRate {
-  provider: 'easypost' | 'shippo';
+  provider: 'easypost' | 'shippo' | 'easyship';
   original_rate?: any;
 }
 
@@ -19,6 +20,7 @@ export interface CombinedRateResponse {
   smartRates?: CombinedSmartRate[];
   easypost_shipment?: any;
   shippo_shipment?: any;
+  easyship_shipment?: any;
   // New: decision metadata
   decisionMetadata: RateDecisionMetadata;
 }
@@ -26,10 +28,12 @@ export interface CombinedRateResponse {
 export class RateShoppingService {
   private easyPostService: ShipmentService;
   private shippoService: ShippoService;
+  private easyshipService: EasyshipService;
 
   constructor() {
     this.easyPostService = new ShipmentService('');
     this.shippoService = new ShippoService('');
+    this.easyshipService = new EasyshipService();
   }
 
   async getRatesFromAllProviders(shipmentData: ShipmentRequest): Promise<CombinedRateResponse> {
@@ -41,7 +45,8 @@ export class RateShoppingService {
 
     const results = await Promise.allSettled([
       this.getEasyPostRates(shipmentData),
-      this.getShippoRates(shipmentData)
+      this.getShippoRates(shipmentData),
+      this.getEasyshipRates(shipmentData)
     ]);
 
     const combinedRates: CombinedRate[] = [];
