@@ -72,7 +72,7 @@ serve(async (req) => {
           },
           items: [
             {
-              actual_weight: parcel.weight, // weight in lb (will convert below)
+              actual_weight: parcel.weight,
               declared_currency: 'USD',
               declared_customs_value: 1,
               dimensions: {
@@ -82,6 +82,7 @@ serve(async (req) => {
               },
               quantity: 1,
               description: 'Merchandise',
+              category: 'others',
             },
           ],
         },
