@@ -620,7 +620,28 @@ async function saveShipmentToDatabase(
   let finalOriginalCost = originalCost;
   let finalMarkedUpCost = markedUpCost;
   
-  if (provider === 'shippo') {
+  if (provider === 'easyship') {
+    const apiCost = parseFloat(String(purchaseResponse.total_charge || '0'));
+    if (finalOriginalCost === null || finalOriginalCost === undefined) finalOriginalCost = apiCost;
+    if (finalMarkedUpCost === null || finalMarkedUpCost === undefined) finalMarkedUpCost = apiCost;
+    shipmentData = {
+      easypost_id: purchaseResponse.easyship_shipment_id,
+      tracking_number: purchaseResponse.tracking_number,
+      carrier: purchaseResponse.courier_name || 'Easyship',
+      service: purchaseResponse.service_name || purchaseResponse.courier_name || 'Standard',
+      status: 'shipped',
+      label_url: purchaseResponse.label_url,
+      label_zpl: null,
+      tracking_url: purchaseResponse.tracking_url,
+      original_cost: finalOriginalCost,
+      cost: finalMarkedUpCost,
+      user_id: userId,
+      company_id: companyId,
+      warehouse_id: warehouseId,
+      actual_package_sku: selectedBox?.selectedBoxSku || selectedBox?.selectedBoxName || null,
+      actual_package_master_id: selectedBox?.selectedBoxId || selectedBox?.boxId || null,
+    };
+  } else if (provider === 'shippo') {
     const apiCost = parseFloat(purchaseResponse.rate?.amount || purchaseResponse.amount || '0');
     if (finalOriginalCost === null || finalOriginalCost === undefined) {
       finalOriginalCost = apiCost;
