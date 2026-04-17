@@ -83,7 +83,7 @@ serve(async (req) => {
           items: [
             {
               description: 'Merchandise',
-              category: 'others',
+              hs_code: '420299', // Generic merchandise HS code (other articles)
               quantity: 1,
               actual_weight: weightKg,
               declared_currency: 'USD',
