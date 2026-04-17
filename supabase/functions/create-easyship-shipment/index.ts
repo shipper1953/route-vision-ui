@@ -87,7 +87,6 @@ serve(async (req) => {
         },
       ],
       incoterms: 'DDU',
-      output_currency: 'USD',
       shipping_settings: {
         units: {
           weight: 'lb',
