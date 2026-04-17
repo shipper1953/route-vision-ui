@@ -311,4 +311,14 @@ export class RateShoppingService {
       throw error;
     }
   }
+
+  private async getEasyshipRates(shipmentData: ShipmentRequest) {
+    try {
+      console.log('🌐 Fetching Easyship rates...');
+      return await this.easyshipService.createShipment(shipmentData);
+    } catch (error) {
+      console.error('Easyship rate fetching failed:', error);
+      throw error;
+    }
+  }
 }
