@@ -103,10 +103,10 @@ export const RateOptionCard = ({
             {provider && (
               <Badge 
                 variant={provider === 'easypost' ? 'default' : 'secondary'} 
-                className={`ml-2 ${provider === 'easypost' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}
+                className="ml-2"
               >
                 <Package className="h-3 w-3 mr-1" />
-                {provider === 'easypost' ? 'EasyPost' : 'Shippo'}
+                {provider === 'easypost' ? 'EasyPost' : provider === 'easyship' ? 'Easyship' : 'Shippo'}
               </Badge>
             )}
             {isRecommended && (
