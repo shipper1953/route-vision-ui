@@ -163,16 +163,12 @@ export const ShippingOptionsSection = ({
       return { rate, meetsDeliveryDate, estimatedDeliveryDate };
     });
 
-    // Sort: rates that meet the deadline first (cheapest first within group),
-    // then rates that don't meet (also cheapest first).
-    return ratesWithMeta.sort((a, b) => {
-      // Group ranking: meets (true) > unknown (null) > does not meet (false)
-      const rank = (m: boolean | null) => (m === true ? 0 : m === null ? 1 : 2);
-      const groupDiff = rank(a.meetsDeliveryDate) - rank(b.meetsDeliveryDate);
-      if (groupDiff !== 0) return groupDiff;
-      // Within same group, sort cheapest first
-      return parseFloat(a.rate.rate) - parseFloat(b.rate.rate);
-    });
+    // Sort purely by price (cheapest first) regardless of provider or deadline.
+    // Deadline grouping is handled by the UI splitting `meets` vs `does not meet` sections,
+    // and within each section rates remain cheapest-first.
+    return ratesWithMeta.sort(
+      (a, b) => parseFloat(a.rate.rate) - parseFloat(b.rate.rate)
+    );
   };
 
   const handleConfirmAndBuy = async () => {
