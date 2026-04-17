@@ -330,47 +330,15 @@ export const ShippingOptionsSection = ({
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {/* Rates that meet delivery date */}
-          {requiredDeliveryDate && meetsCount > 0 && (
-            <div className="mb-3">
-              <div className="flex items-center gap-2 mb-2 text-sm font-medium text-green-700">
-                <CalendarCheck className="h-4 w-4" />
-                Meets Required Delivery Date
-              </div>
-              <div className="space-y-2">
-                {sortedRates
-                  .filter((r) => r.meetsDeliveryDate === true)
-                  .map((item) => (
-                    <RateCard
-                      key={item.rate.id}
-                      sortedRate={item}
-                      isSelected={selectedRateId === item.rate.id}
-                      onSelect={() => setSelectedRateId(item.rate.id)}
-                    />
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {requiredDeliveryDate && meetsCount > 0 && doesNotMeetCount > 0 && (
-            <div className="flex items-center gap-2 my-3 text-sm font-medium text-yellow-700">
-              <CalendarX className="h-4 w-4" />
-              May Not Meet Required Delivery Date
-            </div>
-          )}
-
           <div className="space-y-2">
-            {sortedRates
-              .filter((r) => r.meetsDeliveryDate !== true)
-              .map((item) => (
-                <RateCard
-                  key={item.rate.id}
-                  sortedRate={item}
-                  isSelected={selectedRateId === item.rate.id}
-                  onSelect={() => setSelectedRateId(item.rate.id)}
-                  
-                />
-              ))}
+            {sortedRates.map((item) => (
+              <RateCard
+                key={item.rate.id}
+                sortedRate={item}
+                isSelected={selectedRateId === item.rate.id}
+                onSelect={() => setSelectedRateId(item.rate.id)}
+              />
+            ))}
           </div>
         </CardContent>
       </Card>
