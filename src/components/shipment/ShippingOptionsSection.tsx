@@ -149,20 +149,28 @@ export const ShippingOptionsSection = ({
             : null;
 
       let meetsDeliveryDate: boolean | null = null;
-      if (requiredDeliveryDate && estimatedDeliveryDate) {
-        const reqDate = parseISO(requiredDeliveryDate);
-        meetsDeliveryDate =
-          isBefore(estimatedDeliveryDate, reqDate) || isEqual(estimatedDeliveryDate, reqDate);
+      if (requiredDeliveryDate) {
+        if (estimatedDeliveryDate) {
+          const reqDate = parseISO(requiredDeliveryDate);
+          meetsDeliveryDate =
+            isBefore(estimatedDeliveryDate, reqDate) || isEqual(estimatedDeliveryDate, reqDate);
+        } else {
+          // Unknown delivery time — treat as not meeting deadline so known-good rates rank above it
+          meetsDeliveryDate = false;
+        }
       }
 
       return { rate, meetsDeliveryDate, estimatedDeliveryDate };
     });
 
+    // Sort: rates that meet the deadline first (cheapest first within group),
+    // then rates that don't meet (also cheapest first).
     return ratesWithMeta.sort((a, b) => {
-      if (a.meetsDeliveryDate !== null && b.meetsDeliveryDate !== null) {
-        if (a.meetsDeliveryDate && !b.meetsDeliveryDate) return -1;
-        if (!a.meetsDeliveryDate && b.meetsDeliveryDate) return 1;
-      }
+      // Group ranking: meets (true) > unknown (null) > does not meet (false)
+      const rank = (m: boolean | null) => (m === true ? 0 : m === null ? 1 : 2);
+      const groupDiff = rank(a.meetsDeliveryDate) - rank(b.meetsDeliveryDate);
+      if (groupDiff !== 0) return groupDiff;
+      // Within same group, sort cheapest first
       return parseFloat(a.rate.rate) - parseFloat(b.rate.rate);
     });
   };
