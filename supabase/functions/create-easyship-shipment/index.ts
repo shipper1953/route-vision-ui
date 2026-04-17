@@ -73,10 +73,11 @@ serve(async (req) => {
       },
       parcels: [
         {
+          total_actual_weight: weightKg,
           box: {
-            length: parcel.length,
-            width: parcel.width,
-            height: parcel.height,
+            length: lengthCm,
+            width: widthCm,
+            height: heightCm,
             slug: 'custom',
           },
           items: [
@@ -84,13 +85,13 @@ serve(async (req) => {
               description: 'Merchandise',
               category: 'others',
               quantity: 1,
-              actual_weight: parcel.weight,
+              actual_weight: weightKg,
               declared_currency: 'USD',
               declared_customs_value: 1,
               dimensions: {
-                length: parcel.length,
-                width: parcel.width,
-                height: parcel.height,
+                length: lengthCm,
+                width: widthCm,
+                height: heightCm,
               },
             },
           ],
@@ -99,8 +100,8 @@ serve(async (req) => {
       incoterms: 'DDU',
       shipping_settings: {
         units: {
-          weight: 'lb',
-          dimensions: 'in',
+          weight: 'kg',
+          dimensions: 'cm',
         },
         output_currency: 'USD',
       },
