@@ -147,22 +147,30 @@ serve(async (req) => {
       );
     }
 
-    const rates = (data.rates || []).map((r: any) => ({
-      object_id: r.courier_id || r.id,
-      rate_id: r.courier_id || r.id,
-      courier_id: r.courier_id,
-      courier_name: r.courier_name,
-      courier_logo_url: r.courier_logo_url,
-      service_name: r.courier_name,
-      total_charge: r.total_charge,
-      currency: r.currency || 'USD',
-      min_delivery_time: r.min_delivery_time,
-      max_delivery_time: r.max_delivery_time,
-      delivery_days: r.max_delivery_time || r.min_delivery_time,
-      tracking_rating: r.tracking_rating,
-      ddp_handling_fee: r.ddp_handling_fee,
-      raw: r,
-    }));
+    const rates = (data.rates || []).map((r: any) => {
+      const courierService = r.courier_service || {};
+      const courierId = r.courier_id || courierService.courier_id || r.id;
+      const carrierName = r.courier_name || courierService.umbrella_name || courierService.name || 'Easyship';
+      const serviceName = r.service_name || courierService.name || r.full_description || carrierName;
+      const courierLogoUrl = r.courier_logo_url || courierService.logo;
+
+      return {
+        object_id: courierId,
+        rate_id: courierId,
+        courier_id: courierId,
+        courier_name: carrierName,
+        courier_logo_url: courierLogoUrl,
+        service_name: serviceName,
+        total_charge: r.total_charge,
+        currency: r.currency || 'USD',
+        min_delivery_time: r.min_delivery_time,
+        max_delivery_time: r.max_delivery_time,
+        delivery_days: r.max_delivery_time || r.min_delivery_time,
+        tracking_rating: r.tracking_rating,
+        ddp_handling_fee: r.ddp_handling_fee,
+        raw: r,
+      };
+    });
 
     const responsePayload = {
       object_id: `easyship_${Date.now()}`,
