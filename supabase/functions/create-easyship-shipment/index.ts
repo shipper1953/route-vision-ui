@@ -35,6 +35,15 @@ serve(async (req) => {
     const to = shipmentData.to_address;
     const parcel = shipmentData.parcel;
 
+    // Easyship expects metric units in the request body (kg/cm).
+    // shipping_settings.units controls the response display, not the request payload.
+    const LB_TO_KG = 0.453592;
+    const IN_TO_CM = 2.54;
+    const weightKg = Number((parcel.weight * LB_TO_KG).toFixed(3));
+    const lengthCm = Number((parcel.length * IN_TO_CM).toFixed(2));
+    const widthCm = Number((parcel.width * IN_TO_CM).toFixed(2));
+    const heightCm = Number((parcel.height * IN_TO_CM).toFixed(2));
+
     // Easyship rate request payload (v2024-09)
     // Docs: https://developers.easyship.com/reference/rates_request
     const payload = {
@@ -64,24 +73,25 @@ serve(async (req) => {
       },
       parcels: [
         {
+          total_actual_weight: weightKg,
           box: {
-            length: parcel.length,
-            width: parcel.width,
-            height: parcel.height,
+            length: lengthCm,
+            width: widthCm,
+            height: heightCm,
             slug: 'custom',
           },
           items: [
             {
               description: 'Merchandise',
-              category: 'others',
+              hs_code: '420299', // Generic merchandise HS code (other articles)
               quantity: 1,
-              actual_weight: parcel.weight,
+              actual_weight: weightKg,
               declared_currency: 'USD',
               declared_customs_value: 1,
               dimensions: {
-                length: parcel.length,
-                width: parcel.width,
-                height: parcel.height,
+                length: lengthCm,
+                width: widthCm,
+                height: heightCm,
               },
             },
           ],
@@ -90,8 +100,8 @@ serve(async (req) => {
       incoterms: 'DDU',
       shipping_settings: {
         units: {
-          weight: 'lb',
-          dimensions: 'in',
+          weight: 'kg',
+          dimensions: 'cm',
         },
         output_currency: 'USD',
       },
