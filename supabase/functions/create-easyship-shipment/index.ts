@@ -99,15 +99,27 @@ serve(async (req) => {
 
     console.log('📡 Easyship rates request:', JSON.stringify(payload).slice(0, 500));
 
-    const response = await fetch(`${EASYSHIP_BASE_URL}/2024-09/rates`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    // Retry with exponential backoff for 429 rate limits
+    let response: Response;
+    let attempt = 0;
+    const maxAttempts = 4;
+    while (true) {
+      response = await fetch(`${EASYSHIP_BASE_URL}/2024-09/rates`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.status !== 429 || attempt >= maxAttempts - 1) break;
+      const delay = Math.min(2000 * Math.pow(2, attempt), 8000) + Math.floor(Math.random() * 500);
+      console.warn(`⏳ Easyship 429, retrying in ${delay}ms (attempt ${attempt + 1}/${maxAttempts})`);
+      await new Promise((r) => setTimeout(r, delay));
+      attempt++;
+    }
 
     const text = await response.text();
     let data: any;
