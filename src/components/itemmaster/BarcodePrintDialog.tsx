@@ -14,19 +14,56 @@ interface BarcodePrintDialogProps {
 
 export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialogProps) => {
   const { printers, selectedPrinter, setSelectedPrinter, loading, printZPL } = usePrintNode();
+  const selectedPrinterInfo = printers.find((printer) => printer.id === selectedPrinter);
+
+  const BASE_LABEL_WIDTH_DOTS = 812; // 4in @ 203 DPI
+  const BASE_LABEL_HEIGHT_DOTS = 406; // 2in @ 203 DPI
+
+  const parsePrinterExtent = () => {
+    const extent = selectedPrinterInfo?.capabilities?.extent;
+    if (!extent?.length) {
+      return null;
+    }
+
+    const validExtents = extent.filter(
+      (dimensions): dimensions is number[] =>
+        Array.isArray(dimensions) &&
+        dimensions.length >= 2 &&
+        Number.isFinite(dimensions[0]) &&
+        Number.isFinite(dimensions[1]) &&
+        dimensions[0] > 0 &&
+        dimensions[1] > 0
+    );
+
+    if (!validExtents.length) {
+      return null;
+    }
+
+    const [width, height] = validExtents[0];
+    return {
+      width: Math.round(Math.max(width, BASE_LABEL_WIDTH_DOTS)),
+      height: Math.round(Math.max(height, BASE_LABEL_HEIGHT_DOTS)),
+    };
+  };
+
+  const printerExtent = parsePrinterExtent();
+  const labelWidthDots = printerExtent?.width ?? BASE_LABEL_WIDTH_DOTS;
+  const labelHeightDots = printerExtent?.height ?? BASE_LABEL_HEIGHT_DOTS;
+  const widthScale = labelWidthDots / BASE_LABEL_WIDTH_DOTS;
+  const heightScale = labelHeightDots / BASE_LABEL_HEIGHT_DOTS;
+
+  const dotsToInches = (dots: number) => (dots / 203).toFixed(2);
 
   const handlePrint = () => {
     window.print();
   };
 
   const generateZPL = (item: Item): string => {
-    // Label specifications (4" x 2" at 203 DPI)
-    const labelWidth = 812;
-    const labelCenterX = labelWidth / 2; // 406
+    const labelCenterX = labelWidthDots / 2;
     
     // Barcode specifications
-    const moduleWidth = 4; // ^BY4
-    const barcodeHeight = 90;
+    const moduleWidth = Math.max(2, Math.round(4 * widthScale)); // ^BYx
+    const barcodeHeight = Math.max(90, Math.round(90 * heightScale));
     const skuLength = item.sku.length;
     
     // Calculate barcode width for Code 128: (11 * characters + 35) * module_width
@@ -36,13 +73,16 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
     const barcodeStartX = Math.round(labelCenterX - (barcodeWidth / 2));
     
     // Vertical positioning
-    const barcodeY = 110; // Upper-middle portion of label
-    const nameY = 300; // Lower-middle portion of label
+    const barcodeY = Math.round(110 * heightScale);
+    const nameY = Math.round(300 * heightScale);
+    const fontSize = Math.max(28, Math.round(40 * Math.min(widthScale, heightScale)));
     
     return `^XA
+^PW${labelWidthDots}
+^LL${labelHeightDots}
 ^FO${barcodeStartX},${barcodeY}^BY${moduleWidth}^BCN,${barcodeHeight},Y,N,N
 ^FD${item.sku}^FS
-^FO0,${nameY}^FB${labelWidth},1,0,C,0^A0N,40,40^FD${item.name}^FS
+^FO0,${nameY}^FB${labelWidthDots},1,0,C,0^A0N,${fontSize},${fontSize}^FD${item.name}^FS
 ^XZ`;
   };
 
@@ -124,8 +164,8 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
                 key={item.id}
                 className="border rounded-lg p-4 bg-white barcode-label"
                 style={{
-                  width: '4in',
-                  height: '2in',
+                  width: `${dotsToInches(labelWidthDots)}in`,
+                  height: `${dotsToInches(labelHeightDots)}in`,
                   pageBreakAfter: 'always',
                   display: 'flex',
                   flexDirection: 'column',
@@ -144,12 +184,12 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
         <style dangerouslySetInnerHTML={{__html: `
           @media print {
             @page {
-              size: 4in 2in;
+              size: ${dotsToInches(labelWidthDots)}in ${dotsToInches(labelHeightDots)}in;
               margin: 0;
             }
             html, body {
-              width: 4in;
-              height: 2in;
+              width: ${dotsToInches(labelWidthDots)}in;
+              height: ${dotsToInches(labelHeightDots)}in;
               margin: 0;
               padding: 0;
             }
@@ -168,12 +208,12 @@ export const BarcodePrintDialog = ({ items, isOpen, onClose }: BarcodePrintDialo
               top: 0;
               margin: 0;
               padding: 0;
-              width: 4in;
+              width: ${dotsToInches(labelWidthDots)}in;
               height: auto;
             }
             .barcode-label {
-              width: 4in !important;
-              height: 2in !important;
+              width: ${dotsToInches(labelWidthDots)}in !important;
+              height: ${dotsToInches(labelHeightDots)}in !important;
               page-break-after: always !important;
               page-break-inside: avoid !important;
               margin: 0 !important;
