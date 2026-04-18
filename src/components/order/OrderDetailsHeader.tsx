@@ -23,6 +23,8 @@ const getStatusBadgeVariant = (status: string) => {
       return 'default';
     case 'cancelled':
       return 'destructive';
+    case 'error':
+      return 'destructive';
     default:
       return 'secondary';
   }

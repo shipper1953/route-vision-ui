@@ -32,12 +32,14 @@ export interface ShipmentInfo {
 }
 
 export interface OrderItem {
-  itemId: string;
+  itemId?: string | null;
   quantity: number;
   unitPrice?: number;
   name?: string;
   sku?: string;
   description?: string;
+  item_master_match?: boolean;
+  item_master_error?: string;
   dimensions?: {
     length: number;
     width: number;

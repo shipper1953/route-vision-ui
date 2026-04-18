@@ -136,21 +136,26 @@ export const useCartonization = () => {
       // Handle different order item structures
       let itemData: any = {};
       
-      if (orderItem.itemId && masterItems.length > 0) {
-        // If we have a proper itemId and master items, use those
-        const masterItem = masterItems.find(item => item.id === orderItem.itemId);
+      // Always prefer Item Master dimensions for cartonization when we can map by itemId or SKU.
+      if (masterItems.length > 0) {
+        const normalizedSku = typeof orderItem.sku === 'string' ? orderItem.sku.trim().toLowerCase() : '';
+        const masterItem = masterItems.find(item => item.id === orderItem.itemId)
+          || (normalizedSku
+            ? masterItems.find(item => String(item.sku || '').trim().toLowerCase() === normalizedSku)
+            : undefined);
+
         if (masterItem) {
           itemData = {
             id: `order-item-${index}`,
-            itemId: orderItem.itemId, // Preserve real itemId
-            name: masterItem.name,
-            sku: orderItem.sku || masterItem.sku, // Preserve SKU
-            length: masterItem.length,
-            width: masterItem.width,
-            height: masterItem.height,
-            weight: masterItem.weight,
+            itemId: orderItem.itemId || masterItem.id,
+            name: masterItem.name || orderItem.name || orderItem.description || `Order Item ${index + 1}`,
+            sku: orderItem.sku || masterItem.sku,
+            length: Number(masterItem.length),
+            width: Number(masterItem.width),
+            height: Number(masterItem.height),
+            weight: Number(masterItem.weight),
             quantity: orderItem.quantity || orderItem.count || 1,
-            category: masterItem.category,
+            category: masterItem.category || 'item_master',
             fragility: masterItem.fragility || 'low'
           };
         }

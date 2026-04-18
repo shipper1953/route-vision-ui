@@ -50,15 +50,31 @@ export const OrderInfoCard = ({ order }: OrderInfoCardProps) => {
           {Array.isArray(order.items) && order.items.length > 0 ? (
             <div className="space-y-2">
               {order.items.map((item, index) => (
-                <div key={index} className="flex justify-between items-start p-2 bg-muted/50 rounded-md">
+                <div
+                  key={index}
+                  className={`flex justify-between items-start p-2 rounded-md border ${
+                    item.item_master_match === false
+                      ? 'bg-red-50 border-red-200'
+                      : 'bg-muted/50 border-transparent'
+                  }`}
+                >
                   <div className="flex-1">
-                    <p className="font-medium text-sm">{item.name || item.description || `Item ${index + 1}`}</p>
+                    <p className={`font-medium text-sm ${item.item_master_match === false ? 'text-red-700' : ''}`}>
+                      {item.name || item.description || `Item ${index + 1}`}
+                    </p>
                     {item.sku && (
-                      <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
+                      <p className={`text-xs ${item.item_master_match === false ? 'text-red-600' : 'text-muted-foreground'}`}>
+                        SKU: {item.sku}
+                      </p>
+                    )}
+                    {item.item_master_match === false && (
+                      <p className="text-xs text-red-700 mt-1">
+                        {item.item_master_error || 'Missing from Item Master. Run Shopify product sync.'}
+                      </p>
                     )}
                   </div>
                   <div className="text-right ml-4">
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant={item.item_master_match === false ? 'destructive' : 'secondary'} className="text-xs">
                       Qty: {item.quantity || 1}
                     </Badge>
                     {item.unitPrice && (

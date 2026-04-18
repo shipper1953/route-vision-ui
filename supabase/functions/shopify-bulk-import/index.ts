@@ -126,6 +126,84 @@ serve(async (req) => {
           continue;
         }
 
+        const rawItems = shopifyOrder.line_items?.map((item: any) => ({
+          sku: item.sku || item.name,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: parseFloat(item.price),
+          variant_id: item.variant_id?.toString() || null,
+          product_id: item.product_id?.toString() || null,
+        })) || [];
+
+        const skuSet = new Set<string>();
+        const variantIdSet = new Set<string>();
+        const productIdSet = new Set<string>();
+        rawItems.forEach((item: any) => {
+          if (item.sku) skuSet.add(item.sku);
+          if (item.variant_id) variantIdSet.add(item.variant_id);
+          if (item.product_id) productIdSet.add(item.product_id);
+        });
+
+        const matchedBySku = new Map<string, any>();
+        const matchedByVariantId = new Map<string, any>();
+        const matchedByProductId = new Map<string, any>();
+
+        if (skuSet.size > 0) {
+          const { data: matches } = await supabase
+            .from('items')
+            .select('id, sku, shopify_variant_id, shopify_product_id')
+            .eq('company_id', companyId)
+            .in('sku', Array.from(skuSet));
+          (matches || []).forEach((match: any) => {
+            if (match.sku) matchedBySku.set(match.sku, match);
+          });
+        }
+
+        if (variantIdSet.size > 0) {
+          const { data: matches } = await supabase
+            .from('items')
+            .select('id, sku, shopify_variant_id, shopify_product_id')
+            .eq('company_id', companyId)
+            .in('shopify_variant_id', Array.from(variantIdSet));
+          (matches || []).forEach((match: any) => {
+            if (match.shopify_variant_id) matchedByVariantId.set(match.shopify_variant_id, match);
+          });
+        }
+
+        if (productIdSet.size > 0) {
+          const { data: matches } = await supabase
+            .from('items')
+            .select('id, sku, shopify_variant_id, shopify_product_id')
+            .eq('company_id', companyId)
+            .in('shopify_product_id', Array.from(productIdSet));
+          (matches || []).forEach((match: any) => {
+            if (match.shopify_product_id) matchedByProductId.set(match.shopify_product_id, match);
+          });
+        }
+
+        const items = rawItems.map((item: any) => {
+          const matchedItem = (item.variant_id ? matchedByVariantId.get(item.variant_id) : null)
+            || (item.product_id ? matchedByProductId.get(item.product_id) : null)
+            || (item.sku ? matchedBySku.get(item.sku) : null);
+
+          if (!matchedItem) {
+            return {
+              ...item,
+              itemId: null,
+              item_master_match: false,
+              item_master_error: 'Item not found in Item Master. Run a Shopify product sync.',
+            };
+          }
+
+          return {
+            ...item,
+            itemId: matchedItem.id,
+            item_master_match: true,
+          };
+        });
+
+        const hasUnmatchedItems = items.some((item: any) => item.item_master_match === false);
+
         // Transform and create order
         const orderData = {
           order_id: `SHOP-${shopifyOrder.order_number}`,
@@ -141,15 +219,10 @@ serve(async (req) => {
             zip: shopifyOrder.shipping_address.zip || '',
             country: shopifyOrder.shipping_address.country_code || 'US'
           } : null,
-          items: shopifyOrder.line_items?.map((item: any) => ({
-            sku: item.sku || item.name,
-            name: item.name,
-            quantity: item.quantity,
-            unitPrice: parseFloat(item.price)
-          })) || [],
+          items,
           value: parseFloat(shopifyOrder.total_price || '0'),
           order_date: shopifyOrder.created_at,
-          status: 'processing',
+          status: hasUnmatchedItems ? 'error' : 'processing',
           company_id: companyId,
           warehouse_id: warehouse?.id || null,
           user_id: user.id,
