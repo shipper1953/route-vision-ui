@@ -10,12 +10,17 @@ import { useItemMaster } from "@/hooks/useItemMaster";
 export const useUpdateOrder = (orderId: string) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { items } = useItemMaster();
 
   const onSubmit = async (data: OrderFormValues) => {
     if (!user?.id) {
       toast.error("You must be logged in to update an order");
+      return;
+    }
+
+    if (!userProfile?.company_id) {
+      toast.error("Company context missing. Please contact your administrator.");
       return;
     }
 
@@ -75,7 +80,8 @@ export const useUpdateOrder = (orderId: string) => {
           },
           warehouse_id: data.warehouseId
         })
-        .eq('id', parseInt(orderId)); // Use id field, not order_id
+        .eq('id', parseInt(orderId))
+        .eq('company_id', userProfile.company_id); // Ensure company scoping
       
       if (error) {
         console.error("Error updating order:", error);
@@ -87,21 +93,16 @@ export const useUpdateOrder = (orderId: string) => {
       const { data: updatedOrder, error: fetchError } = await supabase
         .from('orders')
         .select('*')
-        .eq('id', parseInt(orderId)) // Use id field, not order_id
+        .eq('id', parseInt(orderId))
+        .eq('company_id', userProfile.company_id)
         .single();
 
       if (!fetchError && updatedOrder) {
         // Get user's company for cartonization
-        const { data: userProfile, error: profileError } = await supabase
-          .from('users')
-          .select('company_id')
-          .eq('id', user.id)
-          .single();
-
-        if (!profileError && userProfile?.company_id && orderItemsWithDetails.length > 0) {
+        if (orderItemsWithDetails.length > 0) {
           try {
             console.log("Recalculating cartonization for updated order:", updatedOrder.id);
-            
+
             // Get company boxes for cartonization
             const { data: boxes, error: boxError } = await supabase
               .from('boxes')

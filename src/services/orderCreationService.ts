@@ -56,6 +56,29 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
     throw new Error("Could not determine company. Please select a warehouse.");
   }
 
+  // Validate that all order items belong to the user's company
+  if (orderData.orderItems && orderData.orderItems.length > 0) {
+    const itemIds = Array.from(new Set(orderData.orderItems.map(item => item.itemId)));
+
+    const { data: matchingItems, error: itemsError } = await supabase
+      .from('items')
+      .select('id, company_id')
+      .in('id', itemIds);
+
+    if (itemsError) {
+      throw new Error(`Failed to validate order items: ${itemsError.message}`);
+    }
+
+    if (!matchingItems || matchingItems.length !== itemIds.length) {
+      throw new Error('One or more selected items were not found for this company');
+    }
+
+    const invalidItem = matchingItems.find(item => item.company_id !== userProfile.company_id);
+    if (invalidItem) {
+      throw new Error('Orders can only include items that belong to your company');
+    }
+  }
+
   // Determine warehouse ID (use provided, user's first, or company default in parallel)
   let finalWarehouseId: string | null = orderData.warehouseId || null;
   
