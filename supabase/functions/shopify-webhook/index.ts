@@ -270,10 +270,12 @@ async function resolveUniqueOrderId(
   shopifyOrderId: string,
   excludeOrderId?: number,
 ) {
+  // NOTE: orders.order_id has a GLOBAL unique constraint (orders_order_id_key),
+  // not scoped per company. We must check globally to avoid 23505 conflicts when
+  // multiple Shopify stores (across companies) generate the same SHOP-{number} id.
   let query = supabase
     .from('orders')
     .select('id')
-    .eq('company_id', companyId)
     .eq('order_id', preferredOrderId)
     .limit(1);
 
@@ -287,7 +289,22 @@ async function resolveUniqueOrderId(
     return preferredOrderId;
   }
 
-  return `${preferredOrderId}-${shopifyOrderId.slice(-6)}`;
+  // Append last 6 chars of the Shopify order id to disambiguate.
+  let candidate = `${preferredOrderId}-${shopifyOrderId.slice(-6)}`;
+
+  // Defensive: if even the suffixed id collides (extremely unlikely), append more.
+  let suffixCheck = await supabase
+    .from('orders')
+    .select('id')
+    .eq('order_id', candidate)
+    .limit(1)
+    .maybeSingle();
+
+  if (suffixCheck.data && (!excludeOrderId || suffixCheck.data.id !== excludeOrderId)) {
+    candidate = `${preferredOrderId}-${shopifyOrderId}`;
+  }
+
+  return candidate;
 }
 
 async function reserveInventoryForOrder(
