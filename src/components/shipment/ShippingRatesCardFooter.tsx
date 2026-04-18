@@ -331,8 +331,8 @@ export const ShippingRatesCardFooter = ({
               orderId: orderId || `Package-${labels.length + 1}`,
               labelUrl,
               trackingNumber: p?.tracking_code || p?.tracking_number || 'N/A',
-              carrier: p?.selected_rate?.carrier || p?.rate?.carrier || p?.carrier || 'Unknown',
-              service: p?.selected_rate?.service || p?.rate?.service || p?.service || 'Unknown',
+              carrier: p?.selected_rate?.carrier || p?.rate?.carrier || p?.rate?.provider || p?.carrier || pkgRate?.selectedRate?.carrier || 'Unknown',
+              service: p?.selected_rate?.service || p?.rate?.service || p?.rate?.servicelevel?.name || p?.servicelevel?.name || p?.service || pkgRate?.selectedRate?.service || 'Unknown',
             });
             console.log(`✅ Label ${labels.length} extracted:`, labels[labels.length - 1]);
           } else {

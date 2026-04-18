@@ -103,8 +103,8 @@ const CreateShipment = () => {
         labelUrl={labelData?.labelUrl || labelData?.postage_label?.label_url || labelData?.label_url}
         shipmentId={labelData?.shipmentId?.toString() || labelData?.object_id || labelData?.id || ''}
         orderDetails={labelData ? {
-          carrier: labelData.carrier || labelData.selected_rate?.carrier || 'Unknown',
-          service: labelData.service || labelData.selected_rate?.service || 'Unknown',
+          carrier: labelData.carrier || labelData.selected_rate?.carrier || labelData.rate?.provider || 'Unknown',
+          service: labelData.service || labelData.selected_rate?.service || labelData.rate?.servicelevel?.name || labelData.servicelevel?.name || 'Unknown',
           trackingCode: labelData.trackingNumber || labelData.tracking_code || labelData.tracking_number || 'N/A',
           trackingUrl: labelData.trackingUrl || labelData.tracker?.public_url || labelData.tracking_url_provider || '',
           createdAt: new Date().toLocaleString()
