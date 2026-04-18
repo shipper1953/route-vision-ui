@@ -151,6 +151,19 @@ function normalizeShopifyId(value: string | number | null | undefined): string |
   return normalized.includes('/') ? normalized.split('/').pop() || normalized : normalized;
 }
 
+function ensureShopifyGid(
+  value: string | number | null | undefined,
+  resource: 'Order' | 'Location' | 'FulfillmentOrder',
+): string | null {
+  if (value === null || value === undefined) return null;
+  const asString = value.toString().trim();
+  if (!asString) return null;
+  if (asString.startsWith('gid://')) return asString;
+  const numericId = normalizeShopifyId(asString);
+  if (!numericId) return null;
+  return `gid://shopify/${resource}/${numericId}`;
+}
+
 async function shopifyGraphQL(store: any, query: string, variables: Record<string, unknown> = {}) {
   const storeUrl = store.store_url?.replace(/\/$/, '');
   const accessToken = store.access_token;
@@ -202,7 +215,8 @@ async function getOrderFulfillmentOrders(store: any, shopifyOrderId: string, max
     }
   `;
 
-  const orderGid = `gid://shopify/Order/${shopifyOrderId}`;
+  const orderGid = ensureShopifyGid(shopifyOrderId, 'Order');
+  if (!orderGid) return [];
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const data = await shopifyGraphQL(store, query, { orderId: orderGid });
@@ -326,11 +340,15 @@ async function reserveInventoryForOrder(
 }
 
 async function routeAndRequestFulfillmentOrders(store: any, shopifyOrderId: string) {
-  const shipTornadoLocationId = store.fulfillment_service_location_id || store.fulfillment_location_id;
+  const shipTornadoLocationIdRaw = store.fulfillment_service_location_id || store.fulfillment_location_id;
+  const shipTornadoLocationId = ensureShopifyGid(shipTornadoLocationIdRaw, 'Location');
 
   if (!shipTornadoLocationId) {
     console.log('Fulfillment service is not fully configured, skipping auto-routing');
     return;
+  }
+  if (shipTornadoLocationId !== shipTornadoLocationIdRaw) {
+    console.log(`Normalized Ship Tornado location ID from "${shipTornadoLocationIdRaw}" to "${shipTornadoLocationId}"`);
   }
 
   const fulfillmentOrders = await getOrderFulfillmentOrders(store, shopifyOrderId);
