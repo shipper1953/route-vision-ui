@@ -101,9 +101,25 @@ export const OrderLookupSection = ({ setOrderLookupComplete, setOrderItems }: Or
           console.warn("No valid shipping address found in order");
         }
 
-        // Populate From address from the order's warehouse
-        if (order.warehouseId) {
-          await populateFromWarehouse(order.warehouseId);
+        // Populate From address from the order's warehouse, falling back to
+        // the company's default warehouse when the order has none assigned.
+        let warehouseIdToUse = order.warehouseId;
+        if (!warehouseIdToUse && order.companyId) {
+          const { data: defaultWh } = await supabase
+            .from('warehouses')
+            .select('id')
+            .eq('company_id', order.companyId)
+            .eq('is_default', true)
+            .maybeSingle();
+          if (defaultWh?.id) {
+            warehouseIdToUse = defaultWh.id;
+            console.log("ℹ️ Order has no warehouse — using company default:", defaultWh.id);
+          }
+        }
+        if (warehouseIdToUse) {
+          await populateFromWarehouse(warehouseIdToUse);
+        } else {
+          toast.warning("This order has no warehouse and no company default is set. Please assign one.");
         }
         
         // Set parcel dimensions and weight from cartonization data (preferred) or parcelInfo

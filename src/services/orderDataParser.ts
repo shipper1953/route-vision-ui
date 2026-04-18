@@ -194,6 +194,7 @@ export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
       actualDeliveryDate: supabaseOrder.actual_delivery_date
     } : null, // Map shipment_data to shipment field with delivery dates from order
     warehouseId: supabaseOrder.warehouse_id || undefined,
+    companyId: supabaseOrder.company_id || undefined,
     estimatedDeliveryDate: supabaseOrder.estimated_delivery_date || undefined,
     actualDeliveryDate: supabaseOrder.actual_delivery_date || undefined,
   };
