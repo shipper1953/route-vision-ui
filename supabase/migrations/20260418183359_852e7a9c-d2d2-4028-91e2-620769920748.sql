@@ -1,0 +1,1 @@
+DELETE FROM public.transactions WHERE id = '8ad72aaf-3df8-4f15-911b-4c8d93951ad8' AND description = 'SYSTEM: Undocumented balance change detected';
