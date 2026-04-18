@@ -365,16 +365,16 @@ function ensureZpl4x6Dimensions(zplCode: string): string {
       return !trimmed.match(/^\^PW\d+/) &&
              !trimmed.match(/^\^LL\d+/) &&
              !trimmed.match(/^\^LT\d+/) &&
+             !trimmed.match(/^\^MT[DT]/) &&
              !trimmed.match(/^\^MN[NMYW]/) &&
-             !trimmed.match(/^\^JM[A-Z]/) &&
              !trimmed.match(/^\^LS-?\d+/);
     })
     .join('\n');
   
   // Step 3: Insert our dimension commands right after ^XA
   const dimensionCommands = [
-    '^MNM',    // Media Tracking Mark
-    '^JMA',    // 203 DPI resolution  
+    '^MTD',    // Direct thermal media type
+    '^MNY',    // Web/gap sensing media tracking
     '^LT0',    // Label Top 0
     '^PW812',  // Print Width 4"
     '^LL1218', // Label Length 6"
