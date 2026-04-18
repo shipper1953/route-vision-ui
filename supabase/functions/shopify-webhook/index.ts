@@ -8,6 +8,25 @@ function sanitizeString(str: string | null | undefined, maxLength: number = 255)
   return str.trim().slice(0, maxLength);
 }
 
+function getStoreOrderPrefix(store: any): string {
+  const rawStoreKey = String(
+    store?.store_url
+      || store?.shop_domain
+      || store?.myshopify_domain
+      || store?.id
+      || 'store',
+  ).toLowerCase();
+
+  const normalizedStoreKey = rawStoreKey
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
+    .replace(/\.myshopify\.com$/, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalizedStoreKey || 'store';
+}
+
 // Shopify webhook order validation schema
 const ShopifyOrderSchema = z.object({
   id: z.union([z.number(), z.string()]).transform(String),
@@ -265,46 +284,43 @@ async function getOrderFulfillmentOrders(store: any, shopifyOrderId: string, max
 
 async function resolveUniqueOrderId(
   supabase: any,
-  companyId: string,
+  _companyId: string,
   preferredOrderId: string,
   shopifyOrderId: string,
   excludeOrderId?: number,
 ) {
-  // NOTE: orders.order_id has a GLOBAL unique constraint (orders_order_id_key),
-  // not scoped per company. We must check globally to avoid 23505 conflicts when
-  // multiple Shopify stores (across companies) generate the same SHOP-{number} id.
-  let query = supabase
-    .from('orders')
-    .select('id')
-    .eq('order_id', preferredOrderId)
-    .limit(1);
+  const orderIdExists = async (orderId: string) => {
+    let query = supabase
+      .from('orders')
+      .select('id')
+      .eq('order_id', orderId)
+      .limit(1);
 
-  if (excludeOrderId) {
-    query = query.neq('id', excludeOrderId);
-  }
+    if (excludeOrderId) {
+      query = query.neq('id', excludeOrderId);
+    }
 
-  const { data: conflictingOrder } = await query.maybeSingle();
+    const { data } = await query.maybeSingle();
+    return Boolean(data);
+  };
 
-  if (!conflictingOrder) {
+  if (!(await orderIdExists(preferredOrderId))) {
     return preferredOrderId;
   }
 
-  // Append last 6 chars of the Shopify order id to disambiguate.
-  let candidate = `${preferredOrderId}-${shopifyOrderId.slice(-6)}`;
-
-  // Defensive: if even the suffixed id collides (extremely unlikely), append more.
-  let suffixCheck = await supabase
-    .from('orders')
-    .select('id')
-    .eq('order_id', candidate)
-    .limit(1)
-    .maybeSingle();
-
-  if (suffixCheck.data && (!excludeOrderId || suffixCheck.data.id !== excludeOrderId)) {
-    candidate = `${preferredOrderId}-${shopifyOrderId}`;
+  const shopifySuffix = shopifyOrderId.replace(/\D/g, '').slice(-6) || 'shopify';
+  const suffixedOrderId = `${preferredOrderId}-${shopifySuffix}`;
+  if (!(await orderIdExists(suffixedOrderId))) {
+    return suffixedOrderId;
   }
 
-  return candidate;
+  const defensiveSuffix = crypto.randomUUID().split('-')[0];
+  const defensivelySuffixedOrderId = `${suffixedOrderId}-${defensiveSuffix}`;
+  if (!(await orderIdExists(defensivelySuffixedOrderId))) {
+    return defensivelySuffixedOrderId;
+  }
+
+  return `${defensivelySuffixedOrderId}-${Date.now().toString().slice(-6)}`;
 }
 
 async function reserveInventoryForOrder(
@@ -547,7 +563,8 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
   const companyId = store.company_id;
   const shopifyStoreId = store.id;
   const normalizedShopifyOrderId = normalizeShopifyId(order.id) || order.id.toString();
-  const preferredOrderId = `SHOP-${order.order_number || normalizedShopifyOrderId}`;
+  const storeOrderPrefix = getStoreOrderPrefix(store);
+  const preferredOrderId = `SHOP-${storeOrderPrefix}-${order.order_number || normalizedShopifyOrderId}`;
 
   // Get default warehouse with fallback to any active warehouse
   let { data: warehouse } = await supabase
