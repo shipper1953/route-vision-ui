@@ -73,7 +73,7 @@ const PaymentForm = ({ amount, companyId, onSuccess, onCancel }: PaymentFormProp
 
       console.log('[ImprovedPayment] Confirming payment...');
       // Confirm payment using Elements (which is in payment mode)
-      const { error: confirmError } = await stripe.confirmPayment({
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
         clientSecret: piData.clientSecret,
         confirmParams: {
@@ -92,6 +92,22 @@ const PaymentForm = ({ amount, companyId, onSuccess, onCancel }: PaymentFormProp
         setPaymentStep('collecting');
         setLoading(false);
         return;
+      }
+
+      // Credit the wallet server-side now that the payment succeeded
+      const intentId = paymentIntent?.id || piData.paymentIntentId;
+      if (intentId) {
+        console.log('[ImprovedPayment] Crediting wallet for intent:', intentId);
+        const { error: creditError } = await supabase.functions.invoke('confirm-payment-intent', {
+          body: { paymentIntentId: intentId, companyId },
+        });
+        if (creditError) {
+          console.error('[ImprovedPayment] Wallet credit error:', creditError);
+          toast({
+            title: 'Payment received, wallet update pending',
+            description: 'Your payment succeeded but the wallet credit is delayed. Please refresh in a moment.',
+          });
+        }
       }
 
       console.log('[ImprovedPayment] Payment successful');
