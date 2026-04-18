@@ -8,6 +8,9 @@ export interface PrintNodePrinter {
   description: string;
   default: boolean;
   state: string;
+  capabilities?: {
+    extent?: number[][];
+  };
 }
 
 const STORAGE_KEY = 'printnode_selected_printer_id';
