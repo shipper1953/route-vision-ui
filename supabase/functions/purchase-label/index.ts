@@ -1314,20 +1314,34 @@ serve(async (req) => {
         const numericOrderId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
         const { data: orderData } = await supabase
           .from('orders')
-          .select('company_id')
+          .select('company_id, shopify_store_id')
           .eq('id', numericOrderId)
           .single();
         
         if (orderData?.company_id) {
-          const { data: companyData } = await supabase
-            .from('companies')
-            .select('settings')
-            .eq('id', orderData.company_id)
-            .single();
+          // Check shopify_stores table for an active, fulfillment-enabled store
+          // Prefer the store linked to the order; fall back to any active store for the company
+          let shopifyStore: any = null;
+          if (orderData.shopify_store_id) {
+            const { data } = await supabase
+              .from('shopify_stores')
+              .select('id, is_active, fulfillment_sync_enabled')
+              .eq('id', orderData.shopify_store_id)
+              .maybeSingle();
+            shopifyStore = data;
+          }
+          if (!shopifyStore) {
+            const { data } = await supabase
+              .from('shopify_stores')
+              .select('id, is_active, fulfillment_sync_enabled')
+              .eq('company_id', orderData.company_id)
+              .eq('is_active', true)
+              .limit(1)
+              .maybeSingle();
+            shopifyStore = data;
+          }
           
-          const shopifySettings = companyData?.settings?.shopify;
-          
-          if (shopifySettings?.connected && shopifySettings?.sync_config?.fulfillment?.enabled) {
+          if (shopifyStore?.is_active && shopifyStore?.fulfillment_sync_enabled) {
             console.log('📤 Triggering Shopify fulfillment update...');
             
             const trackingNumber = provider === 'shippo' 
