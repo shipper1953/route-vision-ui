@@ -263,7 +263,27 @@ export class LabelService {
 
     if (error) {
       console.error('Supabase purchase-label error:', error);
-      throw new Error(error.message || 'Failed to purchase label via edge function');
+
+      let errorMessage = error.message || 'Failed to purchase label via edge function';
+      const errorContext = (error as any)?.context;
+
+      if (errorContext) {
+        try {
+          const payload = typeof errorContext.json === 'function'
+            ? await errorContext.json()
+            : typeof errorContext.text === 'function'
+              ? JSON.parse(await errorContext.text())
+              : null;
+
+          if (payload?.error) {
+            errorMessage = payload.error;
+          }
+        } catch (contextError) {
+          console.warn('Failed to parse purchase-label error context:', contextError);
+        }
+      }
+
+      throw new Error(errorMessage);
     }
 
     this.storeLabelData(data as any);

@@ -51,11 +51,28 @@ function sanitizePhoneNumber(phone: string | undefined): string {
 
 // ========== HELPER FUNCTIONS ==========
 
-function createErrorResponse(error: string, internalDetails?: any, status: number = 500): Response {
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+    return (error as { message: string }).message;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return 'Unknown error';
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createErrorResponse(error: string, internalDetails?: unknown, status: number = 500, clientMessage?: string): Response {
   console.error('[Purchase Label Error]', error, internalDetails)
-  const clientError = status === 500 
+  const clientError = clientMessage ?? (status === 500
     ? 'An internal error occurred. Please contact support.'
-    : error;
+    : error);
   return new Response(JSON.stringify({ error: clientError }), {
     headers: corsHeaders,
     status,
@@ -215,87 +232,102 @@ async function ensureValidPhoneNumbers(shipmentId: string, apiKey: string): Prom
 
 async function purchaseShippingLabel(shipmentId: string, rateId: string, apiKey: string) {
   console.log('🚚 Purchasing label for shipment:', shipmentId, 'with rate:', rateId)
-  
+
   await ensureValidPhoneNumbers(shipmentId, apiKey);
-  
-  // Request ZPL format for 4x6 thermal labels
-  const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ 
-      rate: { id: rateId },
-      label_format: 'ZPL',
-      file_format: 'ZPL',
-      label_size: '4x6'
-    }),
-  })
-  
-  console.log('📋 Buy request sent with ZPL format request')
-  
-  const responseText = await response.text()
-  let responseData
-  
-  try {
-    responseData = JSON.parse(responseText)
-  } catch (err) {
-    responseData = { raw_response: responseText }
-  }
-  
-  if (!response.ok) {
-    console.error('❌ EasyPost API error:', responseData)
-    
-    if (responseData.error?.code === 'SHIPMENT.POSTAGE.EXISTS') {
-      console.log('⚠️ Postage already exists, retrieving existing shipment data')
-      try {
-        const existingResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        })
-        
-        if (existingResponse.ok) {
-          const existingData = await existingResponse.json()
-          console.log('✅ Retrieved existing shipment data successfully')
-          return existingData
-        }
-      } catch (retrieveError) {
-        console.error('❌ Failed to retrieve existing shipment:', retrieveError)
-      }
+
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const response = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}/buy`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        rate: { id: rateId },
+        label_format: 'ZPL',
+        file_format: 'ZPL',
+        label_size: '4x6'
+      }),
+    })
+
+    console.log(`📋 Buy request sent with ZPL format request (attempt ${attempt}/${maxAttempts})`)
+
+    const responseText = await response.text()
+    let responseData
+
+    try {
+      responseData = JSON.parse(responseText)
+    } catch {
+      responseData = { raw_response: responseText }
     }
-    
-    throw new Error(responseData.error?.message || 'Failed to purchase label')
+
+    if (!response.ok) {
+      console.error('❌ EasyPost API error:', responseData)
+
+      if (responseData.error?.code === 'SHIPMENT.POSTAGE.EXISTS') {
+        console.log('⚠️ Postage already exists, retrieving existing shipment data')
+        try {
+          const existingResponse = await fetch(`https://api.easypost.com/v2/shipments/${shipmentId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (existingResponse.ok) {
+            const existingData = await existingResponse.json()
+            console.log('✅ Retrieved existing shipment data successfully')
+            return existingData
+          }
+        } catch (retrieveError) {
+          console.error('❌ Failed to retrieve existing shipment:', retrieveError)
+        }
+      }
+
+      const providerMessage = responseData.error?.message || 'Failed to purchase label';
+      const isCarrierTimeout = responseData.error?.code === 'SHIPMENT.POSTAGE.TIMED_OUT' || /timed out/i.test(providerMessage);
+
+      if (isCarrierTimeout && attempt < maxAttempts) {
+        const delayMs = attempt * 1500;
+        console.warn(`⏳ Carrier timeout from EasyPost, retrying in ${delayMs}ms...`);
+        await sleep(delayMs);
+        continue;
+      }
+
+      if (isCarrierTimeout) {
+        throw new Error('Carrier timed out while purchasing this label. Please retry or choose another rate.');
+      }
+
+      throw new Error(providerMessage)
+    }
+
+    let zplContent = responseData.label_zpl || null;
+
+    if (!zplContent && responseData.postage_label?.label_zpl_url) {
+      console.log('🔄 Fetching ZPL from postage_label.label_zpl_url...');
+      zplContent = await fetchZplContent(responseData.postage_label.label_zpl_url, apiKey);
+    }
+
+    if (!zplContent) {
+      console.log('🔄 Attempting to retrieve ZPL via GET /label endpoint...');
+      zplContent = await tryGetZplLabel(responseData.id, apiKey);
+    }
+
+    if (zplContent) {
+      responseData.label_zpl = ensureZpl4x6Dimensions(zplContent);
+      console.log('✅ ZPL content successfully retrieved and attached with 4x6 dimensions enforced');
+    } else {
+      console.warn('⚠️ Could not retrieve ZPL content. This may be due to test mode limitations or carrier restrictions.');
+    }
+
+    console.log('✅ Label purchased successfully')
+    return responseData
   }
-  
-  // Try to get ZPL content from multiple sources
-  let zplContent = responseData.label_zpl || null;
-  
-  // Try fetching from label_zpl_url if available
-  if (!zplContent && responseData.postage_label?.label_zpl_url) {
-    console.log('🔄 Fetching ZPL from postage_label.label_zpl_url...');
-    zplContent = await fetchZplContent(responseData.postage_label.label_zpl_url, apiKey);
-  }
-  
-  // Try using the GET /label endpoint for ZPL
-  if (!zplContent) {
-    console.log('🔄 Attempting to retrieve ZPL via GET /label endpoint...');
-    zplContent = await tryGetZplLabel(responseData.id, apiKey);
-  }
-  
-  // Store the ZPL content if we got it with proper 4x6 dimensions
-  if (zplContent) {
-    responseData.label_zpl = ensureZpl4x6Dimensions(zplContent);
-    console.log('✅ ZPL content successfully retrieved and attached with 4x6 dimensions enforced');
-  } else {
-    console.warn('⚠️ Could not retrieve ZPL content. This may be due to test mode limitations or carrier restrictions.');
-  }
-  
-  console.log('✅ Label purchased successfully')
-  return responseData
+
+  throw new Error('Carrier timed out while purchasing this label. Please retry or choose another rate.');
 }
 
 async function tryGetZplLabel(shipmentId: string, apiKey: string): Promise<string | null> {
@@ -417,7 +449,7 @@ async function purchaseShippoLabel(shipmentId: string, rateId: string, apiKey: s
     responseData = JSON.parse(responseText)
   } catch (err) {
     console.error('❌ Failed to parse Shippo response as JSON:', err)
-    responseData = { raw_response: responseText, parse_error: err.message }
+    responseData = { raw_response: responseText, parse_error: getErrorMessage(err) }
   }
   
   if (!response.ok) {
@@ -1104,8 +1136,15 @@ serve(async (req) => {
         }
       }
     } catch (labelError) {
+      const labelErrorMessage = getErrorMessage(labelError);
       console.error('❌ Label purchase failed:', labelError)
-      return createErrorResponse('Failed to purchase label', labelError instanceof Error ? labelError.message : String(labelError), 500)
+      const isCarrierTimeout = /timed out/i.test(labelErrorMessage);
+      return createErrorResponse(
+        'Failed to purchase label',
+        labelErrorMessage,
+        isCarrierTimeout ? 503 : 500,
+        isCarrierTimeout ? labelErrorMessage : undefined,
+      )
     }
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
@@ -1187,7 +1226,7 @@ serve(async (req) => {
       
     } catch (walletError) {
       console.error('❌ Wallet processing failed:', walletError)
-      return createErrorResponse('Wallet processing failed', walletError.message, 500)
+      return createErrorResponse('Wallet processing failed', getErrorMessage(walletError), 500)
     }
     
     let finalShipmentId;
@@ -1204,7 +1243,7 @@ serve(async (req) => {
       )
       finalShipmentId = result.finalShipmentId;
     } catch (saveError) {
-      return createErrorResponse('Failed to save shipment to database', saveError.message, 500)
+      return createErrorResponse('Failed to save shipment to database', getErrorMessage(saveError), 500)
     }
     
     if (orderId && finalShipmentId) {
@@ -1333,6 +1372,6 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Fatal error:', error)
-    return createErrorResponse('An unexpected error occurred', error.message, 500)
+    return createErrorResponse('An unexpected error occurred', getErrorMessage(error), 500)
   }
 })
