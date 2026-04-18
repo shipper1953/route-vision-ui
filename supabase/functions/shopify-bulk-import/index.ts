@@ -55,6 +55,13 @@ serve(async (req) => {
       throw new Error('Store credentials not found or invalid');
     }
 
+    // Guard against placeholder tokens from incomplete OAuth flows
+    if (store.access_token === 'pending' || store.access_token.length < 20) {
+      throw new Error(
+        'Shopify connection is incomplete. Please disconnect this store and reconnect via OAuth (or paste a valid Custom App access token) before running a bulk import.'
+      );
+    }
+
     // Clean and format store URL (remove https://, http://, trailing slashes)
     let storeUrl = store.store_url
       .replace(/^https?:\/\//, '')
