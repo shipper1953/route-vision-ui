@@ -1117,12 +1117,14 @@ serve(async (req) => {
       return createErrorResponse('Unauthorized', 'Missing bearer token', 401)
     }
 
+    const token = authHeader.replace('Bearer ', '')
+
     const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false }
     })
 
-    const { data: authData, error: authError } = await userSupabase.auth.getUser()
+    const { data: authData, error: authError } = await userSupabase.auth.getUser(token)
     const authenticatedUserId = authData?.user?.id ?? null
 
     if (authError || !authenticatedUserId) {
