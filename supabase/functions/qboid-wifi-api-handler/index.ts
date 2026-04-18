@@ -43,8 +43,10 @@ serve(async (req) => {
     console.log('Received data from Qboid device:', qboidData)
 
     // Get the API token from request headers or body
+    // Support: Authorization: Bearer <token>, x-qboid-token header, or token in body
     const authHeader = req.headers.get('authorization')
-    const apiToken = authHeader?.replace('Bearer ', '') || qboidData.token
+    const customTokenHeader = req.headers.get('x-qboid-token')
+    const apiToken = customTokenHeader || authHeader?.replace('Bearer ', '') || qboidData.token
     
     // SECURITY: Never log tokens, even presence check
     console.log('Token validation attempt')
