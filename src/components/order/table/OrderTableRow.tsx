@@ -48,6 +48,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
   const [allShipments, setAllShipments] = useState<ShipmentInfo[]>([]);
   const [isShipmentsExpanded, setIsShipmentsExpanded] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [hasAutoRecalculated, setHasAutoRecalculated] = useState(false);
 
   // Fetch cartonization data for this order
   useEffect(() => {
@@ -57,7 +58,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
           .from('order_cartonization')
           .select('*')
           .eq('order_id', typeof order.id === 'string' ? parseInt(order.id) : order.id)
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           setCartonizationData({
@@ -68,6 +69,32 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
             itemsWeight: data.items_weight || 0,
             boxWeight: data.box_weight || 0
           });
+          return;
+        }
+
+        if (!data && !hasAutoRecalculated) {
+          const orderId = typeof order.id === 'string' ? parseInt(order.id) : order.id;
+          const recalcResult = await recalculateOrderCartonization(orderId);
+          setHasAutoRecalculated(true);
+
+          if (recalcResult.success) {
+            const { data: refreshedData, error: refreshError } = await supabase
+              .from('order_cartonization')
+              .select('*')
+              .eq('order_id', orderId)
+              .maybeSingle();
+
+            if (!refreshError && refreshedData) {
+              setCartonizationData({
+                recommendedBox: refreshedData.recommended_box_data,
+                utilization: refreshedData.utilization || 0,
+                confidence: refreshedData.confidence || 0,
+                totalWeight: refreshedData.total_weight || 0,
+                itemsWeight: refreshedData.items_weight || 0,
+                boxWeight: refreshedData.box_weight || 0
+              });
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching cartonization data:', error);
@@ -78,7 +105,7 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
     if (order.status !== 'shipped' && order.status !== 'delivered') {
       fetchCartonizationData();
     }
-  }, [order.id, order.status]);
+  }, [order.id, order.status, hasAutoRecalculated]);
 
   // Fetch all shipments for this order
   useEffect(() => {

@@ -7,6 +7,7 @@ import { MultiPackageAlgorithm } from './multiPackageAlgorithm';
 export type { Item, Box, CartonizationParameters, CartonizationResult } from './types';
 
 export class CartonizationEngine {
+  private static readonly MAX_SINGLE_PACKAGE_UTILIZATION = 99;
   private boxes: Box[];
   private parameters: CartonizationParameters;
 
@@ -166,29 +167,24 @@ export class CartonizationEngine {
       return null;
     }
 
-    // Apply business rules for selection - prioritize smallest boxes first
+    // Apply business rules for selection - prefer highest utilization, capped at 99%
     let optimizedBoxes = this.sortBoxesByOptimization(fittingBoxes);
-    
+    const utilizationCappedBoxes = optimizedBoxes.filter(
+      analysis => analysis.utilization <= CartonizationEngine.MAX_SINGLE_PACKAGE_UTILIZATION
+    );
+
     if (this.parameters.optimizeForCost) {
-      rulesApplied.push('Cost Optimization Rule');
+      rulesApplied.push('Cost-aware Highest Utilization Rule');
     } else {
-      rulesApplied.push('Smallest Fit Rule (deterministic tie-breakers)');
+      rulesApplied.push('Highest Utilization Rule (≤99%)');
     }
 
-    // Apply fill rate threshold as a soft preference (not a hard exclusion)
-    if (this.parameters.fillRateThreshold > 0) {
-      rulesApplied.push(`Fill Rate Preference (${this.parameters.fillRateThreshold}%)`);
-      const preferenceThreshold = this.parameters.fillRateThreshold;
-      
-
-      console.log(`Applying fill rate preference: ${preferenceThreshold}%`);
-      optimizedBoxes.sort((a, b) => {
-        const aPref = a.utilization >= preferenceThreshold ? 1 : 0;
-        const bPref = b.utilization >= preferenceThreshold ? 1 : 0;
-        if (bPref !== aPref) return bPref - aPref;
-        return b.utilization - a.utilization;
-      });
+    if (!utilizationCappedBoxes.length) {
+      console.log(`❌ All fitting boxes exceed ${CartonizationEngine.MAX_SINGLE_PACKAGE_UTILIZATION}% utilization. Multi-package required.`);
+      return null;
     }
+
+    optimizedBoxes = utilizationCappedBoxes;
 
     if (!optimizedBoxes.length) {
       console.log('❌ No viable boxes remained after optimization');
@@ -220,7 +216,7 @@ export class CartonizationEngine {
     rulesApplied.push('Enhanced 3D Bin Packing Algorithm');
     rulesApplied.push('Multi-Orientation Item Fitting');
     rulesApplied.push('Dimensional Weight Calculation');
-    rulesApplied.push('Deterministic Smallest-Fit Tie-Breaking');
+    rulesApplied.push('Deterministic Highest-Utilization Tie-Breaking');
 
     console.log(`✅ Final recommendation: ${recommendedAnalysis.box.name} with ${recommendedAnalysis.confidence}% confidence`);
 
@@ -244,11 +240,11 @@ export class CartonizationEngine {
         }))
       ],
       tieBreakersApplied: this.parameters.optimizeForCost
-        ? ['primary: lowest_cost', 'tie1: lowest_dim_weight', 'tie2: smallest_outer_volume', 'tie3: highest_utilization']
-        : ['primary: smallest_outer_volume', 'tie1: lowest_dim_weight', 'tie2: lowest_cost', 'tie3: highest_utilization'],
-      reasonCode: this.parameters.optimizeForCost ? 'cost_optimized' : 'smallest_fit',
+        ? ['primary: highest_utilization_≤99', 'tie1: lowest_cost', 'tie2: lowest_dim_weight', 'tie3: smallest_outer_volume']
+        : ['primary: highest_utilization_≤99', 'tie1: lowest_dim_weight', 'tie2: lowest_cost', 'tie3: smallest_outer_volume'],
+      reasonCode: this.parameters.optimizeForCost ? 'cost_aware_high_utilization' : 'highest_utilization',
       algorithmVersion: CARTONIZATION_ALGORITHM_VERSION,
-      optimizationObjective: this.parameters.optimizeForCost ? 'lowest_landed_cost' : 'smallest_fit'
+      optimizationObjective: this.parameters.optimizeForCost ? 'lowest_landed_cost' : 'balanced'
     };
 
     return {
@@ -267,25 +263,30 @@ export class CartonizationEngine {
     };
   }
 
-  // Sorting method focused on smallest-fit recommendation with deterministic tie-breakers
+  // Sorting method focused on highest utilization with deterministic tie-breakers
   private sortBoxesByOptimization(analyses: any[]): any[] {
     return analyses
       .filter(a => a.utilization > 0)
       .sort((a, b) => {
         const volumeA = a.box.length * a.box.width * a.box.height;
         const volumeB = b.box.length * b.box.width * b.box.height;
+        const utilizationDelta = b.utilization - a.utilization;
+
+        if (Math.abs(utilizationDelta) > 0.0001) {
+          return utilizationDelta;
+        }
 
         if (this.parameters.optimizeForCost) {
           if (a.cost !== b.cost) return a.cost - b.cost;
           if (a.dimensionalWeight !== b.dimensionalWeight) return a.dimensionalWeight - b.dimensionalWeight;
           if (volumeA !== volumeB) return volumeA - volumeB;
-          return b.utilization - a.utilization;
+          return 0;
         }
 
-        if (volumeA !== volumeB) return volumeA - volumeB;
         if (a.dimensionalWeight !== b.dimensionalWeight) return a.dimensionalWeight - b.dimensionalWeight;
         if (a.cost !== b.cost) return a.cost - b.cost;
-        return b.utilization - a.utilization;
+        if (volumeA !== volumeB) return volumeA - volumeB;
+        return 0;
       });
   }
 

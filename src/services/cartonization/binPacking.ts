@@ -37,22 +37,18 @@ export class BinPackingAlgorithm {
       }
     });
     
-    // Check 3: Volume reality check with practical packing factor
+    // Check 3: Hard volume feasibility check
     const totalItemVolume = expandedItems.reduce((sum, item) => 
       sum + (item.length * item.width * item.height), 0
     );
     const boxVolumeCalc = box.length * box.width * box.height;
     const theoreticalUtilization = (totalItemVolume / boxVolumeCalc) * 100;
     
-    // Account for practical packing efficiency (~70-85% for real-world scenarios)
-    const practicalPackingFactor = 0.75; // 75% is realistic for non-uniform items
-    const expectedUtilization = theoreticalUtilization / practicalPackingFactor;
-    
     console.log(`📊 Volume Analysis: Total items=${totalItemVolume.toFixed(0)} in³, Box=${boxVolumeCalc.toFixed(0)} in³`);
-    console.log(`📊 Theoretical utilization=${theoreticalUtilization.toFixed(1)}%, Expected with packing factor=${expectedUtilization.toFixed(1)}%`);
+    console.log(`📊 Theoretical utilization=${theoreticalUtilization.toFixed(1)}%`);
     
-    if (expectedUtilization > 100) {
-      console.log(`❌ VOLUME FAIL: Expected utilization ${expectedUtilization.toFixed(1)}% exceeds box capacity even with optimal packing`);
+    if (theoreticalUtilization > 100) {
+      console.log(`❌ VOLUME FAIL: Theoretical utilization ${theoreticalUtilization.toFixed(1)}% exceeds box capacity`);
       return {
         success: false,
         packedItems: [],
