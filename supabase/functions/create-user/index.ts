@@ -73,6 +73,23 @@ const handler = async (req: Request): Promise<Response> => {
         console.error('Profile error:', profileError);
         throw profileError;
       }
+
+      // CRITICAL: Insert into user_roles table - this is the source of truth for role checks
+      const { error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .upsert({
+          user_id: authData.user.id,
+          role: role,
+        }, {
+          onConflict: 'user_id,role'
+        });
+
+      if (roleError) {
+        console.error('Role assignment error:', roleError);
+        throw roleError;
+      }
+
+      console.log('Role assigned in user_roles:', role);
     }
 
     return new Response(
