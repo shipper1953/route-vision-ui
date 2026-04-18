@@ -325,6 +325,7 @@ export const ShippingRatesCardFooter = ({
         result.results.forEach((r: any, idx: number) => {
           console.log(`Processing result ${idx + 1}:`, r);
           const p = r.purchase || r;
+          const pkgRate = packageRates[idx];
           const labelUrl = p?.postage_label?.label_url || p?.label_url;
           if (labelUrl) {
             labels.push({
