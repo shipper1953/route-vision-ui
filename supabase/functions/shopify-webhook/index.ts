@@ -326,7 +326,9 @@ async function reserveInventoryForOrder(
 }
 
 async function routeAndRequestFulfillmentOrders(store: any, shopifyOrderId: string) {
-  if (!store.fulfillment_service_id || !store.fulfillment_service_location_id) {
+  const shipTornadoLocationId = store.fulfillment_service_location_id || store.fulfillment_location_id;
+
+  if (!shipTornadoLocationId) {
     console.log('Fulfillment service is not fully configured, skipping auto-routing');
     return;
   }
@@ -345,7 +347,7 @@ async function routeAndRequestFulfillmentOrders(store: any, shopifyOrderId: stri
     const assignedLocationId = activeFulfillmentOrder.assignedLocation?.location?.id || null;
 
     if (
-      assignedLocationId !== store.fulfillment_service_location_id &&
+      assignedLocationId !== shipTornadoLocationId &&
       (!activeFulfillmentOrder.requestStatus || activeFulfillmentOrder.requestStatus === 'UNSUBMITTED')
     ) {
       const moveMutation = `
@@ -372,7 +374,7 @@ async function routeAndRequestFulfillmentOrders(store: any, shopifyOrderId: stri
 
       const moveResult = await shopifyGraphQL(store, moveMutation, {
         id: activeFulfillmentOrder.id,
-        newLocationId: store.fulfillment_service_location_id,
+        newLocationId: shipTornadoLocationId,
       });
 
       const moveErrors = moveResult?.fulfillmentOrderMove?.userErrors || [];
@@ -385,7 +387,7 @@ async function routeAndRequestFulfillmentOrders(store: any, shopifyOrderId: stri
     }
 
     const currentLocationId = activeFulfillmentOrder.assignedLocation?.location?.id || null;
-    if (currentLocationId !== store.fulfillment_service_location_id) {
+    if (currentLocationId !== shipTornadoLocationId) {
       console.log(`Skipping fulfillment order ${activeFulfillmentOrder.id} because it is still assigned elsewhere`);
       continue;
     }
@@ -702,7 +704,7 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
     });
   }
 
-  if (store.fulfillment_service_id && store.fulfillment_service_location_id) {
+  if (store.fulfillment_service_location_id || store.fulfillment_location_id) {
     try {
       await routeAndRequestFulfillmentOrders(store, normalizedShopifyOrderId);
     } catch (ffError) {
