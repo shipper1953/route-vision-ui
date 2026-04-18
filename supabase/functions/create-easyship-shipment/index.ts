@@ -6,7 +6,22 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const EASYSHIP_BASE_URL = 'https://public-api.easyship.com';
+const EASYSHIP_PROD_BASE_URL = 'https://public-api.easyship.com';
+const EASYSHIP_SANDBOX_BASE_URL = 'https://public-api-sandbox.easyship.com';
+
+function resolveEasyshipBaseUrl(apiKey: string): string {
+  const configuredBaseUrl = Deno.env.get('EASYSHIP_API_BASE_URL');
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
+  }
+
+  // Easyship sandbox keys use the "sand_" prefix and must target the sandbox domain.
+  if (apiKey.startsWith('sand_')) {
+    return EASYSHIP_SANDBOX_BASE_URL;
+  }
+
+  return EASYSHIP_PROD_BASE_URL;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -116,12 +131,15 @@ serve(async (req) => {
 
     console.log('📡 Easyship rates request:', JSON.stringify(payload).slice(0, 500));
 
+    const easyshipBaseUrl = resolveEasyshipBaseUrl(apiKey);
+    console.log(`🌐 Easyship base URL: ${easyshipBaseUrl}`);
+
     // Retry with exponential backoff for 429 rate limits
     let response: Response;
     let attempt = 0;
     const maxAttempts = 4;
     while (true) {
-      response = await fetch(`${EASYSHIP_BASE_URL}/2024-09/rates`, {
+      response = await fetch(`${easyshipBaseUrl}/2024-09/rates`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,

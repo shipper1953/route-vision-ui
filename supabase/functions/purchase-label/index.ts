@@ -504,6 +504,14 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
   console.log('🌐 Easyship Shipment ID:', easyshipShipmentId)
   console.log('🌐 Courier ID (rate):', courierId)
 
+  const configuredBaseUrl = Deno.env.get('EASYSHIP_API_BASE_URL')
+  const easyshipBaseUrl = configuredBaseUrl
+    ? configuredBaseUrl
+    : apiKey.startsWith('sand_')
+      ? 'https://public-api-sandbox.easyship.com'
+      : 'https://public-api.easyship.com'
+  console.log('🌐 Easyship base URL:', easyshipBaseUrl)
+
   // Easyship flow: if we don't already have a stored shipment, create one with selected courier, then buy label.
   // The simplest reliable path with the v2024-09 API is to POST /shipments with selected_courier_id, then POST /shipments/{id}/label
 
@@ -511,7 +519,7 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
 
   if (!shipmentId && shipmentPayload) {
     console.log('📦 Creating Easyship shipment before label purchase...');
-    const createRes = await fetch('https://public-api.easyship.com/2024-09/shipments', {
+    const createRes = await fetch(`${easyshipBaseUrl}/2024-09/shipments`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -538,7 +546,7 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
   }
 
   // Buy label
-  const labelRes = await fetch(`https://public-api.easyship.com/2024-09/shipments/${shipmentId}/labels`, {
+  const labelRes = await fetch(`${easyshipBaseUrl}/2024-09/shipments/${shipmentId}/labels`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
