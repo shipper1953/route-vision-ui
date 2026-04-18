@@ -9,6 +9,8 @@ export const getStatusBadgeVariant = (status: string) => {
       return 'default';
     case 'delivered':
       return 'success';
+    case 'error':
+      return 'destructive';
     default:
       return 'secondary';
   }

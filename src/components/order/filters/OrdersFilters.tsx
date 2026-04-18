@@ -88,6 +88,7 @@ export const OrdersFilters = ({
             <SelectItem value="partially_shipped">Partially Shipped</SelectItem>
             <SelectItem value="shipped">Shipped</SelectItem>
             <SelectItem value="delivered">Delivered</SelectItem>
+            <SelectItem value="error">Error</SelectItem>
           </SelectContent>
         </Select>
         {onCustomerFilterChange && (

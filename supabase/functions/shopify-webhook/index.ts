@@ -492,6 +492,79 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
     grams: li.grams || 0,
   }));
 
+  // Match Shopify order items to Item Master records so downstream cartonization can rely on Item Master dimensions.
+  const skuSet = new Set<string>();
+  const variantIdSet = new Set<string>();
+  const productIdSet = new Set<string>();
+  for (const item of lineItems) {
+    if (item.sku) skuSet.add(item.sku);
+    if (item.variant_id) variantIdSet.add(item.variant_id);
+    if (item.product_id) productIdSet.add(item.product_id);
+  }
+
+  const matchedItemsBySku = new Map<string, any>();
+  const matchedItemsByVariantId = new Map<string, any>();
+  const matchedItemsByProductId = new Map<string, any>();
+
+  if (skuSet.size > 0) {
+    const { data: skuMatches } = await supabase
+      .from('items')
+      .select('id, sku, shopify_variant_id, shopify_product_id')
+      .eq('company_id', companyId)
+      .in('sku', Array.from(skuSet));
+
+    (skuMatches || []).forEach((match: any) => {
+      if (match.sku) matchedItemsBySku.set(match.sku, match);
+    });
+  }
+
+  if (variantIdSet.size > 0) {
+    const { data: variantMatches } = await supabase
+      .from('items')
+      .select('id, sku, shopify_variant_id, shopify_product_id')
+      .eq('company_id', companyId)
+      .in('shopify_variant_id', Array.from(variantIdSet));
+
+    (variantMatches || []).forEach((match: any) => {
+      if (match.shopify_variant_id) matchedItemsByVariantId.set(match.shopify_variant_id, match);
+    });
+  }
+
+  if (productIdSet.size > 0) {
+    const { data: productMatches } = await supabase
+      .from('items')
+      .select('id, sku, shopify_variant_id, shopify_product_id')
+      .eq('company_id', companyId)
+      .in('shopify_product_id', Array.from(productIdSet));
+
+    (productMatches || []).forEach((match: any) => {
+      if (match.shopify_product_id) matchedItemsByProductId.set(match.shopify_product_id, match);
+    });
+  }
+
+  const enrichedLineItems = lineItems.map((item: any) => {
+    const matchedItem = (item.variant_id ? matchedItemsByVariantId.get(item.variant_id) : null)
+      || (item.product_id ? matchedItemsByProductId.get(item.product_id) : null)
+      || (item.sku ? matchedItemsBySku.get(item.sku) : null);
+
+    if (!matchedItem) {
+      return {
+        ...item,
+        itemId: null,
+        item_master_match: false,
+        item_master_error: 'Item not found in Item Master. Run a Shopify product sync.',
+      };
+    }
+
+    return {
+      ...item,
+      itemId: matchedItem.id,
+      item_master_match: true,
+    };
+  });
+
+  const hasUnmatchedItems = enrichedLineItems.some((item: any) => item.item_master_match === false);
+
   // Build shipping address
   const shippingAddr = order.shipping_address ? {
     name: sanitizeString(`${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim(), 200),
@@ -511,6 +584,7 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
   if (fulfillmentStatus === 'fulfilled') status = 'shipped';
   else if (fulfillmentStatus === 'partially_fulfilled') status = 'partially_shipped';
   else if (order.cancelled_at) status = 'cancelled';
+  if (hasUnmatchedItems && status !== 'cancelled') status = 'error';
 
   const customerName = order.customer
     ? sanitizeString(`${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim(), 200)
@@ -526,11 +600,11 @@ async function handleOrderWebhook(supabase: any, order: any, store: any, topic: 
     customer_phone: sanitizeString(order.customer?.phone || shippingAddr?.phone, 20),
     customer_company: sanitizeString(order.customer?.company || shippingAddr?.company, 255),
     shipping_address: shippingAddr,
-    items: lineItems,
+    items: enrichedLineItems,
     value: typeof order.total_price === 'string' ? parseFloat(order.total_price) : (order.total_price || 0),
     status,
     fulfillment_status: fulfillmentStatus,
-    items_total: lineItems.reduce((sum: number, li: any) => sum + (li.quantity || 0), 0),
+    items_total: enrichedLineItems.reduce((sum: number, li: any) => sum + (li.quantity || 0), 0),
     items_shipped: 0,
     fulfillment_percentage: 0,
     order_date: order.created_at ? new Date(order.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
