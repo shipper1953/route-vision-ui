@@ -240,13 +240,12 @@ async function syncToShopify(
         }
 
         // Only sync to the Ship Tornado fulfillment service location
-        if (!store.fulfillment_service_location_id) {
+        const configuredLocationId = getConfiguredShopifyLocationId(store);
+        if (!configuredLocationId) {
           skippedMissingStLocationConfig++;
-          console.log(`No fulfillment service location configured for store, skipping ${item.sku}`);
+          console.log(`No Shopify location configured for store, skipping ${item.sku}`);
           return;
         }
-
-        const configuredLocationId = normalizeLocationId(store.fulfillment_service_location_id);
         const targetEdge = inventoryItem.inventoryLevels.edges.find(
           (e: any) => normalizeLocationId(e.node.location.id) === configuredLocationId
         );
@@ -350,10 +349,6 @@ async function syncFromShopify(
   console.log(`Syncing Shopify → ST for store ${store.store_name || store.id}`);
   let updated = 0;
   let errors = 0;
-  let skippedMissingStLocationConfig = 0;
-  let skippedMissingStLocationInShopify = 0;
-
-  const configuredLocationId = normalizeLocationId(store.fulfillment_service_location_id);
 
   // Fetch all variants from Shopify with pagination
   const productsQuery = `
@@ -366,7 +361,7 @@ async function syncFromShopify(
             sku
             inventoryItem {
               id
-              inventoryLevels(first: 10) {
+              inventoryLevels(first: 250) {
                 edges {
                   node {
                     quantities(names: ["available"]) {
@@ -387,17 +382,18 @@ async function syncFromShopify(
   let hasNextPage = true;
   let afterCursor: string | null = null;
 
-  // Get default warehouse for this company
-  const { data: warehouseData } = await supabase
+  // Get a fallback warehouse for inserts when no inventory levels exist yet.
+  const { data: fallbackWarehouseData } = await supabase
     .from('warehouses')
     .select('id')
     .eq('company_id', companyId)
+    .order('created_at', { ascending: true })
     .limit(1)
     .single();
 
-  const warehouse = (warehouseData || null) as WarehouseRecord | null;
+  const fallbackWarehouse = (fallbackWarehouseData || null) as WarehouseRecord | null;
 
-  if (!warehouse) {
+  if (!fallbackWarehouse) {
     console.error('No warehouse found for company');
     return { updated: 0, errors: 1 };
   }
@@ -472,22 +468,11 @@ async function syncFromShopify(
         const inventoryEdges = variant.inventoryItem?.inventoryLevels?.edges || [];
         let shopifyQty = 0;
 
-        // Only sync inventory from the configured Ship Tornado location
-        if (!configuredLocationId) {
-          skippedMissingStLocationConfig++;
-          console.log(`Skipping ${variant.sku}: no Ship Tornado location configured for store`);
-          continue;
-        }
-
-        const stLocationEdge = inventoryEdges
-          .find((edge: any) => normalizeLocationId(edge.node.location?.id) === configuredLocationId);
-
-        if (!stLocationEdge) {
-          skippedMissingStLocationInShopify++;
-          continue; // SKU not stocked at our configured location
-        }
-
-        shopifyQty = stLocationEdge.node.quantities?.[0]?.quantity ?? 0;
+        // Do not require location mapping: aggregate available quantity across all Shopify locations.
+        shopifyQty = inventoryEdges.reduce(
+          (sum: number, edge: any) => sum + (edge.node?.quantities?.[0]?.quantity ?? 0),
+          0
+        );
 
         // Get current ST quantity
         const { data: currentInvData, error: currentInvError } = await supabase
@@ -495,7 +480,6 @@ async function syncFromShopify(
           .select('id, quantity_on_hand, quantity_available, quantity_allocated, received_date')
           .eq('company_id', companyId)
           .eq('item_id', item.id)
-          .eq('warehouse_id', warehouse.id)
           .order('received_date', { ascending: true });
 
         if (currentInvError) {
@@ -541,7 +525,7 @@ async function syncFromShopify(
             .insert({
               company_id: companyId,
               item_id: item.id,
-              warehouse_id: warehouse.id,
+              warehouse_id: fallbackWarehouse.id,
               customer_id: store.customer_id || null,
               quantity_on_hand: shopifyQty,
               quantity_available: shopifyQty,
@@ -567,13 +551,6 @@ async function syncFromShopify(
     afterCursor = result.data.productVariants.pageInfo.endCursor;
   }
 
-  if (skippedMissingStLocationConfig > 0 || skippedMissingStLocationInShopify > 0) {
-    console.log(
-      `Shopify → ST skips for store ${store.store_name || store.id}: ` +
-      `missing-config(fallback-used)=${skippedMissingStLocationConfig}, location-not-found=${skippedMissingStLocationInShopify}`
-    );
-  }
-
   return { updated, errors };
 }
 
@@ -583,4 +560,14 @@ function normalizeLocationId(locationId: string | null | undefined): string | nu
   if (!value) return null;
   const match = value.match(/(\d+)$/);
   return match ? match[1] : value;
+}
+
+function getConfiguredShopifyLocationId(store: any): string | null {
+  return normalizeLocationId(
+    // Prefer the explicit Shopify location selected in settings.
+    // The fulfillment-service-created location may not be selectable for inventory sync.
+    store.fulfillment_location_id ||
+    store.fulfillment_service_location_id ||
+    null
+  );
 }
