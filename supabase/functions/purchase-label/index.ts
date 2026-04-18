@@ -1222,6 +1222,10 @@ serve(async (req) => {
           ? purchaseResponse.easyship_shipment_id
           : purchaseResponse.id;
 
+      if (!companyIdForWallet) {
+        return createErrorResponse('Wallet processing failed', 'Company not resolved for wallet charge', 500)
+      }
+
       await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId, orderId);
       
     } catch (walletError) {
