@@ -103,12 +103,10 @@ serve(async (req) => {
     }
 
     const newBalance = (wallet?.balance || 0) + amountDollars;
-    const { error: updateError } = await supabase
-      .from("wallets")
-      .update({ balance: newBalance, updated_at: new Date().toISOString() })
-      .eq("id", wallet!.id);
-    if (updateError) throw updateError;
 
+    // IMPORTANT: Insert transaction BEFORE updating balance so the
+    // wallet audit trigger sees a matching transaction and does not
+    // create a duplicate "Undocumented balance change" entry.
     const { error: txError } = await supabase.from("transactions").insert({
       wallet_id: wallet!.id,
       company_id: derivedCompanyId,
@@ -119,6 +117,12 @@ serve(async (req) => {
       reference_type: "stripe_payment_intent",
     });
     if (txError) throw txError;
+
+    const { error: updateError } = await supabase
+      .from("wallets")
+      .update({ balance: newBalance, updated_at: new Date().toISOString() })
+      .eq("id", wallet!.id);
+    if (updateError) throw updateError;
 
     console.log(`Wallet credited via PI ${pi.id}: +$${amountDollars}`);
 
