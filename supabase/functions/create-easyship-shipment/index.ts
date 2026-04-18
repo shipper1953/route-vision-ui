@@ -146,6 +146,24 @@ serve(async (req) => {
       data = { raw: text };
     }
 
+    const noSolutionsAvailable = response.status === 422
+      && data?.error?.code === 'invalid_content'
+      && Array.isArray(data?.error?.details)
+      && data.error.details.some((detail: string) => /no shipping solutions available/i.test(detail));
+
+    if (noSolutionsAvailable) {
+      console.warn('⚠️ Easyship returned no shipping solutions for this shipment lane');
+      return new Response(JSON.stringify({
+        object_id: `easyship_${Date.now()}`,
+        rates: [],
+        unavailable_reason: 'no_shipping_solutions',
+        raw: data,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
     if (!response.ok) {
       console.error('Easyship rates error:', response.status, data);
       return new Response(
