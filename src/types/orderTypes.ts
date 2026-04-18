@@ -89,6 +89,7 @@ export interface OrderData {
   fulfillment_status?: 'unfulfilled' | 'partially_fulfilled' | 'fulfilled';
   // Warehouse
   warehouseId?: string;
+  companyId?: string;
   estimatedDeliveryDate?: string;
   actualDeliveryDate?: string;
 }
