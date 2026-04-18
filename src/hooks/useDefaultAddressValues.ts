@@ -12,46 +12,59 @@ export const useDefaultAddressValues = () => {
       if (!user?.id || !userProfile?.company_id) return;
 
       try {
-        // Get user's assigned warehouse or company default warehouse
         let warehouseId = null;
-        
-        // First try to get user's assigned warehouse
+
         if (userProfile.warehouse_ids && Array.isArray(userProfile.warehouse_ids) && userProfile.warehouse_ids.length > 0) {
-          warehouseId = String(userProfile.warehouse_ids[0]);
-        } else {
-          // Fall back to company default warehouse
-          const { data: defaultWarehouse, error: defaultError } = await supabase
+          const preferredWarehouseId = String(userProfile.warehouse_ids[0]);
+          const { data: assignedWarehouse, error: assignedWarehouseError } = await supabase
             .from('warehouses')
-            .select('id')
+            .select('id, name, address, phone, email')
+            .eq('id', preferredWarehouseId)
             .eq('company_id', userProfile.company_id)
-            .eq('is_default', true)
             .maybeSingle();
-          
-          if (defaultError) {
-            console.error("Error fetching default warehouse:", defaultError);
-          } else if (defaultWarehouse) {
-            warehouseId = defaultWarehouse.id;
+
+          if (assignedWarehouseError) {
+            console.error("Error fetching assigned warehouse details:", assignedWarehouseError);
+          }
+
+          if (assignedWarehouse) {
+            warehouseId = assignedWarehouse.id;
+            if (assignedWarehouse.address) {
+              console.log("Loaded assigned warehouse address:", assignedWarehouse);
+              setWarehouseAddress({
+                name: assignedWarehouse.name,
+                address: assignedWarehouse.address,
+                phone: assignedWarehouse.phone,
+                email: assignedWarehouse.email
+              });
+              return;
+            }
+          } else {
+            console.warn("Assigned warehouse does not belong to the current company, falling back to company default warehouse", {
+              preferredWarehouseId,
+              companyId: userProfile.company_id,
+            });
           }
         }
 
-        if (warehouseId) {
-          const { data: warehouse, error } = await supabase
-            .from('warehouses')
-            .select('name, address, phone, email')
-            .eq('id', warehouseId)
-            .maybeSingle();
-
-          if (error) {
-            console.error("Error fetching warehouse details:", error);
-          } else if (warehouse?.address) {
-            console.log("Loaded warehouse address:", warehouse);
-            setWarehouseAddress({
-              name: warehouse.name,
-              address: warehouse.address,
-              phone: warehouse.phone,
-              email: warehouse.email
-            });
-          }
+        const { data: defaultWarehouse, error: defaultError } = await supabase
+          .from('warehouses')
+          .select('id, name, address, phone, email')
+          .eq('company_id', userProfile.company_id)
+          .eq('is_default', true)
+          .maybeSingle();
+        
+        if (defaultError) {
+          console.error("Error fetching default warehouse:", defaultError);
+        } else if (defaultWarehouse?.address) {
+          warehouseId = defaultWarehouse.id;
+          console.log("Loaded company default warehouse address:", defaultWarehouse);
+          setWarehouseAddress({
+            name: defaultWarehouse.name,
+            address: defaultWarehouse.address,
+            phone: defaultWarehouse.phone,
+            email: defaultWarehouse.email
+          });
         }
       } catch (error) {
         console.error("Error loading warehouse address:", error);

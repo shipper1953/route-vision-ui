@@ -1081,8 +1081,9 @@ serve(async (req) => {
     const easyshipApiKey = Deno.env.get('EASYSHIP_API_KEY')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
     
-    if (!apiKey || !supabaseUrl || !supabaseServiceKey) {
+    if (!apiKey || !supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
       return createErrorResponse('Configuration error', 'Required environment variables not configured', 500)
     }
     
@@ -1110,8 +1111,26 @@ serve(async (req) => {
     if (!shipmentId || !rateId) {
       return createErrorResponse('Missing required parameters: shipmentId and rateId are required', null, 400)
     }
+
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return createErrorResponse('Unauthorized', 'Missing bearer token', 401)
+    }
+
+    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    })
+
+    const { data: authData, error: authError } = await userSupabase.auth.getUser()
+    const authenticatedUserId = authData?.user?.id ?? null
+
+    if (authError || !authenticatedUserId) {
+      return createErrorResponse('Unauthorized', authError?.message || 'Unable to resolve authenticated user', 401)
+    }
     
     console.log(`📦 Purchasing label for shipment ${shipmentId} using ${provider || 'easypost'}`)
+    console.log('👤 Authenticated user resolved for purchase-label:', authenticatedUserId)
 
     let purchaseResponse
     try {
@@ -1124,8 +1143,6 @@ serve(async (req) => {
         if (!easyshipApiKey) {
           return createErrorResponse('Easyship API key not configured', null, 500)
         }
-        // For Easyship, shipmentId may be the synthetic id from rate fetch (no upstream shipment yet).
-        // rateId == courier_id. easyshipShipmentPayload is the original rate request body (optional).
         const easyshipShipmentId = shipmentId.startsWith('easyship_') ? null : shipmentId;
         purchaseResponse = await purchaseEasyshipLabel(easyshipShipmentId, rateId, easyshipApiKey, easyshipShipmentPayload)
       } else {
@@ -1150,9 +1167,18 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
     
     let companyIdForWallet: string | null = null;
-    const defaultUserId = "00be6af7-a275-49fe-842f-1bd402bf113b"
 
     try {
+      const { data: authUserProfile, error: authUserError } = await supabase
+        .from('users')
+        .select('company_id')
+        .eq('id', authenticatedUserId)
+        .maybeSingle();
+
+      if (authUserError || !authUserProfile?.company_id) {
+        return createErrorResponse('User profile not found or not assigned to a company', authUserError?.message, 400);
+      }
+
       if (orderId) {
         const numericOrderId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
         const { data: orderRow } = await supabase
@@ -1162,20 +1188,14 @@ serve(async (req) => {
           .maybeSingle();
         if (orderRow?.company_id) {
           companyIdForWallet = orderRow.company_id;
+          if (companyIdForWallet !== authUserProfile.company_id) {
+            return createErrorResponse('Unauthorized', 'Order company does not match authenticated user company', 403);
+          }
         }
       }
 
       if (!companyIdForWallet) {
-        const { data: userProfile, error: userError } = await supabase
-          .from('users')
-          .select('company_id')
-          .eq('id', defaultUserId)
-          .maybeSingle();
-
-        if (userError || !userProfile?.company_id) {
-          return createErrorResponse('User profile not found or not assigned to a company', null, 400);
-        }
-        companyIdForWallet = userProfile.company_id;
+        companyIdForWallet = authUserProfile.company_id;
       }
 
       const carrierCost = provider === 'shippo'
@@ -1185,7 +1205,6 @@ serve(async (req) => {
           : parsePositiveAmount(purchaseResponse.selected_rate?.rate);
       let markedUpLabelCost = parsePositiveAmount(markedUpCost);
       
-      // Server-side markup fallback: if no marked-up cost was provided, compute it from company settings
       if (markedUpLabelCost === null && carrierCost !== null && companyIdForWallet) {
         try {
           const { data: companyData } = await supabase
@@ -1213,7 +1232,9 @@ serve(async (req) => {
         provider: provider || 'easypost',
         markedUpLabelCost,
         carrierCost,
-        chargedAmount: labelCost
+        chargedAmount: labelCost,
+        companyIdForWallet,
+        authenticatedUserId,
       });
       
       const purchaseResponseId = provider === 'shippo' 
@@ -1226,7 +1247,7 @@ serve(async (req) => {
         return createErrorResponse('Wallet processing failed', 'Company not resolved for wallet charge', 500)
       }
 
-      await processWalletPayment(companyIdForWallet, labelCost, defaultUserId, purchaseResponseId, orderId);
+      await processWalletPayment(companyIdForWallet, labelCost, authenticatedUserId, purchaseResponseId, orderId);
       
     } catch (walletError) {
       console.error('❌ Wallet processing failed:', walletError)
@@ -1238,7 +1259,7 @@ serve(async (req) => {
       const result = await saveShipmentToDatabase(
         purchaseResponse, 
         orderId, 
-        defaultUserId, 
+        authenticatedUserId, 
         provider || 'easypost', 
         selectedBox,
         originalCost,
