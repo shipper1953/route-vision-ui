@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { OrderData } from "@/types/orderTypes";
 import { convertSupabaseToOrderData } from "./orderDataParser";
 import { hydrateOrdersWithShipments } from "./orderShipmentHydration";
+import { recalculateOrderCartonization } from "@/utils/recalculateOrderCartonization";
 
 const DEBUG_ENABLED = import.meta.env.VITE_DEBUG_ORDER_PARSER === 'true' || import.meta.env.DEV;
 
@@ -49,11 +50,23 @@ export const fetchOrderById = async (orderId: string): Promise<OrderData | null>
     const [hydratedOrder] = await hydrateOrdersWithShipments([order]);
 
     // Fetch cartonization data separately
-    const { data: cartonizationData } = await supabase
+    let { data: cartonizationData } = await supabase
       .from('order_cartonization')
       .select('*')
       .eq('order_id', orderIdNumber)
       .maybeSingle();
+
+    if (!cartonizationData && order.status !== 'shipped' && order.status !== 'delivered') {
+      const recalcResult = await recalculateOrderCartonization(orderIdNumber);
+      if (recalcResult.success) {
+        const { data: refreshedCartonizationData } = await supabase
+          .from('order_cartonization')
+          .select('*')
+          .eq('order_id', orderIdNumber)
+          .maybeSingle();
+        cartonizationData = refreshedCartonizationData;
+      }
+    }
 
     if (DEBUG_ENABLED) {
       console.log("Raw order data from database:", order);
