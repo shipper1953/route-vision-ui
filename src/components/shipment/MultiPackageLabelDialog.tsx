@@ -45,11 +45,11 @@ export const MultiPackageLabelDialog = ({
   };
 
   const getCarrier = (label: any) => {
-    return label?.selected_rate?.carrier || 'Unknown';
+    return label?.selected_rate?.carrier || label?.rate?.carrier || label?.rate?.provider || label?.carrier || 'Unknown';
   };
 
   const getService = (label: any) => {
-    return label?.selected_rate?.service || 'Unknown';
+    return label?.selected_rate?.service || label?.rate?.service || label?.rate?.servicelevel?.name || label?.servicelevel?.name || label?.service || 'Unknown';
   };
 
   const handlePrintAll = async () => {

@@ -249,8 +249,19 @@ export const ShippingOptionsSection = ({
         markedUpCost
       );
 
+      const normalizedResult = {
+        ...result,
+        carrier: result?.carrier || (selectedRate as any)?.carrier || (selectedRate as any)?.provider || "Unknown",
+        service:
+          result?.service ||
+          result?.rate?.servicelevel?.name ||
+          result?.servicelevel?.name ||
+          (selectedRate as any)?.service ||
+          "Unknown",
+      };
+
       toast.success("Shipping label purchased successfully!");
-      onLabelPurchased?.(result);
+      onLabelPurchased?.(normalizedResult);
     } catch (error) {
       console.error("Error purchasing label:", error);
       toast.error(error instanceof Error ? error.message : "Failed to purchase label");
