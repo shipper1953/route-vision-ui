@@ -157,6 +157,7 @@ serve(async (req) => {
         trackingNumber,
         trackingUrl,
         carrier,
+        service,
         shopifyOrderId
       );
     } else {
@@ -170,6 +171,7 @@ serve(async (req) => {
         trackingNumber,
         trackingUrl,
         carrier,
+        service,
         shopifyOrderId
       );
     }
