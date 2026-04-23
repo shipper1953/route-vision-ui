@@ -865,6 +865,13 @@ async function handleLegacyFlow(
   const fulfillment = result.fulfillmentCreate.fulfillment;
   console.log('✅ Fulfillment created (legacy):', fulfillment.id);
 
+  const trackingFulfillment = await updateFulfillmentTrackingInfo(
+    store.store_url,
+    store.access_token,
+    fulfillment.id,
+    trackingNumber
+  );
+
   // Update mapping
   await supabase
     .from('shopify_order_mappings')
@@ -876,7 +883,8 @@ async function handleLegacyFlow(
         last_tracking_number: trackingNumber,
         last_carrier: carrier,
         last_service: service,
-        last_flow: 'legacy'
+        last_flow: 'legacy',
+        tracking_info: trackingFulfillment?.trackingInfo ?? fulfillment.trackingInfo ?? null
       }
     })
     .eq('shopify_order_id', mapping.shopify_order_id);
@@ -898,7 +906,8 @@ async function handleLegacyFlow(
       items_fulfilled: fulfillmentOrderLineItems.length,
       match_strategies: matchStrategiesUsed,
       shipped_items: shippedItemsSummary,
-      fulfillment_order_items: foItemsSummary
+      fulfillment_order_items: foItemsSummary,
+      tracking_info: trackingFulfillment?.trackingInfo ?? fulfillment.trackingInfo ?? null
     }
   });
 
