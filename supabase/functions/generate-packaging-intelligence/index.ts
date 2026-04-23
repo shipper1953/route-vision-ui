@@ -45,13 +45,34 @@ function utilizationPct(items: ItemDims[], box: Dims): number {
 }
 
 // Normalize an order item into a usable {length,width,height,quantity}.
-// Falls back to small defaults only when no dims are present at all.
-function normalizeOrderItem(rawItem: any): ItemDims | null {
-  const dims = rawItem?.dimensions ?? rawItem;
-  const length = Number(dims?.length);
-  const width = Number(dims?.width);
-  const height = Number(dims?.height);
+// Tries inline dimensions first, then falls back to the items master lookup
+// (passed in via itemMasterDims keyed by item.id / item.sku).
+function normalizeOrderItem(
+  rawItem: any,
+  itemMasterDims?: Map<string, { length: number; width: number; height: number }>
+): ItemDims | null {
   const quantity = Number(rawItem?.quantity || 1);
+
+  // 1. Inline dims on the order line
+  const inline = rawItem?.dimensions ?? rawItem;
+  let length = Number(inline?.length);
+  let width = Number(inline?.width);
+  let height = Number(inline?.height);
+
+  // 2. Lookup from items master by itemId, then sku
+  if ((!length || !width || !height) && itemMasterDims) {
+    const lookupKeys = [rawItem?.itemId, rawItem?.item_id, rawItem?.sku].filter(Boolean);
+    for (const key of lookupKeys) {
+      const m = itemMasterDims.get(String(key));
+      if (m) {
+        length = m.length;
+        width = m.width;
+        height = m.height;
+        break;
+      }
+    }
+  }
+
   if (!length || !width || !height) return null;
   return { length, width, height, quantity };
 }
