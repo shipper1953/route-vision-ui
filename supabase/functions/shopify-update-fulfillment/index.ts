@@ -333,92 +333,121 @@ async function handleFulfillmentServiceFlow(
   // Build line items for fulfillment
   const fulfillmentOrderLineItems: Array<{ id: string; quantity: number }> = [];
   const lineItems = fulfillmentOrderData.line_items || [];
+  const matchStrategiesUsed: string[] = [];
+  const shippedItemsSummary: any[] = [];
+  const foItemsSummary: any[] = [];
+
+  const normalizeVariantGid = (v: any) =>
+    v ? v.toString().replace('gid://shopify/ProductVariant/', '').trim() : '';
+  const normalizeText = (v: any) =>
+    v ? v.toString().toLowerCase().trim() : '';
 
   if (orderShipment.package_info?.items && Array.isArray(orderShipment.package_info.items)) {
     const shippedItems = orderShipment.package_info.items;
-    
-    console.log('Items in this shipment:', shippedItems.map((si: any) => ({
-      sku: si.sku,
-      name: si.name,
-      quantity: si.quantity
-    })));
 
-    console.log('Fulfillment order line items:', JSON.stringify(lineItems, null, 2));
-    
+    shippedItems.forEach((si: any) => shippedItemsSummary.push({
+      sku: si.sku, name: si.name, quantity: si.quantity, variant_id: si.shopifyVariantId
+    }));
+    lineItems.forEach((li: any) => foItemsSummary.push({
+      id: li.id, sku: li.sku, name: li.name, variant_id: li.variant_id,
+      remaining: li.remainingQuantity ?? li.fulfillable_quantity ?? li.quantity
+    }));
+
+    console.log('Items in this shipment:', shippedItemsSummary);
+    console.log('Fulfillment order line items:', foItemsSummary);
+
     // Filter to only line items that still have quantity to fulfill
-    const availableLineItems = lineItems.filter((li: any) => 
+    const availableLineItems = lineItems.filter((li: any) =>
       (li.remainingQuantity || li.fulfillable_quantity || li.quantity || 0) > 0
     );
-    
+
     console.log(`Available line items with remaining quantity: ${availableLineItems.length} of ${lineItems.length}`);
-    
+
     for (const foLineItem of availableLineItems) {
-      // Try multiple matching strategies
+      let matchedBy: string | null = null;
+
       const shippedItem = shippedItems.find((si: any) => {
-        // Strategy 1: Match by Shopify variant ID
+        // Strategy 1: Match by Shopify variant ID (normalized)
         if (si.shopifyVariantId && foLineItem.variant_id) {
-          const siVariantId = si.shopifyVariantId.toString().replace('gid://shopify/ProductVariant/', '');
-          const foVariantId = foLineItem.variant_id.toString().replace('gid://shopify/ProductVariant/', '');
-          if (siVariantId === foVariantId) {
-            console.log(`✅ Matched by Shopify variant ID: ${siVariantId}`);
+          if (normalizeVariantGid(si.shopifyVariantId) === normalizeVariantGid(foLineItem.variant_id)) {
+            matchedBy = 'variant_id';
             return true;
           }
         }
-        
-        // Strategy 2: Match by SKU
+        // Strategy 2: Match by SKU (case-insensitive, trimmed)
         if (si.sku && foLineItem.sku) {
-          if (si.sku === foLineItem.sku) {
-            console.log(`✅ Matched by SKU: ${si.sku}`);
+          if (normalizeText(si.sku) === normalizeText(foLineItem.sku)) {
+            matchedBy = 'sku';
             return true;
           }
         }
-        
-        // Strategy 3: Match by name (fallback)
+        // Strategy 3: Match by name (case-insensitive, trimmed)
         if (si.name && foLineItem.name) {
-          if (si.name.toLowerCase().trim() === foLineItem.name.toLowerCase().trim()) {
-            console.log(`✅ Matched by name: ${si.name}`);
+          if (normalizeText(si.name) === normalizeText(foLineItem.name)) {
+            matchedBy = 'name';
             return true;
           }
         }
-        
         return false;
       });
 
-      if (shippedItem) {
-        const qtyToFulfill = Math.min(
-          shippedItem.quantity,
-          foLineItem.fulfillable_quantity || foLineItem.remainingQuantity || foLineItem.quantity
-        );
+      if (shippedItem && matchedBy) {
+        const remaining = foLineItem.fulfillable_quantity ?? foLineItem.remainingQuantity ?? foLineItem.quantity ?? 0;
+        const qtyToFulfill = Math.max(0, Math.min(shippedItem.quantity, remaining));
+        if (qtyToFulfill <= 0) {
+          console.warn(`⚠️ Skipping line item with zero remaining capacity:`, foLineItem);
+          continue;
+        }
 
-        // Use the GID directly if available, otherwise construct it
-        const lineItemGid = foLineItem.fulfillment_order_line_item_gid || 
+        const lineItemGid = foLineItem.fulfillment_order_line_item_gid ||
           (foLineItem.id.startsWith('gid://') ? foLineItem.id : `gid://shopify/FulfillmentOrderLineItem/${foLineItem.id}`);
 
-        fulfillmentOrderLineItems.push({
-          id: lineItemGid,
-          quantity: qtyToFulfill
-        });
-
-        console.log(`✅ Will fulfill: ${foLineItem.sku || foLineItem.name} - ${qtyToFulfill} units`);
+        fulfillmentOrderLineItems.push({ id: lineItemGid, quantity: qtyToFulfill });
+        matchStrategiesUsed.push(matchedBy);
+        console.log(`✅ Will fulfill: ${foLineItem.sku || foLineItem.name} - ${qtyToFulfill} units (matched by ${matchedBy})`);
       } else {
         console.warn(`⚠️ No match found for FO line item:`, {
-          id: foLineItem.id,
-          sku: foLineItem.sku,
-          name: foLineItem.name,
-          variant_id: foLineItem.variant_id
+          id: foLineItem.id, sku: foLineItem.sku, name: foLineItem.name, variant_id: foLineItem.variant_id
         });
       }
+    }
+
+    // Defensive guard: shipped items present but zero matches → abort, do not create blank fulfillment
+    if (shippedItems.length > 0 && fulfillmentOrderLineItems.length === 0) {
+      const errorMsg = 'Shipped items did not match any fulfillment-order line items; aborting to avoid blank fulfillment';
+      console.error(`❌ ${errorMsg}`);
+      await supabase.from('shopify_sync_logs').insert({
+        company_id: order.company_id,
+        sync_type: 'fulfillment',
+        direction: 'outbound',
+        status: 'error',
+        shopify_order_id: mapping.shopify_order_id,
+        ship_tornado_order_id: orderShipment.order_id,
+        error_message: errorMsg,
+        metadata: {
+          reason: 'no_item_matches',
+          flow: 'fulfillment_service',
+          shipped_items: shippedItemsSummary,
+          fulfillment_order_items: foItemsSummary,
+          tracking_number: trackingNumber,
+          service,
+          carrier
+        }
+      });
+      return new Response(
+        JSON.stringify({ error: errorMsg, shipped_items: shippedItemsSummary, fulfillment_order_items: foItemsSummary }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
   } else {
     // No item tracking - fulfill all line items
     for (const foLineItem of lineItems) {
+      const remaining = foLineItem.fulfillable_quantity ?? foLineItem.remainingQuantity ?? foLineItem.quantity ?? 0;
+      if (remaining <= 0) continue;
       const lineItemGid = foLineItem.fulfillment_order_line_item_gid ||
         (foLineItem.id.startsWith('gid://') ? foLineItem.id : `gid://shopify/FulfillmentOrderLineItem/${foLineItem.id}`);
-      
-      fulfillmentOrderLineItems.push({
-        id: lineItemGid,
-        quantity: foLineItem.fulfillable_quantity || foLineItem.remainingQuantity || foLineItem.quantity
-      });
+      fulfillmentOrderLineItems.push({ id: lineItemGid, quantity: remaining });
+      matchStrategiesUsed.push('all_remaining');
     }
   }
 
