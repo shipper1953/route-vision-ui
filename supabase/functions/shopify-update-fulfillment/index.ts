@@ -89,7 +89,7 @@ serve(async (req) => {
     // Get Shopify order mapping
     const { data: mapping, error: mappingError } = await supabase
       .from('shopify_order_mappings')
-      .select('shopify_order_id, shopify_store_id')
+      .select('shopify_order_id, shopify_store_id, metadata')
       .eq('ship_tornado_order_id', orderShipment.order_id)
       .maybeSingle();
 
@@ -142,6 +142,12 @@ serve(async (req) => {
     const shopifyOrderId = mapping.shopify_order_id.toString().replace('gid://shopify/Order/', '');
 
     console.log('Processing fulfillment for Shopify order:', shopifyOrderId);
+
+    const existingFulfillmentId = mapping.metadata?.last_fulfillment_id;
+    if (existingFulfillmentId) {
+      console.log('♻️ Existing fulfillment detected, canceling before re-sync:', existingFulfillmentId);
+      await cancelExistingFulfillment(store.store_url, store.access_token, existingFulfillmentId);
+    }
 
     // Check if fulfillment service is registered
     const hasFulfillmentService = !!store.fulfillment_service_location_id;
@@ -244,6 +250,84 @@ async function fetchFulfillmentOrdersFromShopify(
   console.log(`Open fulfillment orders: ${openOrders.length} (statuses: ${fulfillmentOrders.map((fo: any) => fo.status).join(', ')})`);
   
   return openOrders;
+}
+
+async function cancelExistingFulfillment(
+  storeUrl: string,
+  accessToken: string,
+  fulfillmentId: string
+) {
+  const mutation = `
+    mutation fulfillmentCancel($id: ID!) {
+      fulfillmentCancel(id: $id) {
+        fulfillment {
+          id
+          status
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(storeUrl, accessToken, mutation, { id: fulfillmentId });
+  const errors = result?.fulfillmentCancel?.userErrors || [];
+
+  if (errors.length > 0) {
+    throw new Error(`Fulfillment cancel errors: ${errors.map((e: any) => e.message).join(', ')}`);
+  }
+
+  console.log('✅ Existing fulfillment canceled:', result?.fulfillmentCancel?.fulfillment?.id);
+  return result?.fulfillmentCancel?.fulfillment ?? null;
+}
+
+async function updateFulfillmentTrackingInfo(
+  storeUrl: string,
+  accessToken: string,
+  fulfillmentId: string,
+  trackingNumber: string
+) {
+  const mutation = `
+    mutation fulfillmentTrackingInfoUpdate($fulfillmentId: ID!, $trackingInfoInput: FulfillmentTrackingInput!, $notifyCustomer: Boolean) {
+      fulfillmentTrackingInfoUpdate(
+        fulfillmentId: $fulfillmentId
+        trackingInfoInput: $trackingInfoInput
+        notifyCustomer: $notifyCustomer
+      ) {
+        fulfillment {
+          id
+          status
+          trackingInfo {
+            number
+            url
+            company
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(storeUrl, accessToken, mutation, {
+    fulfillmentId,
+    trackingInfoInput: {
+      number: trackingNumber
+    },
+    notifyCustomer: true
+  });
+
+  const errors = result?.fulfillmentTrackingInfoUpdate?.userErrors || [];
+  if (errors.length > 0) {
+    throw new Error(`Tracking update errors: ${errors.map((e: any) => e.message).join(', ')}`);
+  }
+
+  console.log('✅ Fulfillment tracking updated:', fulfillmentId);
+  return result?.fulfillmentTrackingInfoUpdate?.fulfillment ?? null;
 }
 
 // Fulfillment Service Flow - Uses fulfillment orders
@@ -527,6 +611,13 @@ async function handleFulfillmentServiceFlow(
   const fulfillment = result.fulfillmentCreate.fulfillment;
   console.log('✅ Fulfillment created:', fulfillment.id);
 
+  const trackingFulfillment = await updateFulfillmentTrackingInfo(
+    store.store_url,
+    store.access_token,
+    fulfillment.id,
+    trackingNumber
+  );
+
   // Update local fulfillment order record if it exists
   if (fulfillmentOrderData.id) {
     await supabase
@@ -550,7 +641,8 @@ async function handleFulfillmentServiceFlow(
         last_tracking_number: trackingNumber,
         last_carrier: carrier,
         last_service: service,
-        last_flow: 'fulfillment_service'
+        last_flow: 'fulfillment_service',
+        tracking_info: trackingFulfillment?.trackingInfo ?? fulfillment.trackingInfo ?? null
       }
     })
     .eq('shopify_order_id', mapping.shopify_order_id);
@@ -573,7 +665,8 @@ async function handleFulfillmentServiceFlow(
       items_fulfilled: fulfillmentOrderLineItems.length,
       match_strategies: matchStrategiesUsed,
       shipped_items: shippedItemsSummary,
-      fulfillment_order_items: foItemsSummary
+      fulfillment_order_items: foItemsSummary,
+      tracking_info: trackingFulfillment?.trackingInfo ?? fulfillment.trackingInfo ?? null
     }
   });
 
@@ -772,6 +865,13 @@ async function handleLegacyFlow(
   const fulfillment = result.fulfillmentCreate.fulfillment;
   console.log('✅ Fulfillment created (legacy):', fulfillment.id);
 
+  const trackingFulfillment = await updateFulfillmentTrackingInfo(
+    store.store_url,
+    store.access_token,
+    fulfillment.id,
+    trackingNumber
+  );
+
   // Update mapping
   await supabase
     .from('shopify_order_mappings')
@@ -783,7 +883,8 @@ async function handleLegacyFlow(
         last_tracking_number: trackingNumber,
         last_carrier: carrier,
         last_service: service,
-        last_flow: 'legacy'
+        last_flow: 'legacy',
+        tracking_info: trackingFulfillment?.trackingInfo ?? fulfillment.trackingInfo ?? null
       }
     })
     .eq('shopify_order_id', mapping.shopify_order_id);
@@ -805,7 +906,8 @@ async function handleLegacyFlow(
       items_fulfilled: fulfillmentOrderLineItems.length,
       match_strategies: matchStrategiesUsed,
       shipped_items: shippedItemsSummary,
-      fulfillment_order_items: foItemsSummary
+      fulfillment_order_items: foItemsSummary,
+      tracking_info: trackingFulfillment?.trackingInfo ?? fulfillment.trackingInfo ?? null
     }
   });
 

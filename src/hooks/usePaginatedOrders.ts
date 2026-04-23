@@ -20,6 +20,7 @@ export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: s
   
   const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastReloadRef = useRef<number>(0);
+  const lastShippedToastOrderRef = useRef<number | null>(null);
   const MIN_RELOAD_INTERVAL = 1000; // 1 second minimum between reloads
 
   const loadOrders = useCallback(async (page: number, search?: string, status?: string) => {
@@ -75,6 +76,14 @@ export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: s
         { event: 'UPDATE', schema: 'public', table: 'orders' }, 
         async (payload) => {
           console.log('Realtime order update:', payload);
+
+          const statusChanged = payload.old?.status !== payload.new?.status;
+          const shipmentChanged = payload.old?.shipment_id !== payload.new?.shipment_id;
+          const fulfillmentChanged = payload.old?.fulfillment_status !== payload.new?.fulfillment_status;
+
+          if (!statusChanged && !shipmentChanged && !fulfillmentChanged) {
+            return;
+          }
           
           // Clear any pending reload
           if (reloadTimeoutRef.current) {
@@ -97,7 +106,13 @@ export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: s
             await loadOrders(currentPage);
           }
           
-          if (payload.eventType === 'UPDATE' && payload.new?.status === 'shipped') {
+          if (
+            payload.eventType === 'UPDATE' &&
+            payload.new?.status === 'shipped' &&
+            payload.old?.status !== 'shipped' &&
+            lastShippedToastOrderRef.current !== payload.new.id
+          ) {
+            lastShippedToastOrderRef.current = payload.new.id;
             toast.success(`Order ${payload.new.id} marked as shipped`);
           }
         }
