@@ -597,6 +597,7 @@ async function handleLegacyFlow(
   trackingNumber: string,
   trackingUrl: string,
   carrier: string,
+  service: string,
   shopifyOrderId: string
 ) {
   console.log('Using GraphQL fulfillment (legacy - no fulfillment service)');
@@ -621,25 +622,87 @@ async function handleLegacyFlow(
 
   // Build line items
   const fulfillmentOrderLineItems: Array<{ id: string; quantity: number }> = [];
+  const matchStrategiesUsed: string[] = [];
+  const shippedItemsSummary: any[] = [];
+  const foItemsSummary: any[] = foLineItems.map((li: any) => ({
+    id: li.id,
+    sku: li.lineItem?.sku,
+    name: li.lineItem?.name,
+    variant_id: li.lineItem?.variant?.id,
+    remaining: li.remainingQuantity
+  }));
+
+  const normalizeVariantGid = (v: any) =>
+    v ? v.toString().replace('gid://shopify/ProductVariant/', '').trim() : '';
+  const normalizeText = (v: any) =>
+    v ? v.toString().toLowerCase().trim() : '';
 
   if (orderShipment.package_info?.items && Array.isArray(orderShipment.package_info.items)) {
     const shippedItems = orderShipment.package_info.items;
+    shippedItems.forEach((si: any) => shippedItemsSummary.push({
+      sku: si.sku, name: si.name, quantity: si.quantity, variant_id: si.shopifyVariantId
+    }));
 
     for (const foLineItem of foLineItems) {
       if (foLineItem.remainingQuantity <= 0) continue;
+      let matchedBy: string | null = null;
 
       const shippedItem = shippedItems.find((si: any) => {
-        if (si.sku && foLineItem.lineItem?.sku) return si.sku === foLineItem.lineItem.sku;
-        if (si.name && foLineItem.lineItem?.name) return si.name.toLowerCase().trim() === foLineItem.lineItem.name.toLowerCase().trim();
+        if (si.shopifyVariantId && foLineItem.lineItem?.variant?.id) {
+          if (normalizeVariantGid(si.shopifyVariantId) === normalizeVariantGid(foLineItem.lineItem.variant.id)) {
+            matchedBy = 'variant_id';
+            return true;
+          }
+        }
+        if (si.sku && foLineItem.lineItem?.sku) {
+          if (normalizeText(si.sku) === normalizeText(foLineItem.lineItem.sku)) {
+            matchedBy = 'sku';
+            return true;
+          }
+        }
+        if (si.name && foLineItem.lineItem?.name) {
+          if (normalizeText(si.name) === normalizeText(foLineItem.lineItem.name)) {
+            matchedBy = 'name';
+            return true;
+          }
+        }
         return false;
       });
 
-      if (shippedItem) {
-        fulfillmentOrderLineItems.push({
-          id: foLineItem.id,
-          quantity: Math.min(shippedItem.quantity, foLineItem.remainingQuantity)
-        });
+      if (shippedItem && matchedBy) {
+        const qty = Math.max(0, Math.min(shippedItem.quantity, foLineItem.remainingQuantity));
+        if (qty <= 0) continue;
+        fulfillmentOrderLineItems.push({ id: foLineItem.id, quantity: qty });
+        matchStrategiesUsed.push(matchedBy);
       }
+    }
+
+    // Defensive guard
+    if (shippedItems.length > 0 && fulfillmentOrderLineItems.length === 0) {
+      const errorMsg = 'Shipped items did not match any fulfillment-order line items; aborting to avoid blank fulfillment';
+      console.error(`❌ ${errorMsg}`);
+      await supabase.from('shopify_sync_logs').insert({
+        company_id: order.company_id,
+        sync_type: 'fulfillment',
+        direction: 'outbound',
+        status: 'error',
+        shopify_order_id: mapping.shopify_order_id,
+        ship_tornado_order_id: orderShipment.order_id,
+        error_message: errorMsg,
+        metadata: {
+          reason: 'no_item_matches',
+          flow: 'legacy',
+          shipped_items: shippedItemsSummary,
+          fulfillment_order_items: foItemsSummary,
+          tracking_number: trackingNumber,
+          service,
+          carrier
+        }
+      });
+      return new Response(
+        JSON.stringify({ error: errorMsg, shipped_items: shippedItemsSummary, fulfillment_order_items: foItemsSummary }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
   } else {
     for (const foLineItem of foLineItems) {
@@ -648,6 +711,7 @@ async function handleLegacyFlow(
           id: foLineItem.id,
           quantity: foLineItem.remainingQuantity
         });
+        matchStrategiesUsed.push('all_remaining');
       }
     }
   }
@@ -678,10 +742,9 @@ async function handleLegacyFlow(
         fulfillmentOrderId: fo.id,
         fulfillmentOrderLineItems
       }],
+      // Send only the tracking number — Shopify auto-detects carrier and URL
       trackingInfo: {
-        number: trackingNumber,
-        url: trackingUrl,
-        company: carrier
+        number: trackingNumber
       },
       notifyCustomer: true
     }
@@ -693,11 +756,37 @@ async function handleLegacyFlow(
 
   if (result.fulfillmentCreate.userErrors?.length > 0) {
     const errors = result.fulfillmentCreate.userErrors;
+    await supabase.from('shopify_sync_logs').insert({
+      company_id: order.company_id,
+      sync_type: 'fulfillment',
+      direction: 'outbound',
+      status: 'error',
+      shopify_order_id: mapping.shopify_order_id,
+      ship_tornado_order_id: orderShipment.order_id,
+      error_message: errors.map((e: any) => e.message).join(', '),
+      metadata: { userErrors: errors, flow: 'legacy', tracking_number: trackingNumber, carrier, service }
+    });
     throw new Error(`Fulfillment errors: ${errors.map((e: any) => e.message).join(', ')}`);
   }
 
   const fulfillment = result.fulfillmentCreate.fulfillment;
   console.log('✅ Fulfillment created (legacy):', fulfillment.id);
+
+  // Update mapping
+  await supabase
+    .from('shopify_order_mappings')
+    .update({
+      last_synced_at: new Date().toISOString(),
+      sync_status: 'synced',
+      metadata: {
+        last_fulfillment_id: fulfillment.id,
+        last_tracking_number: trackingNumber,
+        last_carrier: carrier,
+        last_service: service,
+        last_flow: 'legacy'
+      }
+    })
+    .eq('shopify_order_id', mapping.shopify_order_id);
 
   await supabase.from('shopify_sync_logs').insert({
     company_id: order.company_id,
@@ -709,8 +798,14 @@ async function handleLegacyFlow(
     metadata: {
       fulfillment_id: fulfillment.id,
       tracking_number: trackingNumber,
+      tracking_url: trackingUrl,
+      carrier,
+      service,
+      flow: 'legacy',
       items_fulfilled: fulfillmentOrderLineItems.length,
-      method: 'legacy_graphql'
+      match_strategies: matchStrategiesUsed,
+      shipped_items: shippedItemsSummary,
+      fulfillment_order_items: foItemsSummary
     }
   });
 
