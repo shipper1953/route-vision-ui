@@ -547,7 +547,10 @@ async function handleFulfillmentServiceFlow(
       sync_status: 'synced',
       metadata: {
         last_fulfillment_id: fulfillment.id,
-        last_tracking_number: trackingNumber
+        last_tracking_number: trackingNumber,
+        last_carrier: carrier,
+        last_service: service,
+        last_flow: 'fulfillment_service'
       }
     })
     .eq('shopify_order_id', mapping.shopify_order_id);
@@ -563,7 +566,14 @@ async function handleFulfillmentServiceFlow(
     metadata: {
       fulfillment_id: fulfillment.id,
       tracking_number: trackingNumber,
-      items_fulfilled: fulfillmentOrderLineItems.length
+      tracking_url: trackingUrl,
+      carrier,
+      service,
+      flow: 'fulfillment_service',
+      items_fulfilled: fulfillmentOrderLineItems.length,
+      match_strategies: matchStrategiesUsed,
+      shipped_items: shippedItemsSummary,
+      fulfillment_order_items: foItemsSummary
     }
   });
 
