@@ -611,6 +611,13 @@ async function handleFulfillmentServiceFlow(
   const fulfillment = result.fulfillmentCreate.fulfillment;
   console.log('✅ Fulfillment created:', fulfillment.id);
 
+  const trackingFulfillment = await updateFulfillmentTrackingInfo(
+    store.store_url,
+    store.access_token,
+    fulfillment.id,
+    trackingNumber
+  );
+
   // Update local fulfillment order record if it exists
   if (fulfillmentOrderData.id) {
     await supabase
@@ -634,7 +641,8 @@ async function handleFulfillmentServiceFlow(
         last_tracking_number: trackingNumber,
         last_carrier: carrier,
         last_service: service,
-        last_flow: 'fulfillment_service'
+        last_flow: 'fulfillment_service',
+        tracking_info: trackingFulfillment?.trackingInfo ?? fulfillment.trackingInfo ?? null
       }
     })
     .eq('shopify_order_id', mapping.shopify_order_id);
@@ -657,7 +665,8 @@ async function handleFulfillmentServiceFlow(
       items_fulfilled: fulfillmentOrderLineItems.length,
       match_strategies: matchStrategiesUsed,
       shipped_items: shippedItemsSummary,
-      fulfillment_order_items: foItemsSummary
+      fulfillment_order_items: foItemsSummary,
+      tracking_info: trackingFulfillment?.trackingInfo ?? fulfillment.trackingInfo ?? null
     }
   });
 
