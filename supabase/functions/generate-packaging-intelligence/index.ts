@@ -45,13 +45,34 @@ function utilizationPct(items: ItemDims[], box: Dims): number {
 }
 
 // Normalize an order item into a usable {length,width,height,quantity}.
-// Falls back to small defaults only when no dims are present at all.
-function normalizeOrderItem(rawItem: any): ItemDims | null {
-  const dims = rawItem?.dimensions ?? rawItem;
-  const length = Number(dims?.length);
-  const width = Number(dims?.width);
-  const height = Number(dims?.height);
+// Tries inline dimensions first, then falls back to the items master lookup
+// (passed in via itemMasterDims keyed by item.id / item.sku).
+function normalizeOrderItem(
+  rawItem: any,
+  itemMasterDims?: Map<string, { length: number; width: number; height: number }>
+): ItemDims | null {
   const quantity = Number(rawItem?.quantity || 1);
+
+  // 1. Inline dims on the order line
+  const inline = rawItem?.dimensions ?? rawItem;
+  let length = Number(inline?.length);
+  let width = Number(inline?.width);
+  let height = Number(inline?.height);
+
+  // 2. Lookup from items master by itemId, then sku
+  if ((!length || !width || !height) && itemMasterDims) {
+    const lookupKeys = [rawItem?.itemId, rawItem?.item_id, rawItem?.sku].filter(Boolean);
+    for (const key of lookupKeys) {
+      const m = itemMasterDims.get(String(key));
+      if (m) {
+        length = m.length;
+        width = m.width;
+        height = m.height;
+        break;
+      }
+    }
+  }
+
   if (!length || !width || !height) return null;
   return { length, width, height, quantity };
 }
@@ -134,6 +155,43 @@ serve(async (req) => {
     }
 
     console.log(`✅ Matched ${matchedShipments.length} shipments with orders`);
+
+    // Build an items-master dimension lookup for all itemIds/skus referenced
+    // by the matched orders. Order line items often only carry { itemId, sku }
+    // and rely on the items table for actual dimensions.
+    const itemKeys = new Set<string>();
+    for (const ms of matchedShipments) {
+      for (const it of (ms.order_items as any[])) {
+        if (it?.itemId) itemKeys.add(String(it.itemId));
+        if (it?.item_id) itemKeys.add(String(it.item_id));
+        if (it?.sku) itemKeys.add(String(it.sku));
+      }
+    }
+
+    const itemMasterDims = new Map<string, { length: number; width: number; height: number }>();
+    if (itemKeys.size > 0) {
+      const keys = Array.from(itemKeys);
+      const ids = keys.filter(k => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k));
+      const skus = keys.filter(k => !ids.includes(k));
+
+      const [byIdRes, bySkuRes] = await Promise.all([
+        ids.length
+          ? supabase.from('items').select('id, sku, length, width, height').in('id', ids)
+          : Promise.resolve({ data: [], error: null } as any),
+        skus.length
+          ? supabase.from('items').select('id, sku, length, width, height').in('sku', skus)
+          : Promise.resolve({ data: [], error: null } as any),
+      ]);
+
+      const rows = [...((byIdRes as any).data || []), ...((bySkuRes as any).data || [])];
+      for (const r of rows) {
+        const dims = { length: Number(r.length), width: Number(r.width), height: Number(r.height) };
+        if (!dims.length || !dims.width || !dims.height) continue;
+        if (r.id) itemMasterDims.set(String(r.id), dims);
+        if (r.sku) itemMasterDims.set(String(r.sku), dims);
+      }
+      console.log(`📐 Loaded dimensions for ${itemMasterDims.size} item keys`);
+    }
 
     // Master list (U-Line / vendor catalog) — the universe of candidate boxes
     const { data: masterListBoxes, error: masterError } = await supabase
@@ -237,7 +295,7 @@ serve(async (req) => {
 
     for (const shipment of matchedShipments) {
       const items = (shipment.order_items as any[])
-        .map(normalizeOrderItem)
+        .map(it => normalizeOrderItem(it, itemMasterDims))
         .filter((x): x is ItemDims => x !== null);
 
       if (items.length === 0) continue;
