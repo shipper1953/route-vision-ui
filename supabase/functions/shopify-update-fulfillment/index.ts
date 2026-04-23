@@ -46,7 +46,7 @@ serve(async (req) => {
   }
 
   const requestBody = await req.json();
-  const { shipmentId, status, trackingNumber, trackingUrl, carrier } = requestBody;
+  const { shipmentId, status, trackingNumber, trackingUrl, carrier, service } = requestBody;
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
