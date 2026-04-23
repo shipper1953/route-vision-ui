@@ -187,9 +187,68 @@ serve(async (req) => {
     console.log('Processing fulfillment for Shopify order:', shopifyOrderId);
 
     const existingFulfillmentId = mapping.metadata?.last_fulfillment_id;
-    if (existingFulfillmentId) {
-      console.log('♻️ Existing fulfillment detected, canceling before re-sync:', existingFulfillmentId);
-      await cancelExistingFulfillment(store.store_url, store.access_token, existingFulfillmentId);
+    const existingShopifyFulfillments = await fetchOrderFulfillments(
+      store.store_url,
+      store.access_token,
+      shopifyOrderId
+    );
+
+    const existingFulfillment = existingShopifyFulfillments.find((fulfillment: any) => {
+      const fulfillmentId = normalizeShopifyResourceId(fulfillment?.admin_graphql_api_id || fulfillment?.id, 'Fulfillment');
+      return fulfillmentId === normalizeShopifyResourceId(existingFulfillmentId, 'Fulfillment');
+    });
+
+    if (existingFulfillment) {
+      console.log('ℹ️ Existing Shopify fulfillment found; will update tracking only:', existingFulfillment.id);
+      const trackingOnlyResult = await updateFulfillmentTrackingInfo(
+        store.store_url,
+        store.access_token,
+        existingFulfillment.admin_graphql_api_id || `gid://shopify/Fulfillment/${existingFulfillment.id}`,
+        trackingNumber
+      );
+
+      await supabase
+        .from('shopify_order_mappings')
+        .update({
+          last_synced_at: new Date().toISOString(),
+          sync_status: 'synced',
+          metadata: {
+            ...mapping.metadata,
+            last_fulfillment_id: existingFulfillment.admin_graphql_api_id || `gid://shopify/Fulfillment/${existingFulfillment.id}`,
+            last_tracking_number: trackingNumber,
+            last_carrier: carrier,
+            last_service: service,
+            last_flow: 'tracking_update_only',
+            tracking_info: trackingOnlyResult?.trackingInfo ?? null
+          }
+        })
+        .eq('shopify_order_id', mapping.shopify_order_id);
+
+      await supabase.from('shopify_sync_logs').insert({
+        company_id: order.company_id,
+        sync_type: 'fulfillment',
+        direction: 'outbound',
+        status: 'success',
+        shopify_order_id: mapping.shopify_order_id,
+        ship_tornado_order_id: orderShipment.order_id,
+        metadata: {
+          fulfillment_id: existingFulfillment.admin_graphql_api_id || `gid://shopify/Fulfillment/${existingFulfillment.id}`,
+          tracking_number: trackingNumber,
+          carrier,
+          service,
+          flow: 'tracking_update_only',
+          tracking_info: trackingOnlyResult?.trackingInfo ?? null
+        }
+      });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          fulfillmentId: existingFulfillment.admin_graphql_api_id || `gid://shopify/Fulfillment/${existingFulfillment.id}`,
+          method: 'tracking_update_only'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
     // Check if fulfillment service is registered
