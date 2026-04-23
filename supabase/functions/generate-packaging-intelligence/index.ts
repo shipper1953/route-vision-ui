@@ -156,6 +156,43 @@ serve(async (req) => {
 
     console.log(`✅ Matched ${matchedShipments.length} shipments with orders`);
 
+    // Build an items-master dimension lookup for all itemIds/skus referenced
+    // by the matched orders. Order line items often only carry { itemId, sku }
+    // and rely on the items table for actual dimensions.
+    const itemKeys = new Set<string>();
+    for (const ms of matchedShipments) {
+      for (const it of (ms.order_items as any[])) {
+        if (it?.itemId) itemKeys.add(String(it.itemId));
+        if (it?.item_id) itemKeys.add(String(it.item_id));
+        if (it?.sku) itemKeys.add(String(it.sku));
+      }
+    }
+
+    const itemMasterDims = new Map<string, { length: number; width: number; height: number }>();
+    if (itemKeys.size > 0) {
+      const keys = Array.from(itemKeys);
+      const ids = keys.filter(k => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k));
+      const skus = keys.filter(k => !ids.includes(k));
+
+      const [byIdRes, bySkuRes] = await Promise.all([
+        ids.length
+          ? supabase.from('items').select('id, sku, length, width, height').in('id', ids)
+          : Promise.resolve({ data: [], error: null } as any),
+        skus.length
+          ? supabase.from('items').select('id, sku, length, width, height').in('sku', skus)
+          : Promise.resolve({ data: [], error: null } as any),
+      ]);
+
+      const rows = [...((byIdRes as any).data || []), ...((bySkuRes as any).data || [])];
+      for (const r of rows) {
+        const dims = { length: Number(r.length), width: Number(r.width), height: Number(r.height) };
+        if (!dims.length || !dims.width || !dims.height) continue;
+        if (r.id) itemMasterDims.set(String(r.id), dims);
+        if (r.sku) itemMasterDims.set(String(r.sku), dims);
+      }
+      console.log(`📐 Loaded dimensions for ${itemMasterDims.size} item keys`);
+    }
+
     // Master list (U-Line / vendor catalog) — the universe of candidate boxes
     const { data: masterListBoxes, error: masterError } = await supabase
       .from('packaging_master_list')
