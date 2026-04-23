@@ -40,6 +40,49 @@ async function shopifyGraphQL(
   return result.data;
 }
 
+async function shopifyRest(
+  storeUrl: string,
+  accessToken: string,
+  path: string,
+  method: string = 'GET',
+  body?: any
+) {
+  const response = await fetch(`https://${storeUrl}${path}`, {
+    method,
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!response.ok) {
+    throw new Error(`REST HTTP error: ${response.status} ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+function normalizeShopifyResourceId(value: any, resource: string) {
+  const raw = value?.toString().trim() ?? '';
+  const prefix = `gid://shopify/${resource}/`;
+  return raw.startsWith(prefix) ? raw.replace(prefix, '') : raw;
+}
+
+async function fetchOrderFulfillments(
+  storeUrl: string,
+  accessToken: string,
+  shopifyOrderId: string
+) {
+  const response = await shopifyRest(
+    storeUrl,
+    accessToken,
+    `/admin/api/2025-01/orders/${shopifyOrderId}/fulfillments.json`
+  );
+
+  return response?.fulfillments || [];
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
