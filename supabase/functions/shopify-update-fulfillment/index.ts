@@ -494,10 +494,9 @@ async function handleFulfillmentServiceFlow(
           fulfillmentOrderLineItems: fulfillmentOrderLineItems
         }
       ],
+      // Send only the tracking number — Shopify auto-detects carrier and URL
       trackingInfo: {
-        number: trackingNumber,
-        url: trackingUrl,
-        company: carrier
+        number: trackingNumber
       },
       notifyCustomer: true
     }
