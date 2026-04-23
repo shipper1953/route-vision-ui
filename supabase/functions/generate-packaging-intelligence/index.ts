@@ -295,7 +295,7 @@ serve(async (req) => {
 
     for (const shipment of matchedShipments) {
       const items = (shipment.order_items as any[])
-        .map(normalizeOrderItem)
+        .map(it => normalizeOrderItem(it, itemMasterDims))
         .filter((x): x is ItemDims => x !== null);
 
       if (items.length === 0) continue;
