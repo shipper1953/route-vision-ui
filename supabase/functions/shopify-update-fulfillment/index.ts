@@ -256,6 +256,7 @@ async function handleFulfillmentServiceFlow(
   trackingNumber: string,
   trackingUrl: string,
   carrier: string,
+  service: string,
   shopifyOrderId: string
 ) {
   console.log('Fetching fulfillment order for order:', orderShipment.order_id);
