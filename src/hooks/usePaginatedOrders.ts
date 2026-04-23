@@ -21,6 +21,7 @@ export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: s
   const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastReloadRef = useRef<number>(0);
   const lastShippedToastOrderRef = useRef<number | null>(null);
+  const lastProcessedUpdateRef = useRef<string | null>(null);
   const MIN_RELOAD_INTERVAL = 1000; // 1 second minimum between reloads
 
   const loadOrders = useCallback(async (page: number, search?: string, status?: string) => {
@@ -80,10 +81,22 @@ export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: s
           const statusChanged = payload.old?.status !== payload.new?.status;
           const shipmentChanged = payload.old?.shipment_id !== payload.new?.shipment_id;
           const fulfillmentChanged = payload.old?.fulfillment_status !== payload.new?.fulfillment_status;
+          const updateSignature = [
+            payload.new?.id,
+            payload.new?.status,
+            payload.new?.shipment_id,
+            payload.new?.fulfillment_status,
+          ].join('|');
 
           if (!statusChanged && !shipmentChanged && !fulfillmentChanged) {
             return;
           }
+
+          if (lastProcessedUpdateRef.current === updateSignature) {
+            return;
+          }
+
+          lastProcessedUpdateRef.current = updateSignature;
           
           // Clear any pending reload
           if (reloadTimeoutRef.current) {
