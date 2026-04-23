@@ -1,58 +1,116 @@
-## Problem
 
-The Packaging Opportunities calculator has three correctness bugs that make its results unreliable. It's running and producing data (current report: 129 shipments analyzed, 10 opportunities, $149.97 savings for the Demo company), but the math behind those numbers is wrong in important ways.
+# Keep Shopify line items visible after shipment sync
 
-### What's wrong today
+## Goal
 
-In `supabase/functions/generate-packaging-intelligence/index.ts`:
+Make Shopify fulfillments behave the same for every company so that when a shipment is marked shipped:
+- tracking is added correctly
+- Shopify auto-detects the carrier from the tracking number
+- the fulfilled line items still remain visible on the Shopify order
 
-1. **"Actual" utilization uses the wrong dimensions.** It reads `shipments.package_dimensions` (free-form JSON often containing label dims, not the real used box). Example from the data: shipment 447 has `actual_package_sku = S-20474` (a 24x16x12 master box) but `package_dimensions = {24,16,12}` — coincidence here, but on shipment 446 the SKU `S-19858` is a 10x10x8 master box and the saved dims were `{10,10,8}` — fine. The bug shows up when users override dims at the label step. We should always look up the real interior dimensions of `actual_package_sku` from `packaging_master_list` (or `boxes`) and use those as the "actual" baseline.
+## Root cause
 
-2. **The selection logic doesn't find the optimal box.** It only proposes a master-list box if its utilization is *higher than the actual* AND `<= 95%`. That means:
-   - If the actual box is already small (say 90% utilization), it will only suggest something between 91-95% — usually nothing.
-   - It never proposes a box that fits more snugly when the actual was *oversized* unless that snugger box also happens to clear an arbitrary 95% ceiling.
-   - The "fit" check is volume-only (`totalItemVolume <= boxVolume`). It does not check that each item's longest side fits in the box, so it can recommend a box that's mathematically smaller in volume but physically can't hold a long item. Example: shipment with a 14" item could be "fit" into a 12x12x8 box because volume math passes.
-   
-   Correct rule: among all master boxes where every item physically fits (per-dimension check, not just volume), pick the one with the **smallest interior volume that still holds the items** — that's the one closest to 100% utilization without going over.
+The shared `shopify-update-fulfillment` edge function is doing two things that can break the Shopify fulfillment display:
 
-3. **Self-recommendation noise.** When the actual box already is in `packaging_master_list`, the loop can pick that same SKU as the "best." It should skip the actual SKU and only surface a *different* box that beats it.
+1. It sends extra tracking fields (`company`, `url`) instead of only the tracking number.
+2. The fulfillment creation depends on matching package items to Shopify fulfillment-order line items; when matching is fragile or logs are sparse, it is hard to verify that the exact shipped items were included.
 
-Smaller issues:
-- `total_savings = improvement * 0.10` is a made-up constant and isn't tied to anything (cost difference, dim-weight savings, etc.). It should at minimum reflect the cost delta between the actual box and the recommended box × shipment count.
-- Opportunities list is sorted by `shipment_count` only, so a box that helps 7 low-utilization shipments outranks a box that would save more money on 3 shipments. Sort by `total_savings` desc instead.
-- The `boxes` table (company inventory) is ignored entirely. The user's request implies comparing against the U-Line master list, which is correct — but we should also use the company's existing `boxes` for the "actual" dimension lookup as a fallback, since some shipments use a custom company box that isn't in `packaging_master_list`.
+The disappearing-items issue is global because this logic lives in the shared fulfillment sync function used by all tenants.
 
-## What we'll change
+## Plan
 
-**File: `supabase/functions/generate-packaging-intelligence/index.ts`**
+### 1. Simplify the Shopify fulfillment payload
+Update `supabase/functions/shopify-update-fulfillment/index.ts` so both fulfillment paths:
+- `handleFulfillmentServiceFlow`
+- `handleLegacyFlow`
 
-1. **Resolve "actual" box dimensions properly.** For each shipment, look up `actual_package_sku` first in `packaging_master_list` (vendor_sku match), then fall back to `boxes` for the company. Use those as the actual interior dims. Only fall back to `package_dimensions` if no SKU match is found.
+send only:
 
-2. **Rewrite the optimization rule.** Replace the current "higher utilization, ≤95%" filter with:
-   - Run a real fit check: every item's three dims (sorted desc) must each fit in the box's three dims (sorted desc), i.e. simple bounding-box rotation check per item. (Keeping it per-item is intentional — we already lack a true 3D bin-packer here.)
-   - Volume check: sum of item volumes ≤ box volume × 0.95 (5% slack for void fill).
-   - Among master boxes that satisfy both checks AND have `vendor_sku <> actual_package_sku`, pick the one with the smallest interior volume. That's the highest utilization without overflow.
-   - Only flag as an "opportunity" if the new utilization beats the actual by at least 10 percentage points (avoid noise from near-equivalent boxes).
+```ts
+trackingInfo: {
+  number: trackingNumber
+}
+```
 
-3. **Fix savings math.** `savings_per_shipment = max(0, actual_box_cost - recommended_box_cost)`. Sum across shipments. If the actual box's cost isn't known, fall back to a small cubic-foot-based estimate but flag `cost_basis: 'estimated'` in the row so the UI can label it.
+Do not send `company` or `url` to Shopify. Keep Shopify carrier detection fully automatic.
 
-4. **Sort by `total_savings` desc** (tiebreak by `shipment_count` desc).
+### 2. Preserve exact shipped line items
+Keep the current package-based fulfillment behavior, where Shopify is told exactly which fulfillment-order line items were shipped, but tighten the logic so it is reliable:
 
-5. **Output schema stays the same** (`top_5_box_discrepancies` array of `{master_box_sku, master_box_name, shipment_count, avg_current_utilization, avg_new_utilization, total_savings, ...}`) so the dashboard and the dashboard-card hook keep working without UI changes.
+- Continue using `order_shipments.package_info.items` as the source of what this package shipped.
+- Keep variant ID as the highest-priority match, then SKU, then name.
+- Normalize values before comparison so matching is less brittle:
+  - trim whitespace
+  - compare case-insensitively for SKU/name
+  - normalize Shopify GIDs before comparing variant IDs
+- Clamp fulfilled quantity to the remaining fulfillable quantity on the fulfillment order line item.
 
-6. Fix the small TS build error on line 326 (typed accumulator for `projected_packaging_need`) flagged by the latest build.
+This preserves partial-fulfillment behavior while ensuring the fulfillment sent to Shopify always contains the right items.
 
-**No DB migration, no UI changes, no schema changes.** After the function is redeployed, the user clicks "Refresh Report" on `/packaging?tab=box-recommendations` and the recomputed opportunities appear.
+### 3. Add a safe guard for empty matches
+Add a defensive branch before calling Shopify:
 
-### Validation plan
+- If package items exist but produce zero matched fulfillment-order line items, do not create a fulfillment silently.
+- Instead:
+  - log a detailed sync error with shipped items and fulfillment-order line items
+  - return a clear error response
+  - leave the fulfillment order open rather than creating a malformed fulfillment
 
-After deploying, I'll:
-1. Re-invoke `generate-packaging-intelligence` for the Demo company.
-2. Spot-check 3 shipments via SQL: confirm the "actual" dims now match the master-list dims for the SKU used, the recommended box actually fits all items per dimension, and the savings number equals the cost delta × shipment count.
-3. Confirm the opportunities list is sorted by savings and excludes any opportunity whose `master_box_sku` equals the `actual_package_sku` of its sample shipments.
+This prevents bad fulfillments that could make the Shopify order look broken.
 
-### Out of scope (will mention but not change unless you ask)
+### 4. Improve traceability in sync logs
+Expand `shopify_sync_logs.metadata` and mapping metadata written by `shopify-update-fulfillment` to capture:
+- tracking number sent to Shopify
+- whether fulfillment service or legacy flow was used
+- matched item count
+- shipped item summary
+- fulfillment-order item summary
+- whether matching used variant ID, SKU, or name
 
-- The 95% volume cap and 10pp improvement threshold are tunable; happy to make them company-level settings later.
-- A real 3D bin packer (vs. per-item dim check) would be more accurate for multi-item shipments but is a much bigger change.
-- The Dashboard "Box Opportunities" widget already reads from the same report, so it'll improve automatically.
+This will make future fulfillment-display issues much faster to diagnose without per-company custom logic.
+
+### 5. Keep purchase-label behavior unchanged
+Do not change the global trigger point in `supabase/functions/purchase-label/index.ts` except to keep passing the same shipment context. It already enriches `package_info.items` with Shopify variant IDs, which supports accurate line-item matching.
+
+### 6. Validate the fix against both sync paths
+After implementation, validate the shared behavior for:
+- stores using fulfillment service flow
+- stores using legacy flow
+
+For each, confirm:
+- `fulfillmentCreate` is called with `trackingInfo.number` only
+- the created fulfillment contains non-empty line items
+- Shopify order page still shows the fulfilled items after shipment
+- tracking appears and carrier is auto-detected by Shopify
+
+## Files to update
+
+- `supabase/functions/shopify-update-fulfillment/index.ts`
+
+## No schema changes
+
+- No database migration
+- No UI changes
+- No per-company branching
+
+## Technical details
+
+Current risky payload in both flows:
+
+```ts
+trackingInfo: {
+  number: trackingNumber,
+  url: trackingUrl,
+  company: carrier
+}
+```
+
+Target payload:
+
+```ts
+trackingInfo: {
+  number: trackingNumber
+}
+```
+
+Matching hardening will stay within the existing fulfillment creation flow so the app continues to support exact-package and partial-shipment syncing.
