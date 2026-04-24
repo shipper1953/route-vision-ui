@@ -438,18 +438,88 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
             )}
           </div>
         ) : cartonizationData?.recommendedBox ? (
-          <div className="flex items-center gap-2">
-            <Box className="h-4 w-4 text-primary" />
-            <div className="text-sm">
-              <div className="font-medium">{cartonizationData.recommendedBox.name}</div>
-              <div className="text-muted-foreground">
-                {cartonizationData.recommendedBox.length}" × {cartonizationData.recommendedBox.width}" × {cartonizationData.recommendedBox.height}"
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Weight: {cartonizationData.totalWeight.toFixed(1)} lbs
+          cartonizationData.totalPackages > 1 && cartonizationData.packages.length > 0 ? (
+            <Dialog>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent transition-colors border border-border text-sm font-medium text-primary"
+                >
+                  <Boxes className="h-4 w-4" />
+                  <span>Multiple Packages ({cartonizationData.totalPackages})</span>
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Recommended Packages ({cartonizationData.totalPackages})</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {cartonizationData.packages.map((pkg: any, idx: number) => {
+                    const box = pkg.box || {};
+                    const items = Array.isArray(pkg.items) ? pkg.items : [];
+                    const aggregated = items.reduce((acc: any[], it: any) => {
+                      const key = it.id || it.sku || it.name;
+                      const existing = acc.find((x) => (x.id || x.sku || x.name) === key);
+                      if (existing) {
+                        existing.quantity = (existing.quantity || 0) + (it.quantity || 1);
+                      } else {
+                        acc.push({ ...it, quantity: it.quantity || 1 });
+                      }
+                      return acc;
+                    }, []);
+                    return (
+                      <div key={idx} className="border border-border rounded-md p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Box className="h-4 w-4 text-primary" />
+                            <span className="font-medium">Package {idx + 1}: {box.name || 'Box'}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {box.length}" × {box.width}" × {box.height}"
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground flex gap-4">
+                          {typeof pkg.utilization === 'number' && (
+                            <span>Utilization: {pkg.utilization.toFixed(1)}%</span>
+                          )}
+                          {typeof pkg.total_weight === 'number' && (
+                            <span>Weight: {pkg.total_weight.toFixed(2)} lbs</span>
+                          )}
+                        </div>
+                        <div className="border-t border-border pt-2">
+                          <div className="text-xs font-medium text-muted-foreground mb-1">Items</div>
+                          <ul className="text-sm space-y-1">
+                            {aggregated.map((it: any, i: number) => (
+                              <li key={i} className="flex justify-between gap-2">
+                                <span className="truncate">
+                                  {it.name || it.sku || 'Item'}
+                                  {it.sku && it.name ? <span className="text-muted-foreground"> ({it.sku})</span> : null}
+                                </span>
+                                <span className="font-medium whitespace-nowrap">× {it.quantity}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Box className="h-4 w-4 text-primary" />
+              <div className="text-sm">
+                <div className="font-medium">{cartonizationData.recommendedBox.name}</div>
+                <div className="text-muted-foreground">
+                  {cartonizationData.recommendedBox.length}" × {cartonizationData.recommendedBox.width}" × {cartonizationData.recommendedBox.height}"
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Weight: {cartonizationData.totalWeight.toFixed(1)} lbs
+                </div>
               </div>
             </div>
-          </div>
+          )
         ) : (
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-sm">No box</span>
