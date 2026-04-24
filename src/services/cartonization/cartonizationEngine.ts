@@ -33,36 +33,29 @@ export class CartonizationEngine {
       return null;
     }
 
-    // Try single-box solution first
+    // Try single-box solution first. It already enforces ≤99% utilization
+    // and picks the box closest to 99%. If that succeeds, prefer it.
     const singleBoxResult = this.calculateSingleBoxSolution(items, startTime);
-    
-    // If single box works and multi-package is not enabled, return single box result
+
     if (singleBoxResult && !enableMultiPackage) {
       return singleBoxResult;
     }
 
-    // If single box fails or multi-package is enabled, try multi-package solution
+    // Multi-package fallback: triggered when no single box can hold all
+    // items at ≤99% utilization, or when the caller explicitly enables it.
     if (enableMultiPackage || !singleBoxResult) {
       console.log('🚀 Attempting multi-package cartonization...');
       const multiPackageAlgorithm = new MultiPackageAlgorithm(this.boxes, this.parameters);
       const multiPackageResult = multiPackageAlgorithm.calculateMultiPackageCartonization(items);
-      
+
       if (multiPackageResult) {
-        // If we have both solutions, decide which to use
         if (singleBoxResult) {
-          // Compare solutions - prefer single box if confidence is high enough
-          if (singleBoxResult.confidence >= 75 && multiPackageResult.packages.length > 1) {
-            console.log('✅ Using single-box solution due to high confidence');
-            singleBoxResult.multiPackageResult = multiPackageResult;
-            return singleBoxResult;
-          } else {
-            console.log('✅ Using multi-package solution');
-            return this.convertMultiPackageToCartonizationResult(multiPackageResult, singleBoxResult);
-          }
-        } else {
-          console.log('✅ Using multi-package solution (only viable option)');
-          return this.convertMultiPackageToCartonizationResult(multiPackageResult);
+          // Both viable — keep the single-box recommendation; expose multi-package for reference.
+          singleBoxResult.multiPackageResult = multiPackageResult;
+          return singleBoxResult;
         }
+        console.log('✅ Using multi-package solution (only viable option)');
+        return this.convertMultiPackageToCartonizationResult(multiPackageResult);
       }
     }
 
