@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useFormContext } from "react-hook-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,7 @@ export const ShippingOptionsSection = ({
   orderId,
 }: ShippingOptionsSectionProps) => {
   const form = useFormContext<ShipmentForm>();
+  const navigate = useNavigate();
   const { userProfile } = useAuth();
   const [rateResponse, setRateResponse] = useState<CombinedRateResponse | null>(null);
   const [fetchingRates, setFetchingRates] = useState(false);
@@ -873,7 +875,16 @@ export const ShippingOptionsSection = ({
 
       <BulkShippingLabelDialog
         isOpen={showBulkDialog}
-        onClose={() => setShowBulkDialog(false)}
+        onClose={() => {
+          setShowBulkDialog(false);
+          // Mirror single-package behavior: return to the orders page after the
+          // user dismisses the labels dialog.
+          if (orderId) {
+            navigate(`/orders?highlight=${orderId}`);
+          } else {
+            navigate('/orders');
+          }
+        }}
         shipmentLabels={bulkLabels}
       />
     </div>
