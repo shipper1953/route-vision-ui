@@ -557,7 +557,7 @@ export const ShippingOptionsSection = ({
             const pkgMarkedUpCost = parseFloat(markedUpPkgRate.rate);
 
             const easyshipPayload = pkgProvider === 'easyship'
-              ? (combined as any)?.easyship_shipment?.shipmentPayload
+              ? (stored as any)?.easyship_shipment?.shipmentPayload
               : undefined;
 
             const result = await labelService.purchaseLabel(
