@@ -187,7 +187,8 @@ export interface BoxRecommendation {
 export const analyzeBoxRecommendations = async (
   boxes: Box[], 
   parameters: any, 
-  createItemsFromOrderData: (items: any[], masterItems: any[]) => any[]
+  createItemsFromOrderData: (items: any[], masterItems: any[]) => any[],
+  masterItems: any[] = []
 ): Promise<BoxRecommendation[]> => {
   const orders = await fetchReadyToShipOrders(300); // Limit to 300 orders for performance
   
