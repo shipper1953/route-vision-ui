@@ -161,58 +161,18 @@ export const useCartonization = () => {
         }
       }
       
-      // Enhanced realistic item generation for better recommendations
+      // Enhanced realistic item generation for better recommendations.
+      // IMPORTANT: We intentionally do NOT use dimensions coming from the order
+      // payload (e.g. Shopify line items) — only Item Master dimensions are
+      // trusted. If no master match was found above, fall back to a synthetic
+      // scenario rather than the Shopify-provided values.
       if (!itemData.id) {
         const itemName = orderItem.name || orderItem.description || `Order Item ${index + 1}`;
         const quantity = orderItem.quantity || orderItem.count || 1;
-        
-        // First, try to use actual dimensions from the order item if available
-        const dimensions = orderItem.dimensions;
-        if (dimensions && dimensions.length && dimensions.width && dimensions.height && dimensions.weight) {
-          console.log("Using actual order item dimensions:", {
-            length: dimensions.length,
-            width: dimensions.width,
-            height: dimensions.height,
-            weight: dimensions.weight
-          });
-          
-          itemData = {
-            id: `order-item-${index}`,
-            itemId: orderItem.itemId, // Preserve real itemId
-            sku: orderItem.sku, // Preserve SKU
-            name: itemName,
-            length: Number(dimensions.length),
-            width: Number(dimensions.width),
-            height: Number(dimensions.height),
-            weight: Number(dimensions.weight),
-            quantity: quantity,
-            category: 'actual',
-            fragility: 'low'
-          };
-        } else if (orderItem.length && orderItem.width && orderItem.height && orderItem.weight) {
-          console.log("Using direct order item dimensions:", {
-            length: orderItem.length,
-            width: orderItem.width,
-            height: orderItem.height,
-            weight: orderItem.weight
-          });
-          
-          itemData = {
-            id: `order-item-${index}`,
-            itemId: orderItem.itemId, // Preserve real itemId
-            sku: orderItem.sku, // Preserve SKU
-            name: itemName,
-            length: Number(orderItem.length),
-            width: Number(orderItem.width),
-            height: Number(orderItem.height),
-            weight: Number(orderItem.weight),
-            quantity: quantity,
-            category: 'actual',
-            fragility: 'low'
-          };
-        } else {
-          // Fall back to realistic scenarios only if no dimensions available
-          console.log("No actual dimensions found, using scenario for:", itemName);
+
+        {
+          // Fall back to realistic scenarios — never use order-payload dims.
+          console.log("No Item Master dims found, using scenario for:", itemName);
           
           // Create more realistic and varied product scenarios
           const scenarios = [
