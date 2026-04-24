@@ -234,6 +234,13 @@ export class LabelService {
       console.log('Including package metadata in edge function request:', finalPackageMetadata);
     }
 
+    // Include Easyship shipment payload so the edge function can create the
+    // real Easyship shipment at label-purchase time (rate-shopping only fetches rates).
+    if (easyshipShipmentPayload) {
+      requestBody.easyshipShipmentPayload = easyshipShipmentPayload;
+      console.log('Including Easyship shipment payload in edge function request');
+    }
+
     // DIAGNOSTIC LOGGING: Log the full request body being sent to edge function
     console.log('📤 Full request body being sent to edge function:', JSON.stringify(requestBody, null, 2));
     console.log('📊 Request body summary:', {
