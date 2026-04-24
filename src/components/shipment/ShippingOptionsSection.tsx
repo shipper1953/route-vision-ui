@@ -17,6 +17,7 @@ import { applyMarkupToRates, MarkedUpRate, MarkedUpSmartRate } from "@/utils/rat
 import { LabelService } from "@/services/easypost/labelService";
 import { RateShoppingService } from "@/services/rateShoppingService";
 import { BulkShippingLabelDialog } from "@/components/cartonization/BulkShippingLabelDialog";
+import { MultiPackageProgressDialog, PackageProgressItem } from "./MultiPackageProgressDialog";
 import { toast } from "sonner";
 import { 
   Check, 
