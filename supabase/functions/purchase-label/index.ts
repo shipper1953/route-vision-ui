@@ -520,20 +520,22 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
   if (!shipmentId && shipmentPayload) {
     console.log('📦 Creating Easyship shipment before label purchase...');
 
-    // The rate-shopping payload contains fields that the /shipments ShipmentCreate
-    // schema rejects (e.g. calculate_tax_and_duties, courier_settings). Strip them
-    // and pass courier selection via the documented courier_selection object.
+    // Easyship v2024-09 shipment creation accepts courier selection via
+    // courier_settings.courier_service_id. The rate-shopping payload includes
+    // extra fields for the Rates API (and extra courier_settings keys like
+    // show_courier_logo_url) that ShipmentCreate rejects, so rebuild a clean body.
     const {
       calculate_tax_and_duties: _ctd,
-      courier_settings: _cs,
+      courier_settings: _ignoredCourierSettings,
       courier_service_id: _csid,
       ...shipmentCreateBody
     } = shipmentPayload as Record<string, any>;
 
     const createBody = {
       ...shipmentCreateBody,
-      courier_selection: {
-        selected_courier_id: courierId,
+      courier_settings: {
+        courier_service_id: courierId,
+        allow_fallback: false,
         apply_shipping_rules: true,
       },
     };
