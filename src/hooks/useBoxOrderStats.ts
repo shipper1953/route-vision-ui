@@ -81,7 +81,7 @@ export const useBoxOrderStats = () => {
     };
 
     calculateBoxStats();
-  }, [boxes]); // Removed createItemsFromOrderData from dependencies to prevent infinite loop
+  }, [boxes, masterItems.length]); // Recalculate when item master loads
 
   return { boxStats, loading };
 };
