@@ -561,6 +561,19 @@ export const ShippingOptionsSection = ({
         </CardContent>
       </Card>
 
+      {/* Multi-package notice */}
+      {isMultiPackage && (
+        <Card className="border-blue-500/40 bg-blue-50/40 dark:bg-blue-950/20">
+          <CardContent className="py-3 flex items-center gap-2 text-sm">
+            <Package className="h-4 w-4 text-blue-600" />
+            <span>
+              This order requires <strong>{multiParcels.length} packages</strong>. The selected
+              carrier &amp; service will be used to purchase a label for each package.
+            </span>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Confirm & Buy */}
       {selectedRateId && (
         <div className="flex justify-end">
@@ -573,17 +586,25 @@ export const ShippingOptionsSection = ({
             {purchasingLabel ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Purchasing Label...
+                {purchaseProgress || 'Purchasing Label...'}
               </>
             ) : (
               <>
                 <Check className="h-4 w-4" />
-                Buy Label & Create Shipment
+                {isMultiPackage
+                  ? `Buy ${multiParcels.length} Labels & Create Shipments`
+                  : 'Buy Label & Create Shipment'}
               </>
             )}
           </Button>
         </div>
       )}
+
+      <BulkShippingLabelDialog
+        isOpen={showBulkDialog}
+        onClose={() => setShowBulkDialog(false)}
+        shipmentLabels={bulkLabels}
+      />
     </div>
   );
 };
