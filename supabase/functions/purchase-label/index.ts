@@ -1472,7 +1472,9 @@ serve(async (req) => {
         
         await linkShipmentToOrder(supabase, orderId.toString(), finalShipmentId, enhancedMetadata);
         
-        // Update order status to shipped
+        // Recalculate fulfillment progress and set order status accordingly.
+        // For multi-package shipments this correctly transitions partially_shipped → shipped
+        // only once every package's items are accounted for.
         const numericId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
         if (!isNaN(numericId)) {
           await reduceInventoryOnShipment(supabase, {
@@ -1480,17 +1482,9 @@ serve(async (req) => {
             shippedItems: enhancedMetadata?.items || [],
           });
 
-          const { error: statusError } = await supabase
-            .from('orders')
-            .update({ status: 'shipped' })
-            .eq('id', numericId);
-          if (statusError) {
-            console.warn('⚠️ Failed to update order status to shipped:', statusError);
-          } else {
-            console.log(`✅ Updated order ${numericId} status to shipped`);
-          }
+          await recalcOrderFulfillment(supabase, numericId);
         }
-        
+
         const numericOrderId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
         const { data: orderData } = await supabase
           .from('orders')
