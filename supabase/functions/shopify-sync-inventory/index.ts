@@ -158,6 +158,12 @@ async function syncToShopify(
 
   console.log(`Found ${items.length} mapped items to sync`);
 
+  const fulfillmentServiceLocationId = await resolveFulfillmentServiceLocationId(store, storeUrl);
+  if (!fulfillmentServiceLocationId) {
+    console.log(`No fulfillment-service Shopify location could be resolved for store ${store.store_name || store.id}`);
+    return { updated: 0, errors: 0 };
+  }
+
   // Process items in batches of 10
   const batchSize = 10;
   for (let i = 0; i < items.length; i += batchSize) {
@@ -188,7 +194,7 @@ async function syncToShopify(
             productVariant(id: $id) {
               inventoryItem {
                 id
-                inventoryLevels(first: 10) {
+                inventoryLevels(first: 250) {
                   edges {
                     node {
                       id
@@ -240,19 +246,25 @@ async function syncToShopify(
         }
 
         // Only sync to the Ship Tornado fulfillment service location
-        const configuredLocationId = getConfiguredShopifyLocationId(store);
-        if (!configuredLocationId) {
+        if (!fulfillmentServiceLocationId) {
           skippedMissingStLocationConfig++;
-          console.log(`No Shopify location configured for store, skipping ${item.sku}`);
+          console.log(`No fulfillment-service Shopify location configured for store, skipping ${item.sku}`);
           return;
         }
         const targetEdge = inventoryItem.inventoryLevels.edges.find(
-          (e: any) => normalizeLocationId(e.node.location.id) === configuredLocationId
+          (e: any) => normalizeLocationId(e.node.location.id) === fulfillmentServiceLocationId
         );
 
         if (!targetEdge) {
           skippedMissingStLocationInShopify++;
-          console.log(`Ship Tornado location not found in Shopify for ${item.sku}, skipping`);
+          const availableLocationIds = (inventoryItem.inventoryLevels.edges || [])
+            .map((e: any) => normalizeLocationId(e?.node?.location?.id))
+            .filter(Boolean)
+            .join(', ');
+          console.log(
+            `Ship Tornado fulfillment-service location ${fulfillmentServiceLocationId} not found in Shopify for ${item.sku}, skipping. ` +
+            `Available location ids: [${availableLocationIds}]`
+          );
           return;
         }
 
@@ -349,6 +361,12 @@ async function syncFromShopify(
   console.log(`Syncing Shopify → ST for store ${store.store_name || store.id}`);
   let updated = 0;
   let errors = 0;
+
+  const fulfillmentServiceLocationId = await resolveFulfillmentServiceLocationId(store, storeUrl);
+  if (!fulfillmentServiceLocationId) {
+    console.log(`No fulfillment-service Shopify location could be resolved for store ${store.store_name || store.id}`);
+    return { updated: 0, errors: 0 };
+  }
 
   // Fetch all variants from Shopify with pagination
   const productsQuery = `
@@ -466,13 +484,10 @@ async function syncFromShopify(
         if (!item) continue;
 
         const inventoryEdges = variant.inventoryItem?.inventoryLevels?.edges || [];
-        let shopifyQty = 0;
-
-        // Do not require location mapping: aggregate available quantity across all Shopify locations.
-        shopifyQty = inventoryEdges.reduce(
-          (sum: number, edge: any) => sum + (edge.node?.quantities?.[0]?.quantity ?? 0),
-          0
+        const targetInventoryEdge = inventoryEdges.find(
+          (edge: any) => normalizeLocationId(edge.node?.location?.id) === fulfillmentServiceLocationId
         );
+        const shopifyQty = targetInventoryEdge?.node?.quantities?.[0]?.quantity ?? 0;
 
         // Get current ST quantity
         const { data: currentInvData, error: currentInvError } = await supabase
@@ -562,12 +577,55 @@ function normalizeLocationId(locationId: string | null | undefined): string | nu
   return match ? match[1] : value;
 }
 
-function getConfiguredShopifyLocationId(store: any): string | null {
-  return normalizeLocationId(
-    // Prefer the explicit Shopify location selected in settings.
-    // The fulfillment-service-created location may not be selectable for inventory sync.
-    store.fulfillment_location_id ||
-    store.fulfillment_service_location_id ||
-    null
-  );
+async function resolveFulfillmentServiceLocationId(store: any, storeUrl: string): Promise<string | null> {
+  const configuredLocationId = normalizeLocationId(store.fulfillment_service_location_id || null);
+  if (configuredLocationId) return configuredLocationId;
+
+  const fulfillmentServiceId = normalizeFulfillmentServiceId(store.fulfillment_service_id || null);
+  if (!fulfillmentServiceId || !store?.access_token) return null;
+
+  try {
+    const locationQuery = `
+      query getFulfillmentServiceLocation($id: ID!) {
+        fulfillmentService(id: $id) {
+          id
+          location { id name }
+        }
+      }
+    `;
+
+    const response = await fetch(`https://${storeUrl}/admin/api/2025-01/graphql.json`, {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': store.access_token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: locationQuery,
+        variables: { id: fulfillmentServiceId }
+      })
+    });
+
+    if (!response.ok) {
+      console.log('Failed to resolve fulfillment service location from Shopify');
+      return null;
+    }
+
+    const result = await response.json();
+    const shopifyLocationId = result?.data?.fulfillmentService?.location?.id;
+    return normalizeLocationId(shopifyLocationId || null);
+  } catch (error) {
+    console.log('Error resolving fulfillment service location from Shopify:', error);
+    return null;
+  }
+}
+
+function normalizeFulfillmentServiceId(serviceId: string | null | undefined): string | null {
+  if (!serviceId) return null;
+  const value = String(serviceId).trim();
+  if (!value) return null;
+  if (value.startsWith('gid://shopify/FulfillmentService/')) return value;
+  const match = value.match(/(\d+)$/);
+  if (!match) return null;
+  return `gid://shopify/FulfillmentService/${match[1]}`;
 }
