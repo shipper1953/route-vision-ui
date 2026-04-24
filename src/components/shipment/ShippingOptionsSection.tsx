@@ -246,6 +246,27 @@ export const ShippingOptionsSection = ({
           phone: data.toPhone || '5555555555', email: data.toEmail,
         };
 
+        // Initialize per-package progress and open the progress dialog
+        const initialProgress: PackageProgressItem[] = multiParcels.map((parcel, idx) => {
+          const boxEntry = (data.selectedBoxes || []).find((b: any) => b.packageIndex === idx)
+            || (data.selectedBoxes || [])[idx];
+          return {
+            index: idx,
+            boxName: boxEntry?.boxName || undefined,
+            dimensions: { length: parcel.length, width: parcel.width, height: parcel.height },
+            weight: parcel.weight,
+            rateStatus: 'pending',
+            labelStatus: 'pending',
+          };
+        });
+        setPackageProgress(initialProgress);
+        setProgressComplete(false);
+        setShowProgressDialog(true);
+
+        const updatePkg = (idx: number, patch: Partial<PackageProgressItem>) => {
+          setPackageProgress((prev) => prev.map((p) => (p.index === idx ? { ...p, ...patch } : p)));
+        };
+
         const rateService = new RateShoppingService();
         const purchasedLabels: Array<{ orderId: string; labelUrl: string; trackingNumber: string; carrier: string; service: string }> = [];
         const errors: string[] = [];
@@ -253,7 +274,8 @@ export const ShippingOptionsSection = ({
 
         for (let i = 0; i < multiParcels.length; i++) {
           const parcel = multiParcels[i];
-          setPurchaseProgress(`Purchasing label ${i + 1} of ${multiParcels.length}...`);
+          setPurchaseProgress(`Processing package ${i + 1} of ${multiParcels.length}...`);
+          updatePkg(i, { rateStatus: 'running' });
 
           try {
             const combined = await rateService.getRatesFromAllProviders({
@@ -272,18 +294,37 @@ export const ShippingOptionsSection = ({
             let pkgRate: any = combined.rates.find(
               (r: any) => r.provider === provider && r.carrier === carrier && r.service === service
             );
+            let matchType: 'exact' | 'fallback-provider' | 'fallback-cheapest' = 'exact';
             if (!pkgRate) {
               const sameProvider = combined.rates.filter((r: any) => r.provider === provider);
               if (sameProvider.length > 0) {
                 pkgRate = sameProvider.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+                matchType = 'fallback-provider';
               }
             }
             if (!pkgRate && combined.rates.length > 0) {
               pkgRate = combined.rates.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+              matchType = 'fallback-cheapest';
             }
             if (!pkgRate) {
               throw new Error(`No rates available for package ${i + 1}`);
             }
+
+            // Apply markup so the rate displayed matches what the customer is charged
+            const markedUpPkgRate = applyMarkupToRates([pkgRate], company)[0];
+            const displayAmount = parseFloat(markedUpPkgRate.rate);
+
+            updatePkg(i, {
+              rateStatus: 'success',
+              matchedRate: {
+                carrier: pkgRate.carrier,
+                service: pkgRate.service,
+                provider: pkgRate.provider,
+                amount: displayAmount,
+                matchType,
+              },
+              labelStatus: 'running',
+            });
 
             const pkgProvider = pkgRate.provider as string;
             let pkgShipmentId: string | undefined;
@@ -322,7 +363,6 @@ export const ShippingOptionsSection = ({
               },
             };
 
-            const markedUpPkgRate = applyMarkupToRates([pkgRate], company)[0];
             const pkgOriginalCost = parseFloat(markedUpPkgRate.original_rate);
             const pkgMarkedUpCost = parseFloat(markedUpPkgRate.rate);
 
@@ -345,22 +385,40 @@ export const ShippingOptionsSection = ({
             if (i === 0) firstResult = result;
 
             const labelUrl = result?.labelUrl || result?.postage_label?.label_url || result?.label_url;
+            const trackingNumber = result?.trackingNumber || result?.tracking_code || result?.tracking_number || 'N/A';
+
             if (labelUrl) {
               purchasedLabels.push({
                 orderId: orderId ? `${orderId} • Pkg ${i + 1}` : `Package ${i + 1}`,
                 labelUrl,
-                trackingNumber: result?.trackingNumber || result?.tracking_code || result?.tracking_number || 'N/A',
+                trackingNumber,
                 carrier: result?.carrier || pkgRate.carrier || 'Unknown',
                 service: result?.service || pkgRate.service || 'Unknown',
               });
+              updatePkg(i, { labelStatus: 'success', trackingNumber });
+            } else {
+              throw new Error('Label URL missing from response');
             }
           } catch (pkgErr: any) {
-            console.error(`Failed to purchase label for package ${i + 1}:`, pkgErr);
-            errors.push(`Package ${i + 1}: ${pkgErr?.message || 'failed'}`);
+            console.error(`Failed to process package ${i + 1}:`, pkgErr);
+            const message = pkgErr?.message || 'failed';
+            errors.push(`Package ${i + 1}: ${message}`);
+            // Mark whichever step is currently running as failed
+            setPackageProgress((prev) => prev.map((p) => {
+              if (p.index !== i) return p;
+              if (p.rateStatus === 'running') {
+                return { ...p, rateStatus: 'failed', rateError: message, labelStatus: 'failed' };
+              }
+              if (p.labelStatus === 'running') {
+                return { ...p, labelStatus: 'failed', labelError: message };
+              }
+              return { ...p, labelStatus: 'failed', labelError: message };
+            }));
           }
         }
 
         setPurchaseProgress(null);
+        setProgressComplete(true);
 
         if (purchasedLabels.length === 0) {
           throw new Error(errors.join('; ') || 'Failed to purchase any labels');
@@ -373,7 +431,6 @@ export const ShippingOptionsSection = ({
         }
 
         setBulkLabels(purchasedLabels);
-        setShowBulkDialog(true);
 
         if (firstResult) {
           onLabelPurchased?.({
