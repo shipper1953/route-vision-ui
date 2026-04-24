@@ -15,6 +15,7 @@ export const useBoxOrderStats = () => {
   const [boxStats, setBoxStats] = useState<BoxOrderStats[]>([]);
   const [loading, setLoading] = useState(true);
   const { boxes, createItemsFromOrderData } = useCartonization();
+  const { items: masterItems } = useItemMaster();
 
   useEffect(() => {
     const calculateBoxStats = async () => {
