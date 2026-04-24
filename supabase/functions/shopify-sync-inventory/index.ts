@@ -188,7 +188,7 @@ async function syncToShopify(
             productVariant(id: $id) {
               inventoryItem {
                 id
-                inventoryLevels(first: 10) {
+                inventoryLevels(first: 250) {
                   edges {
                     node {
                       id
@@ -240,19 +240,26 @@ async function syncToShopify(
         }
 
         // Only sync to the Ship Tornado fulfillment service location
-        const configuredLocationId = getConfiguredShopifyLocationId(store);
-        if (!configuredLocationId) {
+        const inventorySyncLocation = getInventorySyncShopifyLocation(store);
+        if (!inventorySyncLocation) {
           skippedMissingStLocationConfig++;
-          console.log(`No Shopify location configured for store, skipping ${item.sku}`);
+          console.log(`No Shopify inventory sync location configured for store, skipping ${item.sku}`);
           return;
         }
         const targetEdge = inventoryItem.inventoryLevels.edges.find(
-          (e: any) => normalizeLocationId(e.node.location.id) === configuredLocationId
+          (e: any) => normalizeLocationId(e.node.location.id) === inventorySyncLocation.id
         );
 
         if (!targetEdge) {
           skippedMissingStLocationInShopify++;
-          console.log(`Ship Tornado location not found in Shopify for ${item.sku}, skipping`);
+          const availableLocationIds = (inventoryItem.inventoryLevels.edges || [])
+            .map((e: any) => normalizeLocationId(e?.node?.location?.id))
+            .filter(Boolean)
+            .join(', ');
+          console.log(
+            `Ship Tornado location ${inventorySyncLocation.id} (${inventorySyncLocation.source}) not found in Shopify for ${item.sku}, skipping. ` +
+            `Available location ids: [${availableLocationIds}]`
+          );
           return;
         }
 
@@ -466,13 +473,17 @@ async function syncFromShopify(
         if (!item) continue;
 
         const inventoryEdges = variant.inventoryItem?.inventoryLevels?.edges || [];
-        let shopifyQty = 0;
+        const inventorySyncLocation = getInventorySyncShopifyLocation(store);
 
-        // Do not require location mapping: aggregate available quantity across all Shopify locations.
-        shopifyQty = inventoryEdges.reduce(
-          (sum: number, edge: any) => sum + (edge.node?.quantities?.[0]?.quantity ?? 0),
-          0
+        if (!inventorySyncLocation) {
+          console.log(`No Shopify inventory sync location configured for store, skipping ${variant.sku}`);
+          continue;
+        }
+
+        const targetInventoryEdge = inventoryEdges.find(
+          (edge: any) => normalizeLocationId(edge.node?.location?.id) === inventorySyncLocation.id
         );
+        const shopifyQty = targetInventoryEdge?.node?.quantities?.[0]?.quantity ?? 0;
 
         // Get current ST quantity
         const { data: currentInvData, error: currentInvError } = await supabase
@@ -562,12 +573,16 @@ function normalizeLocationId(locationId: string | null | undefined): string | nu
   return match ? match[1] : value;
 }
 
-function getConfiguredShopifyLocationId(store: any): string | null {
-  return normalizeLocationId(
-    // Prefer the explicit Shopify location selected in settings.
-    // The fulfillment-service-created location may not be selectable for inventory sync.
-    store.fulfillment_location_id ||
-    store.fulfillment_service_location_id ||
-    null
-  );
+function getInventorySyncShopifyLocation(store: any): { id: string; source: 'fulfillment_service_location_id' | 'fulfillment_location_id' } | null {
+  const fulfillmentServiceLocationId = normalizeLocationId(store.fulfillment_service_location_id || null);
+  if (fulfillmentServiceLocationId) {
+    return { id: fulfillmentServiceLocationId, source: 'fulfillment_service_location_id' };
+  }
+
+  const fulfillmentLocationId = normalizeLocationId(store.fulfillment_location_id || null);
+  if (fulfillmentLocationId) {
+    return { id: fulfillmentLocationId, source: 'fulfillment_location_id' };
+  }
+
+  return null;
 }
