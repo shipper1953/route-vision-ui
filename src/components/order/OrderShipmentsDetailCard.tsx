@@ -45,22 +45,41 @@ export const OrderShipmentsDetailCard = ({ order }: OrderShipmentsDetailCardProp
 
   const getRemainingItems = (): OrderItem[] => {
     if (!Array.isArray(order.items)) return [];
-    
-    // Build shipped quantities keyed by SKU+name for reliable matching
+
+    // Trust the server-side fulfillment counts: if the order is fully fulfilled,
+    // there are no remaining items regardless of name matching quirks in package_info.
+    if (
+      fulfillmentData.items_total > 0 &&
+      fulfillmentData.items_shipped >= fulfillmentData.items_total
+    ) {
+      return [];
+    }
+    if (
+      (order as any).fulfillment_status === 'fulfilled' ||
+      order.status === 'shipped' ||
+      order.status === 'delivered'
+    ) {
+      return [];
+    }
+
+    // Build shipped quantities keyed by SKU/itemId/name for reliable matching
     const shippedBySku = new Map<string, number>();
     const shippedByName = new Map<string, number>();
     const shippedById = new Map<string, number>();
-    
+    let totalShippedCount = 0;
+
     shipments.forEach(shipment => {
-      shipment.items.forEach(item => {
+      shipment.items.forEach((item: any) => {
+        const qty = item.quantity || 1;
+        totalShippedCount += qty;
         if (item.sku) {
-          shippedBySku.set(item.sku, (shippedBySku.get(item.sku) || 0) + item.quantity);
+          shippedBySku.set(item.sku, (shippedBySku.get(item.sku) || 0) + qty);
         }
         if (item.name) {
-          shippedByName.set(item.name, (shippedByName.get(item.name) || 0) + item.quantity);
+          shippedByName.set(item.name, (shippedByName.get(item.name) || 0) + qty);
         }
         if (item.itemId) {
-          shippedById.set(item.itemId, (shippedById.get(item.itemId) || 0) + item.quantity);
+          shippedById.set(item.itemId, (shippedById.get(item.itemId) || 0) + qty);
         }
       });
     });
@@ -71,36 +90,51 @@ export const OrderShipmentsDetailCard = ({ order }: OrderShipmentsDetailCardProp
     const consumedById = new Map<string, number>();
 
     const remaining: OrderItem[] = [];
+    let totalRemainingCount = 0;
     order.items.forEach(item => {
       const orderItem = item as any;
       const sku = orderItem.sku || '';
       const name = orderItem.name || '';
       const itemId = orderItem.itemId || orderItem.id || '';
-      
-      // Try matching by SKU first, then name, then itemId
+
+      // Try matching by SKU first, then itemId, then name
       let shipped = 0;
       if (sku && shippedBySku.has(sku)) {
         const totalShipped = shippedBySku.get(sku) || 0;
         const alreadyConsumed = consumedBySku.get(sku) || 0;
         shipped = Math.min(item.quantity, totalShipped - alreadyConsumed);
         consumedBySku.set(sku, alreadyConsumed + shipped);
-      } else if (name && shippedByName.has(name)) {
-        const totalShipped = shippedByName.get(name) || 0;
-        const alreadyConsumed = consumedByName.get(name) || 0;
-        shipped = Math.min(item.quantity, totalShipped - alreadyConsumed);
-        consumedByName.set(name, alreadyConsumed + shipped);
       } else if (itemId && shippedById.has(itemId)) {
         const totalShipped = shippedById.get(itemId) || 0;
         const alreadyConsumed = consumedById.get(itemId) || 0;
         shipped = Math.min(item.quantity, totalShipped - alreadyConsumed);
         consumedById.set(itemId, alreadyConsumed + shipped);
+      } else if (name && shippedByName.has(name)) {
+        const totalShipped = shippedByName.get(name) || 0;
+        const alreadyConsumed = consumedByName.get(name) || 0;
+        shipped = Math.min(item.quantity, totalShipped - alreadyConsumed);
+        consumedByName.set(name, alreadyConsumed + shipped);
       }
-      
+
       const remainingQty = item.quantity - shipped;
       if (remainingQty > 0) {
         remaining.push({ ...item, quantity: remainingQty });
+        totalRemainingCount += remainingQty;
       }
     });
+
+    // Safety net: if computed remaining exceeds (items_total - items_shipped),
+    // the package_info names don't line up with order.items names. Trust the
+    // server-side counts and suppress the misleading "still to ship" list.
+    if (fulfillmentData.items_total > 0) {
+      const expectedRemaining = Math.max(
+        0,
+        fulfillmentData.items_total - fulfillmentData.items_shipped
+      );
+      if (totalRemainingCount > expectedRemaining) {
+        return [];
+      }
+    }
 
     return remaining;
   };

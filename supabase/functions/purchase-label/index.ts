@@ -1049,6 +1049,80 @@ async function linkShipmentToOrder(
   return orderUpdateSuccess;
 }
 
+async function recalcOrderFulfillment(supabaseClient: any, orderId: number) {
+  try {
+    const { data: order, error: orderErr } = await supabaseClient
+      .from('orders')
+      .select('id, items, items_total')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (orderErr || !order) {
+      console.warn(`⚠️ recalcOrderFulfillment: order ${orderId} not found`, orderErr);
+      return;
+    }
+
+    const sourceItems = Array.isArray(order.items) ? order.items : [];
+    const itemsTotal = order.items_total
+      ? Number(order.items_total)
+      : sourceItems.reduce((sum: number, li: any) => sum + Number(li?.quantity || li?.qty || 1), 0);
+
+    const { data: shipRows, error: shipErr } = await supabaseClient
+      .from('order_shipments')
+      .select('package_info')
+      .eq('order_id', orderId);
+
+    if (shipErr) {
+      console.warn(`⚠️ recalcOrderFulfillment: failed loading order_shipments for ${orderId}`, shipErr);
+      return;
+    }
+
+    let itemsShipped = 0;
+    for (const row of shipRows || []) {
+      const items = Array.isArray(row?.package_info?.items) ? row.package_info.items : [];
+      for (const it of items) {
+        itemsShipped += Number(it?.quantity || it?.qty || 1);
+      }
+    }
+
+    if (itemsTotal > 0 && itemsShipped > itemsTotal) {
+      // Cap to avoid >100% if metadata duplicated for any reason
+      itemsShipped = itemsTotal;
+    }
+
+    const pct = itemsTotal > 0 ? Math.round((itemsShipped / itemsTotal) * 100) : 0;
+    let fulfillmentStatus = 'unfulfilled';
+    let orderStatus: string | undefined = undefined;
+    if (itemsTotal > 0 && itemsShipped >= itemsTotal) {
+      fulfillmentStatus = 'fulfilled';
+      orderStatus = 'shipped';
+    } else if (itemsShipped > 0) {
+      fulfillmentStatus = 'partially_fulfilled';
+      orderStatus = 'partially_shipped';
+    }
+
+    const updatePayload: Record<string, any> = {
+      items_shipped: itemsShipped,
+      items_total: itemsTotal,
+      fulfillment_percentage: pct,
+      fulfillment_status: fulfillmentStatus,
+    };
+    if (orderStatus) updatePayload.status = orderStatus;
+
+    const { error: updateErr } = await supabaseClient
+      .from('orders')
+      .update(updatePayload)
+      .eq('id', orderId);
+
+    if (updateErr) {
+      console.warn(`⚠️ recalcOrderFulfillment: failed updating order ${orderId}`, updateErr);
+    } else {
+      console.log(`✅ recalcOrderFulfillment: order ${orderId} → ${itemsShipped}/${itemsTotal} (${pct}%) ${fulfillmentStatus}${orderStatus ? ' / ' + orderStatus : ''}`);
+    }
+  } catch (e) {
+    console.warn(`⚠️ recalcOrderFulfillment unexpected error:`, e);
+  }
+}
+
 async function reduceInventoryOnShipment(
   supabaseClient: any,
   params: {
@@ -1398,7 +1472,9 @@ serve(async (req) => {
         
         await linkShipmentToOrder(supabase, orderId.toString(), finalShipmentId, enhancedMetadata);
         
-        // Update order status to shipped
+        // Recalculate fulfillment progress and set order status accordingly.
+        // For multi-package shipments this correctly transitions partially_shipped → shipped
+        // only once every package's items are accounted for.
         const numericId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
         if (!isNaN(numericId)) {
           await reduceInventoryOnShipment(supabase, {
@@ -1406,17 +1482,9 @@ serve(async (req) => {
             shippedItems: enhancedMetadata?.items || [],
           });
 
-          const { error: statusError } = await supabase
-            .from('orders')
-            .update({ status: 'shipped' })
-            .eq('id', numericId);
-          if (statusError) {
-            console.warn('⚠️ Failed to update order status to shipped:', statusError);
-          } else {
-            console.log(`✅ Updated order ${numericId} status to shipped`);
-          }
+          await recalcOrderFulfillment(supabase, numericId);
         }
-        
+
         const numericOrderId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
         const { data: orderData } = await supabase
           .from('orders')

@@ -186,24 +186,47 @@ serve(async (req) => {
 
     console.log('Processing fulfillment for Shopify order:', shopifyOrderId);
 
-    const existingFulfillmentId = mapping.metadata?.last_fulfillment_id;
-    const existingShopifyFulfillments = await fetchOrderFulfillments(
-      store.store_url,
-      store.access_token,
-      shopifyOrderId
-    );
+    // Per-shipment dedup: only treat this as a "tracking update on existing fulfillment"
+    // if THIS specific shipment_id has already been synced before. For multi-package
+    // shipments each package is its own shipment_id and must create its OWN fulfillment
+    // covering only the items in that package. Reusing the prior fulfillment_id (which
+    // was the previous behaviour) overwrote pkg1's tracking number with pkg2's and left
+    // pkg2's items unfulfilled.
+    const { data: priorSyncForShipment } = await supabase
+      .from('shopify_sync_logs')
+      .select('id, metadata')
+      .eq('ship_tornado_order_id', orderShipment.order_id)
+      .eq('sync_type', 'fulfillment')
+      .eq('direction', 'outbound')
+      .eq('status', 'success')
+      .filter('metadata->>shipment_id', 'eq', String(shipmentId))
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    const existingFulfillment = existingShopifyFulfillments.find((fulfillment: any) => {
-      const fulfillmentId = normalizeShopifyResourceId(fulfillment?.admin_graphql_api_id || fulfillment?.id, 'Fulfillment');
-      return fulfillmentId === normalizeShopifyResourceId(existingFulfillmentId, 'Fulfillment');
-    });
+    const priorFulfillmentIdForShipment = priorSyncForShipment?.metadata?.fulfillment_id || null;
+    let trackingOnlyTarget: any = null;
+    if (priorFulfillmentIdForShipment) {
+      const existingShopifyFulfillments = await fetchOrderFulfillments(
+        store.store_url,
+        store.access_token,
+        shopifyOrderId
+      );
+      trackingOnlyTarget = existingShopifyFulfillments.find((fulfillment: any) => {
+        const fulfillmentId = normalizeShopifyResourceId(
+          fulfillment?.admin_graphql_api_id || fulfillment?.id,
+          'Fulfillment'
+        );
+        return fulfillmentId === normalizeShopifyResourceId(priorFulfillmentIdForShipment, 'Fulfillment');
+      });
+    }
 
-    if (existingFulfillment) {
-      console.log('ℹ️ Existing Shopify fulfillment found; will update tracking only:', existingFulfillment.id);
+    if (trackingOnlyTarget) {
+      console.log(`ℹ️ Existing Shopify fulfillment for shipment ${shipmentId}; updating tracking only:`, trackingOnlyTarget.id);
       const trackingOnlyResult = await updateFulfillmentTrackingInfo(
         store.store_url,
         store.access_token,
-        existingFulfillment.admin_graphql_api_id || `gid://shopify/Fulfillment/${existingFulfillment.id}`,
+        trackingOnlyTarget.admin_graphql_api_id || `gid://shopify/Fulfillment/${trackingOnlyTarget.id}`,
         trackingNumber
       );
 
@@ -214,7 +237,7 @@ serve(async (req) => {
           sync_status: 'synced',
           metadata: {
             ...mapping.metadata,
-            last_fulfillment_id: existingFulfillment.admin_graphql_api_id || `gid://shopify/Fulfillment/${existingFulfillment.id}`,
+            last_fulfillment_id: trackingOnlyTarget.admin_graphql_api_id || `gid://shopify/Fulfillment/${trackingOnlyTarget.id}`,
             last_tracking_number: trackingNumber,
             last_carrier: carrier,
             last_service: service,
@@ -232,7 +255,9 @@ serve(async (req) => {
         shopify_order_id: mapping.shopify_order_id,
         ship_tornado_order_id: orderShipment.order_id,
         metadata: {
-          fulfillment_id: existingFulfillment.admin_graphql_api_id || `gid://shopify/Fulfillment/${existingFulfillment.id}`,
+          shipment_id: String(shipmentId),
+          package_index: orderShipment.package_index ?? 0,
+          fulfillment_id: trackingOnlyTarget.admin_graphql_api_id || `gid://shopify/Fulfillment/${trackingOnlyTarget.id}`,
           tracking_number: trackingNumber,
           carrier,
           service,
@@ -244,7 +269,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          fulfillmentId: existingFulfillment.admin_graphql_api_id || `gid://shopify/Fulfillment/${existingFulfillment.id}`,
+          fulfillmentId: trackingOnlyTarget.admin_graphql_api_id || `gid://shopify/Fulfillment/${trackingOnlyTarget.id}`,
           method: 'tracking_update_only'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -266,7 +291,8 @@ serve(async (req) => {
         trackingUrl,
         carrier,
         service,
-        shopifyOrderId
+        shopifyOrderId,
+        shipmentId
       );
     } else {
       console.log('⚠️ Fulfillment service not registered - using legacy flow');
@@ -280,7 +306,8 @@ serve(async (req) => {
         trackingUrl,
         carrier,
         service,
-        shopifyOrderId
+        shopifyOrderId,
+        shipmentId
       );
     }
 
@@ -443,7 +470,8 @@ async function handleFulfillmentServiceFlow(
   trackingUrl: string,
   carrier: string,
   service: string,
-  shopifyOrderId: string
+  shopifyOrderId: string,
+  shipmentId: number | string
 ) {
   console.log('Fetching fulfillment order for order:', orderShipment.order_id);
 
@@ -758,6 +786,8 @@ async function handleFulfillmentServiceFlow(
     shopify_order_id: mapping.shopify_order_id,
     ship_tornado_order_id: orderShipment.order_id,
     metadata: {
+      shipment_id: String(shipmentId),
+      package_index: orderShipment.package_index ?? 0,
       fulfillment_id: fulfillment.id,
       tracking_number: trackingNumber,
       tracking_url: trackingUrl,
@@ -793,7 +823,8 @@ async function handleLegacyFlow(
   trackingUrl: string,
   carrier: string,
   service: string,
-  shopifyOrderId: string
+  shopifyOrderId: string,
+  shipmentId: number | string
 ) {
   console.log('Using GraphQL fulfillment (legacy - no fulfillment service)');
 
@@ -999,6 +1030,8 @@ async function handleLegacyFlow(
     shopify_order_id: mapping.shopify_order_id,
     ship_tornado_order_id: orderShipment.order_id,
     metadata: {
+      shipment_id: String(shipmentId),
+      package_index: orderShipment.package_index ?? 0,
       fulfillment_id: fulfillment.id,
       tracking_number: trackingNumber,
       tracking_url: trackingUrl,
