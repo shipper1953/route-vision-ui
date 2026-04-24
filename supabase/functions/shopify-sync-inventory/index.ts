@@ -188,7 +188,7 @@ async function syncToShopify(
             productVariant(id: $id) {
               inventoryItem {
                 id
-                inventoryLevels(first: 10) {
+                inventoryLevels(first: 250) {
                   edges {
                     node {
                       id
@@ -252,7 +252,14 @@ async function syncToShopify(
 
         if (!targetEdge) {
           skippedMissingStLocationInShopify++;
-          console.log(`Ship Tornado location not found in Shopify for ${item.sku}, skipping`);
+          const availableLocationIds = (inventoryItem.inventoryLevels.edges || [])
+            .map((e: any) => normalizeLocationId(e?.node?.location?.id))
+            .filter(Boolean)
+            .join(', ');
+          console.log(
+            `Ship Tornado location ${fulfillmentServiceLocationId} not found in Shopify for ${item.sku}, skipping. ` +
+            `Available location ids: [${availableLocationIds}]`
+          );
           return;
         }
 
