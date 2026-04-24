@@ -86,8 +86,9 @@ function checkItemsFit(items: Item[], box: Box): { success: boolean; usedVolume:
   );
   const boxVolume = box.length * box.width * box.height;
 
-  // Practical packing factor check
-  if (totalItemVolume / boxVolume / 0.75 > 1) {
+  // Hard volume check only — items cannot exceed the box's cubic capacity.
+  // (No artificial packing-factor cap; the 3D bin packer below decides true fit.)
+  if (totalItemVolume > boxVolume) {
     return { success: false, usedVolume: 0 };
   }
 
