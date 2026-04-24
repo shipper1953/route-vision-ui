@@ -522,11 +522,11 @@ export const ShippingOptionsSection = ({
             let pkgShipmentId: string | undefined;
             const stored = (pkgRate as any)?._shipment_data;
             if (pkgProvider === 'shippo') {
-              pkgShipmentId = pkgRate.shipment_id || stored?.shippo_shipment?.object_id;
+              pkgShipmentId = stored?.shippo_shipment?.object_id || pkgRate.shipment_id;
             } else if (pkgProvider === 'easyship') {
-              pkgShipmentId = pkgRate.shipment_id || stored?.easyship_shipment?.object_id;
+              pkgShipmentId = stored?.easyship_shipment?.object_id || pkgRate.easyship_shipment_id || pkgRate.shipment_id;
             } else {
-              pkgShipmentId = pkgRate.shipment_id || stored?.easypost_shipment?.id;
+              pkgShipmentId = stored?.easypost_shipment?.id || pkgRate.shipment_id;
             }
             if (!pkgShipmentId) {
               throw new Error(`Missing shipment ID for package ${i + 1}`);
@@ -559,7 +559,7 @@ export const ShippingOptionsSection = ({
             const pkgMarkedUpCost = parseFloat(markedUpPkgRate.rate);
 
             const easyshipPayload = pkgProvider === 'easyship'
-              ? (stored as any)?.easyship_shipment?.shipmentPayload
+              ? stored?.easyship_shipment?.shipmentPayload
               : undefined;
 
             const result = await labelService.purchaseLabel(
