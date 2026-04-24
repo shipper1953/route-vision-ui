@@ -1,46 +1,114 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { MultiPackageCartonizationResult, Item } from '@/services/cartonization/types';
+import { MultiPackageCartonizationResult, Item, PackageRecommendation } from '@/services/cartonization/types';
 import { useCartonization } from '@/hooks/useCartonization';
-import { CartonizationEngine } from '@/services/cartonization/cartonizationEngine';
+import { usePackagingDecision } from '@/hooks/usePackagingDecision';
 
 export const useMultiPackageCartonization = () => {
   const [multiPackageResult, setMultiPackageResult] = useState<MultiPackageCartonizationResult | null>(null);
   const [selectedPackageIndex, setSelectedPackageIndex] = useState<number>(0);
   const [isCalculating, setIsCalculating] = useState(false);
-  
+
   const { boxes, parameters } = useCartonization();
+  const { getRecommendation } = usePackagingDecision();
 
   const calculateMultiPackage = useCallback(async (
     items: Item[],
-    optimizationObjective: 'minimize_packages' | 'minimize_cost' | 'balanced' = 'balanced'
+    optimizationObjective: 'minimize_packages' | 'minimize_cost' | 'balanced' = 'balanced',
+    orderId?: number
   ) => {
-    if (!items.length || !boxes.length) {
-      toast.error('No items or boxes available for multi-package cartonization');
+    if (!items.length) {
+      toast.error('No items available for multi-package cartonization');
       return null;
     }
 
     setIsCalculating(true);
     try {
-      console.log('🚀 Starting multi-package cartonization...');
-      
-      const engine = new CartonizationEngine(boxes, parameters);
-      const result = engine.calculateMultiPackageCartonization(items, optimizationObjective);
-      
-      if (result) {
-        setMultiPackageResult(result);
-        setSelectedPackageIndex(0);
-        
-        toast.success(
-          `Multi-package solution: ${result.totalPackages} packages with ${result.confidence}% confidence`
-        );
-        
-        console.log('✅ Multi-package cartonization completed:', result);
-        return result;
-      } else {
-        toast.error('No viable multi-package solution found');
+      console.log('🚀 Running canonical server-side cartonization (packaging-decision)...');
+
+      const serverResult = await getRecommendation(items, orderId);
+      if (!serverResult?.recommended) {
+        toast.error('No viable package solution returned from server');
         return null;
       }
+
+      // Build package list. If server returned a multi_package split, use it.
+      // Otherwise, fall back to a single package using the recommended box.
+      const serverPackages = serverResult.multi_package?.packages?.length
+        ? serverResult.multi_package.packages
+        : [{
+            box: serverResult.recommended.box,
+            items: items,
+            utilization: serverResult.recommended.utilization,
+            dimensional_weight: serverResult.recommended.dimensional_weight,
+            void_ratio: serverResult.recommended.void_ratio,
+            total_weight: serverResult.metadata.total_weight,
+          }];
+
+      const mappedPackages: PackageRecommendation[] = serverPackages.map((pkg: any) => {
+        const box = pkg.box || {};
+        const mappedBox: any = {
+          id: box.id,
+          name: box.name,
+          sku: box.sku,
+          length: Number(box.length) || 0,
+          width: Number(box.width) || 0,
+          height: Number(box.height) || 0,
+          maxWeight: Number(box.max_weight ?? box.maxWeight) || 0,
+          cost: Number(box.cost) || 0,
+          inStock: 1,
+          minStock: 0,
+          maxStock: 100,
+          type: (box.box_type || box.type || 'box') as any,
+        };
+        const assignedItems: Item[] = Array.isArray(pkg.items) ? pkg.items : [];
+        const packageWeight = Number(pkg.total_weight) || assignedItems.reduce(
+          (s, it: any) => s + (Number(it.weight) || 0) * (Number(it.quantity) || 1), 0
+        );
+        const packageVolume = assignedItems.reduce(
+          (s, it: any) => s + (Number(it.length) || 0) * (Number(it.width) || 0) * (Number(it.height) || 0) * (Number(it.quantity) || 1), 0
+        );
+        return {
+          box: mappedBox,
+          assignedItems,
+          utilization: Number(pkg.utilization) || 0,
+          packageWeight,
+          packageVolume,
+          dimensionalWeight: Number(pkg.dimensional_weight) || 0,
+          confidence: serverResult.recommended.confidence ?? 90,
+          packingResult: {
+            success: true,
+            packedItems: [] as any,
+            usedVolume: packageVolume,
+            packingEfficiency: Number(pkg.utilization) || 0,
+          },
+        } as PackageRecommendation;
+      });
+
+      const totalCost = serverResult.multi_package?.total_cost
+        ?? mappedPackages.reduce((s, p) => s + (Number(p.box.cost) || 0), 0);
+
+      const result: MultiPackageCartonizationResult = {
+        packages: mappedPackages,
+        totalPackages: mappedPackages.length,
+        totalWeight: serverResult.metadata.total_weight,
+        totalVolume: serverResult.metadata.total_volume,
+        totalCost,
+        splittingStrategy: 'hybrid',
+        optimizationObjective: optimizationObjective,
+        confidence: serverResult.recommended.confidence ?? 90,
+        alternatives: [],
+        rulesApplied: ['canonical_server_packaging_decision', serverResult.metadata.algorithm_version],
+        processingTime: 0,
+      };
+
+      setMultiPackageResult(result);
+      setSelectedPackageIndex(0);
+
+      toast.success(
+        `Server recommendation: ${result.totalPackages} package${result.totalPackages !== 1 ? 's' : ''} (${result.confidence}% confidence)`
+      );
+      return result;
     } catch (error) {
       console.error('❌ Multi-package cartonization failed:', error);
       toast.error('Failed to calculate multi-package solution');
@@ -48,7 +116,7 @@ export const useMultiPackageCartonization = () => {
     } finally {
       setIsCalculating(false);
     }
-  }, [boxes, parameters]);
+  }, [getRecommendation]);
 
   const addManualPackage = useCallback(() => {
     if (!multiPackageResult) return;
