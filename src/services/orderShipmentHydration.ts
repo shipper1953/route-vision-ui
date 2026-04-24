@@ -4,6 +4,45 @@ import type { Database } from "@/integrations/supabase/types";
 type ShipmentRow = Database["public"]["Tables"]["shipments"]["Row"];
 type OrderShipmentRow = Database["public"]["Tables"]["order_shipments"]["Row"];
 
+const getQuantityTotal = (items: unknown): number => {
+  if (Array.isArray(items)) {
+    return items.reduce((sum, item: any) => {
+      const quantity = Number(item?.quantity ?? item?.count ?? 1);
+      return sum + (Number.isFinite(quantity) ? quantity : 1);
+    }, 0);
+  }
+
+  if (typeof items === 'string') {
+    try {
+      return getQuantityTotal(JSON.parse(items));
+    } catch {
+      return 0;
+    }
+  }
+
+  if (typeof items === 'number') {
+    return Number.isFinite(items) ? items : 0;
+  }
+
+  return 0;
+};
+
+const getPackageInfoQuantityTotal = (packageInfo: unknown): { shipped: number; hasItemData: boolean } => {
+  if (!packageInfo || typeof packageInfo !== 'object') {
+    return { shipped: 0, hasItemData: false };
+  }
+
+  const items = (packageInfo as any).items;
+  if (!Array.isArray(items)) {
+    return { shipped: 0, hasItemData: false };
+  }
+
+  return {
+    shipped: getQuantityTotal(items),
+    hasItemData: true,
+  };
+};
+
 /**
  * Shared utility for hydrating orders with shipment and qboid data
  * Used by fetchOrders, fetchOrdersPaginated, and fetchOrderById
@@ -31,7 +70,7 @@ export async function hydrateOrdersWithShipments(orders: any[], includeQboid: bo
   const orderShipmentPromise = numericOrderIds.length
     ? supabase
         .from('order_shipments')
-        .select('order_id, shipment_id')
+        .select('order_id, shipment_id, package_info')
         .in('order_id', numericOrderIds)
     : Promise.resolve({ data: [] as OrderShipmentRow[], error: null });
   
@@ -119,11 +158,19 @@ export async function hydrateOrdersWithShipments(orders: any[], includeQboid: bo
   }
 
   const linkedShipmentByOrderId = new Map<number, ShipmentRow>();
+  const fulfillmentByOrderId = new Map<number, { shipped: number; hasItemData: boolean }>();
   orderShipmentLinks.forEach(link => {
     const shipment = shipmentsById.get(link.shipment_id);
     if (shipment && !linkedShipmentByOrderId.has(link.order_id)) {
       linkedShipmentByOrderId.set(link.order_id, shipment);
     }
+
+    const current = fulfillmentByOrderId.get(link.order_id) || { shipped: 0, hasItemData: false };
+    const pkg = getPackageInfoQuantityTotal(link.package_info);
+    fulfillmentByOrderId.set(link.order_id, {
+      shipped: current.shipped + pkg.shipped,
+      hasItemData: current.hasItemData || pkg.hasItemData,
+    });
   });
 
   const shopifyMappingByOrderId = new Map<number, { shopify_order_id: string; shopify_order_number: string | null }>();
@@ -166,6 +213,31 @@ export async function hydrateOrdersWithShipments(orders: any[], includeQboid: bo
   }
 
   return orders.map(order => {
+    const fulfillmentSummary = fulfillmentByOrderId.get(order.id);
+    const computedItemsTotal = (() => {
+      const existing = Number(order.items_total);
+      if (Number.isFinite(existing) && existing > 0) return existing;
+      return getQuantityTotal(order.items);
+    })();
+
+    const computedItemsShipped = fulfillmentSummary?.hasItemData
+      ? (computedItemsTotal > 0
+          ? Math.min(fulfillmentSummary.shipped, computedItemsTotal)
+          : fulfillmentSummary.shipped)
+      : Number(order.items_shipped ?? 0);
+
+    const computedFulfillmentPercentage = computedItemsTotal > 0
+      ? (computedItemsShipped / computedItemsTotal) * 100
+      : Number(order.fulfillment_percentage ?? 0);
+
+    const computedFulfillmentStatus = fulfillmentSummary?.hasItemData
+      ? (computedItemsTotal > 0 && computedItemsShipped >= computedItemsTotal
+          ? 'fulfilled'
+          : computedItemsShipped > 0
+            ? 'partially_fulfilled'
+            : 'unfulfilled')
+      : order.fulfillment_status;
+
     const shipmentFromOrder =
       (typeof order.shipment_id === 'number' ? shipmentsById.get(order.shipment_id) : undefined) ||
       linkedShipmentByOrderId.get(order.id) ||
@@ -173,6 +245,10 @@ export async function hydrateOrdersWithShipments(orders: any[], includeQboid: bo
 
     const enhancedOrder = {
       ...order,
+      items_total: computedItemsTotal || order.items_total,
+      items_shipped: computedItemsShipped,
+      fulfillment_percentage: computedFulfillmentPercentage,
+      fulfillment_status: computedFulfillmentStatus,
       shopify_order_id: shopifyMappingByOrderId.get(order.id)?.shopify_order_id || null,
       shopify_order_number: shopifyMappingByOrderId.get(order.id)?.shopify_order_number || null,
       shopify_store_url: order.shopify_store_id ? shopifyStoreUrlById.get(order.shopify_store_id) || null : null,
