@@ -355,7 +355,9 @@ export const ShippingOptionsSection = ({
         if (priorityDiff !== 0) return priorityDiff;
       }
 
-      const priceDiff = getSafeRateAmount(a.rate.rate) - getSafeRateAmount(b.rate.rate);
+      const aPrice = a.totalAmount ?? getSafeRateAmount(a.rate.rate);
+      const bPrice = b.totalAmount ?? getSafeRateAmount(b.rate.rate);
+      const priceDiff = aPrice - bPrice;
       if (priceDiff !== 0) return priceDiff;
 
       if (a.estimatedDeliveryDate && b.estimatedDeliveryDate) {
