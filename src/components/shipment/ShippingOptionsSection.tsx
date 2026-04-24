@@ -73,6 +73,19 @@ export const ShippingOptionsSection = ({
   const [hasFetched, setHasFetched] = useState(false);
   const [company, setCompany] = useState<Company | null>(null);
   const [purchasingLabel, setPurchasingLabel] = useState(false);
+  const [purchaseProgress, setPurchaseProgress] = useState<string | null>(null);
+  const [bulkLabels, setBulkLabels] = useState<Array<{ orderId: string; labelUrl: string; trackingNumber: string; carrier: string; service: string }>>([]);
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
+
+  // Detect multi-package shipment
+  const multiParcelsFromForm = (form as any)?.watch?.('multiParcels') as Array<any> | undefined;
+  const storedMultiParcels = (() => {
+    try { return JSON.parse(localStorage.getItem('multiParcels') || '[]'); } catch { return []; }
+  })();
+  const multiParcels: Array<any> = (Array.isArray(multiParcelsFromForm) && multiParcelsFromForm.length > 0)
+    ? multiParcelsFromForm
+    : storedMultiParcels;
+  const isMultiPackage = Array.isArray(multiParcels) && multiParcels.length > 1;
 
   const setLoading = externalSetLoading || (() => {});
 
