@@ -17,6 +17,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { toast } from "sonner";
 import { orderFormSchema, OrderFormValues } from "@/types/order";
 import { useUpdateOrder } from "@/hooks/useUpdateOrder";
+import { useItemMaster } from "@/hooks/useItemMaster";
 
 const EditOrder = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,11 +25,13 @@ const EditOrder = () => {
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const { isSubmitting, onSubmit } = useUpdateOrder(id || "");
+  const { items: masterItems, isLoading: itemsLoading } = useItemMaster();
 
   // Initialize the form
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     defaultValues: {
+      customerId: "",
       customerName: "",
       customerCompany: "",
       customerEmail: "",
