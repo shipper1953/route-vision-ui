@@ -25,7 +25,7 @@ const EditOrder = () => {
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const { isSubmitting, onSubmit } = useUpdateOrder(id || "");
-  const { items: masterItems, isLoading: itemsLoading } = useItemMaster();
+  const { items: masterItems, loading: itemsLoading } = useItemMaster();
 
   // Initialize the form
   const form = useForm<OrderFormValues>({
