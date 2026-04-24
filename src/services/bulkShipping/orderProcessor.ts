@@ -3,7 +3,11 @@ import { CartonizationEngine, Box } from "@/services/cartonization/cartonization
 import { OrderForShipping, BoxShippingGroup } from "@/types/bulkShipping";
 
 export class OrderProcessor {
-  constructor(private boxes: Box[], private createItemsFromOrderData: Function) {}
+  constructor(
+    private boxes: Box[],
+    private createItemsFromOrderData: Function,
+    private masterItems: any[] = []
+  ) {}
 
   async processOrdersForShipping(): Promise<BoxShippingGroup[]> {
     const orders = await fetchReadyToShipOrders(500); // Limit to 500 orders for performance
