@@ -15,6 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Company, CompanyAddress } from "@/types/auth";
 import { applyMarkupToRates, MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
 import { LabelService } from "@/services/easypost/labelService";
+import { RateShoppingService } from "@/services/rateShoppingService";
+import { BulkShippingLabelDialog } from "@/components/cartonization/BulkShippingLabelDialog";
 import { toast } from "sonner";
 import { 
   Check, 
