@@ -94,6 +94,10 @@ export const ShippingOptionsSection = ({
   const [packageProgress, setPackageProgress] = useState<PackageProgressItem[]>([]);
   const [showProgressDialog, setShowProgressDialog] = useState(false);
   const [progressComplete, setProgressComplete] = useState(false);
+  // Per-additional-package rate maps (index 0 corresponds to package 2, etc.)
+  const [extraPackageRates, setExtraPackageRates] = useState<Array<Map<string, any>>>([]);
+  const [fetchingPackageRates, setFetchingPackageRates] = useState(false);
+  const [packageRateError, setPackageRateError] = useState<string | null>(null);
 
   // Detect multi-package shipment
   const multiParcelsFromForm = (form as any)?.watch?.('multiParcels') as Array<any> | undefined;
