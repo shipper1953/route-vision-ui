@@ -1153,7 +1153,22 @@ serve(async (req) => {
         if (!easyshipApiKey) {
           return createErrorResponse('Easyship API key not configured', null, 500)
         }
-        const easyshipShipmentId = shipmentId.startsWith('easyship_') ? null : shipmentId;
+        // Synthetic IDs from rate-shopping (e.g. "easyship_<ts>", "combined_<ts>")
+        // are NOT real Easyship shipments. Treat them as null so we create one
+        // from the forwarded payload before purchasing the label.
+        const isSyntheticEasyshipId =
+          !shipmentId ||
+          shipmentId.startsWith('easyship_') ||
+          shipmentId.startsWith('combined_') ||
+          shipmentId.startsWith('local_');
+        const easyshipShipmentId = isSyntheticEasyshipId ? null : shipmentId;
+        if (isSyntheticEasyshipId && !easyshipShipmentPayload) {
+          return createErrorResponse(
+            'Easyship shipment payload missing',
+            'A real Easyship shipment ID was not provided and no shipment payload was supplied to create one. Please retry from the rate selection step.',
+            400
+          )
+        }
         purchaseResponse = await purchaseEasyshipLabel(easyshipShipmentId, rateId, easyshipApiKey, easyshipShipmentPayload)
       } else {
         purchaseResponse = await purchaseShippingLabel(shipmentId, rateId, apiKey)
