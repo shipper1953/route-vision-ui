@@ -574,7 +574,8 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
       'Accept': 'application/json',
     },
     body: JSON.stringify({
-      courier_service_id: courierId,
+      // Courier is already locked on the shipment via courier_selection at create time.
+      // ShipmentLabelCreate only accepts printing_options here.
       printing_options: {
         format: 'pdf',
         label: '4x6',
