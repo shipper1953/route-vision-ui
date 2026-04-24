@@ -19,7 +19,8 @@ export class LabelService {
     selectedBoxData?: any,
     selectedItems?: any[],
     originalCost?: number | null,
-    markedUpCost?: number | null
+    markedUpCost?: number | null,
+    easyshipShipmentPayload?: any
   ): Promise<any> {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} using ${provider || 'easypost'}`);
@@ -32,7 +33,7 @@ export class LabelService {
       }
       
       if (this.useEdgeFunctions) {
-        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData, selectedItems, originalCost, markedUpCost);
+        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData, selectedItems, originalCost, markedUpCost, undefined, easyshipShipmentPayload);
       }
       
       return this.purchaseLabelDirectly(shipmentId, rateId);
