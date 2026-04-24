@@ -593,22 +593,74 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
     throw new Error(labelData.error?.message || labelData.message || `Easyship label failed: ${labelRes.status}`);
   }
 
-  const shipment = labelData.shipment || labelData;
-  const label = shipment.label || labelData.label || {};
+  let shipment = labelData.shipment || labelData;
+  let label = shipment.label || labelData.label || {};
+
+  // Easyship label generation is asynchronous. The POST /shipments/{id}/label
+  // returns 202/shipment object with label fields still null. Poll until ready
+  // or until the budget elapses (kept under edge-function timeout).
+  let labelUrl: string | undefined = label.label_url || label.url;
+  let trackingNumber: string | undefined = label.tracking_number || shipment.tracking_number;
+
+  if (!labelUrl || !trackingNumber) {
+    console.log('⏳ Easyship label not ready inline, polling shipment status...');
+    const maxAttempts = 8;
+    const intervalMs = 2000;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await sleep(intervalMs);
+
+      const pollRes = await fetch(`${easyshipBaseUrl}/2024-09/shipments/${shipmentId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json',
+        },
+      });
+      const pollText = await pollRes.text();
+      let pollData: any;
+      try { pollData = JSON.parse(pollText); } catch { pollData = { raw: pollText }; }
+
+      if (!pollRes.ok) {
+        console.warn(`⚠️ Poll attempt ${attempt} failed (${pollRes.status})`);
+        continue;
+      }
+
+      const polledShipment = pollData.shipment || pollData;
+      const polledLabel = polledShipment.label || {};
+      labelUrl = polledLabel.label_url || polledLabel.url;
+      trackingNumber = polledLabel.tracking_number || polledShipment.tracking_number;
+
+      console.log(`🔁 Poll ${attempt}/${maxAttempts} — label_url: ${labelUrl ? 'ready' : 'pending'}, tracking: ${trackingNumber ? 'ready' : 'pending'}, label_state: ${polledShipment.label_state || polledLabel.state || 'n/a'}`);
+
+      if (labelUrl && trackingNumber) {
+        shipment = polledShipment;
+        label = polledLabel;
+        break;
+      }
+
+      const labelState = polledShipment.label_state || polledLabel.state;
+      if (labelState === 'failed') {
+        const failMsg = polledLabel.error_message || polledShipment.label_error || 'Easyship label generation failed';
+        throw new Error(failMsg);
+      }
+    }
+  }
 
   const normalized = {
     easyship_shipment_id: shipment.easyship_shipment_id || shipmentId,
-    tracking_number: label.tracking_number || shipment.tracking_number,
+    tracking_number: trackingNumber,
     tracking_url: label.tracking_page_url || shipment.tracking_page_url,
-    label_url: label.label_url || label.url,
+    label_url: labelUrl,
     courier_name: shipment.courier_name || label.courier_name,
     service_name: shipment.service_name || label.service_name,
     total_charge: shipment.total_actual_charge || shipment.total_charge,
     currency: shipment.currency || 'USD',
+    label_pending: !labelUrl,
     raw: labelData,
   };
 
-  console.log('✅ Easyship label purchased:', normalized.tracking_number);
+  console.log('✅ Easyship label purchase complete. Label ready:', !!labelUrl, '| Tracking:', trackingNumber || 'pending');
   return normalized;
 }
 
@@ -1460,7 +1512,8 @@ serve(async (req) => {
         : provider === 'easyship'
           ? purchaseResponse.service_name
           : purchaseResponse.selected_rate?.service,
-      provider: provider || 'easypost'
+      provider: provider || 'easypost',
+      labelPending: provider === 'easyship' ? !!purchaseResponse.label_pending : false
     })
 
   } catch (error) {
