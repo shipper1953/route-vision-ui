@@ -229,6 +229,9 @@ serve(async (req) => {
       object_id: `easyship_${Date.now()}`,
       rates,
       raw: data,
+      // Persist the exact payload used for rate-shopping so the purchase-label
+      // function can re-create the Easyship shipment at label-buy time.
+      shipmentPayload: payload,
     };
 
     console.log(`✅ Easyship returned ${rates.length} rates`);

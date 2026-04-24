@@ -22,6 +22,7 @@ export interface EasyshipShipmentResponse {
   object_id: string;
   rates: EasyshipRate[];
   raw?: any;
+  shipmentPayload?: any;
 }
 
 export class EasyshipService {

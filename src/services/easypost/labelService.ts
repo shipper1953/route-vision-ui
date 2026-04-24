@@ -19,7 +19,8 @@ export class LabelService {
     selectedBoxData?: any,
     selectedItems?: any[],
     originalCost?: number | null,
-    markedUpCost?: number | null
+    markedUpCost?: number | null,
+    easyshipShipmentPayload?: any
   ): Promise<any> {
     try {
       console.log(`Purchasing label for shipment ${shipmentId} with rate ${rateId}${orderId ? ` for order ${orderId}` : ''} using ${provider || 'easypost'}`);
@@ -32,7 +33,7 @@ export class LabelService {
       }
       
       if (this.useEdgeFunctions) {
-        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData, selectedItems, originalCost, markedUpCost);
+        return this.purchaseLabelViaEdgeFunction(shipmentId, rateId, orderId, provider, selectedBoxData, selectedItems, originalCost, markedUpCost, undefined, easyshipShipmentPayload);
       }
       
       return this.purchaseLabelDirectly(shipmentId, rateId);
@@ -166,7 +167,8 @@ export class LabelService {
       items: Array<any>;
       boxData: { name: string; length: number; width: number; height: number };
       weight: number;
-    }
+    },
+    easyshipShipmentPayload?: any
   ): Promise<any> {
     const requestBody: any = { shipmentId, rateId };
     
@@ -230,6 +232,13 @@ export class LabelService {
     if (finalPackageMetadata) {
       requestBody.packageMetadata = finalPackageMetadata;
       console.log('Including package metadata in edge function request:', finalPackageMetadata);
+    }
+
+    // Include Easyship shipment payload so the edge function can create the
+    // real Easyship shipment at label-purchase time (rate-shopping only fetches rates).
+    if (easyshipShipmentPayload) {
+      requestBody.easyshipShipmentPayload = easyshipShipmentPayload;
+      console.log('Including Easyship shipment payload in edge function request');
     }
 
     // DIAGNOSTIC LOGGING: Log the full request body being sent to edge function
