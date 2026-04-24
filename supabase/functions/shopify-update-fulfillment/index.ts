@@ -291,7 +291,8 @@ serve(async (req) => {
         trackingUrl,
         carrier,
         service,
-        shopifyOrderId
+        shopifyOrderId,
+        shipmentId
       );
     } else {
       console.log('⚠️ Fulfillment service not registered - using legacy flow');
@@ -305,7 +306,8 @@ serve(async (req) => {
         trackingUrl,
         carrier,
         service,
-        shopifyOrderId
+        shopifyOrderId,
+        shipmentId
       );
     }
 
