@@ -875,7 +875,16 @@ export const ShippingOptionsSection = ({
 
       <BulkShippingLabelDialog
         isOpen={showBulkDialog}
-        onClose={() => setShowBulkDialog(false)}
+        onClose={() => {
+          setShowBulkDialog(false);
+          // Mirror single-package behavior: return to the orders page after the
+          // user dismisses the labels dialog.
+          if (orderId) {
+            navigate(`/orders?highlight=${orderId}`);
+          } else {
+            navigate('/orders');
+          }
+        }}
         shipmentLabels={bulkLabels}
       />
     </div>
