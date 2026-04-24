@@ -545,15 +545,22 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
     throw new Error('No Easyship shipment ID available for label purchase');
   }
 
-  // Buy label
-  const labelRes = await fetch(`${easyshipBaseUrl}/2024-09/shipments/${shipmentId}/labels`, {
+  // Buy label — Easyship v2024-09 endpoint is singular: /shipments/{id}/label
+  // Docs: https://developers.easyship.com/reference/shipment_labels_create
+  const labelRes = await fetch(`${easyshipBaseUrl}/2024-09/shipments/${shipmentId}/label`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
-    body: JSON.stringify({ courier_id: courierId, format: 'pdf' }),
+    body: JSON.stringify({
+      courier_service_id: courierId,
+      printing_options: {
+        format: 'pdf',
+        label: '4x6',
+      },
+    }),
   });
   const labelText = await labelRes.text();
   let labelData: any;
