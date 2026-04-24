@@ -924,8 +924,9 @@ const RateCard = ({
                 </Badge>
               )}
               {hasFallback && (
-                <Badge variant="outline" className="border-yellow-400 text-yellow-700 text-xs">
-                  Service substituted on some packages
+                <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs gap-1 hover:bg-amber-100">
+                  <AlertTriangle className="h-3 w-3" />
+                  Mixed services
                 </Badge>
               )}
             </div>
@@ -946,25 +947,64 @@ const RateCard = ({
       </div>
 
       {hasBreakdown && (
-        <div className="ml-9 border-t pt-2 space-y-1">
-          {breakdown!.map((pkg) => (
-            <div key={pkg.packageIndex} className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Package className="h-3 w-3" />
-                <span className="font-medium text-foreground">Package {pkg.packageIndex + 1}</span>
-                {pkg.boxName && <span>· {pkg.boxName}</span>}
-                {!pkg.matched && pkg.matchedCarrier && (
-                  <span className="text-yellow-700">
-                    · using {pkg.matchedCarrier} {pkg.matchedService}
+        <div className="ml-9 rounded-md border bg-muted/30 divide-y divide-border/60 overflow-hidden">
+          {breakdown!.map((pkg) => {
+            const substituted = !pkg.matched && !!pkg.matchedCarrier;
+            const noRate = !pkg.matched && !pkg.matchedCarrier;
+            return (
+              <div
+                key={pkg.packageIndex}
+                className={cn(
+                  "flex items-center justify-between gap-3 px-3 py-2 text-xs",
+                  substituted && "bg-amber-50/60",
+                  noRate && "bg-destructive/5"
+                )}
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-background border flex-shrink-0">
+                    <Package className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-medium text-foreground truncate">
+                        Package {pkg.packageIndex + 1}
+                      </span>
+                      {pkg.boxName && (
+                        <span className="text-muted-foreground truncate">· {pkg.boxName}</span>
+                      )}
+                    </div>
+                    {substituted && (
+                      <span className="text-[11px] text-amber-700 truncate">
+                        Substituted: {pkg.matchedCarrier} {pkg.matchedService}
+                      </span>
+                    )}
+                    {noRate && (
+                      <span className="text-[11px] text-destructive">No rate available</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {substituted && (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] px-1.5 py-0 h-4 gap-0.5"
+                    >
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      Sub
+                    </Badge>
+                  )}
+                  <span
+                    className={cn(
+                      "font-mono font-semibold tabular-nums",
+                      noRate && "text-destructive"
+                    )}
+                  >
+                    ${pkg.amount.toFixed(2)}
                   </span>
-                )}
-                {!pkg.matched && !pkg.matchedCarrier && (
-                  <span className="text-destructive">· no rate available</span>
-                )}
+                </div>
               </div>
-              <span className="font-mono font-medium">${pkg.amount.toFixed(2)}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </button>
