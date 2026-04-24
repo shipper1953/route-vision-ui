@@ -1512,7 +1512,8 @@ serve(async (req) => {
         : provider === 'easyship'
           ? purchaseResponse.service_name
           : purchaseResponse.selected_rate?.service,
-      provider: provider || 'easypost'
+      provider: provider || 'easypost',
+      labelPending: provider === 'easyship' ? !!purchaseResponse.label_pending : false
     })
 
   } catch (error) {
