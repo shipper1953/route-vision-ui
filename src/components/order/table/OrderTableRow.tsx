@@ -23,6 +23,8 @@ interface CartonizationData {
   totalWeight: number;
   itemsWeight: number;
   boxWeight: number;
+  totalPackages: number;
+  packages: any[];
 }
 
 interface ShipmentInfo {
