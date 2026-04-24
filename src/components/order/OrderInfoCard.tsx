@@ -47,18 +47,22 @@ export const OrderInfoCard = ({ order }: OrderInfoCardProps) => {
       const queries: Promise<any>[] = [];
       if (lookupKeys.skus.length > 0) {
         queries.push(
-          supabase
-            .from('items')
-            .select('id, sku, length, width, height, weight')
-            .in('sku', lookupKeys.skus),
+          Promise.resolve(
+            supabase
+              .from('items')
+              .select('id, sku, length, width, height, weight')
+              .in('sku', lookupKeys.skus),
+          ),
         );
       }
       if (lookupKeys.ids.length > 0) {
         queries.push(
-          supabase
-            .from('items')
-            .select('id, sku, length, width, height, weight')
-            .in('id', lookupKeys.ids),
+          Promise.resolve(
+            supabase
+              .from('items')
+              .select('id, sku, length, width, height, weight')
+              .in('id', lookupKeys.ids),
+          ),
         );
       }
       const results = await Promise.all(queries);
