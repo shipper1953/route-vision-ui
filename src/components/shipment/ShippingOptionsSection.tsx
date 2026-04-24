@@ -15,6 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Company, CompanyAddress } from "@/types/auth";
 import { applyMarkupToRates, MarkedUpRate, MarkedUpSmartRate } from "@/utils/rateMarkupUtils";
 import { LabelService } from "@/services/easypost/labelService";
+import { RateShoppingService } from "@/services/rateShoppingService";
+import { BulkShippingLabelDialog } from "@/components/cartonization/BulkShippingLabelDialog";
 import { toast } from "sonner";
 import { 
   Check, 
@@ -71,6 +73,19 @@ export const ShippingOptionsSection = ({
   const [hasFetched, setHasFetched] = useState(false);
   const [company, setCompany] = useState<Company | null>(null);
   const [purchasingLabel, setPurchasingLabel] = useState(false);
+  const [purchaseProgress, setPurchaseProgress] = useState<string | null>(null);
+  const [bulkLabels, setBulkLabels] = useState<Array<{ orderId: string; labelUrl: string; trackingNumber: string; carrier: string; service: string }>>([]);
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
+
+  // Detect multi-package shipment
+  const multiParcelsFromForm = (form as any)?.watch?.('multiParcels') as Array<any> | undefined;
+  const storedMultiParcels = (() => {
+    try { return JSON.parse(localStorage.getItem('multiParcels') || '[]'); } catch { return []; }
+  })();
+  const multiParcels: Array<any> = (Array.isArray(multiParcelsFromForm) && multiParcelsFromForm.length > 0)
+    ? multiParcelsFromForm
+    : storedMultiParcels;
+  const isMultiPackage = Array.isArray(multiParcels) && multiParcels.length > 1;
 
   const setLoading = externalSetLoading || (() => {});
 
@@ -201,7 +216,173 @@ export const ShippingOptionsSection = ({
 
     setPurchasingLabel(true);
     try {
-      // Determine shipment ID based on provider
+      const data = form.getValues();
+      const labelService = new LabelService("");
+
+      // ===== MULTI-PACKAGE FLOW =====
+      // When the order requires multiple packages, purchase one label per package
+      // using the same carrier+service the user selected.
+      if (isMultiPackage) {
+        const provider = (selectedRate as any).provider as string;
+        const carrier = (selectedRate as any).carrier as string;
+        const service = (selectedRate as any).service as string;
+
+        const fromAddress = {
+          name: data.fromName, company: data.fromCompany,
+          street1: data.fromStreet1, street2: data.fromStreet2,
+          city: data.fromCity, state: data.fromState,
+          zip: data.fromZip, country: data.fromCountry,
+          phone: data.fromPhone || '5555555555', email: data.fromEmail,
+        };
+        const toAddress = {
+          name: data.toName, company: data.toCompany,
+          street1: data.toStreet1, street2: data.toStreet2,
+          city: data.toCity, state: data.toState,
+          zip: data.toZip, country: data.toCountry,
+          phone: data.toPhone || '5555555555', email: data.toEmail,
+        };
+
+        const rateService = new RateShoppingService();
+        const purchasedLabels: Array<{ orderId: string; labelUrl: string; trackingNumber: string; carrier: string; service: string }> = [];
+        const errors: string[] = [];
+        let firstResult: any = null;
+
+        for (let i = 0; i < multiParcels.length; i++) {
+          const parcel = multiParcels[i];
+          setPurchaseProgress(`Purchasing label ${i + 1} of ${multiParcels.length}...`);
+
+          try {
+            const combined = await rateService.getRatesFromAllProviders({
+              from_address: fromAddress,
+              to_address: toAddress,
+              parcel: {
+                length: parcel.length,
+                width: parcel.width,
+                height: parcel.height,
+                weight: parcel.weight,
+              },
+              options: { label_format: 'PDF' },
+            } as any);
+
+            // Find the same carrier+service the user picked; fall back to same provider cheapest
+            let pkgRate: any = combined.rates.find(
+              (r: any) => r.provider === provider && r.carrier === carrier && r.service === service
+            );
+            if (!pkgRate) {
+              const sameProvider = combined.rates.filter((r: any) => r.provider === provider);
+              if (sameProvider.length > 0) {
+                pkgRate = sameProvider.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+              }
+            }
+            if (!pkgRate && combined.rates.length > 0) {
+              pkgRate = combined.rates.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+            }
+            if (!pkgRate) {
+              throw new Error(`No rates available for package ${i + 1}`);
+            }
+
+            const pkgProvider = pkgRate.provider as string;
+            let pkgShipmentId: string | undefined;
+            const stored = (pkgRate as any)?._shipment_data;
+            if (pkgProvider === 'shippo') {
+              pkgShipmentId = pkgRate.shipment_id || stored?.shippo_shipment?.object_id || (combined as any)?.shippo_shipment?.object_id;
+            } else if (pkgProvider === 'easyship') {
+              pkgShipmentId = pkgRate.shipment_id || stored?.easyship_shipment?.object_id || (combined as any)?.easyship_shipment?.object_id;
+            } else {
+              pkgShipmentId = pkgRate.shipment_id || stored?.easypost_shipment?.id || (combined as any)?.easypost_shipment?.id;
+            }
+            if (!pkgShipmentId) {
+              throw new Error(`Missing shipment ID for package ${i + 1}`);
+            }
+
+            const selectedBoxEntry = (data.selectedBoxes || []).find((b: any) => b.packageIndex === i)
+              || (data.selectedBoxes || [])[i]
+              || null;
+
+            const pkgItems = Array.isArray(parcel.items) ? parcel.items : [];
+
+            const pkgSelectedBoxData = {
+              selectedBoxId: selectedBoxEntry?.boxId || null,
+              selectedBoxSku: selectedBoxEntry?.boxSku || selectedBoxEntry?.boxName || null,
+              selectedBoxName: selectedBoxEntry?.boxName || 'Unknown',
+              packageMetadata: {
+                packageIndex: i,
+                items: pkgItems,
+                boxData: {
+                  name: selectedBoxEntry?.boxName || 'Unknown',
+                  length: parcel.length,
+                  width: parcel.width,
+                  height: parcel.height,
+                },
+                weight: parcel.weight,
+              },
+            };
+
+            const markedUpPkgRate = applyMarkupToRates([pkgRate], company)[0];
+            const pkgOriginalCost = parseFloat(markedUpPkgRate.original_rate);
+            const pkgMarkedUpCost = parseFloat(markedUpPkgRate.rate);
+
+            const easyshipPayload = pkgProvider === 'easyship'
+              ? (combined as any)?.easyship_shipment?.shipmentPayload
+              : undefined;
+
+            const result = await labelService.purchaseLabel(
+              pkgShipmentId,
+              pkgRate.id,
+              orderId || null,
+              pkgProvider,
+              pkgSelectedBoxData,
+              pkgItems,
+              pkgOriginalCost,
+              pkgMarkedUpCost,
+              easyshipPayload
+            );
+
+            if (i === 0) firstResult = result;
+
+            const labelUrl = result?.labelUrl || result?.postage_label?.label_url || result?.label_url;
+            if (labelUrl) {
+              purchasedLabels.push({
+                orderId: orderId ? `${orderId} • Pkg ${i + 1}` : `Package ${i + 1}`,
+                labelUrl,
+                trackingNumber: result?.trackingNumber || result?.tracking_code || result?.tracking_number || 'N/A',
+                carrier: result?.carrier || pkgRate.carrier || 'Unknown',
+                service: result?.service || pkgRate.service || 'Unknown',
+              });
+            }
+          } catch (pkgErr: any) {
+            console.error(`Failed to purchase label for package ${i + 1}:`, pkgErr);
+            errors.push(`Package ${i + 1}: ${pkgErr?.message || 'failed'}`);
+          }
+        }
+
+        setPurchaseProgress(null);
+
+        if (purchasedLabels.length === 0) {
+          throw new Error(errors.join('; ') || 'Failed to purchase any labels');
+        }
+
+        if (errors.length > 0) {
+          toast.error(`Purchased ${purchasedLabels.length}/${multiParcels.length} labels. Errors: ${errors.join('; ')}`);
+        } else {
+          toast.success(`Successfully purchased ${purchasedLabels.length} shipping labels!`);
+        }
+
+        setBulkLabels(purchasedLabels);
+        setShowBulkDialog(true);
+
+        if (firstResult) {
+          onLabelPurchased?.({
+            ...firstResult,
+            multiPackage: true,
+            packagesCount: purchasedLabels.length,
+            suppressDialog: true,
+          });
+        }
+        return;
+      }
+
+      // ===== SINGLE PACKAGE FLOW =====
       let shipmentId = rateResponse.id;
       const provider = (selectedRate as any).provider;
 
@@ -210,14 +391,9 @@ export const ShippingOptionsSection = ({
       } else if (provider === "shippo" && rateResponse.shippo_shipment?.object_id) {
         shipmentId = rateResponse.shippo_shipment.object_id;
       } else if (provider === "easyship" && rateResponse.easyship_shipment?.object_id) {
-        // Synthetic ID — purchase-label will detect and create a real Easyship shipment
-        // from the forwarded shipmentPayload.
         shipmentId = rateResponse.easyship_shipment.object_id;
       }
 
-      const data = form.getValues();
-
-      // Find the marked-up rate to get original cost
       const markedUpRate = applyMarkupToRates([selectedRate], company)[0];
       const originalCost = parseFloat(markedUpRate.original_rate);
       const markedUpCost = parseFloat(markedUpRate.rate);
@@ -241,7 +417,6 @@ export const ShippingOptionsSection = ({
         },
       };
 
-      const labelService = new LabelService("");
       const easyshipShipmentPayload =
         provider === "easyship" ? rateResponse.easyship_shipment?.shipmentPayload : undefined;
 
@@ -275,6 +450,7 @@ export const ShippingOptionsSection = ({
       toast.error(error instanceof Error ? error.message : "Failed to purchase label");
     } finally {
       setPurchasingLabel(false);
+      setPurchaseProgress(null);
     }
   };
 
@@ -385,6 +561,19 @@ export const ShippingOptionsSection = ({
         </CardContent>
       </Card>
 
+      {/* Multi-package notice */}
+      {isMultiPackage && (
+        <Card className="border-blue-500/40 bg-blue-50/40 dark:bg-blue-950/20">
+          <CardContent className="py-3 flex items-center gap-2 text-sm">
+            <Package className="h-4 w-4 text-blue-600" />
+            <span>
+              This order requires <strong>{multiParcels.length} packages</strong>. The selected
+              carrier &amp; service will be used to purchase a label for each package.
+            </span>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Confirm & Buy */}
       {selectedRateId && (
         <div className="flex justify-end">
@@ -397,17 +586,25 @@ export const ShippingOptionsSection = ({
             {purchasingLabel ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Purchasing Label...
+                {purchaseProgress || 'Purchasing Label...'}
               </>
             ) : (
               <>
                 <Check className="h-4 w-4" />
-                Buy Label & Create Shipment
+                {isMultiPackage
+                  ? `Buy ${multiParcels.length} Labels & Create Shipments`
+                  : 'Buy Label & Create Shipment'}
               </>
             )}
           </Button>
         </div>
       )}
+
+      <BulkShippingLabelDialog
+        isOpen={showBulkDialog}
+        onClose={() => setShowBulkDialog(false)}
+        shipmentLabels={bulkLabels}
+      />
     </div>
   );
 };

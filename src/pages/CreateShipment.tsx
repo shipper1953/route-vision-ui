@@ -23,7 +23,10 @@ const CreateShipment = () => {
   const handleLabelPurchased = async (result: any) => {
     console.log("Label purchased successfully:", result);
     setLabelData(result);
-    setShowLabelDialog(true);
+    // For multi-package shipments the bulk dialog is shown by ShippingOptionsSection itself.
+    if (!result?.suppressDialog) {
+      setShowLabelDialog(true);
+    }
 
     if (result?.id) {
       await new Promise(resolve => setTimeout(resolve, 1000));
