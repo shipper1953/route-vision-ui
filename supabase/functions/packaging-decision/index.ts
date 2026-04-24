@@ -86,8 +86,9 @@ function checkItemsFit(items: Item[], box: Box): { success: boolean; usedVolume:
   );
   const boxVolume = box.length * box.width * box.height;
 
-  // Practical packing factor check
-  if (totalItemVolume / boxVolume / 0.75 > 1) {
+  // Hard volume check only — items cannot exceed the box's cubic capacity.
+  // (No artificial packing-factor cap; the 3D bin packer below decides true fit.)
+  if (totalItemVolume > boxVolume) {
     return { success: false, usedVolume: 0 };
   }
 
@@ -167,15 +168,16 @@ function scoreBox(
 }
 
 // Deterministic tie-breakers, identical for all tenants:
-// 1) lowest dimensional weight, 2) lowest box cost, 3) smallest outer volume
+// 1) smallest outer volume (= highest utilization for the same item set),
+// 2) lowest dimensional weight, 3) lowest box cost
 function applyTieBreakers(a: BoxAnalysis, b: BoxAnalysis): number {
+  if (Math.abs(a.outerVolume - b.outerVolume) > 0.01) {
+    return a.outerVolume - b.outerVolume;
+  }
   if (Math.abs(a.dimensionalWeight - b.dimensionalWeight) > 0.01) {
     return a.dimensionalWeight - b.dimensionalWeight;
   }
-  if (Math.abs(a.cost - b.cost) > 0.01) {
-    return a.cost - b.cost;
-  }
-  return a.outerVolume - b.outerVolume;
+  return a.cost - b.cost;
 }
 
 // Build a BoxAnalysis for a given item set + box, returns null if it doesn't fit
@@ -216,7 +218,8 @@ function pickBestBox(items: Item[], boxes: Box[]): BoxAnalysis | null {
   if (!candidates.length) return null;
   candidates.sort((a, b) => {
     const scoreDiff = b.score - a.score;
-    if (Math.abs(scoreDiff) > 0.0001) return scoreDiff;
+    // Treat scores within 1 percentage point as ties so the smallest-fit box wins.
+    if (Math.abs(scoreDiff) > 1.0) return scoreDiff;
     return applyTieBreakers(a, b);
   });
   return candidates[0];
@@ -558,10 +561,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 5. Sort by closest-to-99 score, then deterministic tie-breakers
+    // 5. Sort by closest-to-99 score, then deterministic tie-breakers.
+    // Treat scores within 1 percentage point as ties so the smallest-fit box wins.
     analyses.sort((a, b) => {
       const scoreDiff = b.score - a.score;
-      if (Math.abs(scoreDiff) > 0.0001) return scoreDiff;
+      if (Math.abs(scoreDiff) > 1.0) return scoreDiff;
       return applyTieBreakers(a, b);
     });
 
