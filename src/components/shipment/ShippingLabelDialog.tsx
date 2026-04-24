@@ -420,6 +420,39 @@ export const ShippingLabelDialog = ({
                 Done
               </Button>
             </>
+          ) : isPending ? (
+            <div className="w-full space-y-4 py-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2 text-amber-700">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="font-medium">Carrier is generating your label</span>
+                </div>
+                <p className="text-sm text-amber-700">
+                  The shipment was purchased successfully, but the carrier hasn't returned the label PDF yet. This usually takes a few seconds.
+                </p>
+                {orderDetails?.trackingCode && orderDetails.trackingCode !== 'N/A' && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Tracking: </span>
+                    <span className="font-medium">{orderDetails.trackingCode}</span>
+                  </div>
+                )}
+                <p className="text-xs text-amber-600">
+                  Note: Easyship sandbox / mock couriers may not return a real PDF.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleRefreshLabel} disabled={refreshing} className="flex-1">
+                  {refreshing ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Checking...</>
+                  ) : (
+                    <><RefreshCw className="h-4 w-4 mr-2" /> Refresh Label</>
+                  )}
+                </Button>
+                <Button onClick={handleClose} variant="outline" className="flex-1">
+                  Close
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No label available for this shipment
