@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { fetchReadyToShipOrders } from "@/services/orderFetchService";
 import { useCartonization } from "@/hooks/useCartonization";
+import { useItemMaster } from "@/hooks/useItemMaster";
 import { CartonizationEngine } from "@/services/cartonization/cartonizationEngine";
 import { Box } from "@/services/cartonization/cartonizationEngine";
 
@@ -14,6 +15,7 @@ export const useBoxOrderStats = () => {
   const [boxStats, setBoxStats] = useState<BoxOrderStats[]>([]);
   const [loading, setLoading] = useState(true);
   const { boxes, createItemsFromOrderData } = useCartonization();
+  const { items: masterItems } = useItemMaster();
 
   useEffect(() => {
     const calculateBoxStats = async () => {
@@ -41,8 +43,8 @@ export const useBoxOrderStats = () => {
         for (const order of orders) {
           // Check if order.items is an array and has items
           if (order.items && Array.isArray(order.items) && order.items.length > 0) {
-            // Create items from order data (using empty master items array for now)
-            const items = createItemsFromOrderData(order.items, []);
+            // Use Item Master dimensions (never order/Shopify dims)
+            const items = createItemsFromOrderData(order.items, masterItems);
             
             if (items.length > 0) {
               const result = engine.calculateOptimalBox(items);
@@ -79,7 +81,7 @@ export const useBoxOrderStats = () => {
     };
 
     calculateBoxStats();
-  }, [boxes]); // Removed createItemsFromOrderData from dependencies to prevent infinite loop
+  }, [boxes, masterItems.length]); // Recalculate when item master loads
 
   return { boxStats, loading };
 };

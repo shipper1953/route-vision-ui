@@ -3,7 +3,11 @@ import { CartonizationEngine, Box } from "@/services/cartonization/cartonization
 import { OrderForShipping, BoxShippingGroup } from "@/types/bulkShipping";
 
 export class OrderProcessor {
-  constructor(private boxes: Box[], private createItemsFromOrderData: Function) {}
+  constructor(
+    private boxes: Box[],
+    private createItemsFromOrderData: Function,
+    private masterItems: any[] = []
+  ) {}
 
   async processOrdersForShipping(): Promise<BoxShippingGroup[]> {
     const orders = await fetchReadyToShipOrders(500); // Limit to 500 orders for performance
@@ -33,9 +37,9 @@ export class OrderProcessor {
       // Only process orders with items
       if (order.items && Array.isArray(order.items) && order.items.length > 0) {
         console.log(`Order ${order.id} has ${order.items.length} items:`, order.items);
-        const items = this.createItemsFromOrderData(order.items, []);
+        const items = this.createItemsFromOrderData(order.items, this.masterItems);
         console.log(`Created cartonization items for order ${order.id}:`, items);
-        
+
         if (items.length > 0) {
           console.log(`Running cartonization for order ${order.id}`);
           const result = engine.calculateOptimalBox(items, true); // Enable multi-package detection

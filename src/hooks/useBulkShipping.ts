@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useCartonization } from "@/hooks/useCartonization";
+import { useItemMaster } from "@/hooks/useItemMaster";
 import { toast } from "sonner";
 import { OrderProcessor } from "@/services/bulkShipping/orderProcessor";
 import { RateService } from "@/services/bulkShipping/rateService";
@@ -10,12 +11,14 @@ export const useBulkShipping = () => {
   const [boxShippingGroups, setBoxShippingGroups] = useState<BoxShippingGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const { boxes, createItemsFromOrderData } = useCartonization();
+  const { items: masterItems } = useItemMaster();
 
   // Memoize the order processor to prevent infinite re-renders
-  const orderProcessor = useMemo(() => 
-    new OrderProcessor(boxes, createItemsFromOrderData), 
-    [boxes, createItemsFromOrderData]
+  const orderProcessor = useMemo(
+    () => new OrderProcessor(boxes, createItemsFromOrderData, masterItems),
+    [boxes, createItemsFromOrderData, masterItems]
   );
+
 
   useEffect(() => {
     const loadShippingGroups = async () => {
