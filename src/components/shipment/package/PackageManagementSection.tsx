@@ -407,7 +407,8 @@ export const PackageManagementSection: React.FC<PackageManagementSectionProps> =
       const items = createItemsFromOrderData(selectedOrderItems, masterItems);
       if (items.length > 0) {
         console.log('🎯 Running cartonization with', items.length, 'items and', boxes.length, 'boxes');
-        calculateMultiPackage(items, 'balanced');
+        const numericOrderId = orderId ? Number(orderId) : undefined;
+        calculateMultiPackage(items, 'balanced', Number.isFinite(numericOrderId as number) ? (numericOrderId as number) : undefined);
       }
     }
   }, [selectedOrderItems, masterItems, boxes]);
