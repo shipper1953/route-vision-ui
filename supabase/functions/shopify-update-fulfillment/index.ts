@@ -1030,6 +1030,8 @@ async function handleLegacyFlow(
     shopify_order_id: mapping.shopify_order_id,
     ship_tornado_order_id: orderShipment.order_id,
     metadata: {
+      shipment_id: String(shipmentId),
+      package_index: orderShipment.package_index ?? 0,
       fulfillment_id: fulfillment.id,
       tracking_number: trackingNumber,
       tracking_url: trackingUrl,
