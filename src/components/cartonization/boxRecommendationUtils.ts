@@ -221,7 +221,7 @@ export const analyzeBoxRecommendations = async (
       continue;
     }
     
-    const items = createItemsFromOrderData(order.items, []);
+    const items = createItemsFromOrderData(order.items, masterItems);
     if (items.length === 0) continue;
 
     // Get current best recommendation
