@@ -209,6 +209,10 @@ export const ShippingOptionsSection = ({
         shipmentId = rateResponse.easypost_shipment.id;
       } else if (provider === "shippo" && rateResponse.shippo_shipment?.object_id) {
         shipmentId = rateResponse.shippo_shipment.object_id;
+      } else if (provider === "easyship" && rateResponse.easyship_shipment?.object_id) {
+        // Synthetic ID — purchase-label will detect and create a real Easyship shipment
+        // from the forwarded shipmentPayload.
+        shipmentId = rateResponse.easyship_shipment.object_id;
       }
 
       const data = form.getValues();
