@@ -197,5 +197,9 @@ export const convertSupabaseToOrderData = (supabaseOrder: any): OrderData => {
     companyId: supabaseOrder.company_id || undefined,
     estimatedDeliveryDate: supabaseOrder.estimated_delivery_date || undefined,
     actualDeliveryDate: supabaseOrder.actual_delivery_date || undefined,
-  };
+    items_total: supabaseOrder.items_total ?? undefined,
+    items_shipped: supabaseOrder.items_shipped ?? undefined,
+    fulfillment_percentage: supabaseOrder.fulfillment_percentage ?? undefined,
+    fulfillment_status: supabaseOrder.fulfillment_status ?? undefined,
+  } as any;
 };
