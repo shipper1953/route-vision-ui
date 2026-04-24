@@ -119,10 +119,10 @@ export async function recalculateOrderCartonization(orderId: number): Promise<Re
     let result = engine.calculateOptimalBox(enrichedItems, false);
     let multiPackageResult = null;
 
-    // Try multi-package if needed
-    if (!result || result.confidence < 60) {
+    // Multi-package fallback only when no single box can fit at ≤99% utilization
+    if (!result) {
       multiPackageResult = engine.calculateMultiPackageCartonization(enrichedItems, 'balanced');
-      
+
       if (multiPackageResult) {
         result = {
           recommendedBox: multiPackageResult.packages[0].box,
