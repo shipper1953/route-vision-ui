@@ -238,6 +238,9 @@ export const ShippingOptionsSection = ({
       };
 
       const labelService = new LabelService("");
+      const easyshipShipmentPayload =
+        provider === "easyship" ? rateResponse.easyship_shipment?.shipmentPayload : undefined;
+
       const result = await labelService.purchaseLabel(
         shipmentId,
         selectedRate.id,
@@ -246,7 +249,8 @@ export const ShippingOptionsSection = ({
         selectedBoxData,
         selectedItems,
         originalCost,
-        markedUpCost
+        markedUpCost,
+        easyshipShipmentPayload
       );
 
       const normalizedResult = {
