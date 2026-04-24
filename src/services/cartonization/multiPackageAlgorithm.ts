@@ -196,14 +196,15 @@ export class MultiPackageAlgorithm {
   }
 
   private splitByVolume(items: Item[]): Item[][] {
-    // Sort boxes by volume to get target package sizes
-    const sortedBoxes = [...this.boxes].sort((a, b) => 
+    // Target each group volume to ~99% of the median box volume so the
+    // selected box for each group lands close to 99% utilization.
+    const sortedBoxes = [...this.boxes].sort((a, b) =>
       (a.length * a.width * a.height) - (b.length * b.width * b.height)
     );
-    
-    const targetVolume = sortedBoxes[Math.floor(sortedBoxes.length / 2)]?.length * 
-                        sortedBoxes[Math.floor(sortedBoxes.length / 2)]?.width * 
-                        sortedBoxes[Math.floor(sortedBoxes.length / 2)]?.height || 1000;
+
+    const median = sortedBoxes[Math.floor(sortedBoxes.length / 2)];
+    const medianVolume = median ? median.length * median.width * median.height : 1000;
+    const targetVolume = medianVolume * 0.99;
 
     const groups: Item[][] = [];
     let currentGroup: Item[] = [];
@@ -211,8 +212,8 @@ export class MultiPackageAlgorithm {
 
     for (const item of items) {
       const itemVolume = item.length * item.width * item.height * item.quantity;
-      
-      if (currentVolume + itemVolume <= targetVolume * 0.8) { // 80% fill target
+
+      if (currentVolume + itemVolume <= targetVolume) {
         currentGroup.push(item);
         currentVolume += itemVolume;
       } else {
