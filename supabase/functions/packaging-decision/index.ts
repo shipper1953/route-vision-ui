@@ -168,15 +168,16 @@ function scoreBox(
 }
 
 // Deterministic tie-breakers, identical for all tenants:
-// 1) lowest dimensional weight, 2) lowest box cost, 3) smallest outer volume
+// 1) smallest outer volume (= highest utilization for the same item set),
+// 2) lowest dimensional weight, 3) lowest box cost
 function applyTieBreakers(a: BoxAnalysis, b: BoxAnalysis): number {
+  if (Math.abs(a.outerVolume - b.outerVolume) > 0.01) {
+    return a.outerVolume - b.outerVolume;
+  }
   if (Math.abs(a.dimensionalWeight - b.dimensionalWeight) > 0.01) {
     return a.dimensionalWeight - b.dimensionalWeight;
   }
-  if (Math.abs(a.cost - b.cost) > 0.01) {
-    return a.cost - b.cost;
-  }
-  return a.outerVolume - b.outerVolume;
+  return a.cost - b.cost;
 }
 
 // Build a BoxAnalysis for a given item set + box, returns null if it doesn't fit
