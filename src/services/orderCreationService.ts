@@ -199,18 +199,17 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
 
           console.log("Running cartonization engine...");
           
-          // Try single-package first, then multi-package if needed
+          // Single-package first; only fall back to multi-package when no
+          // single box can hold all items at ≤99% utilization.
           let result = engine.calculateOptimalBox(items, false);
           let multiPackageResult = null;
-          
-          // If single package fails or has low confidence, try multi-package
-          if (!result || result.confidence < 60) {
-            console.log('Single-package solution insufficient, trying multi-package...');
+
+          if (!result) {
+            console.log('No single box fits at ≤99% utilization, trying multi-package...');
             multiPackageResult = engine.calculateMultiPackageCartonization(items, 'balanced');
-            
+
             if (multiPackageResult) {
               console.log(`Multi-package solution found: ${multiPackageResult.totalPackages} packages`);
-              // Create a result from multi-package for storage
               result = {
                 recommendedBox: multiPackageResult.packages[0].box,
                 utilization: multiPackageResult.packages[0].utilization,
