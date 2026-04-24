@@ -787,8 +787,16 @@ export const ShippingOptionsSection = ({
           <CardContent className="py-3 flex items-center gap-2 text-sm">
             <Package className="h-4 w-4 text-blue-600" />
             <span>
-              This order requires <strong>{multiParcels.length} packages</strong>. The selected
-              carrier &amp; service will be used to purchase a label for each package.
+              This order requires <strong>{multiParcels.length} packages</strong>. Prices below
+              show the <strong>total across all packages</strong> with a per-package breakdown.
+              {fetchingPackageRates && (
+                <span className="ml-2 inline-flex items-center gap-1 text-blue-700">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Loading rates for additional packages…
+                </span>
+              )}
+              {packageRateError && (
+                <span className="ml-2 text-destructive">{packageRateError}</span>
+              )}
             </span>
           </CardContent>
         </Card>
