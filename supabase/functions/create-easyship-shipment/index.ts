@@ -190,17 +190,27 @@ serve(async (req) => {
       );
     }
 
-    const rates = (data.rates || []).map((r: any) => {
+    const rates = (data.rates || []).map((r: any, idx: number) => {
       const courierService = r.courier_service || {};
       const courierId = r.courier_id || courierService.courier_id || r.id;
       const carrierName = r.courier_name || courierService.umbrella_name || courierService.name || 'Easyship';
       const serviceName = r.service_name || courierService.name || r.full_description || carrierName;
       const courierLogoUrl = r.courier_logo_url || courierService.logo;
 
+      // CRITICAL: each rate must have a UNIQUE id. Easyship returns the same courier_id
+      // for every service from the same carrier (e.g. all FedEx services share one courier_id),
+      // so we must derive the rate id from the per-service id, not the courier id.
+      const serviceLevelId =
+        courierService.id ||
+        r.courier_service_id ||
+        r.id ||
+        `${courierId}-${serviceName}-${idx}`;
+
       return {
-        object_id: courierId,
-        rate_id: courierId,
+        object_id: serviceLevelId,
+        rate_id: serviceLevelId,
         courier_id: courierId,
+        courier_service_id: serviceLevelId,
         courier_name: carrierName,
         courier_logo_url: courierLogoUrl,
         service_name: serviceName,
