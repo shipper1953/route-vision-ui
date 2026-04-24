@@ -43,8 +43,8 @@ export const useBoxOrderStats = () => {
         for (const order of orders) {
           // Check if order.items is an array and has items
           if (order.items && Array.isArray(order.items) && order.items.length > 0) {
-            // Create items from order data (using empty master items array for now)
-            const items = createItemsFromOrderData(order.items, []);
+            // Use Item Master dimensions (never order/Shopify dims)
+            const items = createItemsFromOrderData(order.items, masterItems);
             
             if (items.length > 0) {
               const result = engine.calculateOptimalBox(items);
