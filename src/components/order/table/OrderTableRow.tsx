@@ -96,7 +96,9 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
                 confidence: refreshedData.confidence || 0,
                 totalWeight: refreshedData.total_weight || 0,
                 itemsWeight: refreshedData.items_weight || 0,
-                boxWeight: refreshedData.box_weight || 0
+                boxWeight: refreshedData.box_weight || 0,
+                totalPackages: refreshedData.total_packages || 1,
+                packages: Array.isArray(refreshedData.packages) ? refreshedData.packages : []
               });
             }
           }
