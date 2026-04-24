@@ -44,16 +44,30 @@ interface ShippingOptionsSectionProps {
   orderId?: string;
 }
 
+interface PackageRateBreakdown {
+  packageIndex: number;
+  boxName?: string;
+  amount: number;
+  matched: boolean; // false when we had to fall back to a different service for this package
+  matchedCarrier?: string;
+  matchedService?: string;
+}
+
 interface SortedRate {
   rate: MarkedUpRate | MarkedUpSmartRate;
   meetsDeliveryDate: boolean | null;
   estimatedDeliveryDate: Date | null;
+  // Multi-package: total cost across all packages and per-package breakdown
+  totalAmount?: number;
+  packageBreakdown?: PackageRateBreakdown[];
 }
 
 const getSafeRateAmount = (value: string): number => {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
 };
+
+const rateKey = (r: any) => `${r.provider || ''}|${r.carrier || ''}|${r.service || ''}`;
 
 export const ShippingOptionsSection = ({
   selectedItems,
