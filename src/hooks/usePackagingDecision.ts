@@ -37,6 +37,19 @@ export interface PackagingDecisionResult {
     reason: string;
     score: number;
   }>;
+  multi_package?: {
+    total_packages: number;
+    total_cost: number;
+    average_utilization: number;
+    packages: Array<{
+      box: any;
+      items: Item[];
+      utilization: number;
+      dimensional_weight: number;
+      void_ratio: number;
+      total_weight: number;
+    }>;
+  };
   metadata: {
     algorithm_version: string;
     policy_version_id: string | null;
@@ -46,6 +59,7 @@ export interface PackagingDecisionResult {
     total_volume: number;
     boxes_evaluated: number;
     has_fragile_items: boolean;
+    target_utilization?: number;
   };
 }
 

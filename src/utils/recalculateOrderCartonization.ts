@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import { CartonizationEngine } from "@/services/cartonization/cartonizationEngine";
 
 interface RecalculateResult {
   orderId: number;
@@ -89,101 +88,39 @@ export async function recalculateOrderCartonization(orderId: number): Promise<Re
       return { orderId, success: false, error: 'No items with dimensions found' };
     }
 
-    // Fetch company boxes
-    const { data: boxes, error: boxError } = await supabase
-      .from('boxes')
-      .select('*')
-      .eq('company_id', order.company_id)
-      .eq('is_active', true);
-
-    if (boxError || !boxes || boxes.length === 0) {
-      return { orderId, success: false, error: 'No active boxes found' };
-    }
-
-    // Run cartonization
-    const engine = new CartonizationEngine(boxes.map(box => ({
-      id: box.id,
-      name: box.name,
-      sku: box.sku || '',
-      length: Number(box.length),
-      width: Number(box.width),
-      height: Number(box.height),
-      maxWeight: Number(box.max_weight),
-      cost: Number(box.cost),
-      inStock: box.in_stock,
-      minStock: box.min_stock || 10,
-      maxStock: box.max_stock || 100,
-      type: box.box_type as 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom'
-    })));
-
-    let result = engine.calculateOptimalBox(enrichedItems, false);
-    let multiPackageResult = null;
-
-    // Multi-package fallback only when no single box can fit at ≤99% utilization
-    if (!result) {
-      multiPackageResult = engine.calculateMultiPackageCartonization(enrichedItems, 'balanced');
-
-      if (multiPackageResult) {
-        result = {
-          recommendedBox: multiPackageResult.packages[0].box,
-          utilization: multiPackageResult.packages[0].utilization,
-          itemsFit: true,
-          totalWeight: multiPackageResult.totalWeight,
-          totalVolume: multiPackageResult.totalVolume,
-          dimensionalWeight: multiPackageResult.packages[0].dimensionalWeight,
-          savings: 0,
-          confidence: multiPackageResult.confidence,
-          alternatives: [],
-          rulesApplied: multiPackageResult.rulesApplied,
-          processingTime: multiPackageResult.processingTime,
-          multiPackageResult: multiPackageResult
-        };
+    // Run canonical packaging-decision (single source of truth).
+    const { data: decisionData, error: decisionError } = await supabase.functions.invoke(
+      'packaging-decision',
+      {
+        body: {
+          order_id: Number(orderId),
+          items: enrichedItems.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            length: Number(item.length),
+            width: Number(item.width),
+            height: Number(item.height),
+            weight: Number(item.weight),
+            quantity: Number(item.quantity || 1),
+            fragility: item.fragility || 'low',
+            category: item.category || 'order_item'
+          }))
+        }
       }
-    }
+    );
 
-    if (!result || !result.recommendedBox) {
-      return { orderId, success: false, error: 'No suitable box found' };
-    }
-
-    // Calculate weights
-    const itemsWeight = enrichedItems.reduce((sum: number, item: any) => sum + (item.weight * item.quantity), 0);
-    const boxWeight = result.recommendedBox.cost * 0.1;
-    const totalWeight = itemsWeight + boxWeight;
-
-    // Store cartonization data
-    const cartonizationRecord = {
-      order_id: orderId,
-      recommended_box_id: result.recommendedBox.id,
-      recommended_box_data: {
-        ...result.recommendedBox,
-        multiPackageResult: multiPackageResult || null
-      },
-      utilization: Number(result.utilization),
-      confidence: Number(result.confidence),
-      total_weight: Number(totalWeight),
-      items_weight: Number(itemsWeight),
-      box_weight: Number(boxWeight),
-      calculation_timestamp: new Date().toISOString(),
-      packages: multiPackageResult?.packages || [],
-      total_packages: multiPackageResult?.totalPackages || 1,
-      splitting_strategy: multiPackageResult?.splittingStrategy || null,
-      optimization_objective: multiPackageResult?.optimizationObjective || 'balanced'
-    };
-
-    const { error: cartonError } = await supabase
-      .from('order_cartonization')
-      .upsert(cartonizationRecord, {
-        onConflict: 'order_id'
-      });
-
-    if (cartonError) {
-      return { orderId, success: false, error: `Database error: ${cartonError.message}` };
+    if (decisionError || decisionData?.error || !decisionData?.recommended?.box_name) {
+      return {
+        orderId,
+        success: false,
+        error: `Failed to recalculate via packaging-decision: ${decisionError?.message || decisionData?.error || 'No recommendation returned'}`
+      };
     }
 
     return {
       orderId,
       success: true,
-      boxName: result.recommendedBox.name
+      boxName: decisionData.recommended.box_name
     };
 
   } catch (error) {
