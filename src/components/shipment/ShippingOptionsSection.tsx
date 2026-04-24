@@ -270,7 +270,78 @@ export const ShippingOptionsSection = ({
         }
       }
 
-      return { rate, meetsDeliveryDate, estimatedDeliveryDate };
+      // Multi-package: build per-package breakdown using the rates we fetched
+      // for packages 2..N. Match by provider+carrier+service; if the package
+      // doesn't have an exact match, fall back to that package's cheapest
+      // rate from the same provider so the total reflects what we'd actually buy.
+      let totalAmount: number | undefined;
+      let packageBreakdown: PackageRateBreakdown[] | undefined;
+      if (isMultiPackage) {
+        const data = form.getValues();
+        const firstAmount = parseFloat(rate.rate);
+        const firstBox = (data.selectedBoxes || []).find((b: any) => b.packageIndex === 0)
+          || (data.selectedBoxes || [])[0];
+        packageBreakdown = [{
+          packageIndex: 0,
+          boxName: firstBox?.boxName,
+          amount: Number.isFinite(firstAmount) ? firstAmount : 0,
+          matched: true,
+          matchedCarrier: rate.carrier,
+          matchedService: rate.service,
+        }];
+        let runningTotal = packageBreakdown[0].amount;
+        const targetKey = rateKey(rate);
+        const targetProvider = (rate as any).provider;
+
+        for (let i = 0; i < extraPackageRates.length; i++) {
+          const pkgIdx = i + 1; // index 0 in extraPackageRates = package 2
+          const pkgMap = extraPackageRates[i];
+          const boxEntry = (data.selectedBoxes || []).find((b: any) => b.packageIndex === pkgIdx)
+            || (data.selectedBoxes || [])[pkgIdx];
+          let candidate: any = pkgMap.get(targetKey);
+          let matched = true;
+          if (!candidate) {
+            // fall back to cheapest from same provider
+            const sameProvider = Array.from(pkgMap.values()).filter((r: any) => r.provider === targetProvider);
+            if (sameProvider.length > 0) {
+              candidate = sameProvider.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+              matched = false;
+            }
+          }
+          if (!candidate) {
+            // last resort: cheapest of any provider
+            const all = Array.from(pkgMap.values());
+            if (all.length > 0) {
+              candidate = all.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+              matched = false;
+            }
+          }
+          if (candidate) {
+            const markedCandidate = applyMarkupToRates([candidate], company)[0];
+            const amt = parseFloat(markedCandidate.rate);
+            const safeAmt = Number.isFinite(amt) ? amt : 0;
+            packageBreakdown.push({
+              packageIndex: pkgIdx,
+              boxName: boxEntry?.boxName,
+              amount: safeAmt,
+              matched,
+              matchedCarrier: candidate.carrier,
+              matchedService: candidate.service,
+            });
+            runningTotal += safeAmt;
+          } else {
+            packageBreakdown.push({
+              packageIndex: pkgIdx,
+              boxName: boxEntry?.boxName,
+              amount: 0,
+              matched: false,
+            });
+          }
+        }
+        totalAmount = runningTotal;
+      }
+
+      return { rate, meetsDeliveryDate, estimatedDeliveryDate, totalAmount, packageBreakdown };
     });
 
     // Sort order for Create Shipment:
