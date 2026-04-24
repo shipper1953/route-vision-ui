@@ -17,29 +17,45 @@ Deno.serve(async (req) => {
       }
     );
 
-    const {
-      company_id,
-      item_id,
-      warehouse_id,
-      location_id,
-      quantity_change,
-      reason,
-      notes,
-      lot_number,
-      serial_number,
-      user_id
-    } = await req.json();
+    const body = await req.json();
+    // Normalize empty strings to null (UUID columns reject "")
+    const nz = (v: unknown) => (v === '' || v === undefined ? null : v);
+    const company_id = nz(body.company_id);
+    const item_id = nz(body.item_id);
+    const warehouse_id = nz(body.warehouse_id);
+    const location_id = nz(body.location_id);
+    const quantity_change = Number(body.quantity_change ?? 0);
+    const reason = body.reason ?? null;
+    const notes = body.notes ?? null;
+    const lot_number = nz(body.lot_number);
+    const serial_number = nz(body.serial_number);
+    const user_id = nz(body.user_id);
+
+    if (!company_id || !item_id || !warehouse_id) {
+      return new Response(
+        JSON.stringify({ error: 'company_id, item_id and warehouse_id are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Find or create inventory level
-    const { data: inventory, error: fetchError } = await supabaseClient
+    let fetchQuery = supabaseClient
       .from('inventory_levels')
       .select('*')
       .eq('item_id', item_id)
-      .eq('warehouse_id', warehouse_id)
-      .eq('location_id', location_id)
-      .is('lot_number', lot_number || null)
-      .is('serial_number', serial_number || null)
-      .maybeSingle();
+      .eq('warehouse_id', warehouse_id);
+
+    fetchQuery = location_id
+      ? fetchQuery.eq('location_id', location_id)
+      : fetchQuery.is('location_id', null);
+    fetchQuery = lot_number
+      ? fetchQuery.eq('lot_number', lot_number)
+      : fetchQuery.is('lot_number', null);
+    fetchQuery = serial_number
+      ? fetchQuery.eq('serial_number', serial_number)
+      : fetchQuery.is('serial_number', null);
+
+    const { data: inventory, error: fetchError } = await fetchQuery.maybeSingle();
 
     if (fetchError) throw fetchError;
 
