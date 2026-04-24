@@ -58,6 +58,11 @@ const EditOrder = () => {
         return;
       }
 
+      // Wait for the item master to load so we can resolve customerId and items
+      if (itemsLoading) {
+        return;
+      }
+
       try {
         setLoading(true);
         const orderData = await fetchOrderById(id);
@@ -66,13 +71,13 @@ const EditOrder = () => {
           navigate("/orders");
           return;
         }
-        
+
         if (orderData.status !== 'ready_to_ship') {
           toast.error("Only orders with 'ready to ship' status can be edited");
           navigate("/orders");
           return;
         }
-        
+
         setOrder(orderData);
 
         // Pre-populate the form with existing order data
@@ -80,7 +85,12 @@ const EditOrder = () => {
         form.setValue("customerCompany", orderData.customerCompany || "");
         form.setValue("customerEmail", orderData.customerEmail || "");
         form.setValue("customerPhone", orderData.customerPhone || "");
-        
+
+        // Warehouse
+        if (orderData.warehouseId) {
+          form.setValue("warehouseId", orderData.warehouseId);
+        }
+
         // Safely parse date - only set if valid
         if (orderData.requiredDeliveryDate) {
           const parsedDate = new Date(orderData.requiredDeliveryDate);
@@ -88,21 +98,38 @@ const EditOrder = () => {
             form.setValue("requiredDeliveryDate", parsedDate);
           }
         }
-        
-        // Convert existing items data to orderItems array
+
+        // Convert existing items data to orderItems array, resolving itemId via
+        // the Item Master (matching by stored itemId first, then SKU, then name).
+        let resolvedCustomerId = "";
         if (orderData.items && Array.isArray(orderData.items)) {
-          const existingOrderItems = orderData.items.map((item: any) => ({
-            itemId: item.itemId || item.id,
-            quantity: item.quantity || 1,
-            unitPrice: item.unitPrice || 0
-          }));
+          const existingOrderItems = orderData.items
+            .map((item: any) => {
+              const masterMatch =
+                masterItems.find((mi) => mi.id === (item.itemId || item.id)) ||
+                masterItems.find((mi) => item.sku && mi.sku === item.sku) ||
+                masterItems.find((mi) => item.name && mi.name === item.name);
+
+              if (masterMatch && !resolvedCustomerId && masterMatch.customerId) {
+                resolvedCustomerId = masterMatch.customerId;
+              }
+
+              return {
+                itemId: masterMatch?.id || item.itemId || item.id || "",
+                quantity: item.quantity || 1,
+                unitPrice: item.unitPrice || 0,
+              };
+            })
+            .filter((oi) => oi.itemId);
+
+          if (resolvedCustomerId) {
+            form.setValue("customerId", resolvedCustomerId);
+          }
           form.setValue("orderItems", existingOrderItems);
         } else {
           form.setValue("orderItems", []);
         }
-        
-        // For now, we'll let the user select the warehouse since OrderData doesn't include it
-        // This could be enhanced to fetch and pre-populate the warehouse from the order record
+
         // Set shipping address
         if (orderData.shippingAddress) {
           form.setValue("street1", orderData.shippingAddress.street1 || "");
@@ -112,7 +139,7 @@ const EditOrder = () => {
           form.setValue("zip", orderData.shippingAddress.zip || "");
           form.setValue("country", orderData.shippingAddress.country || "US");
         }
-        
+
       } catch (error) {
         console.error("Error loading order:", error);
         toast.error("Failed to load order");
@@ -123,7 +150,7 @@ const EditOrder = () => {
     };
 
     loadOrder();
-  }, [id, navigate, form]);
+  }, [id, navigate, form, itemsLoading, masterItems]);
 
   if (loading) {
     return (
