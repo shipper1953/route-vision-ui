@@ -170,7 +170,74 @@ export const ShippingOptionsSection = ({
     }
   };
 
-  const requiredDeliveryDate = form.watch("requiredDeliveryDate");
+  // For multi-package shipments, fetch rates for packages 2..N so we can show
+  // the true total cost (and per-package breakdown) on each shipping option.
+  useEffect(() => {
+    if (!isMultiPackage || !rateResponse?.rates?.length) return;
+
+    let cancelled = false;
+    const fetchExtras = async () => {
+      setFetchingPackageRates(true);
+      setPackageRateError(null);
+      try {
+        const data = form.getValues();
+        const fromAddress = {
+          name: data.fromName, company: data.fromCompany,
+          street1: data.fromStreet1, street2: data.fromStreet2,
+          city: data.fromCity, state: data.fromState,
+          zip: data.fromZip, country: data.fromCountry,
+          phone: data.fromPhone || '5555555555', email: data.fromEmail,
+        };
+        const toAddress = {
+          name: data.toName, company: data.toCompany,
+          street1: data.toStreet1, street2: data.toStreet2,
+          city: data.toCity, state: data.toState,
+          zip: data.toZip, country: data.toCountry,
+          phone: data.toPhone || '5555555555', email: data.toEmail,
+        };
+
+        const rateService = new RateShoppingService();
+        const extras: Array<Map<string, any>> = [];
+        // Skip index 0 — already covered by rateResponse
+        for (let i = 1; i < multiParcels.length; i++) {
+          if (cancelled) return;
+          const parcel = multiParcels[i];
+          try {
+            const combined = await rateService.getRatesFromAllProviders({
+              from_address: fromAddress,
+              to_address: toAddress,
+              parcel: {
+                length: parcel.length,
+                width: parcel.width,
+                height: parcel.height,
+                weight: parcel.weight,
+              },
+              options: { label_format: 'PDF' },
+            } as any);
+            const map = new Map<string, any>();
+            for (const r of (combined.rates || [])) {
+              map.set(rateKey(r), r);
+            }
+            extras.push(map);
+          } catch (err) {
+            console.error(`Failed to fetch rates for package ${i + 1}:`, err);
+            extras.push(new Map()); // empty map = no rates available for this package
+          }
+        }
+        if (!cancelled) setExtraPackageRates(extras);
+      } catch (err) {
+        if (!cancelled) {
+          setPackageRateError(err instanceof Error ? err.message : 'Failed to fetch package rates');
+        }
+      } finally {
+        if (!cancelled) setFetchingPackageRates(false);
+      }
+    };
+    fetchExtras();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMultiPackage, rateResponse?.id, multiParcels.length]);
+
 
   const getSortedRates = (): SortedRate[] => {
     if (!rateResponse?.rates) return [];
