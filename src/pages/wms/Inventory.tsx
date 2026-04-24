@@ -116,13 +116,11 @@ export default function Inventory() {
           />
         )}
 
-        <AdjustInventoryDialog
+        <InventoryItemDialog
           open={adjustDialogOpen}
           onOpenChange={setAdjustDialogOpen}
           onAdjust={adjustInventory}
-          itemId={selectedItem?.item_id}
-          warehouseId={selectedItem?.warehouse_id}
-          locationId={selectedItem?.location_id}
+          item={selectedItem}
         />
       </div>
     </TmsLayout>
