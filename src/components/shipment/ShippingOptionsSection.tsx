@@ -647,7 +647,7 @@ export const ShippingOptionsSection = ({
             {purchasingLabel ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {purchaseProgress || 'Purchasing Label...'}
+                {isMultiPackage ? (purchaseProgress || 'Processing packages...') : (purchaseProgress || 'Purchasing Label...')}
               </>
             ) : (
               <>
