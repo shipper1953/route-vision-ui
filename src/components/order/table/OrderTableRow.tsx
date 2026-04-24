@@ -250,7 +250,9 @@ export const OrderTableRow = ({ order }: OrderTableRowProps) => {
             confidence: data.confidence || 0,
             totalWeight: data.total_weight || 0,
             itemsWeight: data.items_weight || 0,
-            boxWeight: data.box_weight || 0
+            boxWeight: data.box_weight || 0,
+            totalPackages: data.total_packages || 1,
+            packages: Array.isArray(data.packages) ? data.packages : []
           });
         }
       } else {
