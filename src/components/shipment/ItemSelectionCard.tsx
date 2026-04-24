@@ -218,6 +218,24 @@ export const ItemSelectionCard = ({
                 const selectedQty = localSelection.get(itemKey) || 0;
                 const alreadyShipped = getShippedQuantity(item, index);
 
+                // Resolve dims/weight from nested `dimensions` or top-level fields
+                const dims = item.dimensions ?? (
+                  (item.length || item.width || item.height || item.weight)
+                    ? { length: item.length, width: item.width, height: item.height, weight: item.weight }
+                    : null
+                );
+                const hasDims = dims && (dims.length || dims.width || dims.height);
+                const hasWeight = dims && (dims.weight ?? null) !== null && dims.weight !== undefined;
+                const dimsLabel = hasDims
+                  ? `${dims.length ?? '?'}"×${dims.width ?? '?'}"×${dims.height ?? '?'}"`
+                  : null;
+                const weightLabel = hasWeight ? `${dims.weight} lbs` : null;
+                const metaParts = [
+                  `SKU: ${item.sku || 'N/A'}`,
+                  dimsLabel,
+                  weightLabel,
+                ].filter(Boolean);
+
                 if (remaining <= 0) {
                   return (
                     <div key={itemKey} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg opacity-60">
@@ -226,10 +244,7 @@ export const ItemSelectionCard = ({
                         <div className="flex-1">
                           <div className="font-medium text-sm">{item.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            SKU: {item.sku || 'N/A'}
-                            {item.dimensions && (
-                              <> • {item.dimensions.length}"×{item.dimensions.width}"×{item.dimensions.height}" • {item.dimensions.weight} lbs</>
-                            )}
+                            {metaParts.join(' • ')}
                           </div>
                         </div>
                         <Badge variant="secondary">
@@ -250,10 +265,7 @@ export const ItemSelectionCard = ({
                       <div className="flex-1">
                         <div className="font-medium text-sm">{item.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          SKU: {item.sku || 'N/A'}
-                          {item.dimensions && (
-                            <> • {item.dimensions.length}"×{item.dimensions.width}"×{item.dimensions.height}" • {item.dimensions.weight} lbs</>
-                          )}
+                          {metaParts.join(' • ')}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
