@@ -64,7 +64,11 @@ export class RateShoppingService {
         const easyPostRates = easyPostResponse.rates.map((rate: Rate) => ({
           ...rate,
           provider: 'easypost' as const,
-          original_rate: rate
+          original_rate: rate,
+          shipment_id: easyPostResponse.id,
+          _shipment_data: {
+            easypost_shipment: easyPostResponse,
+          },
         }));
         combinedRates.push(...easyPostRates);
       }
@@ -108,7 +112,11 @@ export class RateShoppingService {
           delivery_date_guaranteed: false,
           est_delivery_days: rate.estimated_days,
           provider: 'shippo' as const,
-          original_rate: rate
+          original_rate: rate,
+          shipment_id: shippoResponse.object_id,
+          _shipment_data: {
+            shippo_shipment: shippoResponse,
+          },
         } as CombinedRate));
         combinedRates.push(...shippoRates);
       }
@@ -144,8 +152,11 @@ export class RateShoppingService {
           est_delivery_days: rate.max_delivery_time ?? rate.min_delivery_time,
           provider: 'easyship' as const,
           original_rate: rate,
-          // Carry shipment id so the purchase flow can pass it back
           easyship_shipment_id: easyshipResponse.object_id,
+          shipment_id: easyshipResponse.object_id,
+          _shipment_data: {
+            easyship_shipment: easyshipResponse,
+          },
         } as CombinedRate));
         combinedRates.push(...easyshipRates);
       }
