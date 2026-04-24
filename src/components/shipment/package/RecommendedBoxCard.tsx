@@ -50,8 +50,8 @@ export const RecommendedBoxCard = ({
           <div className="space-y-2">
             <div className="flex justify-between">
               <span>Space Utilization:</span>
-              <span className={`font-semibold ${boxUtilization > 95 ? 'text-red-600' : boxUtilization > 80 ? 'text-green-600' : 'text-yellow-600'}`}>
-                {boxUtilization.toFixed(1)}%
+              <span className={`font-semibold ${boxUtilization > 99 ? 'text-red-600' : boxUtilization >= 90 ? 'text-green-600' : boxUtilization >= 70 ? 'text-yellow-600' : 'text-orange-600'}`}>
+                {boxUtilization.toFixed(1)}% <span className="text-xs text-muted-foreground font-normal">(target ≤ 99%)</span>
               </span>
             </div>
             <div className="flex justify-between">
