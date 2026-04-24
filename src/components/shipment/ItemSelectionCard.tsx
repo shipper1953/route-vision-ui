@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { ShoppingCart, Package, Weight } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SelectedItem } from "@/types/fulfillment";
 import { supabase } from "@/integrations/supabase/client";
+import { useItemMaster } from "@/hooks/useItemMaster";
 
 interface ItemSelectionCardProps {
   orderItems: any[];
@@ -24,6 +25,40 @@ export const ItemSelectionCard = ({
 }: ItemSelectionCardProps) => {
   const [localSelection, setLocalSelection] = useState<Map<string, number>>(new Map());
   const [shippedItemsFromDB, setShippedItemsFromDB] = useState<Map<string, number>>(new Map());
+  const { items: masterItems } = useItemMaster();
+
+  // Build SKU + id lookup maps so we can backfill dims/weight when the order
+  // line item only carries name/sku/qty (typical for Shopify-imported orders).
+  const masterBySku = useMemo(() => {
+    const m = new Map<string, any>();
+    masterItems.forEach((mi: any) => {
+      if (mi?.sku) m.set(String(mi.sku).toLowerCase(), mi);
+    });
+    return m;
+  }, [masterItems]);
+  const masterById = useMemo(() => {
+    const m = new Map<string, any>();
+    masterItems.forEach((mi: any) => {
+      if (mi?.id) m.set(String(mi.id), mi);
+    });
+    return m;
+  }, [masterItems]);
+
+  const resolveDims = (item: any) => {
+    if (item?.dimensions && (item.dimensions.length || item.dimensions.width || item.dimensions.height || item.dimensions.weight)) {
+      return item.dimensions;
+    }
+    if (item?.length || item?.width || item?.height || item?.weight) {
+      return { length: item.length, width: item.width, height: item.height, weight: item.weight };
+    }
+    const lookupId = item?.itemId || item?.id;
+    const master = (item?.sku && masterBySku.get(String(item.sku).toLowerCase()))
+      || (lookupId && masterById.get(String(lookupId)));
+    if (master) {
+      return { length: master.length, width: master.width, height: master.height, weight: master.weight };
+    }
+    return null;
+  };
 
   // Create a unique key combining itemId, name, sku, and unitPrice to handle duplicate line items
   const getUniqueItemKey = (item: any, index?: number): string => {
@@ -218,12 +253,8 @@ export const ItemSelectionCard = ({
                 const selectedQty = localSelection.get(itemKey) || 0;
                 const alreadyShipped = getShippedQuantity(item, index);
 
-                // Resolve dims/weight from nested `dimensions` or top-level fields
-                const dims = item.dimensions ?? (
-                  (item.length || item.width || item.height || item.weight)
-                    ? { length: item.length, width: item.width, height: item.height, weight: item.weight }
-                    : null
-                );
+                // Resolve dims/weight from the order line, falling back to the master item record.
+                const dims = resolveDims(item);
                 const hasDims = dims && (dims.length || dims.width || dims.height);
                 const hasWeight = dims && (dims.weight ?? null) !== null && dims.weight !== undefined;
                 const dimsLabel = hasDims
