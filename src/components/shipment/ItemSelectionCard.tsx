@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { ShoppingCart, Package, Weight } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SelectedItem } from "@/types/fulfillment";
 import { supabase } from "@/integrations/supabase/client";
+import { useItemMaster } from "@/hooks/useItemMaster";
 
 interface ItemSelectionCardProps {
   orderItems: any[];
