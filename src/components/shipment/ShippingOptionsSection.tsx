@@ -437,34 +437,65 @@ export const ShippingOptionsSection = ({
           updatePkg(i, { rateStatus: 'running' });
 
           try {
-            const combined = await rateService.getRatesFromAllProviders({
-              from_address: fromAddress,
-              to_address: toAddress,
-              parcel: {
-                length: parcel.length,
-                width: parcel.width,
-                height: parcel.height,
-                weight: parcel.weight,
-              },
-              options: { label_format: 'PDF' },
-            } as any);
-
-            // Find the same carrier+service the user picked; fall back to same provider cheapest
-            let pkgRate: any = combined.rates.find(
-              (r: any) => r.provider === provider && r.carrier === carrier && r.service === service
-            );
+            // Reuse cached rates fetched during rate-shopping for packages 2..N
+            // to avoid re-creating Shippo/EasyPost shipments (which can flake with
+            // "Address not found" on rapid duplicate calls).
+            let pkgRate: any = null;
             let matchType: 'exact' | 'fallback-provider' | 'fallback-cheapest' = 'exact';
-            if (!pkgRate) {
-              const sameProvider = combined.rates.filter((r: any) => r.provider === provider);
-              if (sameProvider.length > 0) {
-                pkgRate = sameProvider.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
-                matchType = 'fallback-provider';
+
+            if (i === 0) {
+              pkgRate = selectedRate;
+            } else {
+              const cachedMap = extraPackageRates[i - 1];
+              const targetKey = `${provider}|${carrier}|${service}`;
+              if (cachedMap) {
+                pkgRate = cachedMap.get(targetKey);
+                if (!pkgRate) {
+                  const sameProvider = Array.from(cachedMap.values()).filter((r: any) => r.provider === provider);
+                  if (sameProvider.length > 0) {
+                    pkgRate = sameProvider.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+                    matchType = 'fallback-provider';
+                  }
+                }
+                if (!pkgRate) {
+                  const all = Array.from(cachedMap.values());
+                  if (all.length > 0) {
+                    pkgRate = all.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+                    matchType = 'fallback-cheapest';
+                  }
+                }
+              }
+
+              // Last-resort: re-fetch rates for this package if cache is empty/missing
+              if (!pkgRate) {
+                const combined = await rateService.getRatesFromAllProviders({
+                  from_address: fromAddress,
+                  to_address: toAddress,
+                  parcel: {
+                    length: parcel.length,
+                    width: parcel.width,
+                    height: parcel.height,
+                    weight: parcel.weight,
+                  },
+                  options: { label_format: 'PDF' },
+                } as any);
+                pkgRate = combined.rates.find(
+                  (r: any) => r.provider === provider && r.carrier === carrier && r.service === service
+                );
+                if (!pkgRate) {
+                  const sp = combined.rates.filter((r: any) => r.provider === provider);
+                  if (sp.length > 0) {
+                    pkgRate = sp.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+                    matchType = 'fallback-provider';
+                  }
+                }
+                if (!pkgRate && combined.rates.length > 0) {
+                  pkgRate = combined.rates.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
+                  matchType = 'fallback-cheapest';
+                }
               }
             }
-            if (!pkgRate && combined.rates.length > 0) {
-              pkgRate = combined.rates.sort((a: any, b: any) => parseFloat(a.rate) - parseFloat(b.rate))[0];
-              matchType = 'fallback-cheapest';
-            }
+
             if (!pkgRate) {
               throw new Error(`No rates available for package ${i + 1}`);
             }
@@ -489,11 +520,11 @@ export const ShippingOptionsSection = ({
             let pkgShipmentId: string | undefined;
             const stored = (pkgRate as any)?._shipment_data;
             if (pkgProvider === 'shippo') {
-              pkgShipmentId = pkgRate.shipment_id || stored?.shippo_shipment?.object_id || (combined as any)?.shippo_shipment?.object_id;
+              pkgShipmentId = pkgRate.shipment_id || stored?.shippo_shipment?.object_id;
             } else if (pkgProvider === 'easyship') {
-              pkgShipmentId = pkgRate.shipment_id || stored?.easyship_shipment?.object_id || (combined as any)?.easyship_shipment?.object_id;
+              pkgShipmentId = pkgRate.shipment_id || stored?.easyship_shipment?.object_id;
             } else {
-              pkgShipmentId = pkgRate.shipment_id || stored?.easypost_shipment?.id || (combined as any)?.easypost_shipment?.id;
+              pkgShipmentId = pkgRate.shipment_id || stored?.easypost_shipment?.id;
             }
             if (!pkgShipmentId) {
               throw new Error(`Missing shipment ID for package ${i + 1}`);
