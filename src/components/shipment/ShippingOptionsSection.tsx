@@ -861,68 +861,112 @@ const RateCard = ({
 }) => {
   const { rate } = sortedRate;
   const deliveryDays = rate.delivery_days || rate.est_delivery_days || 0;
+  const breakdown = sortedRate.packageBreakdown;
+  const hasBreakdown = Array.isArray(breakdown) && breakdown.length > 1;
+  const displayPrice = sortedRate.totalAmount ?? parseFloat(rate.rate);
+  const hasFallback = hasBreakdown && breakdown!.some((p) => !p.matched);
 
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        "w-full flex items-center justify-between p-4 rounded-lg border-2 transition-all text-left",
+        "w-full flex flex-col gap-3 p-4 rounded-lg border-2 transition-all text-left",
         isSelected
           ? "border-primary bg-primary/5 shadow-sm"
           : "border-border hover:border-primary/30 hover:bg-muted/30"
       )}
     >
-      <div className="flex items-center gap-4">
-        <div
-          className={cn(
-            "w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0",
-            isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div
+            className={cn(
+              "w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+              isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
+            )}
+          >
+            {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{rate.carrier}</span>
+              <span className="text-muted-foreground">•</span>
+              <span className="text-sm">{rate.service}</span>
+              {(rate as any).provider && (
+                <Badge variant="secondary" className="text-xs">
+                  {(rate as any).provider}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
+              {deliveryDays > 0 && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {deliveryDays} {deliveryDays === 1 ? "day" : "days"}
+                </span>
+              )}
+              {sortedRate.estimatedDeliveryDate && (
+                <span className="flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  Est. {format(sortedRate.estimatedDeliveryDate, "MMM d")}
+                </span>
+              )}
+              {sortedRate.meetsDeliveryDate === true && (
+                <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">✓ On time</Badge>
+              )}
+              {sortedRate.meetsDeliveryDate === false && (
+                <Badge variant="outline" className="border-yellow-400 text-yellow-700 text-xs">May be late</Badge>
+              )}
+              {hasBreakdown && (
+                <Badge variant="outline" className="text-xs">
+                  {breakdown!.length} packages
+                </Badge>
+              )}
+              {hasFallback && (
+                <Badge variant="outline" className="border-yellow-400 text-yellow-700 text-xs">
+                  Service substituted on some packages
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="text-right">
+          <div className="flex items-center gap-1 justify-end">
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xl font-bold">{displayPrice.toFixed(2)}</span>
+          </div>
+          {hasBreakdown && (
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              total · {breakdown!.length} pkgs
+            </div>
           )}
-        >
-          {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
         </div>
+      </div>
 
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">{rate.carrier}</span>
-            <span className="text-muted-foreground">•</span>
-            <span className="text-sm">{rate.service}</span>
-            {(rate as any).provider && (
-              <Badge variant="secondary" className="text-xs">
-                {(rate as any).provider}
-              </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-            {deliveryDays > 0 && (
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {deliveryDays} {deliveryDays === 1 ? "day" : "days"}
-              </span>
-            )}
-            {sortedRate.estimatedDeliveryDate && (
-              <span className="flex items-center gap-1">
+      {hasBreakdown && (
+        <div className="ml-9 border-t pt-2 space-y-1">
+          {breakdown!.map((pkg) => (
+            <div key={pkg.packageIndex} className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-muted-foreground">
                 <Package className="h-3 w-3" />
-                Est. {format(sortedRate.estimatedDeliveryDate, "MMM d")}
-              </span>
-            )}
-            {sortedRate.meetsDeliveryDate === true && (
-              <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">✓ On time</Badge>
-            )}
-            {sortedRate.meetsDeliveryDate === false && (
-              <Badge variant="outline" className="border-yellow-400 text-yellow-700 text-xs">May be late</Badge>
-            )}
-          </div>
+                <span className="font-medium text-foreground">Package {pkg.packageIndex + 1}</span>
+                {pkg.boxName && <span>· {pkg.boxName}</span>}
+                {!pkg.matched && pkg.matchedCarrier && (
+                  <span className="text-yellow-700">
+                    · using {pkg.matchedCarrier} {pkg.matchedService}
+                  </span>
+                )}
+                {!pkg.matched && !pkg.matchedCarrier && (
+                  <span className="text-destructive">· no rate available</span>
+                )}
+              </div>
+              <span className="font-mono font-medium">${pkg.amount.toFixed(2)}</span>
+            </div>
+          ))}
         </div>
-      </div>
-
-      <div className="text-right">
-        <div className="flex items-center gap-1">
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xl font-bold">{parseFloat(rate.rate).toFixed(2)}</span>
-        </div>
-      </div>
+      )}
     </button>
   );
 };
