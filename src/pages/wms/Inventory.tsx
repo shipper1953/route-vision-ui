@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventory, InventoryItem } from "@/hooks/useInventory";
 import { InventoryList } from "@/components/wms/inventory/InventoryList";
-import { AdjustInventoryDialog } from "@/components/wms/inventory/AdjustInventoryDialog";
+import { InventoryItemDialog } from "@/components/wms/inventory/InventoryItemDialog";
 import { Search, Plus, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
