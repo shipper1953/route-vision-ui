@@ -218,7 +218,8 @@ function pickBestBox(items: Item[], boxes: Box[]): BoxAnalysis | null {
   if (!candidates.length) return null;
   candidates.sort((a, b) => {
     const scoreDiff = b.score - a.score;
-    if (Math.abs(scoreDiff) > 0.0001) return scoreDiff;
+    // Treat scores within 1 percentage point as ties so the smallest-fit box wins.
+    if (Math.abs(scoreDiff) > 1.0) return scoreDiff;
     return applyTieBreakers(a, b);
   });
   return candidates[0];
