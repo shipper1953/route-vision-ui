@@ -102,6 +102,8 @@ const CreateShipment = () => {
         onClose={handleDialogClose}
         labelUrl={labelData?.labelUrl || labelData?.postage_label?.label_url || labelData?.label_url}
         shipmentId={labelData?.shipmentId?.toString() || labelData?.object_id || labelData?.id || ''}
+        labelPending={!!labelData?.labelPending}
+        provider={labelData?.provider}
         orderDetails={labelData ? {
           carrier: labelData.carrier || labelData.selected_rate?.carrier || labelData.rate?.provider || 'Unknown',
           service: labelData.service || labelData.selected_rate?.service || labelData.rate?.servicelevel?.name || labelData.servicelevel?.name || 'Unknown',
