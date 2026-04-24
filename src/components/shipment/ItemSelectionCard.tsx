@@ -253,12 +253,8 @@ export const ItemSelectionCard = ({
                 const selectedQty = localSelection.get(itemKey) || 0;
                 const alreadyShipped = getShippedQuantity(item, index);
 
-                // Resolve dims/weight from nested `dimensions` or top-level fields
-                const dims = item.dimensions ?? (
-                  (item.length || item.width || item.height || item.weight)
-                    ? { length: item.length, width: item.width, height: item.height, weight: item.weight }
-                    : null
-                );
+                // Resolve dims/weight from the order line, falling back to the master item record.
+                const dims = resolveDims(item);
                 const hasDims = dims && (dims.length || dims.width || dims.height);
                 const hasWeight = dims && (dims.weight ?? null) !== null && dims.weight !== undefined;
                 const dimsLabel = hasDims
