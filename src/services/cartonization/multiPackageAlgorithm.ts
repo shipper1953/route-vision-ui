@@ -295,44 +295,63 @@ export class MultiPackageAlgorithm {
   }
 
   private findOptimalBoxForGroup(items: Item[], packageNumber: number): PackageRecommendation | null {
+    const TARGET_UTILIZATION = 99;
     const groupWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-    const groupVolume = items.reduce((sum, item) => 
+    const groupVolume = items.reduce((sum, item) =>
       sum + (item.length * item.width * item.height * item.quantity), 0
     );
 
     console.log(`📦 Package ${packageNumber}: ${items.length} items, ${groupWeight} lbs, ${groupVolume} cubic inches`);
 
-    // Filter boxes that can handle the weight
-    const suitableBoxes = this.boxes
+    // Evaluate every box that satisfies weight + 3D fit, score by distance from 99%.
+    const candidates = this.boxes
       .filter(box => box.maxWeight >= groupWeight)
-      .sort((a, b) => (a.length * a.width * a.height) - (b.length * b.width * b.height));
-
-    for (const box of suitableBoxes) {
-      const packingResult = BinPackingAlgorithm.enhanced3DBinPacking(items, box);
-      
-      if (packingResult.success) {
+      .map(box => {
+        const packingResult = BinPackingAlgorithm.enhanced3DBinPacking(items, box);
+        if (!packingResult.success) return null;
         const boxVolume = box.length * box.width * box.height;
         const utilization = (packingResult.usedVolume / boxVolume) * 100;
+        if (utilization > TARGET_UTILIZATION) return null;
         const dimensionalWeight = CartonizationUtils.calculateDimensionalWeight(box, this.parameters.dimensionalWeightFactor);
         const confidence = CartonizationUtils.calculateConfidence(utilization, groupWeight, box, packingResult.packingEfficiency);
-
-        console.log(`✅ Package ${packageNumber}: ${box.name} (${utilization.toFixed(1)}% utilization)`);
-
         return {
           box,
-          assignedItems: items,
           utilization,
-          packageWeight: groupWeight,
-          packageVolume: groupVolume,
           dimensionalWeight,
           confidence,
-          packingResult
+          packingResult,
+          distance: Math.abs(TARGET_UTILIZATION - utilization),
+          outerVolume: boxVolume,
         };
-      }
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+
+    if (!candidates.length) {
+      console.log(`❌ Package ${packageNumber}: No suitable box found at ≤${TARGET_UTILIZATION}% utilization`);
+      return null;
     }
 
-    console.log(`❌ Package ${packageNumber}: No suitable box found`);
-    return null;
+    // Sort: closest to 99% wins; tie-breakers: lowest dim weight, lowest cost, smallest outer volume.
+    candidates.sort((a, b) => {
+      if (Math.abs(a.distance - b.distance) > 0.0001) return a.distance - b.distance;
+      if (a.dimensionalWeight !== b.dimensionalWeight) return a.dimensionalWeight - b.dimensionalWeight;
+      if (a.box.cost !== b.box.cost) return a.box.cost - b.box.cost;
+      return a.outerVolume - b.outerVolume;
+    });
+
+    const best = candidates[0];
+    console.log(`✅ Package ${packageNumber}: ${best.box.name} (${best.utilization.toFixed(1)}% utilization, target ${TARGET_UTILIZATION}%)`);
+
+    return {
+      box: best.box,
+      assignedItems: items,
+      utilization: best.utilization,
+      packageWeight: groupWeight,
+      packageVolume: groupVolume,
+      dimensionalWeight: best.dimensionalWeight,
+      confidence: best.confidence,
+      packingResult: best.packingResult,
+    };
   }
 
   private selectBestResult(
