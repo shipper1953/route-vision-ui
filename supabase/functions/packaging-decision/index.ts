@@ -401,7 +401,7 @@ Deno.serve(async (req) => {
       (i) => i.fragility === "high" || i.fragility === "medium"
     );
 
-    // 3. Evaluate each box
+    // 3. Evaluate each box (single-package candidates, ≤99% utilization)
     const rejectedCandidates: RejectedCandidate[] = [];
     const analyses: BoxAnalysis[] = [];
 
@@ -434,6 +434,17 @@ Deno.serve(async (req) => {
       const voidRatio = 1 - packResult.usedVolume / outerVolume;
       const dimensionalWeight = outerVolume / DIM_WEIGHT_FACTOR;
 
+      // Reject anything above the 99% safety cap
+      if (utilization > MAX_UTILIZATION) {
+        rejectedCandidates.push({
+          box_id: box.id,
+          box_name: box.name,
+          reason: `Utilization ${utilization.toFixed(1)}% exceeds ${MAX_UTILIZATION}% cap`,
+          score: 0,
+        });
+        continue;
+      }
+
       const partialAnalysis = {
         box,
         utilization,
@@ -444,31 +455,114 @@ Deno.serve(async (req) => {
         itemsFit: true,
       };
 
-      const { score, scoreBreakdown } = scoreBox(
-        partialAnalysis,
-        policy,
-        totalWeight,
-        hasFragileItems
-      );
-
+      const { score, scoreBreakdown } = scoreBox(partialAnalysis);
       analyses.push({ ...partialAnalysis, score, scoreBreakdown });
     }
 
+    // 4. If no single box works, attempt multi-package fallback
     if (!analyses.length) {
+      const multiPackages = buildMultiPackages(items, boxes as Box[]);
+      if (!multiPackages || multiPackages.length === 0) {
+        return new Response(
+          JSON.stringify({
+            error: "No boxes can fit the items (single or multi-package)",
+            rejected_candidates: rejectedCandidates,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const totalCost = multiPackages.reduce((s, p) => s + p.box.cost, 0);
+      const avgUtilization =
+        multiPackages.reduce((s, p) => s + p.utilization, 0) / multiPackages.length;
+      const confidence = Math.max(
+        0,
+        Math.min(100, Math.round(100 - Math.abs(MAX_UTILIZATION - avgUtilization)))
+      );
+
+      const primary = multiPackages[0];
+      const primaryBox = primary.box;
+
+      if (order_id) {
+        const serviceClient = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+        );
+        await serviceClient.from("order_cartonization").upsert(
+          {
+            order_id,
+            recommended_box_id: primaryBox.id,
+            recommended_box_data: {
+              id: primaryBox.id,
+              name: primaryBox.name,
+              length: primaryBox.length,
+              width: primaryBox.width,
+              height: primaryBox.height,
+              max_weight: primaryBox.max_weight,
+              cost: primaryBox.cost,
+            },
+            utilization: primary.utilization,
+            confidence,
+            total_weight: totalWeight,
+            items_weight: totalWeight,
+            box_weight: 0,
+            optimization_objective: policy.optimization_objective,
+            score_breakdown: { target_utilization: MAX_UTILIZATION, average_utilization: avgUtilization },
+            rejected_candidates: rejectedCandidates.slice(0, 20),
+            policy_version_id: policy.policy_version_id,
+            algorithm_version: ALGORITHM_VERSION,
+            calculation_timestamp: new Date().toISOString(),
+            packages: multiPackages,
+            total_packages: multiPackages.length,
+            splitting_strategy: "greedy_99_target",
+          },
+          { onConflict: "order_id" }
+        );
+      }
+
       return new Response(
         JSON.stringify({
-          error: "No boxes can fit the items",
-          rejected_candidates: rejectedCandidates,
+          recommended: {
+            box_id: primaryBox.id,
+            box_name: primaryBox.name,
+            box: primaryBox,
+            utilization: primary.utilization,
+            void_ratio: primary.void_ratio,
+            dimensional_weight: primary.dimensional_weight,
+            score: -Math.abs(MAX_UTILIZATION - primary.utilization),
+            score_breakdown: { target_utilization: MAX_UTILIZATION },
+            confidence,
+            reason_code: "multi_package_required",
+          },
+          multi_package: {
+            total_packages: multiPackages.length,
+            total_cost: totalCost,
+            average_utilization: avgUtilization,
+            packages: multiPackages,
+          },
+          alternatives: [],
+          rejected_candidates: rejectedCandidates.slice(0, 10),
+          metadata: {
+            algorithm_version: ALGORITHM_VERSION,
+            policy_version_id: policy.policy_version_id,
+            optimization_objective: policy.optimization_objective,
+            tie_breakers: ["distance_from_99", "lowest_dim_weight", "lowest_cost", "smallest_volume"],
+            total_weight: totalWeight,
+            total_volume: totalVolume,
+            boxes_evaluated: (boxes as Box[]).length,
+            has_fragile_items: hasFragileItems,
+            target_utilization: MAX_UTILIZATION,
+          },
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 4. Sort by score, then apply deterministic tie-breakers
+    // 5. Sort by closest-to-99 score, then deterministic tie-breakers
     analyses.sort((a, b) => {
       const scoreDiff = b.score - a.score;
-      if (Math.abs(scoreDiff) > 0.5) return scoreDiff;
-      return applyTieBreakers(a, b, policy.tie_breaker_order);
+      if (Math.abs(scoreDiff) > 0.0001) return scoreDiff;
+      return applyTieBreakers(a, b);
     });
 
     // Add non-selected fitting boxes to rejected list
@@ -476,7 +570,7 @@ Deno.serve(async (req) => {
       rejectedCandidates.push({
         box_id: analyses[i].box.id,
         box_name: analyses[i].box.name,
-        reason: `Lower score than ${analyses[0].box.name} (${analyses[i].score.toFixed(1)} vs ${analyses[0].score.toFixed(1)})`,
+        reason: `Further from ${MAX_UTILIZATION}% target than ${analyses[0].box.name} (${analyses[i].utilization.toFixed(1)}% vs ${analyses[0].utilization.toFixed(1)}%)`,
         score: analyses[i].score,
       });
     }
@@ -491,16 +585,16 @@ Deno.serve(async (req) => {
       score_breakdown: a.scoreBreakdown,
     }));
 
-    // Determine reason code
-    let reasonCode = "optimal_fit";
-    if (recommended.utilization >= 90) reasonCode = "tight_fit";
-    else if (recommended.utilization >= 70) reasonCode = "good_fit";
-    else if (recommended.utilization >= 50) reasonCode = "acceptable_fit";
-    else reasonCode = "loose_fit";
+    let reasonCode = "loose_fit";
+    if (recommended.utilization >= 95) reasonCode = "near_target_fit";
+    else if (recommended.utilization >= 85) reasonCode = "good_fit";
+    else if (recommended.utilization >= 60) reasonCode = "acceptable_fit";
 
-    const confidence = Math.min(100, Math.round(recommended.score));
+    const confidence = Math.max(
+      0,
+      Math.min(100, Math.round(100 - Math.abs(MAX_UTILIZATION - recommended.utilization)))
+    );
 
-    // 5. Persist to order_cartonization if order_id provided
     if (order_id) {
       const serviceClient = createClient(
         Deno.env.get("SUPABASE_URL")!,
@@ -531,12 +625,13 @@ Deno.serve(async (req) => {
           policy_version_id: policy.policy_version_id,
           algorithm_version: ALGORITHM_VERSION,
           calculation_timestamp: new Date().toISOString(),
+          packages: [],
+          total_packages: 1,
         },
         { onConflict: "order_id" }
       );
     }
 
-    // 6. Return response
     const result = {
       recommended: {
         box_id: recommended.box.id,
@@ -556,11 +651,12 @@ Deno.serve(async (req) => {
         algorithm_version: ALGORITHM_VERSION,
         policy_version_id: policy.policy_version_id,
         optimization_objective: policy.optimization_objective,
-        tie_breakers: policy.tie_breaker_order,
+        tie_breakers: ["distance_from_99", "lowest_dim_weight", "lowest_cost", "smallest_volume"],
         total_weight: totalWeight,
         total_volume: totalVolume,
         boxes_evaluated: (boxes as Box[]).length,
         has_fragile_items: hasFragileItems,
+        target_utilization: MAX_UTILIZATION,
       },
     };
 
