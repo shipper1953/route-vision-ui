@@ -263,17 +263,20 @@ export class CartonizationEngine {
     };
   }
 
-  // Sorting method focused on highest utilization with deterministic tie-breakers
+  // Sort boxes by distance from 99% utilization (closest wins), then deterministic tie-breakers.
+  // Identical behavior across all tenants — optimizeForCost only changes tie-breaker order.
   private sortBoxesByOptimization(analyses: any[]): any[] {
+    const TARGET = CartonizationEngine.MAX_SINGLE_PACKAGE_UTILIZATION;
     return analyses
       .filter(a => a.utilization > 0)
       .sort((a, b) => {
         const volumeA = a.box.length * a.box.width * a.box.height;
         const volumeB = b.box.length * b.box.width * b.box.height;
-        const utilizationDelta = b.utilization - a.utilization;
+        const distA = Math.abs(TARGET - a.utilization);
+        const distB = Math.abs(TARGET - b.utilization);
 
-        if (Math.abs(utilizationDelta) > 0.0001) {
-          return utilizationDelta;
+        if (Math.abs(distA - distB) > 0.0001) {
+          return distA - distB; // closer to 99% wins
         }
 
         if (this.parameters.optimizeForCost) {
