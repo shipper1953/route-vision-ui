@@ -167,7 +167,8 @@ export class LabelService {
       items: Array<any>;
       boxData: { name: string; length: number; width: number; height: number };
       weight: number;
-    }
+    },
+    easyshipShipmentPayload?: any
   ): Promise<any> {
     const requestBody: any = { shipmentId, rateId };
     
