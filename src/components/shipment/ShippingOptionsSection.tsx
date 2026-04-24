@@ -77,6 +77,9 @@ export const ShippingOptionsSection = ({
   const [purchaseProgress, setPurchaseProgress] = useState<string | null>(null);
   const [bulkLabels, setBulkLabels] = useState<Array<{ orderId: string; labelUrl: string; trackingNumber: string; carrier: string; service: string }>>([]);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
+  const [packageProgress, setPackageProgress] = useState<PackageProgressItem[]>([]);
+  const [showProgressDialog, setShowProgressDialog] = useState(false);
+  const [progressComplete, setProgressComplete] = useState(false);
 
   // Detect multi-package shipment
   const multiParcelsFromForm = (form as any)?.watch?.('multiParcels') as Array<any> | undefined;
