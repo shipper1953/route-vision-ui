@@ -111,14 +111,17 @@ serve(async (req) => {
     console.log(`📦 Found ${allShipments?.length || 0} shipments`);
 
     // Match shipments to orders for THIS company only
-    let matchedShipments: Array<{
+    const matchedShipments: Array<{
       shipment_id: number;
       order_id: string;
+      order_pk_id: number;
       actual_package_sku: string;
       package_dimensions: any;
       cost: number | null;
       created_at: string;
       order_items: any[];
+      recommended_box_data: any | null;
+      recommended_utilization: number | null;
     }> = [];
 
     if (allShipments && allShipments.length > 0) {
@@ -138,18 +141,32 @@ serve(async (req) => {
         if (o.shipment_id != null) ordersByShipment.set(o.shipment_id, o);
       });
 
+      const orderIds = (orders || []).map(o => o.id);
+      const cartonizationByOrderId = new Map<number, any>();
+      if (orderIds.length > 0) {
+        const { data: cartonizations } = await supabase
+          .from('order_cartonization')
+          .select('order_id, recommended_box_data, utilization')
+          .in('order_id', orderIds);
+        (cartonizations || []).forEach(c => cartonizationByOrderId.set(Number(c.order_id), c));
+      }
+
       for (const shipment of allShipments) {
         const order = ordersByShipment.get(shipment.id);
         if (!order) continue;
         if (!Array.isArray(order.items) || order.items.length === 0) continue;
+        const cartonization = cartonizationByOrderId.get(Number(order.id));
         matchedShipments.push({
           shipment_id: shipment.id,
           order_id: order.order_id,
+          order_pk_id: Number(order.id),
           actual_package_sku: shipment.actual_package_sku,
           package_dimensions: shipment.package_dimensions,
           cost: shipment.cost,
           created_at: shipment.created_at,
           order_items: order.items,
+          recommended_box_data: cartonization?.recommended_box_data ?? null,
+          recommended_utilization: cartonization?.utilization ?? null,
         });
       }
     }
@@ -193,35 +210,7 @@ serve(async (req) => {
       console.log(`📐 Loaded dimensions for ${itemMasterDims.size} item keys`);
     }
 
-    // Master list (U-Line / vendor catalog) — the universe of candidate boxes
-    const { data: masterListBoxes, error: masterError } = await supabase
-      .from('packaging_master_list')
-      .select('id, name, vendor_sku, length_in, width_in, height_in, cost, vendor, type')
-      .eq('is_active', true)
-      .eq('type', 'box');
-
-    if (masterError) throw new Error(`Master list query failed: ${masterError.message}`);
-    console.log(`📦 Found ${masterListBoxes?.length || 0} master-list boxes`);
-
-    // Pre-sort master boxes by volume ascending — first one that fits is the tightest
-    const sortedMasterBoxes = (masterListBoxes || [])
-      .filter(b => b.length_in && b.width_in && b.height_in)
-      .map(b => ({
-        ...b,
-        length: Number(b.length_in),
-        width: Number(b.width_in),
-        height: Number(b.height_in),
-        cost: Number(b.cost) || 0,
-        volume: Number(b.length_in) * Number(b.width_in) * Number(b.height_in),
-      }))
-      .sort((a, b) => a.volume - b.volume);
-
-    // Build a SKU lookup so we can resolve "actual" dims/cost from the catalog,
-    // not from free-form package_dimensions which often gets overridden at label time.
-    const masterBySku = new Map<string, typeof sortedMasterBoxes[number]>();
-    sortedMasterBoxes.forEach(b => masterBySku.set(b.vendor_sku, b));
-
-    // Also load company boxes as a fallback (custom boxes not in vendor catalog)
+    // Load company boxes so actual package SKU can resolve dimensions/cost.
     const { data: companyBoxes } = await supabase
       .from('boxes')
       .select('sku, name, length, width, height, cost')
@@ -243,12 +232,8 @@ serve(async (req) => {
     });
 
     // Resolve the actual box used (dims + cost) for a shipment.
-    // Priority: vendor master list -> company boxes -> raw package_dimensions.
-    function resolveActualBox(actualSku: string, packageDims: any): { dims: Dims; cost: number; source: 'master' | 'company' | 'package_dims' } | null {
-      const fromMaster = masterBySku.get(actualSku);
-      if (fromMaster) {
-        return { dims: { length: fromMaster.length, width: fromMaster.width, height: fromMaster.height }, cost: fromMaster.cost, source: 'master' };
-      }
+    // Priority: company boxes -> raw package_dimensions.
+    function resolveActualBox(actualSku: string, packageDims: any): { dims: Dims; cost: number; source: 'company' | 'package_dims' } | null {
       const fromCompany = companyBoxBySku.get(actualSku);
       if (fromCompany) {
         return { dims: { length: fromCompany.length, width: fromCompany.width, height: fromCompany.height }, cost: fromCompany.cost, source: 'company' };
@@ -268,10 +253,11 @@ serve(async (req) => {
     }
 
     // ============ Analyze each shipment ============
+    // Use canonical recommendation from order_cartonization (generated by
+    // packaging-decision) to keep intelligence aligned with operational logic.
     const masterBoxOpportunities: Record<string, {
       master_box_sku: string;
       master_box_name: string;
-      master_box_vendor: string;
       master_box_cost: number;
       shipments: Array<{
         shipment_id: number;
@@ -290,8 +276,7 @@ serve(async (req) => {
     let utilizationCount = 0;
     const allAnalysisResults: Array<{ shipment_id: number; actual_utilization: number; has_opportunity: boolean }> = [];
 
-    const VOLUME_SLACK = 0.95;       // Treat boxes as "full" at 95% volume to leave room for void fill
-    const MIN_IMPROVEMENT_PP = 10;   // Only flag opportunities that beat actual by >=10 percentage points
+    const MIN_IMPROVEMENT_PP = 5;   // Only flag opportunities that beat actual by >=5 percentage points
 
     for (const shipment of matchedShipments) {
       const items = (shipment.order_items as any[])
@@ -302,6 +287,7 @@ serve(async (req) => {
 
       const actual = resolveActualBox(shipment.actual_package_sku, shipment.package_dimensions);
       if (!actual) continue;
+      if (!shipment.recommended_box_data) continue;
 
       const actualUtil = utilizationPct(items, actual.dims);
       if (actualUtil > 0) {
@@ -309,57 +295,51 @@ serve(async (req) => {
         utilizationCount++;
       }
 
-      // Find the smallest master-list box that fits all items (per-dim) AND has
-      // total item volume <= 95% of box volume. Since sortedMasterBoxes is sorted
-      // by volume ascending, the FIRST match is the tightest fit.
-      const itemsVol = totalItemVolume(items);
-      let bestMaster: typeof sortedMasterBoxes[number] | null = null;
-      for (const mb of sortedMasterBoxes) {
-        if (mb.vendor_sku === shipment.actual_package_sku) continue; // skip self-recommendation
-        if (itemsVol > mb.volume * VOLUME_SLACK) continue;
-        if (!allItemsFitInBox(items, { length: mb.length, width: mb.width, height: mb.height })) continue;
-        bestMaster = mb;
-        break;
-      }
+      const recommendedBox = shipment.recommended_box_data;
+      const recDims = {
+        length: Number(recommendedBox.length),
+        width: Number(recommendedBox.width),
+        height: Number(recommendedBox.height)
+      };
+      if (!recDims.length || !recDims.width || !recDims.height) continue;
+
+      // Safety guard: ensure recommended box can fit order items geometrically.
+      if (!allItemsFitInBox(items, recDims)) continue;
+
+      const newUtil = Number(shipment.recommended_utilization ?? utilizationPct(items, recDims));
+      const improvement = newUtil - actualUtil;
+      const recommendedSku = recommendedBox.sku || recommendedBox.id || recommendedBox.name;
+      const recommendedCost = Number(recommendedBox.cost || 0);
 
       let hasOpportunity = false;
-      if (bestMaster) {
-        const newUtil = utilizationPct(items, { length: bestMaster.length, width: bestMaster.width, height: bestMaster.height });
-        const improvement = newUtil - actualUtil;
+      if (improvement >= MIN_IMPROVEMENT_PP && recommendedSku !== shipment.actual_package_sku) {
+        hasOpportunity = true;
+        const savings = Math.max(0, actual.cost - recommendedCost);
 
-        if (improvement >= MIN_IMPROVEMENT_PP) {
-          hasOpportunity = true;
-          // Savings = positive cost delta between actual box and recommended box.
-          // If actual cost is unknown (source = package_dims), savings defaults to 0
-          // for that shipment — the opportunity still surfaces via the utilization gap.
-          const savings = Math.max(0, actual.cost - bestMaster.cost);
-
-          const key = bestMaster.vendor_sku;
-          if (!masterBoxOpportunities[key]) {
-            masterBoxOpportunities[key] = {
-              master_box_sku: bestMaster.vendor_sku,
-              master_box_name: bestMaster.name,
-              master_box_vendor: bestMaster.vendor,
-              master_box_cost: bestMaster.cost,
-              shipments: [],
-              total_improvement: 0,
-              total_savings: 0,
-            };
-          }
-          masterBoxOpportunities[key].shipments.push({
-            shipment_id: shipment.shipment_id,
-            order_id: shipment.order_id,
-            current_box_sku: shipment.actual_package_sku,
-            current_utilization: actualUtil,
-            new_utilization: newUtil,
-            improvement,
-            savings,
-          });
-          masterBoxOpportunities[key].total_improvement += improvement;
-          masterBoxOpportunities[key].total_savings += savings;
-
-          console.log(`✨ Shipment ${shipment.shipment_id}: ${shipment.actual_package_sku} (${actualUtil.toFixed(1)}%) → ${bestMaster.vendor_sku} (${newUtil.toFixed(1)}%), save $${savings.toFixed(2)}`);
+        const key = String(recommendedSku);
+        if (!masterBoxOpportunities[key]) {
+          masterBoxOpportunities[key] = {
+            master_box_sku: key,
+            master_box_name: recommendedBox.name || key,
+            master_box_cost: recommendedCost,
+            shipments: [],
+            total_improvement: 0,
+            total_savings: 0,
+          };
         }
+        masterBoxOpportunities[key].shipments.push({
+          shipment_id: shipment.shipment_id,
+          order_id: shipment.order_id,
+          current_box_sku: shipment.actual_package_sku,
+          current_utilization: actualUtil,
+          new_utilization: newUtil,
+          improvement,
+          savings,
+        });
+        masterBoxOpportunities[key].total_improvement += improvement;
+        masterBoxOpportunities[key].total_savings += savings;
+
+        console.log(`✨ Shipment ${shipment.shipment_id}: ${shipment.actual_package_sku} (${actualUtil.toFixed(1)}%) → ${key} (${newUtil.toFixed(1)}%), save $${savings.toFixed(2)}`);
       }
 
       allAnalysisResults.push({
@@ -378,7 +358,6 @@ serve(async (req) => {
         return {
           master_box_sku: opp.master_box_sku,
           master_box_name: opp.master_box_name,
-          master_box_vendor: opp.master_box_vendor,
           master_box_cost: opp.master_box_cost,
           shipment_count: n,
           avg_current_utilization: avgCurrent.toFixed(1),

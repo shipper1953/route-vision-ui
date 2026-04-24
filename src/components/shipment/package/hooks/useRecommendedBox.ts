@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { toast } from "sonner";
 import { ShipmentForm } from "@/types/shipment";
-import { useCartonization } from "@/hooks/useCartonization";
 import { useItemMaster } from "@/hooks/useItemMaster";
 import { usePackagingDecision } from "@/hooks/usePackagingDecision";
-import { CartonizationEngine, CartonizationResult } from "@/services/cartonization/cartonizationEngine";
+import { CartonizationResult } from "@/services/cartonization/cartonizationEngine";
 import { MultiPackageCartonizationResult } from "@/services/cartonization/types";
+import { useCartonization } from "@/hooks/useCartonization";
 
 export const useRecommendedBox = (orderItems: any[], orderId?: number) => {
   const form = useFormContext<ShipmentForm>();
@@ -15,7 +15,7 @@ export const useRecommendedBox = (orderItems: any[], orderId?: number) => {
   const [cartonizationResult, setCartonizationResult] = useState<CartonizationResult | null>(null);
   const [multiPackageResult, setMultiPackageResult] = useState<MultiPackageCartonizationResult | null>(null);
   const [needsMultiPackage, setNeedsMultiPackage] = useState<boolean>(false);
-  const { boxes, parameters, createItemsFromOrderData } = useCartonization();
+  const { createItemsFromOrderData } = useCartonization();
   const { items: masterItems } = useItemMaster();
   const { getRecommendation } = usePackagingDecision();
   
@@ -33,7 +33,7 @@ export const useRecommendedBox = (orderItems: any[], orderId?: number) => {
       const items = createItemsFromOrderData(orderItems, masterItems);
       if (items.length === 0) return;
 
-      // Try server-side decision first, fall back to client-side
+      // Use canonical server-side decision to keep logic consistent across flows.
       const calculate = async () => {
         try {
           const serverResult = await getRecommendation(items, orderId);
@@ -56,8 +56,35 @@ export const useRecommendedBox = (orderItems: any[], orderId?: number) => {
 
             setRecommendedBox(box);
             setBoxUtilization(rec.utilization);
-            setNeedsMultiPackage(false);
-            setMultiPackageResult(null);
+            const multiPackage = (serverResult as any).multi_package;
+            const hasMultiPackage = !!(multiPackage?.packages?.length && multiPackage.total_packages > 1);
+            setNeedsMultiPackage(hasMultiPackage);
+            setMultiPackageResult(
+              hasMultiPackage
+                ? {
+                    packages: multiPackage.packages.map((pkg: any) => ({
+                      box: pkg.box,
+                      assignedItems: pkg.items || [],
+                      utilization: pkg.utilization,
+                      packageWeight: pkg.total_weight || 0,
+                      packageVolume: 0,
+                      dimensionalWeight: pkg.dimensional_weight,
+                      confidence: rec.confidence,
+                      packingResult: { success: true, packedItems: [], usedVolume: 0, packingEfficiency: 0 }
+                    })),
+                    totalPackages: multiPackage.total_packages,
+                    totalWeight: serverResult.metadata.total_weight,
+                    totalVolume: serverResult.metadata.total_volume,
+                    totalCost: multiPackage.total_cost || 0,
+                    splittingStrategy: 'hybrid',
+                    optimizationObjective: 'balanced',
+                    confidence: rec.confidence,
+                    alternatives: [],
+                    rulesApplied: ['canonical_server_multi_package'],
+                    processingTime: 0
+                  }
+                : null
+            );
             setCartonizationResult({
               recommendedBox: box,
               utilization: rec.utilization,
@@ -112,79 +139,16 @@ export const useRecommendedBox = (orderItems: any[], orderId?: number) => {
             calculatedItemsRef.current = itemsKey;
             return;
           }
+          toast.error('No packaging recommendation returned for these items.');
         } catch (err) {
-          console.warn("Server-side packaging decision failed, falling back to client-side:", err);
-        }
-
-        // Fallback: client-side engine
-        try {
-          const engine = new CartonizationEngine(boxes, parameters);
-          let result = engine.calculateOptimalBox(items, false);
-          let multiPackage = null;
-          let requiresMultiPackage = false;
-          
-          if (!result || result.confidence < 75) {
-            multiPackage = engine.calculateMultiPackageCartonization(items, 'balanced');
-            if (multiPackage) {
-              requiresMultiPackage = true;
-              setMultiPackageResult(multiPackage);
-              setNeedsMultiPackage(true);
-              const firstPackage = multiPackage.packages[0];
-              if (firstPackage) {
-                result = {
-                  recommendedBox: firstPackage.box,
-                  utilization: firstPackage.utilization,
-                  itemsFit: true,
-                  totalWeight: multiPackage.totalWeight,
-                  totalVolume: multiPackage.totalVolume,
-                  dimensionalWeight: firstPackage.dimensionalWeight,
-                  savings: 0,
-                  confidence: multiPackage.confidence,
-                  alternatives: multiPackage.packages.slice(1, 4).map(pkg => ({
-                    box: pkg.box,
-                    utilization: pkg.utilization,
-                    cost: pkg.box.cost,
-                    confidence: pkg.confidence,
-                  })),
-                  rulesApplied: multiPackage.rulesApplied,
-                  processingTime: multiPackage.processingTime,
-                  multiPackageResult: multiPackage,
-                };
-              }
-            }
-          } else {
-            setNeedsMultiPackage(false);
-            setMultiPackageResult(null);
-          }
-          
-          if (result) {
-            setRecommendedBox(result.recommendedBox);
-            setBoxUtilization(result.utilization);
-            setCartonizationResult(result);
-            
-            if (!hasSetFormValuesRef.current) {
-              form.setValue("length", result.recommendedBox.length);
-              form.setValue("width", result.recommendedBox.width);
-              form.setValue("height", result.recommendedBox.height);
-              const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-              form.setValue("weight", totalWeight);
-              hasSetFormValuesRef.current = true;
-              if (requiresMultiPackage) {
-                toast.success(`Multi-package solution: ${multiPackage!.totalPackages} packages needed`);
-              } else {
-                toast.success(`Recommended ${result.recommendedBox.name} with ${result.confidence}% confidence`);
-              }
-            }
-            calculatedItemsRef.current = itemsKey;
-          }
-        } catch (error) {
-          console.error("Error calculating recommended box:", error);
+          console.error("Server-side packaging decision failed:", err);
+          toast.error("Unable to compute packaging recommendation right now.");
         }
       };
 
       calculate();
     }
-  }, [orderItems, masterItems, boxes, parameters, createItemsFromOrderData, form, orderId, getRecommendation]);
+  }, [orderItems, masterItems, createItemsFromOrderData, form, orderId, getRecommendation]);
 
   useEffect(() => {
     const itemsKey = JSON.stringify(orderItems.map(item => item.itemId).sort());

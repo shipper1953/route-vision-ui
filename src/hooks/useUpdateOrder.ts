@@ -101,85 +101,37 @@ export const useUpdateOrder = (orderId: string) => {
         if (!profileError && userProfile?.company_id && orderItemsWithDetails.length > 0) {
           try {
             console.log("Recalculating cartonization for updated order:", updatedOrder.id);
-            
-            // Get company boxes for cartonization
-            const { data: boxes, error: boxError } = await supabase
-              .from('boxes')
-              .select('*')
-              .eq('company_id', userProfile.company_id)
-              .eq('is_active', true)
-              .gt('in_stock', 0);
 
-            if (!boxError && boxes && boxes.length > 0) {
-              // Import cartonization logic
-              const { CartonizationEngine } = await import('../services/cartonization/cartonizationEngine');
-              
-              // Convert order items to cartonization items
-              const items = orderItemsWithDetails
-                .filter(item => item.dimensions)
-                .map(item => ({
-                  id: item.itemId,
-                  name: item.name,
-                  sku: item.sku,
-                  length: item.dimensions!.length,
-                  width: item.dimensions!.width,
-                  height: item.dimensions!.height,
-                  weight: item.dimensions!.weight,
-                  quantity: item.quantity,
-                  category: 'order_item'
-                }));
+            // Convert order items to canonical packaging-decision payload
+            const items = orderItemsWithDetails
+              .filter(item => item.dimensions)
+              .map(item => ({
+                id: item.itemId,
+                name: item.name,
+                length: Number(item.dimensions!.length),
+                width: Number(item.dimensions!.width),
+                height: Number(item.dimensions!.height),
+                weight: Number(item.dimensions!.weight),
+                quantity: Number(item.quantity || 1),
+                fragility: 'low',
+                category: 'order_item'
+              }));
 
-              if (items.length > 0) {
-                const engine = new CartonizationEngine(boxes.map(box => ({
-                  id: box.id,
-                  name: box.name,
-                  sku: box.sku,
-                  length: box.length,
-                  width: box.width,
-                  height: box.height,
-                  maxWeight: box.max_weight,
-                  cost: box.cost,
-                  inStock: box.in_stock,
-                  minStock: box.min_stock,
-                  maxStock: box.max_stock,
-                  type: box.box_type
-                })));
-
-                const result = engine.calculateOptimalBox(items);
-                
-                if (result && result.recommendedBox) {
-                  const itemsWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-                  const boxWeight = result.recommendedBox.cost * 0.1; // Estimate box weight
-                  const totalWeight = itemsWeight + boxWeight;
-
-                  // Update cartonization result
-                  const { error: cartonError } = await supabase.rpc('update_order_cartonization', {
-                    p_order_id: updatedOrder.id,
-                    p_recommended_box_id: result.recommendedBox.id,
-                    p_recommended_box_data: JSON.parse(JSON.stringify(result.recommendedBox)),
-                    p_utilization: result.utilization,
-                    p_confidence: result.confidence,
-                    p_total_weight: totalWeight,
-                    p_items_weight: itemsWeight,
-                    p_box_weight: boxWeight
-                  });
-
-                  if (cartonError) {
-                    console.error("Error updating cartonization data:", cartonError);
-                  } else {
-                    console.log("Cartonization data updated successfully for order:", updatedOrder.id);
-                  }
-                } else {
-                  // If no suitable box found, remove existing cartonization
-                  const { error: deleteError } = await supabase
-                    .from('order_cartonization')
-                    .delete()
-                    .eq('order_id', updatedOrder.id);
-                  
-                  if (deleteError) {
-                    console.error("Error removing cartonization data:", deleteError);
+            if (items.length > 0) {
+              const { data: decisionData, error: decisionError } = await supabase.functions.invoke(
+                'packaging-decision',
+                {
+                  body: {
+                    order_id: Number(updatedOrder.id),
+                    items
                   }
                 }
+              );
+
+              if (decisionError || decisionData?.error) {
+                console.error("Error updating cartonization data via packaging-decision:", decisionError || decisionData?.error);
+              } else {
+                console.log("Cartonization data updated successfully for order:", updatedOrder.id);
               }
             }
           } catch (cartonizationError) {

@@ -150,151 +150,43 @@ export const createOrder = async (orderData: CreateOrderInput): Promise<OrderDat
 
   console.log("Order created successfully with warehouse:", data.warehouse_id);
 
-  // Calculate and store cartonization data for the new order (only if items have dimensions)
-  if (orderData.orderItems && orderData.orderItems.length > 0 && 
+  // Calculate and store cartonization data for the new order using the canonical
+  // server-side packaging-decision logic (same algorithm used in shipment flow).
+  if (orderData.orderItems && orderData.orderItems.length > 0 &&
       orderData.orderItems.some(item => item.dimensions)) {
     try {
-      // Fetch boxes only for cartonization (narrower projection for performance)
-      const { data: boxes, error: boxError } = await supabase
-        .from('boxes')
-        .select('id, name, sku, length, width, height, max_weight, cost, in_stock, min_stock, max_stock, box_type')
-        .eq('company_id', companyId)
-        .eq('is_active', true)
-        .gt('in_stock', 0);
+      const items = orderData.orderItems
+        .filter(item => item.dimensions)
+        .map(item => ({
+          id: item.itemId,
+          name: item.name,
+          length: Number(item.dimensions!.length),
+          width: Number(item.dimensions!.width),
+          height: Number(item.dimensions!.height),
+          weight: Number(item.dimensions!.weight),
+          quantity: Number(item.quantity || 1),
+          fragility: 'low',
+          category: 'order_item'
+        }));
 
-      if (!boxError && boxes && boxes.length > 0) {
-        // Import cartonization logic
-        const { CartonizationEngine } = await import('../services/cartonization/cartonizationEngine');
-        
-        // Convert order items to cartonization items
-        const items = orderData.orderItems
-          .filter(item => item.dimensions)
-          .map(item => ({
-            id: item.itemId,
-            name: item.name,
-            sku: item.sku,
-            length: item.dimensions!.length,
-            width: item.dimensions!.width,
-            height: item.dimensions!.height,
-            weight: item.dimensions!.weight,
-            quantity: item.quantity,
-            category: 'order_item' as const
-          }));
-
-        if (items.length > 0) {
-          const engine = new CartonizationEngine(boxes.map(box => ({
-            id: box.id,
-            name: box.name,
-            sku: box.sku,
-            length: Number(box.length),
-            width: Number(box.width),
-            height: Number(box.height),
-            maxWeight: Number(box.max_weight),
-            cost: Number(box.cost),
-            inStock: box.in_stock,
-            minStock: box.min_stock,
-            maxStock: box.max_stock,
-            type: box.box_type as 'box' | 'poly_bag' | 'envelope' | 'tube' | 'custom'
-          })));
-
-          console.log("Running cartonization engine...");
-          
-          // Single-package first; only fall back to multi-package when no
-          // single box can hold all items at ≤99% utilization.
-          let result = engine.calculateOptimalBox(items, false);
-          let multiPackageResult = null;
-
-          if (!result) {
-            console.log('No single box fits at ≤99% utilization, trying multi-package...');
-            multiPackageResult = engine.calculateMultiPackageCartonization(items, 'balanced');
-
-            if (multiPackageResult) {
-              console.log(`Multi-package solution found: ${multiPackageResult.totalPackages} packages`);
-              result = {
-                recommendedBox: multiPackageResult.packages[0].box,
-                utilization: multiPackageResult.packages[0].utilization,
-                itemsFit: true,
-                totalWeight: multiPackageResult.totalWeight,
-                totalVolume: multiPackageResult.totalVolume,
-                dimensionalWeight: multiPackageResult.packages[0].dimensionalWeight,
-                savings: 0,
-                confidence: multiPackageResult.confidence,
-                alternatives: multiPackageResult.packages.slice(1, 4).map(pkg => ({
-                  box: pkg.box,
-                  utilization: pkg.utilization,
-                  cost: pkg.box.cost,
-                  confidence: pkg.confidence
-                })),
-                rulesApplied: multiPackageResult.rulesApplied,
-                processingTime: multiPackageResult.processingTime,
-                multiPackageResult: multiPackageResult
-              };
+      if (items.length > 0) {
+        const { data: decisionData, error: decisionError } = await supabase.functions.invoke(
+          'packaging-decision',
+          {
+            body: {
+              order_id: Number(data.id),
+              items
             }
           }
-          
-          console.log("Cartonization result:", result);
-          
-          if (result && result.recommendedBox) {
-            const itemsWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-            const boxWeight = result.recommendedBox.cost * 0.1; // Estimate box weight
-            const totalWeight = itemsWeight + boxWeight;
+        );
 
-            if (import.meta.env.DEV) {
-              console.log("Storing cartonization data:", {
-                orderId: data.id,
-                boxId: result.recommendedBox.id,
-                utilization: result.utilization,
-                confidence: result.confidence,
-                totalWeight,
-                multiPackage: !!multiPackageResult
-              });
-            }
-
-            // Store cartonization result with direct INSERT/UPDATE (better error visibility than RPC)
-            const cartonizationRecord = {
-              order_id: data.id,
-              recommended_box_id: result.recommendedBox.id,
-              recommended_box_data: {
-                ...result.recommendedBox,
-                multiPackageResult: multiPackageResult || null
-              },
-              utilization: Number(result.utilization),
-              confidence: Number(result.confidence),
-              total_weight: Number(totalWeight),
-              items_weight: Number(itemsWeight),
-              box_weight: Number(boxWeight),
-              calculation_timestamp: new Date().toISOString(),
-              packages: multiPackageResult?.packages || [],
-              total_packages: multiPackageResult?.totalPackages || 1,
-              splitting_strategy: multiPackageResult?.splittingStrategy || null,
-              optimization_objective: multiPackageResult?.optimizationObjective || 'balanced'
-            };
-
-            const { error: cartonError } = await supabase
-              .from('order_cartonization')
-              .upsert(cartonizationRecord, {
-                onConflict: 'order_id'
-              });
-
-            if (cartonError) {
-              console.error("Error storing cartonization data:", cartonError);
-              console.error("Cartonization record that failed:", cartonizationRecord);
-            } else {
-              if (import.meta.env.DEV) {
-                console.log("Cartonization data stored successfully for order:", data.id);
-                if (multiPackageResult) {
-                  console.log(`Multi-package data stored: ${multiPackageResult.totalPackages} packages`);
-                }
-              }
-            }
-          } else {
-            console.log("No cartonization result returned from engine");
-          }
-        } else {
-          console.log("No items with dimensions found for cartonization");
+        if (decisionError || decisionData?.error) {
+          console.error('Canonical cartonization (packaging-decision) failed on order create:', decisionError || decisionData?.error);
+        } else if (import.meta.env.DEV) {
+          console.log('Canonical cartonization stored via packaging-decision for order:', data.id, decisionData);
         }
       } else {
-        console.log("No boxes available for cartonization:", { boxError, boxCount: boxes?.length });
+        console.log('No items with dimensions found for canonical cartonization');
       }
     } catch (cartonizationError) {
       console.error("Error calculating cartonization:", cartonizationError);
