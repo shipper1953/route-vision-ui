@@ -661,6 +661,18 @@ export const ShippingOptionsSection = ({
         </div>
       )}
 
+      <MultiPackageProgressDialog
+        isOpen={showProgressDialog}
+        onClose={() => {
+          setShowProgressDialog(false);
+          if (bulkLabels.length > 0) setShowBulkDialog(true);
+        }}
+        packages={packageProgress}
+        isComplete={progressComplete}
+        selectedCarrier={selectedRateId ? (rateResponse?.rates.find(r => r.id === selectedRateId) as any)?.carrier : undefined}
+        selectedService={selectedRateId ? (rateResponse?.rates.find(r => r.id === selectedRateId) as any)?.service : undefined}
+      />
+
       <BulkShippingLabelDialog
         isOpen={showBulkDialog}
         onClose={() => setShowBulkDialog(false)}
