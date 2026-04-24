@@ -823,7 +823,8 @@ async function handleLegacyFlow(
   trackingUrl: string,
   carrier: string,
   service: string,
-  shopifyOrderId: string
+  shopifyOrderId: string,
+  shipmentId: number | string
 ) {
   console.log('Using GraphQL fulfillment (legacy - no fulfillment service)');
 
