@@ -81,6 +81,7 @@ export const ShippingOptionsSection = ({
   orderId,
 }: ShippingOptionsSectionProps) => {
   const form = useFormContext<ShipmentForm>();
+  const navigate = useNavigate();
   const { userProfile } = useAuth();
   const [rateResponse, setRateResponse] = useState<CombinedRateResponse | null>(null);
   const [fetchingRates, setFetchingRates] = useState(false);
