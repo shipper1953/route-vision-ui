@@ -488,6 +488,13 @@ export const ShippingLabelDialog = ({
                 <p className="text-xs text-amber-600">
                   Note: Easyship sandbox / mock couriers may not return a real PDF.
                 </p>
+                <p className="text-xs text-amber-700">
+                  {autoRefreshFailed
+                    ? 'Auto-refresh stopped. Use the button below to try again.'
+                    : autoAttempts >= AUTO_REFRESH_MAX_ATTEMPTS
+                      ? `Auto-refresh stopped after ${AUTO_REFRESH_MAX_ATTEMPTS} attempts. Tap Refresh to keep trying.`
+                      : `Auto-checking every ${AUTO_REFRESH_INTERVAL_MS / 1000}s (attempt ${autoAttempts + 1}/${AUTO_REFRESH_MAX_ATTEMPTS})...`}
+                </p>
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleRefreshLabel} disabled={refreshing} className="flex-1">
