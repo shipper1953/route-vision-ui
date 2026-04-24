@@ -240,14 +240,14 @@ async function syncToShopify(
         }
 
         // Only sync to the Ship Tornado fulfillment service location
-        const fulfillmentServiceLocationId = getFulfillmentServiceShopifyLocationId(store);
-        if (!fulfillmentServiceLocationId) {
+        const inventorySyncLocation = getInventorySyncShopifyLocation(store);
+        if (!inventorySyncLocation) {
           skippedMissingStLocationConfig++;
-          console.log(`No fulfillment service location configured for store, skipping ${item.sku}`);
+          console.log(`No Shopify inventory sync location configured for store, skipping ${item.sku}`);
           return;
         }
         const targetEdge = inventoryItem.inventoryLevels.edges.find(
-          (e: any) => normalizeLocationId(e.node.location.id) === fulfillmentServiceLocationId
+          (e: any) => normalizeLocationId(e.node.location.id) === inventorySyncLocation.id
         );
 
         if (!targetEdge) {
@@ -257,7 +257,7 @@ async function syncToShopify(
             .filter(Boolean)
             .join(', ');
           console.log(
-            `Ship Tornado location ${fulfillmentServiceLocationId} not found in Shopify for ${item.sku}, skipping. ` +
+            `Ship Tornado location ${inventorySyncLocation.id} (${inventorySyncLocation.source}) not found in Shopify for ${item.sku}, skipping. ` +
             `Available location ids: [${availableLocationIds}]`
           );
           return;
@@ -473,15 +473,15 @@ async function syncFromShopify(
         if (!item) continue;
 
         const inventoryEdges = variant.inventoryItem?.inventoryLevels?.edges || [];
-        const fulfillmentServiceLocationId = getFulfillmentServiceShopifyLocationId(store);
+        const inventorySyncLocation = getInventorySyncShopifyLocation(store);
 
-        if (!fulfillmentServiceLocationId) {
-          console.log(`No fulfillment service location configured for store, skipping ${variant.sku}`);
+        if (!inventorySyncLocation) {
+          console.log(`No Shopify inventory sync location configured for store, skipping ${variant.sku}`);
           continue;
         }
 
         const targetInventoryEdge = inventoryEdges.find(
-          (edge: any) => normalizeLocationId(edge.node?.location?.id) === fulfillmentServiceLocationId
+          (edge: any) => normalizeLocationId(edge.node?.location?.id) === inventorySyncLocation.id
         );
         const shopifyQty = targetInventoryEdge?.node?.quantities?.[0]?.quantity ?? 0;
 
@@ -573,6 +573,16 @@ function normalizeLocationId(locationId: string | null | undefined): string | nu
   return match ? match[1] : value;
 }
 
-function getFulfillmentServiceShopifyLocationId(store: any): string | null {
-  return normalizeLocationId(store.fulfillment_service_location_id || null);
+function getInventorySyncShopifyLocation(store: any): { id: string; source: 'fulfillment_service_location_id' | 'fulfillment_location_id' } | null {
+  const fulfillmentServiceLocationId = normalizeLocationId(store.fulfillment_service_location_id || null);
+  if (fulfillmentServiceLocationId) {
+    return { id: fulfillmentServiceLocationId, source: 'fulfillment_service_location_id' };
+  }
+
+  const fulfillmentLocationId = normalizeLocationId(store.fulfillment_location_id || null);
+  if (fulfillmentLocationId) {
+    return { id: fulfillmentLocationId, source: 'fulfillment_location_id' };
+  }
+
+  return null;
 }
