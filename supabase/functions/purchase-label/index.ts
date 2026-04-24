@@ -528,7 +528,9 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
       },
       body: JSON.stringify({
         ...shipmentPayload,
-        selected_courier_id: courierId,
+        // Easyship v2024-09 uses courier_service_id (the per-service identifier)
+        // to lock the shipment to a specific service. Our rate UI passes that same id.
+        courier_service_id: courierId,
       }),
     });
     const createText = await createRes.text();
@@ -539,6 +541,7 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
       throw new Error(createData.error?.message || createData.message || `Easyship create failed: ${createRes.status}`);
     }
     shipmentId = createData.shipment?.easyship_shipment_id || createData.easyship_shipment_id;
+    console.log('✅ Created Easyship shipment:', shipmentId);
   }
 
   if (!shipmentId) {
