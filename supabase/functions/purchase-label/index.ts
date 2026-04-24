@@ -519,6 +519,27 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
 
   if (!shipmentId && shipmentPayload) {
     console.log('📦 Creating Easyship shipment before label purchase...');
+
+    // The rate-shopping payload contains fields that the /shipments ShipmentCreate
+    // schema rejects (e.g. calculate_tax_and_duties, courier_settings). Strip them
+    // and pass courier selection via the documented courier_selection object.
+    const {
+      calculate_tax_and_duties: _ctd,
+      courier_settings: _cs,
+      courier_service_id: _csid,
+      ...shipmentCreateBody
+    } = shipmentPayload as Record<string, any>;
+
+    const createBody = {
+      ...shipmentCreateBody,
+      courier_selection: {
+        selected_courier_id: courierId,
+        apply_shipping_rules: true,
+      },
+    };
+
+    console.log('📦 Easyship create body keys:', Object.keys(createBody).join(','));
+
     const createRes = await fetch(`${easyshipBaseUrl}/2024-09/shipments`, {
       method: 'POST',
       headers: {
@@ -526,12 +547,7 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: JSON.stringify({
-        ...shipmentPayload,
-        // Easyship v2024-09 uses courier_service_id (the per-service identifier)
-        // to lock the shipment to a specific service. Our rate UI passes that same id.
-        courier_service_id: courierId,
-      }),
+      body: JSON.stringify(createBody),
     });
     const createText = await createRes.text();
     let createData: any;
@@ -558,7 +574,8 @@ async function purchaseEasyshipLabel(easyshipShipmentId: string | null, courierI
       'Accept': 'application/json',
     },
     body: JSON.stringify({
-      courier_service_id: courierId,
+      // Courier is already locked on the shipment via courier_selection at create time.
+      // ShipmentLabelCreate only accepts printing_options here.
       printing_options: {
         format: 'pdf',
         label: '4x6',
