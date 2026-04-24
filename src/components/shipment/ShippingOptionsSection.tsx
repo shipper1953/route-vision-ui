@@ -238,6 +238,7 @@ export const ShippingOptionsSection = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMultiPackage, rateResponse?.id, multiParcels.length]);
 
+  const requiredDeliveryDate = form.watch("requiredDeliveryDate");
 
   const getSortedRates = (): SortedRate[] => {
     if (!rateResponse?.rates) return [];
