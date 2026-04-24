@@ -148,88 +148,151 @@ function checkItemsFit(items: Item[], box: Box): { success: boolean; usedVolume:
 }
 
 // ─── Scoring ────────────────────────────────────────────────────────────────
+// Target: utilization as close to 99% as possible without exceeding.
+// Identical behavior across all tenants — policy is informational only.
+
+const MAX_UTILIZATION = 99;
 
 function scoreBox(
-  analysis: Omit<BoxAnalysis, "score" | "scoreBreakdown">,
-  policy: TenantPolicy,
-  totalWeight: number,
-  hasFragileItems: boolean
+  analysis: Omit<BoxAnalysis, "score" | "scoreBreakdown">
 ): { score: number; scoreBreakdown: Record<string, number> } {
   const breakdown: Record<string, number> = {};
-  let score = 0;
-
-  const objective = policy.optimization_objective;
-
-  // Volume utilization score (0-40)
-  const utilizationScore = Math.min(40, analysis.utilization * 0.4);
-  breakdown.utilization = utilizationScore;
-  score += utilizationScore;
-
-  // Void ratio penalty
-  const maxVoid = hasFragileItems
-    ? policy.fragility_rules?.max_void_ratio ?? policy.max_void_ratio
-    : policy.max_void_ratio;
-  const voidPenalty = analysis.voidRatio > maxVoid ? -20 : 0;
-  breakdown.void_penalty = voidPenalty;
-  score += voidPenalty;
-
-  // Objective-specific scoring
-  if (objective === "smallest_fit") {
-    // Prefer smallest outer volume
-    const volumeScore = Math.max(0, 30 - analysis.outerVolume / 100);
-    breakdown.volume_fit = volumeScore;
-    score += volumeScore;
-  } else if (objective === "lowest_landed_cost") {
-    // Factor in box cost + estimated shipping (dim weight proxy)
-    const costScore = Math.max(0, 30 - (analysis.cost + analysis.dimensionalWeight * 0.15));
-    breakdown.landed_cost = costScore;
-    score += costScore;
-  } else if (objective === "damage_risk_min") {
-    // Prefer tighter void ratio
-    const damageScore = Math.max(0, 30 * (1 - analysis.voidRatio));
-    breakdown.damage_risk = damageScore;
-    score += damageScore;
-  }
-
-  // Weight safety margin (0-10)
-  const weightRatio = totalWeight / analysis.box.max_weight;
-  const weightScore = weightRatio <= 0.95 ? 10 : weightRatio <= 1.0 ? 5 : 0;
-  breakdown.weight_safety = weightScore;
-  score += weightScore;
-
-  // Cost efficiency (0-10)
-  const costEfficiency = Math.max(0, 10 - analysis.cost);
-  breakdown.cost_efficiency = costEfficiency;
-  score += costEfficiency;
-
+  // Primary metric: negative distance from 99% (closer to 99 = higher score)
+  const distance = Math.abs(MAX_UTILIZATION - analysis.utilization);
+  const score = -distance;
+  breakdown.utilization = analysis.utilization;
+  breakdown.distance_from_target = distance;
+  breakdown.target_utilization = MAX_UTILIZATION;
   return { score, scoreBreakdown: breakdown };
 }
 
-function applyTieBreakers(
-  a: BoxAnalysis,
-  b: BoxAnalysis,
-  tieBreakers: string[]
-): number {
-  for (const tb of tieBreakers) {
-    let diff = 0;
-    switch (tb) {
-      case "smallest_volume":
-        diff = a.outerVolume - b.outerVolume;
-        break;
-      case "lowest_dim_weight":
-        diff = a.dimensionalWeight - b.dimensionalWeight;
-        break;
-      case "lowest_cost":
-      case "lowest_box_cost":
-        diff = a.cost - b.cost;
-        break;
-      case "highest_utilization":
-        diff = b.utilization - a.utilization;
-        break;
-    }
-    if (Math.abs(diff) > 0.01) return diff;
+// Deterministic tie-breakers, identical for all tenants:
+// 1) lowest dimensional weight, 2) lowest box cost, 3) smallest outer volume
+function applyTieBreakers(a: BoxAnalysis, b: BoxAnalysis): number {
+  if (Math.abs(a.dimensionalWeight - b.dimensionalWeight) > 0.01) {
+    return a.dimensionalWeight - b.dimensionalWeight;
   }
-  return 0;
+  if (Math.abs(a.cost - b.cost) > 0.01) {
+    return a.cost - b.cost;
+  }
+  return a.outerVolume - b.outerVolume;
+}
+
+// Build a BoxAnalysis for a given item set + box, returns null if it doesn't fit
+function analyzeBoxForItems(items: Item[], box: Box, totalWeight: number): BoxAnalysis | null {
+  if (box.max_weight < totalWeight) return null;
+  const packResult = checkItemsFit(items, box);
+  if (!packResult.success) return null;
+
+  const outerVolume = box.length * box.width * box.height;
+  const utilization = (packResult.usedVolume / outerVolume) * 100;
+  // Reject any box that would exceed 99% utilization
+  if (utilization > MAX_UTILIZATION) return null;
+
+  const voidRatio = 1 - packResult.usedVolume / outerVolume;
+  const dimensionalWeight = outerVolume / 139;
+
+  const partial = {
+    box,
+    utilization,
+    dimensionalWeight,
+    outerVolume,
+    cost: box.cost,
+    voidRatio,
+    itemsFit: true,
+  };
+  const { score, scoreBreakdown } = scoreBox(partial);
+  return { ...partial, score, scoreBreakdown };
+}
+
+// Pick the best box for a set of items: closest to 99% utilization, then tie-breakers
+function pickBestBox(items: Item[], boxes: Box[]): BoxAnalysis | null {
+  const totalWeight = items.reduce((s, i) => s + i.weight * i.quantity, 0);
+  const candidates: BoxAnalysis[] = [];
+  for (const box of boxes) {
+    const a = analyzeBoxForItems(items, box, totalWeight);
+    if (a) candidates.push(a);
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => {
+    const scoreDiff = b.score - a.score;
+    if (Math.abs(scoreDiff) > 0.0001) return scoreDiff;
+    return applyTieBreakers(a, b);
+  });
+  return candidates[0];
+}
+
+// ─── Multi-package splitter ────────────────────────────────────────────────
+// Greedy: expand items by quantity, sort by volume desc, fill packages one
+// at a time choosing the box that keeps utilization closest to 99%.
+
+interface PackageResult {
+  box: Box;
+  items: Item[];
+  utilization: number;
+  dimensional_weight: number;
+  void_ratio: number;
+  total_weight: number;
+}
+
+function buildMultiPackages(items: Item[], boxes: Box[]): PackageResult[] | null {
+  // Expand items to unit quantities so the splitter can mix
+  const units: Item[] = [];
+  for (const item of items) {
+    for (let i = 0; i < item.quantity; i++) {
+      units.push({ ...item, quantity: 1 });
+    }
+  }
+  // Sort by volume desc
+  units.sort(
+    (a, b) => b.length * b.width * b.height - a.length * a.width * a.height
+  );
+
+  const packages: PackageResult[] = [];
+  let remaining = [...units];
+  let safety = 0;
+
+  while (remaining.length > 0 && safety++ < 1000) {
+    // Start a new package with the largest remaining item
+    let current: Item[] = [remaining[0]];
+    let bestBox = pickBestBox(current, boxes);
+    if (!bestBox) {
+      // Single item cannot fit any box — abort
+      return null;
+    }
+    let pool = remaining.slice(1);
+
+    // Greedily try to add more items, keeping the box choice that's closest to 99%
+    let progress = true;
+    while (progress) {
+      progress = false;
+      for (let i = 0; i < pool.length; i++) {
+        const trial = [...current, pool[i]];
+        const trialBox = pickBestBox(trial, boxes);
+        if (trialBox) {
+          current = trial;
+          bestBox = trialBox;
+          pool.splice(i, 1);
+          progress = true;
+          break;
+        }
+      }
+    }
+
+    const totalWeight = current.reduce((s, i) => s + i.weight * i.quantity, 0);
+    packages.push({
+      box: bestBox.box,
+      items: current,
+      utilization: bestBox.utilization,
+      dimensional_weight: bestBox.dimensionalWeight,
+      void_ratio: bestBox.voidRatio,
+      total_weight: totalWeight,
+    });
+    remaining = pool;
+  }
+
+  if (remaining.length > 0) return null;
+  return packages;
 }
 
 // ─── Main Handler ───────────────────────────────────────────────────────────
