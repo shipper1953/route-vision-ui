@@ -137,7 +137,17 @@ Deno.serve(async (req) => {
 
     if (logError) console.error('Failed to log adjustment:', logError);
 
-    return new Response(JSON.stringify({ success: true }), {
+    // Push the adjusted item's quantity to Shopify (Ship Tornado fulfillment service location)
+    let shopifySync: { attempted: boolean; ok?: boolean; error?: string; sku?: string } = { attempted: false };
+    try {
+      shopifySync = await pushItemToShopify(supabaseClient, company_id as string, item_id as string);
+    } catch (pushErr) {
+      const msg = pushErr instanceof Error ? pushErr.message : String(pushErr);
+      console.error('Shopify push after adjustment failed:', msg);
+      shopifySync = { attempted: true, ok: false, error: msg };
+    }
+
+    return new Response(JSON.stringify({ success: true, shopifySync }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
