@@ -60,7 +60,7 @@ export function findRecommendedRateByDate(response: ShipmentResponse, requiredDa
       }
     }
   } 
-  // Fall back to regular rates if smartrates aren't available
+  // Fall back to regular rates if SmartRates aren't available
   else if (response.rates && response.rates.length > 0) {
     console.log("Using standard rates (SmartRates not available)");
     
