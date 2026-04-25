@@ -9,7 +9,7 @@ interface ReceivingSession {
   session_number: string;
   warehouse_id: string;
   receiving_user_id: string;
-  status: 'in_progress' | 'completed' | 'cancelled';
+  status: 'in_progress' | 'paused' | 'completed' | 'cancelled';
   started_at: string;
   completed_at?: string;
 }
@@ -236,7 +236,7 @@ export const useWmsReceiving = () => {
 
       const { error } = await supabase
         .from('receiving_sessions' as any)
-        .update({ status: 'in_progress' })
+        .update({ status: 'paused' })
         .eq('id', sessionId);
 
       if (error) throw error;
