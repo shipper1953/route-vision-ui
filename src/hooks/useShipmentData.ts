@@ -3,18 +3,20 @@ import { useState, useEffect } from 'react';
 import { Shipment } from "@/components/shipment/ShipmentsTable";
 import { toast } from "sonner";
 import { sampleShipments } from "@/types/shipmentTypes";
-import { 
-  mergeShipments, 
-  loadShipmentsFromLocalStorage, 
-  saveShipmentsToLocalStorage 
+import {
+  mergeShipments,
+  loadShipmentsFromLocalStorage,
+  saveShipmentsToLocalStorage
 } from "@/utils/shipmentDataUtils";
 import { useSupabaseShipments } from "./useSupabaseShipments";
 import { useOrderShipments } from "./useOrderShipments";
 import { usePurchasedLabelHandler } from "./usePurchasedLabelHandler";
+import { useAuth } from "./useAuth";
 
 export const useShipmentData = () => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated } = useAuth();
   
   // Get shipments from various sources
   const { shipments: supabaseShipments, loading: loadingSupabase, error: supabaseError } = useSupabaseShipments();
@@ -47,14 +49,19 @@ export const useShipmentData = () => {
           // Get local storage shipments as fallback
           const localStorageShipments = loadShipmentsFromLocalStorage();
           console.log("Local storage shipments:", localStorageShipments.length);
-          
+
           if (localStorageShipments.length > 0) {
             console.log("Using local storage shipments, total:", localStorageShipments.length);
             setShipments(localStorageShipments);
           } else {
-            // Use sample data only if nothing else is available and no user is logged in
-            console.log("No shipments found from any source, using sample data");
-            setShipments(sampleShipments);
+            // Use sample data only when unauthenticated; authenticated users should see empty state
+            if (isAuthenticated) {
+              console.log("Authenticated user with no shipments found; skipping sample dataset fallback");
+              setShipments([]);
+            } else {
+              console.log("No shipments found from any source, using sample data");
+              setShipments(sampleShipments);
+            }
           }
         }
         
@@ -72,20 +79,23 @@ export const useShipmentData = () => {
         const localStorageShipments = loadShipmentsFromLocalStorage();
         if (localStorageShipments.length > 0) {
           setShipments(localStorageShipments);
+        } else if (isAuthenticated) {
+          // Authenticated users should see an empty state instead of sample data when all sources fail
+          setShipments([]);
         } else {
-          // As a last resort, use sample data
+          // As a last resort for unauthenticated users, use sample data
           setShipments(sampleShipments);
         }
       } finally {
         setLoading(false);
       }
     };
-    
+
     // Only load when both sources have finished loading
     if (!loadingSupabase && !loadingOrders) {
       loadAllShipments();
     }
-  }, [supabaseShipments, orderShipments, loadingSupabase, loadingOrders, supabaseError]);
+  }, [supabaseShipments, orderShipments, loadingSupabase, loadingOrders, supabaseError, isAuthenticated]);
 
   return {
     shipments,
