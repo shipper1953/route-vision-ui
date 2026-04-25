@@ -72,9 +72,37 @@ export const usePaginatedOrders = (pageSize: number = 10, initialStatusFilter: s
   // Realtime updates with debouncing and rate limiting
   useEffect(() => {
     const channel = supabase
-      .channel('public:orders')
-      .on('postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'orders' }, 
+      .channel(`public:orders:${Date.now()}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        async (payload) => {
+          console.log('Realtime new order inserted:', payload);
+
+          // Clear any pending reload
+          if (reloadTimeoutRef.current) {
+            clearTimeout(reloadTimeoutRef.current);
+          }
+
+          const now = Date.now();
+          const timeSinceLastReload = now - lastReloadRef.current;
+
+          if (timeSinceLastReload < MIN_RELOAD_INTERVAL) {
+            reloadTimeoutRef.current = setTimeout(() => {
+              lastReloadRef.current = Date.now();
+              loadOrders(currentPage);
+            }, MIN_RELOAD_INTERVAL - timeSinceLastReload);
+          } else {
+            lastReloadRef.current = now;
+            await loadOrders(currentPage);
+          }
+
+          if (payload.new?.order_id) {
+            toast.success(`New order ${payload.new.order_id} synced`);
+          }
+        }
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
         async (payload) => {
           console.log('Realtime order update:', payload);
 
