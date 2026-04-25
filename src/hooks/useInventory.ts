@@ -113,7 +113,17 @@ export const useInventory = () => {
 
       if (error) throw error;
 
-      toast.success('Inventory adjusted successfully');
+      const sync = (data as any)?.shopifySync;
+      if (sync?.attempted) {
+        if (sync.ok) {
+          toast.success(`Inventory adjusted; Shopify updated to ${sync.pushedQty}`);
+        } else {
+          toast.success('Inventory adjusted');
+          toast.warning(`Shopify sync failed: ${sync.error || 'unknown error'}`);
+        }
+      } else {
+        toast.success('Inventory adjusted successfully');
+      }
       await fetchInventory();
       return data;
     } catch (error) {
