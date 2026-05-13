@@ -74,6 +74,7 @@ const SuperAdminPanel = () => {
             <TabsTrigger value="companies">Companies</TabsTrigger>
             <TabsTrigger value="packages">Package Inventory</TabsTrigger>
             <TabsTrigger value="shipments">Shipments Report</TabsTrigger>
+            <TabsTrigger value="shopify-mapping">Shopify Mapping</TabsTrigger>
             <TabsTrigger value="tools">Data Tools</TabsTrigger>
           </TabsList>
           
