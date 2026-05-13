@@ -134,7 +134,12 @@ export const usePurchaseOrders = () => {
       return po as unknown as PurchaseOrder;
     } catch (error: any) {
       console.error('Error creating purchase order:', error);
-      toast.error(error.message || 'Failed to create purchase order');
+      const msg = error?.message || '';
+      if (msg.includes('purchase_orders_company_id_po_number_key') || error?.code === '23505') {
+        toast.error(`PO number "${poData.po_number}" already exists. Please use a different PO number.`);
+      } else {
+        toast.error(msg || 'Failed to create purchase order');
+      }
       return null;
     } finally {
       setLoading(false);
