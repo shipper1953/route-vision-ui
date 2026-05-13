@@ -122,25 +122,56 @@ export const useWmsReceiving = () => {
     try {
       setLoading(true);
 
-      const { error } = await supabase
+      const acceptedQty = Math.max(
+        params.quantityReceived - (params.damagedQuantity || 0) - (params.nonCompliantQuantity || 0),
+        0
+      );
+
+      const baseInsertPayload = {
+        session_id: params.sessionId,
+        po_line_id: params.poLineId,
+        item_id: params.itemId,
+        quantity_received: params.quantityReceived,
+        uom: params.uom,
+        lot_number: params.lotNumber,
+        serial_numbers: params.serialNumbers,
+        condition: params.condition || 'new',
+        qc_required: params.qcRequired || false,
+        received_by: userProfile?.id,
+        received_at: new Date().toISOString(),
+      };
+
+      const extendedPayload = {
+        ...baseInsertPayload,
+        quantity_damaged: params.damagedQuantity || 0,
+        quantity_non_compliant: params.nonCompliantQuantity || 0,
+        quantity_accepted: acceptedQty,
+        non_compliance_reason: params.nonComplianceReason,
+      };
+
+      let { error } = await supabase
         .from('receiving_line_items' as any)
-        .insert({
-          session_id: params.sessionId,
-          po_line_id: params.poLineId,
-          item_id: params.itemId,
-          quantity_received: params.quantityReceived,
-          uom: params.uom,
-          lot_number: params.lotNumber,
-          serial_numbers: params.serialNumbers,
-          condition: params.condition || 'new',
-          quantity_damaged: params.damagedQuantity || 0,
-          quantity_non_compliant: params.nonCompliantQuantity || 0,
-          quantity_accepted: Math.max(params.quantityReceived - (params.damagedQuantity || 0) - (params.nonCompliantQuantity || 0), 0),
-          non_compliance_reason: params.nonComplianceReason,
-          qc_required: params.qcRequired || false,
-          received_by: userProfile?.id,
-          received_at: new Date().toISOString(),
-        });
+        .insert(extendedPayload as any);
+
+      // Backward-compatible fallback when DB migration isn't applied yet.
+      if (error && String(error.message || '').includes('quantity_accepted')) {
+        const fallbackNotes = [
+          params.damagedQuantity ? `Damaged: ${params.damagedQuantity}` : null,
+          params.nonCompliantQuantity ? `Non-compliant: ${params.nonCompliantQuantity}` : null,
+          params.nonComplianceReason ? `Reason: ${params.nonComplianceReason}` : null,
+        ].filter(Boolean).join(' | ');
+
+        const fallbackPayload = {
+          ...baseInsertPayload,
+          notes: fallbackNotes || undefined,
+        };
+
+        const fallbackResult = await supabase
+          .from('receiving_line_items' as any)
+          .insert(fallbackPayload as any);
+
+        error = fallbackResult.error;
+      }
 
       if (error) throw error;
 
@@ -153,7 +184,6 @@ export const useWmsReceiving = () => {
 
       if (!poLineResult.error && poLineResult.data) {
         const poLine = poLineResult.data as unknown as { quantity_received: number; quantity_ordered: number; po_id: string };
-        const acceptedQty = Math.max(params.quantityReceived - (params.damagedQuantity || 0) - (params.nonCompliantQuantity || 0), 0);
         const newQuantity = (poLine.quantity_received || 0) + acceptedQty;
         
         await supabase
