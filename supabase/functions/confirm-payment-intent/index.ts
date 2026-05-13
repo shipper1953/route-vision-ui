@@ -4,7 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -16,10 +17,13 @@ serve(async (req) => {
     const { paymentIntentId, companyId } = await req.json();
 
     if (!paymentIntentId) {
-      return new Response(JSON.stringify({ error: "Missing paymentIntentId" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
+      return new Response(
+        JSON.stringify({ error: "Missing paymentIntentId" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        },
+      );
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -29,27 +33,34 @@ serve(async (req) => {
     const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
 
     if (!pi) {
-      return new Response(JSON.stringify({ error: "PaymentIntent not found" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 404,
-      });
+      return new Response(
+        JSON.stringify({ error: "PaymentIntent not found" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+        },
+      );
     }
 
     if (pi.status !== "succeeded") {
       return new Response(
-        JSON.stringify({ error: `PaymentIntent not succeeded (status: ${pi.status})` }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        JSON.stringify({
+          error: `PaymentIntent not succeeded (status: ${pi.status})`,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        },
       );
     }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { persistSession: false } }
+      { auth: { persistSession: false } },
     );
 
-    const derivedCompanyId =
-      (pi.metadata?.company_id as string) || companyId;
+    const derivedCompanyId = (pi.metadata?.company_id as string) || companyId;
     if (!derivedCompanyId) {
       return new Response(JSON.stringify({ error: "Missing companyId" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -71,7 +82,10 @@ serve(async (req) => {
       console.log("Transaction already recorded for", pi.id);
       return new Response(
         JSON.stringify({ credited: false, alreadyRecorded: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        },
       );
     }
 
@@ -93,7 +107,12 @@ serve(async (req) => {
 
       const { data: newWallet, error: createError } = await supabase
         .from("wallets")
-        .insert({ company_id: derivedCompanyId, user_id: ownerId, balance: 0, currency: "USD" })
+        .insert({
+          company_id: derivedCompanyId,
+          user_id: ownerId,
+          balance: 0,
+          currency: "USD",
+        })
         .select()
         .single();
       if (createError) throw createError;
@@ -127,14 +146,24 @@ serve(async (req) => {
     console.log(`Wallet credited via PI ${pi.id}: +$${amountDollars}`);
 
     return new Response(
-      JSON.stringify({ credited: true, amount: amountDollars, balance: newBalance }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      JSON.stringify({
+        credited: true,
+        amount: amountDollars,
+        balance: newBalance,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      },
     );
   } catch (error) {
     console.error("confirm-payment-intent error:", error);
     return new Response(
       JSON.stringify({ error: (error as Error).message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      },
     );
   }
 });

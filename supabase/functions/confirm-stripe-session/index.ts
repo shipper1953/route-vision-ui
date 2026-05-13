@@ -1,11 +1,11 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -46,9 +46,12 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
 
-    const derivedCompanyId = (session.metadata?.company_id as string) || companyId;
+    const derivedCompanyId = (session.metadata?.company_id as string) ||
+      companyId;
     if (!derivedCompanyId) {
       return new Response(JSON.stringify({ error: "Missing companyId" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -74,10 +77,13 @@ serve(async (req) => {
 
       if (existingTx && existingTx.length > 0) {
         console.log("Transaction already recorded, skipping credit");
-        return new Response(JSON.stringify({ credited: false, alreadyRecorded: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
+        return new Response(
+          JSON.stringify({ credited: false, alreadyRecorded: true }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          },
+        );
       }
     }
 
@@ -102,7 +108,12 @@ serve(async (req) => {
       }
       const { data: newWallet, error: createError } = await supabase
         .from("wallets")
-        .insert({ company_id: derivedCompanyId, user_id: ownerId, balance: 0, currency: "USD" })
+        .insert({
+          company_id: derivedCompanyId,
+          user_id: ownerId,
+          balance: 0,
+          currency: "USD",
+        })
         .select()
         .single();
       if (createError) throw createError;
@@ -133,17 +144,30 @@ serve(async (req) => {
 
     if (txError) throw txError;
 
-    console.log(`Wallet credited: company ${derivedCompanyId}, +$${amountDollars}`);
+    console.log(
+      `Wallet credited: company ${derivedCompanyId}, +$${amountDollars}`,
+    );
 
     return new Response(
-      JSON.stringify({ credited: true, amount: amountDollars, walletId: wallet!.id, balance: newBalance }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      JSON.stringify({
+        credited: true,
+        amount: amountDollars,
+        walletId: wallet!.id,
+        balance: newBalance,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      },
     );
   } catch (error) {
     console.error("confirm-stripe-session error:", error);
     return new Response(
       JSON.stringify({ error: (error as Error).message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      },
     );
   }
 });

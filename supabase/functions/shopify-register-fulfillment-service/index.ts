@@ -1,8 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface ShopifyGraphQLResponse {
@@ -22,21 +23,24 @@ interface ShopifyGraphQLResponse {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { companyId, storeId, shopifySettings } = await req.json();
 
     if (!companyId) {
       return new Response(
-        JSON.stringify({ error: 'Missing companyId' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Missing companyId" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -50,17 +54,20 @@ Deno.serve(async (req) => {
       storeUrl = shopifySettings.store_url;
     } else if (storeId) {
       const { data: storeData, error: storeError } = await supabase
-        .from('shopify_stores')
-        .select('id, access_token, store_url')
-        .eq('id', storeId)
-        .eq('company_id', companyId)
+        .from("shopify_stores")
+        .select("id, access_token, store_url")
+        .eq("id", storeId)
+        .eq("company_id", companyId)
         .single();
 
       if (storeError || !storeData) {
-        console.error('Failed to fetch store:', storeError);
+        console.error("Failed to fetch store:", storeError);
         return new Response(
-          JSON.stringify({ error: 'Shopify store not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: "Shopify store not found" }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
 
@@ -69,24 +76,36 @@ Deno.serve(async (req) => {
       actualStoreId = storeData.id;
     } else {
       return new Response(
-        JSON.stringify({ error: 'Either storeId or shopifySettings must be provided' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          error: "Either storeId or shopifySettings must be provided",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
     if (!accessToken || !storeUrl) {
       return new Response(
-        JSON.stringify({ error: 'Shopify credentials missing' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Shopify credentials missing" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
     console.log(`Registering fulfillment service for company ${companyId}`);
 
     // Get callback URL for fulfillment order notifications
-    const callbackUrl = `${supabaseUrl}/functions/v1/shopify-fulfillment-order-notification`;
+    const callbackUrl =
+      `${supabaseUrl}/functions/v1/shopify-fulfillment-order-notification`;
 
-    console.log('Registering fulfillment service with callback URL:', callbackUrl);
+    console.log(
+      "Registering fulfillment service with callback URL:",
+      callbackUrl,
+    );
 
     // GraphQL mutation to create fulfillment service
     // Note: Shopify auto-generates sharedSecret - we don't provide it
@@ -117,46 +136,53 @@ Deno.serve(async (req) => {
     const response = await fetch(
       `https://${storeUrl}/admin/api/2025-01/graphql.json`,
       {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json',
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           query: mutation,
-          variables: { 
-            callbackUrl
-          }
+          variables: {
+            callbackUrl,
+          },
         }),
-      }
+      },
     );
 
     if (!response.ok) {
-      throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Shopify API error: ${response.status} ${response.statusText}`,
+      );
     }
 
     const result: ShopifyGraphQLResponse = await response.json();
 
     // Check for GraphQL errors
     if (result.errors) {
-      console.error('GraphQL errors:', result.errors);
-      throw new Error(`GraphQL error: ${result.errors.map(e => e.message).join(', ')}`);
+      console.error("GraphQL errors:", result.errors);
+      throw new Error(
+        `GraphQL error: ${result.errors.map((e) => e.message).join(", ")}`,
+      );
     }
 
     // Check for user errors - handle "already exists" gracefully
     if (result.data?.fulfillmentServiceCreate?.userErrors?.length) {
       const errors = result.data.fulfillmentServiceCreate.userErrors;
-      console.error('User errors:', errors);
-      
+      console.error("User errors:", errors);
+
       // If already exists, try to fetch existing service
-      const nameExistsError = errors.find(e => 
-        e.message.toLowerCase().includes('already been taken') || 
-        e.message.toLowerCase().includes('name') && e.message.toLowerCase().includes('taken')
+      const nameExistsError = errors.find((e) =>
+        e.message.toLowerCase().includes("already been taken") ||
+        e.message.toLowerCase().includes("name") &&
+          e.message.toLowerCase().includes("taken")
       );
-      
+
       if (nameExistsError) {
-        console.log('Fulfillment service already exists, fetching existing service...');
-        
+        console.log(
+          "Fulfillment service already exists, fetching existing service...",
+        );
+
         const getServiceQuery = `
           query {
             shop {
@@ -171,52 +197,62 @@ Deno.serve(async (req) => {
             }
           }
         `;
-        
+
         const getResponse = await fetch(
           `https://${storeUrl}/admin/api/2025-01/graphql.json`,
           {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'X-Shopify-Access-Token': accessToken,
-              'Content-Type': 'application/json',
+              "X-Shopify-Access-Token": accessToken,
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({ query: getServiceQuery }),
-          }
+          },
         );
-        
+
         const getResult = await getResponse.json();
-        console.log('Fulfillment services query result:', JSON.stringify(getResult));
-        
+        console.log(
+          "Fulfillment services query result:",
+          JSON.stringify(getResult),
+        );
+
         const services = getResult.data?.shop?.fulfillmentServices || [];
         const existingService = services.find(
-          (svc: any) => svc.serviceName === 'Ship Tornado' || svc.serviceName?.toLowerCase() === 'ship tornado'
+          (svc: any) =>
+            svc.serviceName === "Ship Tornado" ||
+            svc.serviceName?.toLowerCase() === "ship tornado",
         );
-        
+
         if (existingService) {
-          console.log('Found existing Ship Tornado fulfillment service:', existingService.id);
-          
+          console.log(
+            "Found existing Ship Tornado fulfillment service:",
+            existingService.id,
+          );
+
           // Use existing service
           const fulfillmentService = {
             id: existingService.id,
             location: {
               id: existingService.location.id,
               name: existingService.location.name,
-            }
+            },
           };
-          
+
           // Update shopify_stores with existing service
           if (actualStoreId) {
             await supabase
-              .from('shopify_stores')
-              .update({ 
+              .from("shopify_stores")
+              .update({
                 fulfillment_service_id: existingService.id,
-                fulfillment_service_location_id: existingService.location?.id || null,
+                fulfillment_service_location_id: existingService.location?.id ||
+                  null,
                 fulfillment_location_id: existingService.location?.id || null,
-                fulfillment_location_name: existingService.location?.name || null,
+                fulfillment_location_name: existingService.location?.name ||
+                  null,
               })
-              .eq('id', actualStoreId);
+              .eq("id", actualStoreId);
           }
-          
+
           return new Response(
             JSON.stringify({
               success: true,
@@ -227,45 +263,53 @@ Deno.serve(async (req) => {
                 alreadyExisted: true,
               },
             }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
       }
-      
-      throw new Error(`Fulfillment service creation failed: ${errors.map(e => e.message).join(', ')}`);
+
+      throw new Error(
+        `Fulfillment service creation failed: ${
+          errors.map((e) => e.message).join(", ")
+        }`,
+      );
     }
 
-    const fulfillmentService = result.data?.fulfillmentServiceCreate?.fulfillmentService;
-    
+    const fulfillmentService = result.data?.fulfillmentServiceCreate
+      ?.fulfillmentService;
+
     if (!fulfillmentService) {
-      throw new Error('No fulfillment service returned from Shopify');
+      throw new Error("No fulfillment service returned from Shopify");
     }
 
     // Update shopify_stores table with fulfillment service info
     if (actualStoreId) {
       const { error: updateError } = await supabase
-        .from('shopify_stores')
-        .update({ 
+        .from("shopify_stores")
+        .update({
           fulfillment_service_id: fulfillmentService.id,
           fulfillment_service_location_id: fulfillmentService.location.id,
           fulfillment_location_id: fulfillmentService.location.id,
           fulfillment_location_name: fulfillmentService.location.name,
         })
-        .eq('id', actualStoreId);
+        .eq("id", actualStoreId);
 
       if (updateError) {
-        console.error('Failed to update store with fulfillment service:', updateError);
+        console.error(
+          "Failed to update store with fulfillment service:",
+          updateError,
+        );
         throw updateError;
       }
     }
 
     // Log success
-    await supabase.from('shopify_sync_logs').insert({
+    await supabase.from("shopify_sync_logs").insert({
       company_id: companyId,
       shopify_store_id: actualStoreId,
-      sync_type: 'fulfillment_service_registration',
-      direction: 'outbound',
-      status: 'success',
+      sync_type: "fulfillment_service_registration",
+      direction: "outbound",
+      status: "success",
       metadata: {
         fulfillment_service_id: fulfillmentService.id,
         location_id: fulfillmentService.location.id,
@@ -273,14 +317,17 @@ Deno.serve(async (req) => {
       },
     });
 
-    console.log('Fulfillment service registered successfully:', fulfillmentService);
+    console.log(
+      "Fulfillment service registered successfully:",
+      fulfillmentService,
+    );
 
     // Subscribe to fulfillment order webhooks only (not orders/create)
     const webhookTopics = [
-      'FULFILLMENT_ORDERS_FULFILLMENT_REQUEST',
-      'FULFILLMENT_ORDERS_CANCELLATION_REQUEST',
-      'FULFILLMENT_ORDERS_HOLD',
-      'FULFILLMENT_ORDERS_RELEASE_HOLD'
+      "FULFILLMENT_ORDERS_FULFILLMENT_REQUEST",
+      "FULFILLMENT_ORDERS_CANCELLATION_REQUEST",
+      "FULFILLMENT_ORDERS_HOLD",
+      "FULFILLMENT_ORDERS_RELEASE_HOLD",
     ];
 
     const webhookIds: Record<string, string> = {};
@@ -305,10 +352,10 @@ Deno.serve(async (req) => {
         const webhookResponse = await fetch(
           `https://${storeUrl}/admin/api/2025-01/graphql.json`,
           {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'X-Shopify-Access-Token': accessToken,
-              'Content-Type': 'application/json',
+              "X-Shopify-Access-Token": accessToken,
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({
               query: webhookMutation,
@@ -316,19 +363,27 @@ Deno.serve(async (req) => {
                 topic,
                 webhookSubscription: {
                   callbackUrl: callbackUrl,
-                  format: 'JSON'
-                }
-              }
+                  format: "JSON",
+                },
+              },
             }),
-          }
+          },
         );
 
         const webhookResult = await webhookResponse.json();
 
-        if (webhookResult.data?.webhookSubscriptionCreate?.userErrors?.length > 0) {
-          console.error(`Webhook subscription error for ${topic}:`, webhookResult.data.webhookSubscriptionCreate.userErrors);
-        } else if (webhookResult.data?.webhookSubscriptionCreate?.webhookSubscription) {
-          const webhookId = webhookResult.data.webhookSubscriptionCreate.webhookSubscription.id;
+        if (
+          webhookResult.data?.webhookSubscriptionCreate?.userErrors?.length > 0
+        ) {
+          console.error(
+            `Webhook subscription error for ${topic}:`,
+            webhookResult.data.webhookSubscriptionCreate.userErrors,
+          );
+        } else if (
+          webhookResult.data?.webhookSubscriptionCreate?.webhookSubscription
+        ) {
+          const webhookId =
+            webhookResult.data.webhookSubscriptionCreate.webhookSubscription.id;
           webhookIds[topic.toLowerCase()] = webhookId;
           console.log(`✅ Subscribed to webhook: ${topic} (${webhookId})`);
         }
@@ -341,23 +396,26 @@ Deno.serve(async (req) => {
     // Store webhook IDs in shopify_stores if we have any
     if (actualStoreId && Object.keys(webhookIds).length > 0) {
       const { data: currentStore } = await supabase
-        .from('shopify_stores')
-        .select('settings')
-        .eq('id', actualStoreId)
+        .from("shopify_stores")
+        .select("settings")
+        .eq("id", actualStoreId)
         .single();
-      
+
       await supabase
-        .from('shopify_stores')
-        .update({ 
+        .from("shopify_stores")
+        .update({
           settings: {
             ...(currentStore?.settings || {}),
             webhooks: webhookIds,
-          }
+          },
         })
-        .eq('id', actualStoreId);
+        .eq("id", actualStoreId);
     }
 
-    console.log('Webhook subscriptions completed:', Object.keys(webhookIds).length);
+    console.log(
+      "Webhook subscriptions completed:",
+      Object.keys(webhookIds).length,
+    );
 
     return new Response(
       JSON.stringify({
@@ -369,18 +427,20 @@ Deno.serve(async (req) => {
         },
         webhooks: webhookIds,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error: any) {
-    console.error('Error registering fulfillment service:', error);
-    
+    console.error("Error registering fulfillment service:", error);
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message,
-        details: error.stack 
+        details: error.stack,
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 });
