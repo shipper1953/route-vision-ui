@@ -132,6 +132,11 @@ export const ShopifyFulfillmentMapping = () => {
 
   const fix = async (store: StoreRow) => {
     setBusy((b) => ({ ...b, [store.id]: "fix" }));
+    // Clear stale verification result so the row visibly re-evaluates
+    setResults((r) => {
+      const { [store.id]: _omit, ...rest } = r;
+      return rest;
+    });
     try {
       const { data, error } = await supabase.functions.invoke("shopify-register-fulfillment-service", {
         body: { companyId: store.company_id, storeId: store.id },
@@ -143,11 +148,16 @@ export const ShopifyFulfillmentMapping = () => {
           ? `Linked to ${data.fulfillmentService.locationName}`
           : "Mapping updated",
       });
-      await load();
-      await verify({
+      // Reload from DB so the row reflects the new stored mapping, then re-verify against live Shopify
+      const refreshed = await load();
+      const updatedStore = refreshed.find((s) => s.id === store.id) || {
         ...store,
         fulfillment_location_id: data?.fulfillmentService?.locationId || store.fulfillment_location_id,
-      });
+        fulfillment_location_name: data?.fulfillmentService?.locationName || store.fulfillment_location_name,
+      };
+      setBusy((b) => ({ ...b, [store.id]: undefined }));
+      await verify(updatedStore);
+      return;
     } catch (e: any) {
       toast({ title: "Fix failed", description: e.message, variant: "destructive" });
     } finally {
