@@ -272,7 +272,7 @@ export const useWmsReceiving = () => {
                 });
             }
 
-            const { data: transaction } = await supabase
+            const { data: transactionRaw } = await supabase
               .from('inventory_transactions' as any)
               .insert({
                 company_id: sessionData.company_id,
@@ -289,6 +289,7 @@ export const useWmsReceiving = () => {
               })
               .select('id')
               .single();
+            const transaction = transactionRaw as any;
 
             if (transaction?.id) {
               await supabase.functions.invoke('shopify-sync-receipt-to-shopify', {
