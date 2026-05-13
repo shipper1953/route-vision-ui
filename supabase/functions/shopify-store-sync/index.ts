@@ -1,141 +1,150 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Authenticate user
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      throw new Error('Missing authorization header');
+      throw new Error("Missing authorization header");
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
+      authHeader.replace("Bearer ", ""),
     );
 
     if (authError || !user) {
-      throw new Error('Unauthorized');
+      throw new Error("Unauthorized");
     }
 
     const { storeId } = await req.json();
 
     if (!storeId) {
-      throw new Error('Missing storeId');
+      throw new Error("Missing storeId");
     }
 
     // Get store details
     const { data: store, error: storeError } = await supabase
-      .from('shopify_stores')
-      .select('*')
-      .eq('id', storeId)
+      .from("shopify_stores")
+      .select("*")
+      .eq("id", storeId)
       .single();
 
     if (storeError || !store) {
-      throw new Error('Store not found');
+      throw new Error("Store not found");
     }
 
     // Invoke bulk import function for orders
-    const { data, error } = await supabase.functions.invoke('shopify-bulk-import', {
-      body: {
-        companyId: store.company_id,
-        storeId: storeId,
-        dateRangeDays: 30,
+    const { data, error } = await supabase.functions.invoke(
+      "shopify-bulk-import",
+      {
+        body: {
+          companyId: store.company_id,
+          storeId: storeId,
+          dateRangeDays: 30,
+        },
+        headers: {
+          Authorization: authHeader,
+        },
       },
-      headers: {
-        Authorization: authHeader,
-      },
-    });
+    );
 
     if (error) {
       throw new Error(`Bulk import failed: ${error.message}`);
     }
 
-    console.log('Bulk import completed:', data);
+    console.log("Bulk import completed:", data);
 
     // Also sync products for this store
-    const { data: productData, error: productError } = await supabase.functions.invoke('shopify-sync-products', {
-      body: {
-        companyId: store.company_id,
-        storeId: storeId,
-        importVariants: true,
-        syncDimensions: true,
-        syncWeight: true,
-      },
-      headers: {
-        Authorization: authHeader,
-      },
-    });
+    const { data: productData, error: productError } = await supabase.functions
+      .invoke("shopify-sync-products", {
+        body: {
+          companyId: store.company_id,
+          storeId: storeId,
+          importVariants: true,
+          syncDimensions: true,
+          syncWeight: true,
+        },
+        headers: {
+          Authorization: authHeader,
+        },
+      });
 
     if (productError) {
-      console.error('Product sync failed:', productError);
+      console.error("Product sync failed:", productError);
       // Don't throw - order sync succeeded, just log the product sync failure
     } else {
-      console.log('Product sync completed:', productData);
+      console.log("Product sync completed:", productData);
     }
 
     // Sync Purchase Orders
-    console.log('Syncing purchase orders...');
-    const { data: poData, error: poError } = await supabase.functions.invoke('shopify-sync-purchase-orders', {
-      body: {
-        companyId: store.company_id,
-        storeId: storeId,
-        dateRangeDays: 90,
+    console.log("Syncing purchase orders...");
+    const { data: poData, error: poError } = await supabase.functions.invoke(
+      "shopify-sync-purchase-orders",
+      {
+        body: {
+          companyId: store.company_id,
+          storeId: storeId,
+          dateRangeDays: 90,
+        },
+        headers: {
+          Authorization: authHeader,
+        },
       },
-      headers: {
-        Authorization: authHeader,
-      },
-    });
+    );
 
     if (poError) {
-      console.error('PO sync failed:', poError);
+      console.error("PO sync failed:", poError);
     } else {
-      console.log('PO sync completed:', poData);
+      console.log("PO sync completed:", poData);
     }
 
     // Sync Transfer Orders
-    console.log('Syncing transfer orders...');
-    const { data: transferData, error: transferError } = await supabase.functions.invoke('shopify-sync-transfer-orders', {
-      body: {
-        companyId: store.company_id,
-        storeId: storeId,
-        dateRangeDays: 90,
-      },
-      headers: {
-        Authorization: authHeader,
-      },
-    });
+    console.log("Syncing transfer orders...");
+    const { data: transferData, error: transferError } = await supabase
+      .functions.invoke("shopify-sync-transfer-orders", {
+        body: {
+          companyId: store.company_id,
+          storeId: storeId,
+          dateRangeDays: 90,
+        },
+        headers: {
+          Authorization: authHeader,
+        },
+      });
 
     if (transferError) {
-      console.error('Transfer sync failed:', transferError);
+      console.error("Transfer sync failed:", transferError);
     } else {
-      console.log('Transfer sync completed:', transferData);
+      console.log("Transfer sync completed:", transferData);
     }
 
     // Update last_sync_at timestamp
     await supabase
-      .from('shopify_stores')
+      .from("shopify_stores")
       .update({ last_sync_at: new Date().toISOString() })
-      .eq('id', storeId);
+      .eq("id", storeId);
 
     // Log the sync
-    await supabase.from('shopify_sync_logs').insert({
+    await supabase.from("shopify_sync_logs").insert({
       company_id: store.company_id,
       shopify_store_id: storeId,
-      sync_type: 'manual_sync',
-      direction: 'inbound',
-      status: 'success',
+      sync_type: "manual_sync",
+      direction: "inbound",
+      status: "success",
       metadata: {
         orders_synced: data?.succeeded || 0,
         triggered_by: user.id,
@@ -143,25 +152,24 @@ Deno.serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
-        message: 'Sync completed successfully',
+        message: "Sync completed successfully",
         stats: data,
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
-      }
+      },
     );
-
   } catch (error: any) {
-    console.error('Error syncing store:', error);
+    console.error("Error syncing store:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
-      }
+      },
     );
   }
 });

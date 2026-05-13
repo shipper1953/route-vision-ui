@@ -1,39 +1,44 @@
-import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // GraphQL helper for Shopify API calls
 export async function shopifyGraphQL(
   shopifySettings: { store_url: string; access_token: string },
   query: string,
-  variables: Record<string, any> = {}
+  variables: Record<string, any> = {},
 ) {
   const response = await fetch(
     `https://${shopifySettings.store_url}/admin/api/2025-01/graphql.json`,
     {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'X-Shopify-Access-Token': shopifySettings.access_token,
-        'Content-Type': 'application/json',
+        "X-Shopify-Access-Token": shopifySettings.access_token,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ query, variables }),
-    }
+    },
   );
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Shopify GraphQL API error: ${response.status} - ${errorText}`);
+    throw new Error(
+      `Shopify GraphQL API error: ${response.status} - ${errorText}`,
+    );
   }
 
   const result = await response.json();
-  
+
   if (result.errors) {
     throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
   }
-  
+
   return result;
 }
 
 // Sanitization helper to prevent injection attacks
-export function sanitizeString(str: string | null | undefined, maxLength: number = 255): string | null {
+export function sanitizeString(
+  str: string | null | undefined,
+  maxLength: number = 255,
+): string | null {
   if (!str) return null;
   return str.trim().slice(0, maxLength);
 }
@@ -42,7 +47,7 @@ export function sanitizeString(str: string | null | undefined, maxLength: number
 export function addBusinessDays(startDate: Date, daysToAdd: number): Date {
   const result = new Date(startDate);
   let addedDays = 0;
-  
+
   while (addedDays < daysToAdd) {
     result.setDate(result.getDate() + 1);
     // Skip weekends (0 = Sunday, 6 = Saturday)
@@ -50,7 +55,7 @@ export function addBusinessDays(startDate: Date, daysToAdd: number): Date {
       addedDays++;
     }
   }
-  
+
   return result;
 }
 
@@ -59,173 +64,193 @@ export async function ensureItemExists(
   supabase: SupabaseClient,
   companyId: string,
   lineItem: any,
-  shopifyStoreId?: string
+  shopifyStoreId?: string,
 ): Promise<{ id: string; details: any }> {
   // PRIORITY 1: Try to match by variant_id (most specific)
   if (lineItem.variant_id) {
     const query = supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight, shopify_variant_id, shopify_product_id, shopify_store_id')
-      .eq('company_id', companyId)
-      .eq('shopify_variant_id', lineItem.variant_id.toString());
-    
+      .from("items")
+      .select(
+        "id, sku, name, length, width, height, weight, shopify_variant_id, shopify_product_id, shopify_store_id",
+      )
+      .eq("company_id", companyId)
+      .eq("shopify_variant_id", lineItem.variant_id.toString());
+
     // If store ID provided, prefer store-specific items
     if (shopifyStoreId) {
       const { data: storeMatch } = await query
-        .eq('shopify_store_id', shopifyStoreId)
+        .eq("shopify_store_id", shopifyStoreId)
         .maybeSingle();
-      
+
       if (storeMatch) {
         console.log(`✅ Matched by variant_id + store: ${lineItem.variant_id}`);
         return { id: storeMatch.id, details: storeMatch };
       }
     }
-    
+
     // Fallback to any item with this variant (shared items)
     const { data: variantMatch } = await query.maybeSingle();
-    
+
     if (variantMatch) {
       console.log(`✅ Matched by variant_id: ${lineItem.variant_id}`);
-      
+
       // Backfill Shopify IDs and store ID if missing
-      if (!variantMatch.shopify_variant_id || !variantMatch.shopify_product_id || !variantMatch.shopify_store_id) {
+      if (
+        !variantMatch.shopify_variant_id || !variantMatch.shopify_product_id ||
+        !variantMatch.shopify_store_id
+      ) {
         await supabase
-          .from('items')
+          .from("items")
           .update({
             shopify_product_id: lineItem.product_id?.toString() || null,
             shopify_variant_id: lineItem.variant_id?.toString() || null,
             shopify_store_id: shopifyStoreId || null,
           })
-          .eq('id', variantMatch.id);
+          .eq("id", variantMatch.id);
         console.log(`🔄 Backfilled Shopify IDs for item ${variantMatch.sku}`);
       }
-      
+
       return { id: variantMatch.id, details: variantMatch };
     }
   }
-  
+
   // PRIORITY 2: Try to match by product_id
   if (lineItem.product_id) {
     const query = supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight, shopify_variant_id, shopify_product_id, shopify_store_id')
-      .eq('company_id', companyId)
-      .eq('shopify_product_id', lineItem.product_id.toString());
-    
+      .from("items")
+      .select(
+        "id, sku, name, length, width, height, weight, shopify_variant_id, shopify_product_id, shopify_store_id",
+      )
+      .eq("company_id", companyId)
+      .eq("shopify_product_id", lineItem.product_id.toString());
+
     // If store ID provided, prefer store-specific items
     if (shopifyStoreId) {
       const { data: storeMatch } = await query
-        .eq('shopify_store_id', shopifyStoreId)
+        .eq("shopify_store_id", shopifyStoreId)
         .maybeSingle();
-      
+
       if (storeMatch) {
         console.log(`✅ Matched by product_id + store: ${lineItem.product_id}`);
-        
+
         // Backfill variant ID if missing
         if (!storeMatch.shopify_variant_id) {
           await supabase
-            .from('items')
+            .from("items")
             .update({
               shopify_variant_id: lineItem.variant_id?.toString() || null,
             })
-            .eq('id', storeMatch.id);
+            .eq("id", storeMatch.id);
         }
-        
+
         return { id: storeMatch.id, details: storeMatch };
       }
     }
-    
+
     const { data: productMatch } = await query.maybeSingle();
-    
+
     if (productMatch) {
       console.log(`✅ Matched by product_id: ${lineItem.product_id}`);
-      
+
       // Backfill Shopify IDs and store ID if missing
-      if (!productMatch.shopify_variant_id || !productMatch.shopify_product_id || !productMatch.shopify_store_id) {
+      if (
+        !productMatch.shopify_variant_id || !productMatch.shopify_product_id ||
+        !productMatch.shopify_store_id
+      ) {
         await supabase
-          .from('items')
+          .from("items")
           .update({
             shopify_product_id: lineItem.product_id?.toString() || null,
             shopify_variant_id: lineItem.variant_id?.toString() || null,
             shopify_store_id: shopifyStoreId || null,
           })
-          .eq('id', productMatch.id);
+          .eq("id", productMatch.id);
         console.log(`🔄 Backfilled Shopify IDs for item ${productMatch.sku}`);
       }
-      
+
       return { id: productMatch.id, details: productMatch };
     }
   }
-  
+
   // PRIORITY 3: Fallback to SKU matching
   if (lineItem.sku) {
     const query = supabase
-      .from('items')
-      .select('id, sku, name, length, width, height, weight, shopify_variant_id, shopify_product_id, shopify_store_id')
-      .eq('company_id', companyId)
-      .eq('sku', lineItem.sku);
-    
+      .from("items")
+      .select(
+        "id, sku, name, length, width, height, weight, shopify_variant_id, shopify_product_id, shopify_store_id",
+      )
+      .eq("company_id", companyId)
+      .eq("sku", lineItem.sku);
+
     // If store ID provided, prefer store-specific items
     if (shopifyStoreId) {
       const { data: storeMatch } = await query
-        .eq('shopify_store_id', shopifyStoreId)
+        .eq("shopify_store_id", shopifyStoreId)
         .maybeSingle();
-      
+
       if (storeMatch) {
         console.log(`✅ Matched by SKU + store: ${lineItem.sku}`);
-        
+
         // Backfill Shopify IDs
         if (!storeMatch.shopify_variant_id || !storeMatch.shopify_product_id) {
           await supabase
-            .from('items')
+            .from("items")
             .update({
               shopify_product_id: lineItem.product_id?.toString() || null,
               shopify_variant_id: lineItem.variant_id?.toString() || null,
             })
-            .eq('id', storeMatch.id);
+            .eq("id", storeMatch.id);
         }
-        
+
         return { id: storeMatch.id, details: storeMatch };
       }
     }
-    
+
     const { data: skuMatch } = await query.maybeSingle();
-    
+
     if (skuMatch) {
       console.log(`✅ Matched by SKU: ${lineItem.sku}`);
-      
+
       // Backfill Shopify IDs and store ID if missing
-      if (!skuMatch.shopify_variant_id || !skuMatch.shopify_product_id || !skuMatch.shopify_store_id) {
+      if (
+        !skuMatch.shopify_variant_id || !skuMatch.shopify_product_id ||
+        !skuMatch.shopify_store_id
+      ) {
         await supabase
-          .from('items')
+          .from("items")
           .update({
             shopify_product_id: lineItem.product_id?.toString() || null,
             shopify_variant_id: lineItem.variant_id?.toString() || null,
             shopify_store_id: shopifyStoreId || null,
           })
-          .eq('id', skuMatch.id);
+          .eq("id", skuMatch.id);
         console.log(`🔄 Backfilled Shopify IDs for item ${skuMatch.sku}`);
       }
-      
+
       return { id: skuMatch.id, details: skuMatch };
     }
   }
-  
+
   // PRIORITY 4: Create new item
-  console.log(`📦 Creating new item for product_id: ${lineItem.product_id}, variant_id: ${lineItem.variant_id}, store: ${shopifyStoreId}`);
-  
-  const sku = sanitizeString(lineItem.sku || `SHOP-${lineItem.variant_id || lineItem.product_id}`, 100);
-  
+  console.log(
+    `📦 Creating new item for product_id: ${lineItem.product_id}, variant_id: ${lineItem.variant_id}, store: ${shopifyStoreId}`,
+  );
+
+  const sku = sanitizeString(
+    lineItem.sku || `SHOP-${lineItem.variant_id || lineItem.product_id}`,
+    100,
+  );
+
   let weightInLbs = 0.125;
   if (lineItem.grams && lineItem.grams > 0) {
     weightInLbs = lineItem.grams / 453.592;
   }
-  
+
   const itemData = {
     company_id: companyId,
     sku: sku,
     name: sanitizeString(lineItem.name || lineItem.title, 255),
-    category: 'Shopify Product',
+    category: "Shopify Product",
     is_active: true,
     length: 12,
     width: 12,
@@ -235,18 +260,20 @@ export async function ensureItemExists(
     shopify_variant_id: lineItem.variant_id?.toString() || null,
     shopify_store_id: shopifyStoreId || null,
   };
-  
+
   const { data: newItem, error: itemError } = await supabase
-    .from('items')
+    .from("items")
     .insert(itemData)
-    .select('id, sku, name, length, width, height, weight')
+    .select("id, sku, name, length, width, height, weight")
     .single();
-  
+
   if (itemError) {
-    console.error('Error creating item:', itemError);
+    console.error("Error creating item:", itemError);
     throw new Error(`Failed to create item: ${itemError.message}`);
   }
-  
-  console.log(`✅ Created item: ${sku} with Shopify IDs (store: ${shopifyStoreId})`);
+
+  console.log(
+    `✅ Created item: ${sku} with Shopify IDs (store: ${shopifyStoreId})`,
+  );
   return { id: newItem.id, details: newItem };
 }

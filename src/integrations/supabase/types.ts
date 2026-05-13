@@ -1413,6 +1413,7 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          created_by: string | null
           customer_id: string | null
           expected_date: string | null
           id: string
@@ -1426,6 +1427,7 @@ export type Database = {
           source_type: string | null
           status: string
           updated_at: string
+          vendor_contact: string | null
           vendor_id: string | null
           vendor_name: string | null
           warehouse_id: string
@@ -1433,6 +1435,7 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
+          created_by?: string | null
           customer_id?: string | null
           expected_date?: string | null
           id?: string
@@ -1446,6 +1449,7 @@ export type Database = {
           source_type?: string | null
           status?: string
           updated_at?: string
+          vendor_contact?: string | null
           vendor_id?: string | null
           vendor_name?: string | null
           warehouse_id: string
@@ -1453,6 +1457,7 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
+          created_by?: string | null
           customer_id?: string | null
           expected_date?: string | null
           id?: string
@@ -1466,6 +1471,7 @@ export type Database = {
           source_type?: string | null
           status?: string
           updated_at?: string
+          vendor_contact?: string | null
           vendor_id?: string | null
           vendor_name?: string | null
           warehouse_id?: string

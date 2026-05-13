@@ -2,8 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface ProductSyncRequest {
@@ -17,13 +18,13 @@ interface ProductSyncRequest {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const {
@@ -33,34 +34,34 @@ serve(async (req) => {
       importBundles = false,
       syncDimensions = true,
       syncWeight = true,
-      mapToItemMaster = true
+      mapToItemMaster = true,
     }: ProductSyncRequest = await req.json();
 
     if (!companyId) {
-      throw new Error('Company ID is required');
+      throw new Error("Company ID is required");
     }
 
     if (!storeId) {
-      throw new Error('Store ID is required');
+      throw new Error("Store ID is required");
     }
 
-    console.log('Starting Shopify product sync for store:', storeId);
+    console.log("Starting Shopify product sync for store:", storeId);
 
     // Get store-specific Shopify credentials
     const { data: store, error: storeError } = await supabase
-      .from('shopify_stores')
-      .select('id, company_id, store_url, access_token, customer_id')
-      .eq('id', storeId)
-      .eq('company_id', companyId)
+      .from("shopify_stores")
+      .select("id, company_id, store_url, access_token, customer_id")
+      .eq("id", storeId)
+      .eq("company_id", companyId)
       .single();
 
     if (storeError) throw storeError;
 
     if (!store?.access_token || !store?.store_url) {
-      throw new Error('Store credentials not found or invalid');
+      throw new Error("Store credentials not found or invalid");
     }
 
-    console.log('Fetching products from Shopify store:', store.store_url);
+    console.log("Fetching products from Shopify store:", store.store_url);
 
     // Fetch products from Shopify using GraphQL
     const productsQuery = `
@@ -102,28 +103,28 @@ serve(async (req) => {
     const productsResponse = await fetch(
       `https://${store.store_url}/admin/api/2024-10/graphql.json`,
       {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'X-Shopify-Access-Token': store.access_token,
-          'Content-Type': 'application/json',
+          "X-Shopify-Access-Token": store.access_token,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           query: productsQuery,
-          variables: { first: 250 }
-        })
-      }
+          variables: { first: 250 },
+        }),
+      },
     );
 
     if (!productsResponse.ok) {
       const errorText = await productsResponse.text();
-      console.error('Shopify API error:', errorText);
-      throw new Error('Failed to fetch products from Shopify');
+      console.error("Shopify API error:", errorText);
+      throw new Error("Failed to fetch products from Shopify");
     }
 
     const result = await productsResponse.json();
-    
+
     if (result.errors) {
-      console.error('GraphQL errors:', result.errors);
+      console.error("GraphQL errors:", result.errors);
       throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
     }
 
@@ -140,40 +141,43 @@ serve(async (req) => {
         console.log(`Processing product: ${product.title} (ID: ${product.id})`);
 
         // Process variants if enabled, otherwise use main product
-        const itemsToProcess = importVariants && product.variants?.edges?.length > 0
-          ? product.variants.edges.map((e: any) => e.node)
-          : [{
+        const itemsToProcess =
+          importVariants && product.variants?.edges?.length > 0
+            ? product.variants.edges.map((e: any) => e.node)
+            : [{
               id: product.id,
               legacyResourceId: product.legacyResourceId,
-              sku: product.variants?.edges?.[0]?.node?.sku || `SHOP-${product.legacyResourceId}`,
+              sku: product.variants?.edges?.[0]?.node?.sku ||
+                `SHOP-${product.legacyResourceId}`,
               title: product.title,
-              price: product.variants?.edges?.[0]?.node?.price || '0',
-              weight: product.variants?.edges?.[0]?.node?.inventoryItem?.measurement?.weight
+              price: product.variants?.edges?.[0]?.node?.price || "0",
+              weight: product.variants?.edges?.[0]?.node?.inventoryItem
+                ?.measurement?.weight,
             }];
 
         for (const variant of itemsToProcess) {
           const sku = variant.sku || `SHOP-${variant.legacyResourceId}`;
-          
+
           // Check if item exists
           const { data: existingItem } = await supabase
-            .from('items')
-            .select('id, sku')
-            .eq('company_id', companyId)
-            .eq('sku', sku)
+            .from("items")
+            .select("id, sku")
+            .eq("company_id", companyId)
+            .eq("sku", sku)
             .maybeSingle();
 
           // Prepare item data
           const itemData: any = {
             company_id: companyId,
             sku,
-            name: importVariants && itemsToProcess.length > 1 
-              ? `${product.title} - ${variant.title || ''}`
+            name: importVariants && itemsToProcess.length > 1
+              ? `${product.title} - ${variant.title || ""}`
               : product.title,
-            category: product.productType || 'General',
-            is_active: product.status === 'ACTIVE',
+            category: product.productType || "General",
+            is_active: product.status === "ACTIVE",
             shopify_store_id: storeId,
             customer_id: store.customer_id || null,
-            
+
             // Store both numeric IDs (legacy) and GIDs (new)
             shopify_product_id: product.legacyResourceId,
             shopify_variant_id: variant.legacyResourceId,
@@ -194,15 +198,15 @@ serve(async (req) => {
             // Convert weight to lbs (Shopify can be in GRAMS, OUNCES, POUNDS, KILOGRAMS)
             let weightInLbs = parseFloat(variant.weight.value);
             const weightUnit = variant.weight.unit?.toLowerCase();
-            
-            if (weightUnit === 'grams') {
+
+            if (weightUnit === "grams") {
               weightInLbs = weightInLbs / 453.592; // grams to lbs
-            } else if (weightUnit === 'ounces') {
+            } else if (weightUnit === "ounces") {
               weightInLbs = weightInLbs / 16; // ounces to lbs
-            } else if (weightUnit === 'kilograms') {
+            } else if (weightUnit === "kilograms") {
               weightInLbs = weightInLbs * 2.20462; // kg to lbs
             }
-            
+
             itemData.weight = Math.max(0.1, weightInLbs); // Min 0.1 lbs
           } else {
             itemData.weight = 1; // Default 1 lb
@@ -211,9 +215,9 @@ serve(async (req) => {
           if (existingItem) {
             // Update existing item
             const { error: updateError } = await supabase
-              .from('items')
+              .from("items")
               .update(itemData)
-              .eq('id', existingItem.id);
+              .eq("id", existingItem.id);
 
             if (updateError) {
               console.error(`Error updating item ${sku}:`, updateError);
@@ -226,7 +230,7 @@ serve(async (req) => {
           } else {
             // Create new item
             const { error: insertError } = await supabase
-              .from('items')
+              .from("items")
               .insert(itemData);
 
             if (insertError) {
@@ -239,7 +243,6 @@ serve(async (req) => {
             console.log(`✅ Created item: ${sku}`);
           }
         }
-
       } catch (productError) {
         console.error(`Error processing product ${product.id}:`, productError);
         errors.push(`Product ${product.title}: ${productError.message}`);
@@ -248,23 +251,25 @@ serve(async (req) => {
 
     // Log sync event
     await supabase
-      .from('shopify_sync_logs')
+      .from("shopify_sync_logs")
       .insert({
         company_id: companyId,
-        sync_type: 'product_import',
-        direction: 'inbound',
-        status: errors.length === 0 ? 'success' : 'partial',
+        sync_type: "product_import",
+        direction: "inbound",
+        status: errors.length === 0 ? "success" : "partial",
         metadata: {
           total_products: products.length,
           imported,
           updated,
           skipped,
-          errors: errors.length
+          errors: errors.length,
         },
-        error_message: errors.length > 0 ? errors.join('; ') : null,
+        error_message: errors.length > 0 ? errors.join("; ") : null,
       });
 
-    console.log(`Product sync complete: ${imported} imported, ${updated} updated, ${skipped} skipped, ${errors.length} errors`);
+    console.log(
+      `Product sync complete: ${imported} imported, ${updated} updated, ${skipped} skipped, ${errors.length} errors`,
+    );
 
     return new Response(
       JSON.stringify({
@@ -274,28 +279,27 @@ serve(async (req) => {
           imported,
           updated,
           skipped,
-          errors: errors.length
+          errors: errors.length,
         },
-        errors: errors.length > 0 ? errors : undefined
+        errors: errors.length > 0 ? errors : undefined,
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
-      }
+      },
     );
-
   } catch (error) {
-    console.error('Product sync error:', error);
+    console.error("Product sync error:", error);
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message,
-        success: false 
+        success: false,
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
-      }
+      },
     );
   }
 });
