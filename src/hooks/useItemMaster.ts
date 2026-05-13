@@ -95,7 +95,7 @@ export const useItemMaster = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('items')
         .insert({
           sku: itemData.sku,
@@ -146,7 +146,7 @@ export const useItemMaster = () => {
   const updateItem = async (updatedItem: Item) => {
     setLoading(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('items')
         .update({
           sku: updatedItem.sku,
