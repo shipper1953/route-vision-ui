@@ -109,7 +109,7 @@ export const useItemMaster = () => {
           customer_id: itemData.customerId || null,
           company_id: userProfile.company_id,
           uom_eaches: itemData.uomEaches || { each: 1, innerpack: 1, case: 1, pallet: 1 }
-        } as any)
+        })
         .select()
         .single();
 
@@ -159,7 +159,7 @@ export const useItemMaster = () => {
           is_active: updatedItem.isActive,
           customer_id: updatedItem.customerId || null,
           uom_eaches: updatedItem.uomEaches || { each: 1, innerpack: 1, case: 1, pallet: 1 }
-        } as any)
+        })
         .eq('id', updatedItem.id);
 
       if (error) throw error;
