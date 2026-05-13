@@ -109,7 +109,7 @@ export const useItemMaster = () => {
           customer_id: itemData.customerId || null,
           company_id: userProfile.company_id,
           uom_eaches: itemData.uomEaches || { each: 1, innerpack: 1, case: 1, pallet: 1 }
-        })
+        } as any)
         .select()
         .single();
 
