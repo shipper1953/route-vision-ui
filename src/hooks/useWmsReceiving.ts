@@ -233,7 +233,7 @@ export const useWmsReceiving = () => {
           const poData = poRes.data as any;
 
           if (sessionData?.warehouse_id) {
-            const { data: existingInventory } = await supabase
+            const { data: existingInventoryRaw } = await supabase
               .from('inventory_levels' as any)
               .select('id, quantity_on_hand, quantity_available')
               .eq('company_id', sessionData.company_id)
@@ -243,6 +243,7 @@ export const useWmsReceiving = () => {
               .is('lot_number', params.lotNumber || null)
               .is('serial_number', params.serialNumbers?.[0] || null)
               .maybeSingle();
+            const existingInventory = existingInventoryRaw as any;
 
             if (existingInventory?.id) {
               await supabase
