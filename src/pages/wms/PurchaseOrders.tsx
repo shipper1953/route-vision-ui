@@ -1,96 +1,120 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { TmsLayout } from "@/components/layout/TmsLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PackageOpen, Calendar, Building2, User } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { PackageOpen, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { usePurchaseOrders, type PurchaseOrder } from "@/hooks/usePurchaseOrders";
+import { CreatePurchaseOrderDialog } from "@/components/wms/po/CreatePurchaseOrderDialog";
+import { PurchaseOrdersList } from "@/components/wms/po/PurchaseOrdersList";
+import { supabase } from "@/integrations/supabase/client";
 
 const PurchaseOrders = () => {
-  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { userProfile } = useAuth();
   const navigate = useNavigate();
+  const { purchaseOrders, loading, createPurchaseOrder, cancelPurchaseOrder } = usePurchaseOrders();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedPO, setSelectedPO] = useState<any | null>(null);
 
-  useEffect(() => {
-    if (userProfile?.company_id) {
-      fetchPurchaseOrders();
-    }
-  }, [userProfile?.company_id]);
+  const openPO = async (po: PurchaseOrder) => {
+    const { data } = await supabase
+      .from('purchase_orders' as any)
+      .select('*, customers(*), po_line_items(*, items(*))')
+      .eq('id', po.id)
+      .single();
 
-  const fetchPurchaseOrders = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('purchase_orders' as any)
-        .select('*, customers(*), po_line_items(*)')
-        .eq('company_id', userProfile?.company_id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setPurchaseOrders(data || []);
-    } catch (error) {
-      console.error('Error fetching purchase orders:', error);
-    } finally {
-      setLoading(false);
-    }
+    setSelectedPO(data || po);
   };
+
+  const lineCountLabel = useMemo(() => {
+    return `${purchaseOrders.length} PO${purchaseOrders.length === 1 ? '' : 's'}`;
+  }, [purchaseOrders.length]);
 
   return (
     <TmsLayout>
       <div className="space-y-6 max-w-7xl">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold">Purchase Orders</h1>
-            <p className="text-muted-foreground mt-1">Manage incoming inventory</p>
+            <p className="text-muted-foreground mt-1">Create inbound POs by SKU/qty, then receive them.</p>
           </div>
-          <Button onClick={() => navigate('/wms/receiving')}>
-            <PackageOpen className="mr-2 h-4 w-4" />
-            Start Receiving
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/wms/receiving')}>
+              <PackageOpen className="mr-2 h-4 w-4" />
+              Start Receiving
+            </Button>
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create PO
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Badge variant="secondary">{lineCountLabel}</Badge>
+          <span>Use Create PO to enter SKUs and quantities before receiving.</span>
         </div>
 
         {loading ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading...</p>
+            <p className="text-muted-foreground">Loading purchase orders...</p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {purchaseOrders.map((po) => (
-              <Card key={po.id} className="hover:border-primary transition-colors">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{po.po_number}</CardTitle>
-                    <Badge>{po.status.replace('_', ' ')}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {po.vendor_name && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span>{po.vendor_name}</span>
-                    </div>
-                  )}
-                  {po.expected_date && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>{format(new Date(po.expected_date), 'MMM d, yyyy')}</span>
-                    </div>
-                  )}
-                  {po.status !== 'received' && (
-                    <Button className="w-full" size="sm" onClick={() => navigate('/wms/receiving')}>
-                      <PackageOpen className="mr-2 h-4 w-4" />
-                      Start Receiving
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <PurchaseOrdersList
+            purchaseOrders={purchaseOrders}
+            onView={openPO}
+            onCancel={cancelPurchaseOrder}
+          />
         )}
+
+        <CreatePurchaseOrderDialog
+          open={isCreateOpen}
+          onOpenChange={setIsCreateOpen}
+          onSubmit={createPurchaseOrder as any}
+        />
+
+        <Dialog open={!!selectedPO} onOpenChange={(open) => !open && setSelectedPO(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>{selectedPO?.po_number} details</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <p><span className="font-medium">Vendor:</span> {selectedPO?.vendor_name || '-'}</p>
+                <p><span className="font-medium">Status:</span> {selectedPO?.status}</p>
+              </div>
+              <div className="border rounded-md">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-2 text-left">SKU</th>
+                      <th className="p-2 text-left">Product</th>
+                      <th className="p-2 text-right">Ordered</th>
+                      <th className="p-2 text-right">Received</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedPO?.po_line_items?.length ?? 0) === 0 ? (
+                      <tr>
+                        <td className="p-3 text-muted-foreground" colSpan={4}>No line items were saved for this PO.</td>
+                      </tr>
+                    ) : selectedPO?.po_line_items?.map((line: any) => (
+                      <tr key={line.id} className="border-b last:border-0">
+                        <td className="p-2">{line.items?.sku || line.sku}</td>
+                        <td className="p-2">{line.items?.name || line.product_name}</td>
+                        <td className="p-2 text-right">{line.quantity_ordered}</td>
+                        <td className="p-2 text-right">{line.quantity_received || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={() => navigate('/wms/receiving')}>Receive this PO</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </TmsLayout>
   );
