@@ -216,7 +216,7 @@ export const useWmsReceiving = () => {
 
         // Increase inventory for accepted qty and trigger Shopify sync.
         if (acceptedQty > 0) {
-          const [{ data: sessionData }, { data: poData }] = await Promise.all([
+          const [sessionRes, poRes] = await Promise.all([
             supabase
               .from('receiving_sessions' as any)
               .select('company_id, warehouse_id')
@@ -228,9 +228,11 @@ export const useWmsReceiving = () => {
               .eq('id', poLine.po_id)
               .single()
           ]);
+          const sessionData = sessionRes.data as any;
+          const poData = poRes.data as any;
 
           if (sessionData?.warehouse_id) {
-            const { data: existingInventory } = await supabase
+            const { data: existingInventoryRaw } = await supabase
               .from('inventory_levels' as any)
               .select('id, quantity_on_hand, quantity_available')
               .eq('company_id', sessionData.company_id)
