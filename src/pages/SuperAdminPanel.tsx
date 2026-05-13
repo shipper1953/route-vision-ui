@@ -93,6 +93,10 @@ const SuperAdminPanel = () => {
           <TabsContent value="shipments" className="space-y-4">
             <SuperAdminShipmentsReport />
           </TabsContent>
+
+          <TabsContent value="shopify-mapping" className="space-y-4">
+            <ShopifyFulfillmentMapping />
+          </TabsContent>
           
           <TabsContent value="tools" className="space-y-4">
             <div className="grid gap-4">
