@@ -233,16 +233,31 @@ export const useWmsReceiving = () => {
           const poData = poRes.data as any;
 
           if (sessionData?.warehouse_id) {
-            const { data: existingInventoryRaw } = await supabase
+            const customerId = poData?.customer_id || null;
+            const condition = params.condition || 'good';
+            const lotNumber = params.lotNumber || null;
+            const serialNumber = params.serialNumbers?.[0] || null;
+
+            let matchQuery = supabase
               .from('inventory_levels' as any)
               .select('id, quantity_on_hand, quantity_available')
               .eq('company_id', sessionData.company_id)
               .eq('warehouse_id', sessionData.warehouse_id)
               .eq('item_id', params.itemId)
-              .is('location_id', null)
-              .is('lot_number', params.lotNumber || null)
-              .is('serial_number', params.serialNumbers?.[0] || null)
-              .maybeSingle();
+              .eq('condition', condition)
+              .is('location_id', null);
+
+            matchQuery = customerId
+              ? matchQuery.eq('customer_id', customerId)
+              : matchQuery.is('customer_id', null);
+            matchQuery = lotNumber
+              ? matchQuery.eq('lot_number', lotNumber)
+              : matchQuery.is('lot_number', null);
+            matchQuery = serialNumber
+              ? matchQuery.eq('serial_number', serialNumber)
+              : matchQuery.is('serial_number', null);
+
+            const { data: existingInventoryRaw } = await matchQuery.maybeSingle();
             const existingInventory = existingInventoryRaw as any;
 
             if (existingInventory?.id) {
@@ -260,14 +275,14 @@ export const useWmsReceiving = () => {
                 .insert({
                   company_id: sessionData.company_id,
                   warehouse_id: sessionData.warehouse_id,
-                  customer_id: poData?.customer_id || null,
+                  customer_id: customerId,
                   item_id: params.itemId,
                   quantity_on_hand: acceptedQty,
                   quantity_available: acceptedQty,
                   quantity_allocated: 0,
-                  condition: params.condition || 'good',
-                  lot_number: params.lotNumber || null,
-                  serial_number: params.serialNumbers?.[0] || null,
+                  condition,
+                  lot_number: lotNumber,
+                  serial_number: serialNumber,
                   received_date: new Date().toISOString(),
                 });
             }
