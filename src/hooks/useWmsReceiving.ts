@@ -25,6 +25,10 @@ interface ReceivingLineItem {
   lot_number?: string;
   serial_numbers?: string[];
   condition: 'good' | 'damaged' | 'expired';
+  quantity_damaged?: number;
+  quantity_non_compliant?: number;
+  quantity_accepted?: number;
+  non_compliance_reason?: string;
   qc_required: boolean;
   qc_status?: 'pending' | 'passed' | 'failed';
   received_at: string;
@@ -110,6 +114,9 @@ export const useWmsReceiving = () => {
     lotNumber?: string;
     serialNumbers?: string[];
     condition?: string;
+    damagedQuantity?: number;
+    nonCompliantQuantity?: number;
+    nonComplianceReason?: string;
     qcRequired?: boolean;
   }) => {
     try {
@@ -126,6 +133,10 @@ export const useWmsReceiving = () => {
           lot_number: params.lotNumber,
           serial_numbers: params.serialNumbers,
           condition: params.condition || 'new',
+          quantity_damaged: params.damagedQuantity || 0,
+          quantity_non_compliant: params.nonCompliantQuantity || 0,
+          quantity_accepted: Math.max(params.quantityReceived - (params.damagedQuantity || 0) - (params.nonCompliantQuantity || 0), 0),
+          non_compliance_reason: params.nonComplianceReason,
           qc_required: params.qcRequired || false,
           received_by: userProfile?.id,
           received_at: new Date().toISOString(),
@@ -142,7 +153,8 @@ export const useWmsReceiving = () => {
 
       if (!poLineResult.error && poLineResult.data) {
         const poLine = poLineResult.data as unknown as { quantity_received: number; quantity_ordered: number; po_id: string };
-        const newQuantity = (poLine.quantity_received || 0) + params.quantityReceived;
+        const acceptedQty = Math.max(params.quantityReceived - (params.damagedQuantity || 0) - (params.nonCompliantQuantity || 0), 0);
+        const newQuantity = (poLine.quantity_received || 0) + acceptedQty;
         
         await supabase
           .from('po_line_items' as any)

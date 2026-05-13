@@ -2,8 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 type Dims = { length: number; width: number; height: number };
@@ -11,7 +12,11 @@ type ItemDims = Dims & { quantity: number };
 
 // Sort 3 dims descending
 function sortedDesc(d: Dims): [number, number, number] {
-  return [d.length, d.width, d.height].sort((a, b) => b - a) as [number, number, number];
+  return [d.length, d.width, d.height].sort((a, b) => b - a) as [
+    number,
+    number,
+    number,
+  ];
 }
 
 function totalItemVolume(items: ItemDims[]): number {
@@ -36,11 +41,15 @@ function expandItems(items: ItemDims[]): Dims[] {
   const units: Dims[] = [];
   for (const item of items) {
     for (let i = 0; i < (item.quantity || 1); i++) {
-      units.push({ length: item.length, width: item.width, height: item.height });
+      units.push({
+        length: item.length,
+        width: item.width,
+        height: item.height,
+      });
     }
   }
   return units.sort(
-    (a, b) => (b.length * b.width * b.height) - (a.length * a.width * a.height)
+    (a, b) => (b.length * b.width * b.height) - (a.length * a.width * a.height),
   );
 }
 
@@ -53,10 +62,21 @@ function packedVolume3D(items: ItemDims[], box: Dims): number | null {
 
   const units = expandItems(items);
   interface Space {
-    x: number; y: number; z: number;
-    length: number; width: number; height: number;
+    x: number;
+    y: number;
+    z: number;
+    length: number;
+    width: number;
+    height: number;
   }
-  const spaces: Space[] = [{ x: 0, y: 0, z: 0, length: bL, width: bW, height: bH }];
+  const spaces: Space[] = [{
+    x: 0,
+    y: 0,
+    z: 0,
+    length: bL,
+    width: bW,
+    height: bH,
+  }];
   let usedVolume = 0;
 
   for (const item of units) {
@@ -81,16 +101,39 @@ function packedVolume3D(items: ItemDims[], box: Dims): number | null {
 
           const newSpaces: Space[] = [];
           if (space.length - o.l > 0) {
-            newSpaces.push({ x: space.x + o.l, y: space.y, z: space.z, length: space.length - o.l, width: space.width, height: space.height });
+            newSpaces.push({
+              x: space.x + o.l,
+              y: space.y,
+              z: space.z,
+              length: space.length - o.l,
+              width: space.width,
+              height: space.height,
+            });
           }
           if (space.width - o.w > 0) {
-            newSpaces.push({ x: space.x, y: space.y + o.w, z: space.z, length: o.l, width: space.width - o.w, height: space.height });
+            newSpaces.push({
+              x: space.x,
+              y: space.y + o.w,
+              z: space.z,
+              length: o.l,
+              width: space.width - o.w,
+              height: space.height,
+            });
           }
           if (space.height - o.h > 0) {
-            newSpaces.push({ x: space.x, y: space.y, z: space.z + o.h, length: o.l, width: o.w, height: space.height - o.h });
+            newSpaces.push({
+              x: space.x,
+              y: space.y,
+              z: space.z + o.h,
+              length: o.l,
+              width: o.w,
+              height: space.height - o.h,
+            });
           }
 
-          newSpaces.sort((a, b) => (a.length * a.width * a.height) - (b.length * b.width * b.height));
+          newSpaces.sort((a, b) =>
+            (a.length * a.width * a.height) - (b.length * b.width * b.height)
+          );
           spaces.splice(si, 0, ...newSpaces);
           packed = true;
           break;
@@ -117,7 +160,10 @@ function utilizationPct3D(items: ItemDims[], box: Dims): number {
 // (passed in via itemMasterDims keyed by item.id / item.sku).
 function normalizeOrderItem(
   rawItem: any,
-  itemMasterDims?: Map<string, { length: number; width: number; height: number }>
+  itemMasterDims?: Map<
+    string,
+    { length: number; width: number; height: number }
+  >,
 ): ItemDims | null {
   const quantity = Number(rawItem?.quantity || 1);
 
@@ -129,7 +175,9 @@ function normalizeOrderItem(
 
   // 2. Lookup from items master by itemId, then sku
   if ((!length || !width || !height) && itemMasterDims) {
-    const lookupKeys = [rawItem?.itemId, rawItem?.item_id, rawItem?.sku].filter(Boolean);
+    const lookupKeys = [rawItem?.itemId, rawItem?.item_id, rawItem?.sku].filter(
+      Boolean,
+    );
     for (const key of lookupKeys) {
       const m = itemMasterDims.get(String(key));
       if (m) {
@@ -146,21 +194,24 @@ function normalizeOrderItem(
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { company_id } = await req.json();
-    console.log('🎯 Generating packaging intelligence for company:', company_id);
+    console.log(
+      "🎯 Generating packaging intelligence for company:",
+      company_id,
+    );
 
     if (!company_id) {
-      throw new Error('Company ID is required');
+      throw new Error("Company ID is required");
     }
 
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
     // Last 60 days of shipments with packaging data
@@ -168,14 +219,18 @@ serve(async (req) => {
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
     const { data: allShipments, error: shipmentsError } = await supabase
-      .from('shipments')
-      .select('id, created_at, actual_package_sku, package_dimensions, cost, total_weight')
-      .not('actual_package_sku', 'is', null)
-      .gte('created_at', sixtyDaysAgo.toISOString())
-      .order('created_at', { ascending: false })
+      .from("shipments")
+      .select(
+        "id, created_at, actual_package_sku, package_dimensions, cost, total_weight",
+      )
+      .not("actual_package_sku", "is", null)
+      .gte("created_at", sixtyDaysAgo.toISOString())
+      .order("created_at", { ascending: false })
       .limit(500);
 
-    if (shipmentsError) throw new Error(`Shipments query failed: ${shipmentsError.message}`);
+    if (shipmentsError) {
+      throw new Error(`Shipments query failed: ${shipmentsError.message}`);
+    }
     console.log(`📦 Found ${allShipments?.length || 0} shipments`);
 
     // Match shipments to orders for THIS company only
@@ -191,19 +246,23 @@ serve(async (req) => {
     }> = [];
 
     if (allShipments && allShipments.length > 0) {
-      const shipmentIds = allShipments.map(s => s.id);
+      const shipmentIds = allShipments.map((s) => s.id);
 
       const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('id, order_id, items, company_id, shipment_id')
-        .eq('company_id', company_id)
-        .in('shipment_id', shipmentIds);
+        .from("orders")
+        .select("id, order_id, items, company_id, shipment_id")
+        .eq("company_id", company_id)
+        .in("shipment_id", shipmentIds);
 
-      if (ordersError) throw new Error(`Orders query failed: ${ordersError.message}`);
-      console.log(`📋 Found ${orders?.length || 0} orders for company ${company_id}`);
+      if (ordersError) {
+        throw new Error(`Orders query failed: ${ordersError.message}`);
+      }
+      console.log(
+        `📋 Found ${orders?.length || 0} orders for company ${company_id}`,
+      );
 
       const ordersByShipment = new Map<number, any>();
-      (orders || []).forEach(o => {
+      (orders || []).forEach((o) => {
         if (o.shipment_id != null) ordersByShipment.set(o.shipment_id, o);
       });
 
@@ -238,24 +297,44 @@ serve(async (req) => {
       }
     }
 
-    const itemMasterDims = new Map<string, { length: number; width: number; height: number }>();
+    const itemMasterDims = new Map<
+      string,
+      { length: number; width: number; height: number }
+    >();
     if (itemKeys.size > 0) {
       const keys = Array.from(itemKeys);
-      const ids = keys.filter(k => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k));
-      const skus = keys.filter(k => !ids.includes(k));
+      const ids = keys.filter((k) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          k,
+        )
+      );
+      const skus = keys.filter((k) => !ids.includes(k));
 
       const [byIdRes, bySkuRes] = await Promise.all([
         ids.length
-          ? supabase.from('items').select('id, sku, length, width, height').in('id', ids)
+          ? supabase.from("items").select("id, sku, length, width, height").in(
+            "id",
+            ids,
+          )
           : Promise.resolve({ data: [], error: null } as any),
         skus.length
-          ? supabase.from('items').select('id, sku, length, width, height').in('sku', skus)
+          ? supabase.from("items").select("id, sku, length, width, height").in(
+            "sku",
+            skus,
+          )
           : Promise.resolve({ data: [], error: null } as any),
       ]);
 
-      const rows = [...((byIdRes as any).data || []), ...((bySkuRes as any).data || [])];
+      const rows = [
+        ...((byIdRes as any).data || []),
+        ...((bySkuRes as any).data || []),
+      ];
       for (const r of rows) {
-        const dims = { length: Number(r.length), width: Number(r.width), height: Number(r.height) };
+        const dims = {
+          length: Number(r.length),
+          width: Number(r.width),
+          height: Number(r.height),
+        };
         if (!dims.length || !dims.width || !dims.height) continue;
         if (r.id) itemMasterDims.set(String(r.id), dims);
         if (r.sku) itemMasterDims.set(String(r.sku), dims);
@@ -265,13 +344,23 @@ serve(async (req) => {
 
     // Load company boxes so actual package SKU can resolve dimensions/cost.
     const { data: companyBoxes } = await supabase
-      .from('boxes')
-      .select('sku, name, length, width, height, cost')
-      .eq('company_id', company_id)
-      .eq('is_active', true);
+      .from("boxes")
+      .select("sku, name, length, width, height, cost")
+      .eq("company_id", company_id)
+      .eq("is_active", true);
 
-    const companyBoxBySku = new Map<string, { sku: string; name: string; length: number; width: number; height: number; cost: number }>();
-    (companyBoxes || []).forEach(b => {
+    const companyBoxBySku = new Map<
+      string,
+      {
+        sku: string;
+        name: string;
+        length: number;
+        width: number;
+        height: number;
+        cost: number;
+      }
+    >();
+    (companyBoxes || []).forEach((b) => {
       if (b.sku) {
         companyBoxBySku.set(b.sku, {
           sku: b.sku,
@@ -286,16 +375,18 @@ serve(async (req) => {
 
     // Load packaging master list as the recommendation candidate pool.
     const { data: masterBoxes, error: masterBoxesError } = await supabase
-      .from('packaging_master_list')
-      .select('vendor_sku, name, length_in, width_in, height_in, cost')
-      .eq('is_active', true);
+      .from("packaging_master_list")
+      .select("vendor_sku, name, length_in, width_in, height_in, cost")
+      .eq("is_active", true);
 
-    if (masterBoxesError) throw new Error(`Master box query failed: ${masterBoxesError.message}`);
+    if (masterBoxesError) {
+      throw new Error(`Master box query failed: ${masterBoxesError.message}`);
+    }
 
     const masterCandidates = (masterBoxes || [])
       .map((box) => ({
-        sku: String(box.vendor_sku || '').trim(),
-        name: String(box.name || box.vendor_sku || '').trim(),
+        sku: String(box.vendor_sku || "").trim(),
+        name: String(box.name || box.vendor_sku || "").trim(),
         dims: {
           length: Number(box.length_in),
           width: Number(box.width_in),
@@ -303,21 +394,37 @@ serve(async (req) => {
         },
         cost: Number(box.cost) || 0,
       }))
-      .filter((box) => box.sku && box.dims.length > 0 && box.dims.width > 0 && box.dims.height > 0);
+      .filter((box) =>
+        box.sku && box.dims.length > 0 && box.dims.width > 0 &&
+        box.dims.height > 0
+      );
 
-    console.log(`📚 Loaded ${masterCandidates.length} active packaging master candidates`);
+    console.log(
+      `📚 Loaded ${masterCandidates.length} active packaging master candidates`,
+    );
 
     // Resolve the actual box used (dims + cost) for a shipment.
     // Priority: company boxes -> raw package_dimensions.
-    function resolveActualBox(actualSku: string, packageDims: any): { dims: Dims; cost: number; source: 'company' | 'package_dims' } | null {
+    function resolveActualBox(
+      actualSku: string,
+      packageDims: any,
+    ): { dims: Dims; cost: number; source: "company" | "package_dims" } | null {
       const fromCompany = companyBoxBySku.get(actualSku);
       if (fromCompany) {
-        return { dims: { length: fromCompany.length, width: fromCompany.width, height: fromCompany.height }, cost: fromCompany.cost, source: 'company' };
+        return {
+          dims: {
+            length: fromCompany.length,
+            width: fromCompany.width,
+            height: fromCompany.height,
+          },
+          cost: fromCompany.cost,
+          source: "company",
+        };
       }
       // Fallback: parse package_dimensions
       let parsed: any = packageDims;
       try {
-        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+        if (typeof parsed === "string") parsed = JSON.parse(parsed);
       } catch {
         return null;
       }
@@ -325,7 +432,11 @@ serve(async (req) => {
       const width = Number(parsed?.width);
       const height = Number(parsed?.height);
       if (!length || !width || !height) return null;
-      return { dims: { length, width, height }, cost: 0, source: 'package_dims' };
+      return {
+        dims: { length, width, height },
+        cost: 0,
+        source: "package_dims",
+      };
     }
 
     // ============ Analyze each shipment ============
@@ -350,21 +461,31 @@ serve(async (req) => {
 
     let totalUtilization = 0;
     let utilizationCount = 0;
-    const allAnalysisResults: Array<{ shipment_id: number; actual_utilization: number; has_opportunity: boolean }> = [];
+    const allAnalysisResults: Array<
+      {
+        shipment_id: number;
+        actual_utilization: number;
+        has_opportunity: boolean;
+      }
+    > = [];
 
-    const MIN_IMPROVEMENT_PP = 5;   // Only flag opportunities that beat actual by >=5 percentage points
+    const MIN_IMPROVEMENT_PP = 5; // Only flag opportunities that beat actual by >=5 percentage points
 
     for (const shipment of matchedShipments) {
       const items = (shipment.order_items as any[])
-        .map(it => normalizeOrderItem(it, itemMasterDims))
+        .map((it) => normalizeOrderItem(it, itemMasterDims))
         .filter((x): x is ItemDims => x !== null);
 
       if (items.length === 0) continue;
 
-      const actual = resolveActualBox(shipment.actual_package_sku, shipment.package_dimensions);
+      const actual = resolveActualBox(
+        shipment.actual_package_sku,
+        shipment.package_dimensions,
+      );
       if (!actual) continue;
 
-      const actualUtil = utilizationPct3D(items, actual.dims) || utilizationPct(items, actual.dims);
+      const actualUtil = utilizationPct3D(items, actual.dims) ||
+        utilizationPct(items, actual.dims);
       if (actualUtil > 0) {
         totalUtilization += actualUtil;
         utilizationCount++;
@@ -382,7 +503,15 @@ serve(async (req) => {
             volume: boxVolume(candidate.dims),
           };
         })
-        .filter((box): box is { sku: string; name: string; cost: number; utilization: number; volume: number } => box !== null)
+        .filter((
+          box,
+        ): box is {
+          sku: string;
+          name: string;
+          cost: number;
+          utilization: number;
+          volume: number;
+        } => box !== null)
         .sort((a, b) => {
           const scoreA = Math.abs(99 - a.utilization);
           const scoreB = Math.abs(99 - b.utilization);
@@ -402,7 +531,8 @@ serve(async (req) => {
       let hasOpportunity = false;
       if (
         improvement >= MIN_IMPROVEMENT_PP &&
-        recommendedSku.trim().toUpperCase() !== String(shipment.actual_package_sku || '').trim().toUpperCase()
+        recommendedSku.trim().toUpperCase() !==
+          String(shipment.actual_package_sku || "").trim().toUpperCase()
       ) {
         hasOpportunity = true;
         const savings = Math.max(0, actual.cost - recommendedCost);
@@ -430,7 +560,11 @@ serve(async (req) => {
         masterBoxOpportunities[key].total_improvement += improvement;
         masterBoxOpportunities[key].total_savings += savings;
 
-        console.log(`✨ Shipment ${shipment.shipment_id}: ${shipment.actual_package_sku} (${actualUtil.toFixed(1)}%) → ${key} (${newUtil.toFixed(1)}%), save $${savings.toFixed(2)}`);
+        console.log(
+          `✨ Shipment ${shipment.shipment_id}: ${shipment.actual_package_sku} (${
+            actualUtil.toFixed(1)
+          }%) → ${key} (${newUtil.toFixed(1)}%), save $${savings.toFixed(2)}`,
+        );
       }
 
       allAnalysisResults.push({
@@ -442,10 +576,12 @@ serve(async (req) => {
 
     // Build, rank, and slice top opportunities
     const topOpportunities = Object.values(masterBoxOpportunities)
-      .map(opp => {
+      .map((opp) => {
         const n = opp.shipments.length;
-        const avgCurrent = opp.shipments.reduce((s, x) => s + x.current_utilization, 0) / n;
-        const avgNew = opp.shipments.reduce((s, x) => s + x.new_utilization, 0) / n;
+        const avgCurrent = opp.shipments.reduce((s, x) =>
+          s + x.current_utilization, 0) / n;
+        const avgNew = opp.shipments.reduce((s, x) =>
+          s + x.new_utilization, 0) / n;
         return {
           master_box_sku: opp.master_box_sku,
           master_box_name: opp.master_box_name,
@@ -455,44 +591,54 @@ serve(async (req) => {
           avg_new_utilization: avgNew.toFixed(1),
           avg_improvement: (opp.total_improvement / n).toFixed(1),
           total_savings: parseFloat(opp.total_savings.toFixed(2)),
-          sample_shipments: opp.shipments.slice(0, 3).map(s => s.shipment_id),
+          sample_shipments: opp.shipments.slice(0, 3).map((s) => s.shipment_id),
         };
       })
       // Sort by total_savings desc, then by shipment_count desc as tiebreaker
-      .sort((a, b) => (b.total_savings - a.total_savings) || (b.shipment_count - a.shipment_count))
+      .sort((a, b) =>
+        (b.total_savings - a.total_savings) ||
+        (b.shipment_count - a.shipment_count)
+      )
       .slice(0, 10);
 
     console.log(`✨ Found ${topOpportunities.length} packaging opportunities`);
 
-    const averageUtilization = utilizationCount > 0 ? totalUtilization / utilizationCount : 0;
+    const averageUtilization = utilizationCount > 0
+      ? totalUtilization / utilizationCount
+      : 0;
 
     // Most-used boxes
     const boxUsage: Record<string, number> = {};
-    matchedShipments.forEach(s => {
+    matchedShipments.forEach((s) => {
       if (s.actual_package_sku) {
-        boxUsage[s.actual_package_sku] = (boxUsage[s.actual_package_sku] || 0) + 1;
+        boxUsage[s.actual_package_sku] = (boxUsage[s.actual_package_sku] || 0) +
+          1;
       }
     });
     const mostUsedBoxes = Object.entries(boxUsage)
       .map(([sku, count]) => ({
         box_sku: sku,
         usage_count: count,
-        percentage_of_shipments: ((count / Math.max(matchedShipments.length, 1)) * 100).toFixed(1),
+        percentage_of_shipments:
+          ((count / Math.max(matchedShipments.length, 1)) * 100).toFixed(1),
       }))
       .sort((a, b) => b.usage_count - a.usage_count)
       .slice(0, 5);
 
-    const totalPotentialSavings = topOpportunities.reduce((sum, opp) => sum + opp.total_savings, 0);
+    const totalPotentialSavings = topOpportunities.reduce(
+      (sum, opp) => sum + opp.total_savings,
+      0,
+    );
 
     const projectedNeed: Record<string, number> = {};
-    mostUsedBoxes.forEach(box => {
+    mostUsedBoxes.forEach((box) => {
       projectedNeed[box.box_sku] = Math.ceil(box.usage_count * 2);
     });
 
     const report = {
       company_id,
       generated_at: new Date().toISOString(),
-      analysis_period: 'Last 60 days',
+      analysis_period: "Last 60 days",
       total_orders_analyzed: matchedShipments.length,
       potential_savings: parseFloat(totalPotentialSavings.toFixed(2)),
       top_5_most_used_boxes: mostUsedBoxes,
@@ -504,34 +650,49 @@ serve(async (req) => {
         average_actual_utilization: averageUtilization.toFixed(1),
         optimization_opportunities: topOpportunities.length,
         total_potential_savings: totalPotentialSavings.toFixed(2),
-        high_efficiency_shipments: allAnalysisResults.filter(r => r.actual_utilization >= 75).length,
-        low_efficiency_shipments: allAnalysisResults.filter(r => r.actual_utilization < 50).length,
-        shipments_with_opportunities: allAnalysisResults.filter(r => r.has_opportunity).length,
+        high_efficiency_shipments: allAnalysisResults.filter((r) =>
+          r.actual_utilization >= 75
+        ).length,
+        low_efficiency_shipments: allAnalysisResults.filter((r) =>
+          r.actual_utilization < 50
+        ).length,
+        shipments_with_opportunities: allAnalysisResults.filter((r) =>
+          r.has_opportunity
+        ).length,
         utilization_distribution: {
-          excellent: allAnalysisResults.filter(r => r.actual_utilization >= 85).length,
-          good: allAnalysisResults.filter(r => r.actual_utilization >= 70 && r.actual_utilization < 85).length,
-          fair: allAnalysisResults.filter(r => r.actual_utilization >= 50 && r.actual_utilization < 70).length,
-          poor: allAnalysisResults.filter(r => r.actual_utilization < 50).length,
+          excellent:
+            allAnalysisResults.filter((r) => r.actual_utilization >= 85).length,
+          good: allAnalysisResults.filter((r) =>
+            r.actual_utilization >= 70 && r.actual_utilization < 85
+          ).length,
+          fair: allAnalysisResults.filter((r) =>
+            r.actual_utilization >= 50 && r.actual_utilization < 70
+          ).length,
+          poor: allAnalysisResults.filter((r) =>
+            r.actual_utilization < 50
+          ).length,
         },
       },
     };
 
     // Replace today's report for this company
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     await supabase
-      .from('packaging_intelligence_reports')
+      .from("packaging_intelligence_reports")
       .delete()
-      .eq('company_id', company_id)
-      .gte('generated_at', `${today}T00:00:00Z`)
-      .lt('generated_at', `${today}T23:59:59Z`);
+      .eq("company_id", company_id)
+      .gte("generated_at", `${today}T00:00:00Z`)
+      .lt("generated_at", `${today}T23:59:59Z`);
 
     const { error: reportError } = await supabase
-      .from('packaging_intelligence_reports')
+      .from("packaging_intelligence_reports")
       .insert([report]);
 
-    if (reportError) throw new Error(`Failed to save report: ${reportError.message}`);
+    if (reportError) {
+      throw new Error(`Failed to save report: ${reportError.message}`);
+    }
 
-    console.log('✅ Report generated successfully');
+    console.log("✅ Report generated successfully");
 
     return new Response(
       JSON.stringify({
@@ -541,13 +702,16 @@ serve(async (req) => {
         average_utilization: averageUtilization,
         optimization_opportunities: topOpportunities.length,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error('❌ Function error:', error);
+    console.error("❌ Function error:", error);
     return new Response(
       JSON.stringify({ success: false, error: (error as Error).message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      },
     );
   }
 });

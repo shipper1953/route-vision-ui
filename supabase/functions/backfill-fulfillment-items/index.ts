@@ -2,8 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface OrderItem {
@@ -14,16 +15,16 @@ interface OrderItem {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Starting backfill of fulfillment item tracking...');
+    console.log("Starting backfill of fulfillment item tracking...");
 
     // Get the request body to check for specific order_id or run all
     const body = await req.json().catch(() => ({}));
@@ -31,7 +32,7 @@ serve(async (req) => {
 
     // Find order_shipments records that don't have items in package_info
     let query = supabase
-      .from('order_shipments')
+      .from("order_shipments")
       .select(`
         id,
         order_id,
@@ -44,10 +45,10 @@ serve(async (req) => {
           items
         )
       `)
-      .order('created_at', { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (orderId) {
-      query = query.eq('order_id', orderId);
+      query = query.eq("order_id", orderId);
     } else {
       query = query.limit(limit);
     }
@@ -60,14 +61,14 @@ serve(async (req) => {
 
     if (!orderShipments || orderShipments.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          message: 'No order shipments found to backfill',
-          updated: 0 
+        JSON.stringify({
+          message: "No order shipments found to backfill",
+          updated: 0,
         }),
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
-        }
+        },
       );
     }
 
@@ -81,9 +82,14 @@ serve(async (req) => {
       try {
         // Check if package_info already has items
         const packageInfo = orderShipment.package_info || {};
-        
-        if (packageInfo.items && Array.isArray(packageInfo.items) && packageInfo.items.length > 0) {
-          console.log(`Order shipment ${orderShipment.id} already has item tracking, skipping`);
+
+        if (
+          packageInfo.items && Array.isArray(packageInfo.items) &&
+          packageInfo.items.length > 0
+        ) {
+          console.log(
+            `Order shipment ${orderShipment.id} already has item tracking, skipping`,
+          );
           skippedCount++;
           continue;
         }
@@ -95,7 +101,7 @@ serve(async (req) => {
         if (order.items) {
           if (Array.isArray(order.items)) {
             orderItems = order.items;
-          } else if (typeof order.items === 'object') {
+          } else if (typeof order.items === "object") {
             // Handle old format if items is an object
             orderItems = [order.items];
           }
@@ -110,70 +116,76 @@ serve(async (req) => {
         // Update package_info with items
         const updatedPackageInfo = {
           ...packageInfo,
-          items: orderItems.map(item => ({
+          items: orderItems.map((item) => ({
             sku: item.sku || item.name,
             name: item.name || item.sku,
-            quantity: item.quantity || 1
+            quantity: item.quantity || 1,
           })),
           backfilled: true,
-          backfilled_at: new Date().toISOString()
+          backfilled_at: new Date().toISOString(),
         };
 
         // Update the order_shipments record
         const { error: updateError } = await supabase
-          .from('order_shipments')
+          .from("order_shipments")
           .update({ package_info: updatedPackageInfo })
-          .eq('id', orderShipment.id);
+          .eq("id", orderShipment.id);
 
         if (updateError) {
-          const errorMsg = `Failed to update order_shipment ${orderShipment.id}: ${updateError.message}`;
+          const errorMsg =
+            `Failed to update order_shipment ${orderShipment.id}: ${updateError.message}`;
           console.error(errorMsg);
           errors.push(errorMsg);
           continue;
         }
 
-        console.log(`✅ Backfilled items for order_shipment ${orderShipment.id} (order ${order.order_id})`);
+        console.log(
+          `✅ Backfilled items for order_shipment ${orderShipment.id} (order ${order.order_id})`,
+        );
         updatedCount++;
-
       } catch (itemError) {
-        const errorMsg = `Error processing order_shipment ${orderShipment.id}: ${(itemError as Error).message}`;
+        const errorMsg =
+          `Error processing order_shipment ${orderShipment.id}: ${
+            (itemError as Error).message
+          }`;
         console.error(errorMsg);
         errors.push(errorMsg);
       }
     }
 
-    console.log(`Backfill complete: ${updatedCount} updated, ${skippedCount} skipped, ${errors.length} errors`);
+    console.log(
+      `Backfill complete: ${updatedCount} updated, ${skippedCount} skipped, ${errors.length} errors`,
+    );
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
-        message: 'Backfill completed',
+        message: "Backfill completed",
         stats: {
           processed: orderShipments.length,
           updated: updatedCount,
           skipped: skippedCount,
-          errors: errors.length
+          errors: errors.length,
         },
-        errors: errors.length > 0 ? errors : undefined
+        errors: errors.length > 0 ? errors : undefined,
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
-      }
+      },
     );
-
   } catch (error) {
-    console.error('Backfill error:', error);
-    
+    console.error("Backfill error:", error);
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: (error as Error).message,
-        success: false
+        success: false,
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
-      }
+      },
     );
   }
 });
