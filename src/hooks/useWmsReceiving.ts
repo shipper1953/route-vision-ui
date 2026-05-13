@@ -52,38 +52,6 @@ export const useWmsReceiving = () => {
     try {
       setLoading(true);
 
-      // Ensure receipts are always tied to an existing item record already linked on the PO line.
-      const { data: poLineItemRef, error: poLineItemRefError } = await supabase
-        .from('po_line_items' as any)
-        .select('id, item_id, sku, product_name, purchase_orders!inner(company_id)')
-        .eq('id', params.poLineId)
-        .single();
-
-      if (poLineItemRefError || !poLineItemRef) {
-        throw new Error('PO line item not found.');
-      }
-
-      if (!poLineItemRef.item_id) {
-        throw new Error(`PO line ${poLineItemRef.sku || poLineItemRef.product_name} is not mapped to an existing item. Map item first before receiving.`);
-      }
-
-      if (poLineItemRef.item_id !== params.itemId) {
-        throw new Error('Selected item does not match the PO line item mapping.');
-      }
-
-      const { data: existingItem, error: existingItemError } = await supabase
-        .from('items' as any)
-        .select('id, company_id')
-        .eq('id', params.itemId)
-        .single();
-
-      if (existingItemError || !existingItem) {
-        throw new Error('Mapped item no longer exists.');
-      }
-
-      if (existingItem.company_id !== userProfile?.company_id) {
-        throw new Error('Mapped item belongs to a different company.');
-      }
       const { data, error } = await supabase
         .from('purchase_orders' as any)
         .select('*, customers(*), po_line_items(*, items(*))')
