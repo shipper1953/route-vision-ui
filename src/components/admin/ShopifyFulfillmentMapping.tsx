@@ -37,7 +37,7 @@ export const ShopifyFulfillmentMapping = () => {
   const [busy, setBusy] = useState<Record<string, "verify" | "fix" | undefined>>({});
   const [results, setResults] = useState<Record<string, VerifyResult>>({});
 
-  const load = async () => {
+  const load = async (): Promise<StoreRow[]> => {
     setLoading(true);
     const { data, error } = await supabase
       .from("shopify_stores")
@@ -46,7 +46,7 @@ export const ShopifyFulfillmentMapping = () => {
     if (error) {
       toast({ title: "Failed to load stores", description: error.message, variant: "destructive" });
       setLoading(false);
-      return;
+      return [];
     }
     const rows = (data || []) as StoreRow[];
     const companyIds = Array.from(new Set(rows.map((r) => r.company_id).filter(Boolean)));
@@ -58,8 +58,10 @@ export const ShopifyFulfillmentMapping = () => {
         .in("id", companyIds);
       companyMap = Object.fromEntries((comps || []).map((c: any) => [c.id, c.name]));
     }
-    setStores(rows.map((s) => ({ ...s, company_name: companyMap[s.company_id] })));
+    const enriched = rows.map((s) => ({ ...s, company_name: companyMap[s.company_id] }));
+    setStores(enriched);
     setLoading(false);
+    return enriched;
   };
 
   useEffect(() => {
