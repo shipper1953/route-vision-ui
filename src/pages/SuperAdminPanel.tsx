@@ -10,6 +10,7 @@ import { SuperAdminPackageInventory } from "@/components/admin/SuperAdminPackage
 import { FulfillmentBackfillTool } from "@/components/admin/FulfillmentBackfillTool";
 import { PartialFulfillmentTestingPanel } from "@/components/admin/PartialFulfillmentTestingPanel";
 import { PartialFulfillmentDocs } from "@/components/admin/PartialFulfillmentDocs";
+import { ShopifyFulfillmentMapping } from "@/components/admin/ShopifyFulfillmentMapping";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const SuperAdminPanel = () => {
@@ -73,6 +74,7 @@ const SuperAdminPanel = () => {
             <TabsTrigger value="companies">Companies</TabsTrigger>
             <TabsTrigger value="packages">Package Inventory</TabsTrigger>
             <TabsTrigger value="shipments">Shipments Report</TabsTrigger>
+            <TabsTrigger value="shopify-mapping">Shopify Mapping</TabsTrigger>
             <TabsTrigger value="tools">Data Tools</TabsTrigger>
           </TabsList>
           
@@ -90,6 +92,10 @@ const SuperAdminPanel = () => {
           
           <TabsContent value="shipments" className="space-y-4">
             <SuperAdminShipmentsReport />
+          </TabsContent>
+
+          <TabsContent value="shopify-mapping" className="space-y-4">
+            <ShopifyFulfillmentMapping />
           </TabsContent>
           
           <TabsContent value="tools" className="space-y-4">
