@@ -213,6 +213,71 @@ export const useWmsReceiving = () => {
             })
             .eq('id', poLine.po_id);
         }
+
+        // Increase inventory for accepted qty and trigger Shopify sync.
+        if (acceptedQty > 0) {
+          const [{ data: sessionData }, { data: poData }] = await Promise.all([
+            supabase
+              .from('receiving_sessions' as any)
+              .select('company_id, warehouse_id')
+              .eq('id', params.sessionId)
+              .single(),
+            supabase
+              .from('purchase_orders' as any)
+              .select('customer_id')
+              .eq('id', poLine.po_id)
+              .single()
+          ]);
+
+          if (sessionData?.warehouse_id) {
+            const { data: existingInventory } = await supabase
+              .from('inventory_levels' as any)
+              .select('id, quantity_on_hand, quantity_available')
+              .eq('company_id', sessionData.company_id)
+              .eq('warehouse_id', sessionData.warehouse_id)
+              .eq('item_id', params.itemId)
+              .is('location_id', null)
+              .is('lot_number', params.lotNumber || null)
+              .is('serial_number', params.serialNumbers?.[0] || null)
+              .maybeSingle();
+
+            if (existingInventory?.id) {
+              await supabase
+                .from('inventory_levels' as any)
+                .update({
+                  quantity_on_hand: (existingInventory.quantity_on_hand || 0) + acceptedQty,
+                  quantity_available: (existingInventory.quantity_available || 0) + acceptedQty,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingInventory.id);
+            } else {
+              await supabase
+                .from('inventory_levels' as any)
+                .insert({
+                  company_id: sessionData.company_id,
+                  warehouse_id: sessionData.warehouse_id,
+                  customer_id: poData?.customer_id || null,
+                  item_id: params.itemId,
+                  quantity_on_hand: acceptedQty,
+                  quantity_available: acceptedQty,
+                  quantity_allocated: 0,
+                  condition: params.condition || 'good',
+                  lot_number: params.lotNumber || null,
+                  serial_number: params.serialNumbers?.[0] || null,
+                  received_date: new Date().toISOString(),
+                });
+            }
+
+            await supabase.functions.invoke('shopify-sync-inventory', {
+              body: {
+                companyId: userProfile?.company_id,
+                itemId: params.itemId,
+                warehouseId: sessionData.warehouse_id,
+                source: 'wms_receiving',
+              }
+            });
+          }
+        }
       }
 
       // Fetch updated received items
