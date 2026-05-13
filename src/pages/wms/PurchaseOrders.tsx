@@ -94,7 +94,11 @@ const PurchaseOrders = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedPO?.po_line_items?.map((line: any) => (
+                    {(selectedPO?.po_line_items?.length ?? 0) === 0 ? (
+                      <tr>
+                        <td className="p-3 text-muted-foreground" colSpan={4}>No line items were saved for this PO.</td>
+                      </tr>
+                    ) : selectedPO?.po_line_items?.map((line: any) => (
                       <tr key={line.id} className="border-b last:border-0">
                         <td className="p-2">{line.items?.sku || line.sku}</td>
                         <td className="p-2">{line.items?.name || line.product_name}</td>

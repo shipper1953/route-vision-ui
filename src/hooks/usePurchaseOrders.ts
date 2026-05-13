@@ -144,11 +144,33 @@ export const usePurchaseOrders = () => {
       createdPoId = (po as any).id;
 
       // Create line items
-      const lineItemsWithPoId = validLineItems.map((item, index) => ({
-        ...item,
-        po_id: (po as any).id,
-        line_number: index + 1
-      }));
+      const itemIds = validLineItems.map((item) => item.item_id);
+      const { data: itemRows, error: itemFetchError } = await supabase
+        .from('items' as any)
+        .select('id, sku, name')
+        .in('id', itemIds);
+
+      if (itemFetchError) throw itemFetchError;
+
+      const itemById = new Map((itemRows || []).map((row: any) => [row.id, row]));
+
+      const lineItemsWithPoId = validLineItems.map((item) => {
+        const selectedItem = itemById.get(item.item_id);
+        if (!selectedItem) {
+          throw new Error('One or more selected SKUs no longer exist. Please reselect line items.');
+        }
+
+        return {
+          po_id: (po as any).id,
+          item_id: item.item_id,
+          sku: selectedItem.sku,
+          product_name: selectedItem.name,
+          quantity_ordered: item.quantity_ordered,
+          quantity_received: item.quantity_received || 0,
+          unit_cost: item.unit_cost,
+          uom: item.uom || 'each'
+        };
+      });
 
       const { error: lineItemsError } = await supabase
         .from('po_line_items' as any)
