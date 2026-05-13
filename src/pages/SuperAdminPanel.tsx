@@ -10,6 +10,7 @@ import { SuperAdminPackageInventory } from "@/components/admin/SuperAdminPackage
 import { FulfillmentBackfillTool } from "@/components/admin/FulfillmentBackfillTool";
 import { PartialFulfillmentTestingPanel } from "@/components/admin/PartialFulfillmentTestingPanel";
 import { PartialFulfillmentDocs } from "@/components/admin/PartialFulfillmentDocs";
+import { ShopifyFulfillmentMapping } from "@/components/admin/ShopifyFulfillmentMapping";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const SuperAdminPanel = () => {
