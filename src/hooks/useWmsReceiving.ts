@@ -243,6 +243,7 @@ export const useWmsReceiving = () => {
               .is('serial_number', params.serialNumbers?.[0] || null)
               .maybeSingle();
 
+            const existingInventory = existingInventoryRaw as any;
             if (existingInventory?.id) {
               await supabase
                 .from('inventory_levels' as any)
