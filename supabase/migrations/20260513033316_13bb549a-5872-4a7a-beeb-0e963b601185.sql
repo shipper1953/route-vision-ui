@@ -1,0 +1,1 @@
+ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id), ADD COLUMN IF NOT EXISTS vendor_contact text;
