@@ -17,6 +17,9 @@ interface ReceivingItemFormProps {
   onReceive: (data: {
     uom: string;
     quantity: number;
+    damagedQuantity: number;
+    nonCompliantQuantity: number;
+    nonComplianceReason?: string;
     lotNumber?: string;
     serialNumbers?: string[];
     condition: string;
@@ -28,6 +31,9 @@ export const ReceivingItemForm = ({ item, poLineItem, onReceive, onCancel }: Rec
   const [uom, setUom] = useState(poLineItem?.uom || 'each');
   const [quantity, setQuantity] = useState(1);
   const [lotNumber, setLotNumber] = useState("");
+  const [damagedQuantity, setDamagedQuantity] = useState(0);
+  const [nonCompliantQuantity, setNonCompliantQuantity] = useState(0);
+  const [nonComplianceReason, setNonComplianceReason] = useState("");
   const [serialNumbers, setSerialNumbers] = useState("");
   const [condition, setCondition] = useState<string>("good");
 
@@ -35,6 +41,9 @@ export const ReceivingItemForm = ({ item, poLineItem, onReceive, onCancel }: Rec
     onReceive({
       uom,
       quantity,
+      damagedQuantity,
+      nonCompliantQuantity,
+      nonComplianceReason: nonComplianceReason || undefined,
       lotNumber: lotNumber || undefined,
       serialNumbers: serialNumbers ? serialNumbers.split(',').map(s => s.trim()) : undefined,
       condition
@@ -103,6 +112,25 @@ export const ReceivingItemForm = ({ item, poLineItem, onReceive, onCancel }: Rec
           </Button>
         </div>
       </div>
+
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label htmlFor="damagedQty">Damaged Qty</Label>
+          <Input id="damagedQty" type="number" min="0" value={damagedQuantity} onChange={(e) => setDamagedQuantity(Math.max(0, parseInt(e.target.value) || 0))} className="h-12" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="nonCompliantQty">Non-compliant Qty</Label>
+          <Input id="nonCompliantQty" type="number" min="0" value={nonCompliantQuantity} onChange={(e) => setNonCompliantQuantity(Math.max(0, parseInt(e.target.value) || 0))} className="h-12" />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="nonComplianceReason">Non-compliance Reason (Optional)</Label>
+        <Input id="nonComplianceReason" type="text" value={nonComplianceReason} onChange={(e) => setNonComplianceReason(e.target.value)} placeholder="Packaging issue, missing label, etc." className="h-12" />
+      </div>
+
+      <p className="text-sm text-muted-foreground">Accepted to available flow: {Math.max(quantity - damagedQuantity - nonCompliantQuantity, 0)}</p>
 
       {/* Lot Number */}
       <div className="space-y-2">

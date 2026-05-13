@@ -65,9 +65,18 @@ const Receiving = () => {
     }
   };
 
+  const handleSelectLineForReceive = (poLineItem: any) => {
+    if (!poLineItem?.items) return;
+    setScannedItem(poLineItem.items);
+    setSelectedPOLineItem(poLineItem);
+  };
+
   const handleReceiveItem = async (data: {
     uom: string;
     quantity: number;
+    damagedQuantity: number;
+    nonCompliantQuantity: number;
+    nonComplianceReason?: string;
     lotNumber?: string;
     serialNumbers?: string[];
     condition: string;
@@ -83,6 +92,9 @@ const Receiving = () => {
       lotNumber: data.lotNumber,
       serialNumbers: data.serialNumbers,
       condition: data.condition,
+      damagedQuantity: data.damagedQuantity,
+      nonCompliantQuantity: data.nonCompliantQuantity,
+      nonComplianceReason: data.nonComplianceReason,
       qcRequired: false
     });
 
@@ -152,6 +164,33 @@ const Receiving = () => {
                   disabled={loading}
                   placeholder="Scan item barcode..."
                 />
+
+                <div className="border rounded-lg">
+                  <div className="p-3 border-b bg-muted/50 font-medium">PO Line Items</div>
+                  <div className="divide-y">
+                    {currentPO.po_line_items?.map((line: any) => {
+                      const remaining = Math.max((line.quantity_ordered || 0) - (line.quantity_received || 0), 0);
+                      return (
+                        <div key={line.id} className="p-3 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{line.items?.name || line.product_name}</p>
+                            <p className="text-sm text-muted-foreground">SKU: {line.items?.sku || line.sku}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Ordered: {line.quantity_ordered} | Received: {line.quantity_received || 0} | Remaining: {remaining}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={remaining <= 0 || loading}
+                            onClick={() => handleSelectLineForReceive(line)}
+                          >
+                            Receive Qty
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 
                 <ReceivedItemsList items={receivedItems} />
               </>
