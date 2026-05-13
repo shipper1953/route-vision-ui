@@ -25,6 +25,10 @@ interface ReceivingLineItem {
   lot_number?: string;
   serial_numbers?: string[];
   condition: 'good' | 'damaged' | 'expired';
+  quantity_damaged?: number;
+  quantity_non_compliant?: number;
+  quantity_accepted?: number;
+  non_compliance_reason?: string;
   qc_required: boolean;
   qc_status?: 'pending' | 'passed' | 'failed';
   received_at: string;
@@ -110,26 +114,64 @@ export const useWmsReceiving = () => {
     lotNumber?: string;
     serialNumbers?: string[];
     condition?: string;
+    damagedQuantity?: number;
+    nonCompliantQuantity?: number;
+    nonComplianceReason?: string;
     qcRequired?: boolean;
   }) => {
     try {
       setLoading(true);
 
-      const { error } = await supabase
+      const acceptedQty = Math.max(
+        params.quantityReceived - (params.damagedQuantity || 0) - (params.nonCompliantQuantity || 0),
+        0
+      );
+
+      const baseInsertPayload = {
+        session_id: params.sessionId,
+        po_line_id: params.poLineId,
+        item_id: params.itemId,
+        quantity_received: params.quantityReceived,
+        uom: params.uom,
+        lot_number: params.lotNumber,
+        serial_numbers: params.serialNumbers,
+        condition: params.condition || 'new',
+        qc_required: params.qcRequired || false,
+        received_by: userProfile?.id,
+        received_at: new Date().toISOString(),
+      };
+
+      const extendedPayload = {
+        ...baseInsertPayload,
+        quantity_damaged: params.damagedQuantity || 0,
+        quantity_non_compliant: params.nonCompliantQuantity || 0,
+        quantity_accepted: acceptedQty,
+        non_compliance_reason: params.nonComplianceReason,
+      };
+
+      let { error } = await supabase
         .from('receiving_line_items' as any)
-        .insert({
-          session_id: params.sessionId,
-          po_line_id: params.poLineId,
-          item_id: params.itemId,
-          quantity_received: params.quantityReceived,
-          uom: params.uom,
-          lot_number: params.lotNumber,
-          serial_numbers: params.serialNumbers,
-          condition: params.condition || 'new',
-          qc_required: params.qcRequired || false,
-          received_by: userProfile?.id,
-          received_at: new Date().toISOString(),
-        });
+        .insert(extendedPayload as any);
+
+      // Backward-compatible fallback when DB migration isn't applied yet.
+      if (error && String(error.message || '').includes('quantity_accepted')) {
+        const fallbackNotes = [
+          params.damagedQuantity ? `Damaged: ${params.damagedQuantity}` : null,
+          params.nonCompliantQuantity ? `Non-compliant: ${params.nonCompliantQuantity}` : null,
+          params.nonComplianceReason ? `Reason: ${params.nonComplianceReason}` : null,
+        ].filter(Boolean).join(' | ');
+
+        const fallbackPayload = {
+          ...baseInsertPayload,
+          notes: fallbackNotes || undefined,
+        };
+
+        const fallbackResult = await supabase
+          .from('receiving_line_items' as any)
+          .insert(fallbackPayload as any);
+
+        error = fallbackResult.error;
+      }
 
       if (error) throw error;
 
@@ -142,7 +184,7 @@ export const useWmsReceiving = () => {
 
       if (!poLineResult.error && poLineResult.data) {
         const poLine = poLineResult.data as unknown as { quantity_received: number; quantity_ordered: number; po_id: string };
-        const newQuantity = (poLine.quantity_received || 0) + params.quantityReceived;
+        const newQuantity = (poLine.quantity_received || 0) + acceptedQty;
         
         await supabase
           .from('po_line_items' as any)
@@ -170,6 +212,71 @@ export const useWmsReceiving = () => {
               status: fullyReceived ? 'received' : (partiallyReceived ? 'partially_received' : 'pending')
             })
             .eq('id', poLine.po_id);
+        }
+
+        // Increase inventory for accepted qty and trigger Shopify sync.
+        if (acceptedQty > 0) {
+          const [{ data: sessionData }, { data: poData }] = await Promise.all([
+            supabase
+              .from('receiving_sessions' as any)
+              .select('company_id, warehouse_id')
+              .eq('id', params.sessionId)
+              .single(),
+            supabase
+              .from('purchase_orders' as any)
+              .select('customer_id')
+              .eq('id', poLine.po_id)
+              .single()
+          ]);
+
+          if (sessionData?.warehouse_id) {
+            const { data: existingInventory } = await supabase
+              .from('inventory_levels' as any)
+              .select('id, quantity_on_hand, quantity_available')
+              .eq('company_id', sessionData.company_id)
+              .eq('warehouse_id', sessionData.warehouse_id)
+              .eq('item_id', params.itemId)
+              .is('location_id', null)
+              .is('lot_number', params.lotNumber || null)
+              .is('serial_number', params.serialNumbers?.[0] || null)
+              .maybeSingle();
+
+            if (existingInventory?.id) {
+              await supabase
+                .from('inventory_levels' as any)
+                .update({
+                  quantity_on_hand: (existingInventory.quantity_on_hand || 0) + acceptedQty,
+                  quantity_available: (existingInventory.quantity_available || 0) + acceptedQty,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingInventory.id);
+            } else {
+              await supabase
+                .from('inventory_levels' as any)
+                .insert({
+                  company_id: sessionData.company_id,
+                  warehouse_id: sessionData.warehouse_id,
+                  customer_id: poData?.customer_id || null,
+                  item_id: params.itemId,
+                  quantity_on_hand: acceptedQty,
+                  quantity_available: acceptedQty,
+                  quantity_allocated: 0,
+                  condition: params.condition || 'good',
+                  lot_number: params.lotNumber || null,
+                  serial_number: params.serialNumbers?.[0] || null,
+                  received_date: new Date().toISOString(),
+                });
+            }
+
+            await supabase.functions.invoke('shopify-sync-inventory', {
+              body: {
+                companyId: userProfile?.company_id,
+                itemId: params.itemId,
+                warehouseId: sessionData.warehouse_id,
+                source: 'wms_receiving',
+              }
+            });
+          }
         }
       }
 
