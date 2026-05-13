@@ -1,8 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.7";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface PrintNodePrinter {
@@ -34,14 +35,14 @@ interface PrintJob {
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const apiKey = Deno.env.get('PRINTNODE_API_KEY')?.trim();
+    const apiKey = Deno.env.get("PRINTNODE_API_KEY")?.trim();
     if (!apiKey) {
-      throw new Error('PrintNode API key not configured');
+      throw new Error("PrintNode API key not configured");
     }
 
     // Parse request body to get action
@@ -49,202 +50,229 @@ Deno.serve(async (req) => {
     const action = body.action;
 
     if (!action) {
-      throw new Error('Missing action parameter');
+      throw new Error("Missing action parameter");
     }
 
     // Base64 encode the API key for basic auth (PrintNode uses key as username, blank password)
-    const authHeader = `Basic ${btoa(apiKey + ':')}`;
+    const authHeader = `Basic ${btoa(apiKey + ":")}`;
 
-    if (action === 'list-printers') {
+    if (action === "list-printers") {
       // Get list of printers
-      const response = await fetch('https://api.printnode.com/printers', {
+      const response = await fetch("https://api.printnode.com/printers", {
         headers: {
-          'Authorization': authHeader,
+          "Authorization": authHeader,
         },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('PrintNode list-printers error:', response.status, errorText);
+        console.error(
+          "PrintNode list-printers error:",
+          response.status,
+          errorText,
+        );
         const hint = response.status === 403 || response.status === 401
-          ? ' Check that PRINTNODE_API_KEY is a valid API key (from PrintNode → Account → API Keys), not an account password or integration key, and that the account is active.'
-          : '';
-        return new Response(JSON.stringify({
-          error: `PrintNode API error: ${response.statusText}${hint}`,
-          details: errorText,
-          status: response.status,
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+          ? " Check that PRINTNODE_API_KEY is a valid API key (from PrintNode → Account → API Keys), not an account password or integration key, and that the account is active."
+          : "";
+        return new Response(
+          JSON.stringify({
+            error: `PrintNode API error: ${response.statusText}${hint}`,
+            details: errorText,
+            status: response.status,
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       const printers: PrintNodePrinter[] = await response.json();
-      
+
       return new Response(JSON.stringify({ printers }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (action === 'print-uri') {
+    if (action === "print-uri") {
       const { printerId, title, contentType, content, source } = body;
 
       if (!printerId || !content) {
-        throw new Error('Missing required fields: printerId, content');
+        throw new Error("Missing required fields: printerId, content");
       }
 
       // Submit print job with URI - PrintNode will auto-detect and convert to printer format
       const printJob = {
         printerId,
-        title: title || 'Print Job',
-        contentType: contentType || 'pdf_uri',
+        title: title || "Print Job",
+        contentType: contentType || "pdf_uri",
         content, // This is a URL, not base64
-        source: source || 'ShipTornado',
+        source: source || "ShipTornado",
       };
 
-      console.log('📋 Submitting print job to PrintNode:', {
+      console.log("📋 Submitting print job to PrintNode:", {
         printerId,
         title,
         contentType,
-        contentUrlPreview: content.substring(0, 80) + '...'
+        contentUrlPreview: content.substring(0, 80) + "...",
       });
 
-      const response = await fetch('https://api.printnode.com/printjobs', {
-        method: 'POST',
+      const response = await fetch("https://api.printnode.com/printjobs", {
+        method: "POST",
         headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
+          "Authorization": authHeader,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(printJob),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('PrintNode print-uri error:', response.status, errorText);
-        return new Response(JSON.stringify({ 
-          error: `PrintNode rejected the print job: ${response.statusText}`,
-          details: errorText,
-          status: response.status
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        console.error("PrintNode print-uri error:", response.status, errorText);
+        return new Response(
+          JSON.stringify({
+            error: `PrintNode rejected the print job: ${response.statusText}`,
+            details: errorText,
+            status: response.status,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       const result = await response.json();
-      console.log('Print job (URI) submitted:', result);
+      console.log("Print job (URI) submitted:", result);
 
-      return new Response(JSON.stringify({ 
-        success: true, 
-        jobId: result,
-        message: 'Print job submitted successfully' 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          jobId: result,
+          message: "Print job submitted successfully",
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
-    if (action === 'print') {
-      const { printerId, title, contentType, content, source } = body as PrintJob;
+    if (action === "print") {
+      const { printerId, title, contentType, content, source } =
+        body as PrintJob;
 
       if (!printerId || !content) {
-        throw new Error('Missing required fields: printerId, content');
+        throw new Error("Missing required fields: printerId, content");
       }
 
       // Submit print job
       const printJob = {
         printerId,
-        title: title || 'Print Job',
-        contentType: contentType || 'pdf_base64',
+        title: title || "Print Job",
+        contentType: contentType || "pdf_base64",
         content,
-        source: source || 'ShipTornado',
+        source: source || "ShipTornado",
       };
 
-      const response = await fetch('https://api.printnode.com/printjobs', {
-        method: 'POST',
+      const response = await fetch("https://api.printnode.com/printjobs", {
+        method: "POST",
         headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
+          "Authorization": authHeader,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(printJob),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('PrintNode print error:', response.status, errorText);
-        return new Response(JSON.stringify({ 
-          error: `PrintNode rejected the print job: ${response.statusText}`,
-          details: errorText,
-          status: response.status
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        console.error("PrintNode print error:", response.status, errorText);
+        return new Response(
+          JSON.stringify({
+            error: `PrintNode rejected the print job: ${response.statusText}`,
+            details: errorText,
+            status: response.status,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       const result = await response.json();
-      console.log('Print job submitted:', result);
+      console.log("Print job submitted:", result);
 
-      return new Response(JSON.stringify({ 
-        success: true, 
-        jobId: result,
-        message: 'Print job submitted successfully' 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          jobId: result,
+          message: "Print job submitted successfully",
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
-    if (action === 'print-zpl') {
+    if (action === "print-zpl") {
       const { printerId, title, zplCode } = body;
 
       if (!printerId || !zplCode) {
-        throw new Error('Missing required fields: printerId, zplCode');
+        throw new Error("Missing required fields: printerId, zplCode");
       }
 
       // Submit ZPL print job
       const printJob = {
         printerId,
-        title: title || 'ZPL Print Job',
-        contentType: 'raw_base64',
+        title: title || "ZPL Print Job",
+        contentType: "raw_base64",
         content: btoa(zplCode),
-        source: 'ShipTornado',
+        source: "ShipTornado",
       };
 
-      const response = await fetch('https://api.printnode.com/printjobs', {
-        method: 'POST',
+      const response = await fetch("https://api.printnode.com/printjobs", {
+        method: "POST",
         headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
+          "Authorization": authHeader,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(printJob),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('PrintNode ZPL print error:', errorText);
+        console.error("PrintNode ZPL print error:", errorText);
         throw new Error(`PrintNode print error: ${response.statusText}`);
       }
 
       const result = await response.json();
-      console.log('ZPL print job submitted:', result);
+      console.log("ZPL print job submitted:", result);
 
-      return new Response(JSON.stringify({ 
-        success: true, 
-        jobId: result,
-        message: 'ZPL print job submitted successfully' 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          jobId: result,
+          message: "ZPL print job submitted successfully",
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
-    throw new Error('Invalid action. Use ?action=list-printers, ?action=print, ?action=print-uri, or ?action=print-zpl');
-
+    throw new Error(
+      "Invalid action. Use ?action=list-printers, ?action=print, ?action=print-uri, or ?action=print-zpl",
+    );
   } catch (error) {
-    console.error('PrintNode function error:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("PrintNode function error:", error);
+    return new Response(
+      JSON.stringify({
+        error: error.message,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });

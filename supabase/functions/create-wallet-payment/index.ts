@@ -1,13 +1,13 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { WalletPaymentSchema } from './validation.ts';
-import { ZodError } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { WalletPaymentSchema } from "./validation.ts";
+import { ZodError } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -17,7 +17,7 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
-    
+
     // Validate input with Zod
     const validated = WalletPaymentSchema.parse(requestBody);
     const { amount, companyId, savePaymentMethod } = validated;
@@ -34,9 +34,9 @@ serve(async (req) => {
 
     // Get company information
     const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('name, email')
-      .eq('id', companyId)
+      .from("companies")
+      .select("name, email")
+      .eq("id", companyId)
       .single();
 
     if (companyError) {
@@ -45,9 +45,9 @@ serve(async (req) => {
 
     // Check if customer exists in Stripe
     let customerId;
-    const customers = await stripe.customers.list({ 
+    const customers = await stripe.customers.list({
       email: company.email || `company-${companyId}@placeholder.com`,
-      limit: 1 
+      limit: 1,
     });
 
     if (customers.data.length > 0) {
@@ -64,18 +64,22 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
-    console.log(`Creating checkout session for company ${companyId}, amount: $${(amount / 100).toFixed(2)}`);
-    
+    console.log(
+      `Creating checkout session for company ${companyId}, amount: $${
+        (amount / 100).toFixed(2)
+      }`,
+    );
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      payment_method_types: ['card'], // Simplified to just cards for better loading
+      payment_method_types: ["card"], // Simplified to just cards for better loading
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: "usd",
             product_data: {
-              name: 'Wallet Top-up',
+              name: "Wallet Top-up",
               description: `Add $${(amount / 100).toFixed(2)} to wallet`,
             },
             unit_amount: amount, // amount in cents
@@ -83,16 +87,18 @@ serve(async (req) => {
           quantity: 1,
         },
       ],
-      mode: 'payment',
-      success_url: `${req.headers.get("origin")}/company-admin?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      mode: "payment",
+      success_url: `${
+        req.headers.get("origin")
+      }/company-admin?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/company-admin?canceled=true`,
       metadata: {
         company_id: companyId,
-        wallet_topup: 'true',
+        wallet_topup: "true",
       },
       ...(savePaymentMethod && {
         payment_intent_data: {
-          setup_future_usage: 'off_session',
+          setup_future_usage: "off_session",
         },
       }),
     });
@@ -104,31 +110,31 @@ serve(async (req) => {
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
-      }
+      },
     );
   } catch (error) {
     console.error("Error creating payment session:", error);
-    
+
     // Handle validation errors separately
     if (error instanceof ZodError) {
       return new Response(
-        JSON.stringify({ 
-          error: "Invalid request data", 
-          details: error.errors 
+        JSON.stringify({
+          error: "Invalid request data",
+          details: error.errors,
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400,
-        }
+        },
       );
     }
-    
+
     return new Response(
       JSON.stringify({ error: error.message }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
-      }
+      },
     );
   }
 });

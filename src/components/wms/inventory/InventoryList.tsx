@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { InventoryItem } from "@/hooks/useInventory";
-import { Package, MapPin, Calendar } from "lucide-react";
+import { Package, MapPin, Calendar, History } from "lucide-react";
+import { InventoryAuditTrailDialog } from "./InventoryAuditTrailDialog";
 
 interface InventoryListProps {
   inventory: InventoryItem[];
@@ -9,6 +12,9 @@ interface InventoryListProps {
 }
 
 export const InventoryList = ({ inventory, onSelectItem }: InventoryListProps) => {
+  const [auditItem, setAuditItem] = useState<InventoryItem | null>(null);
+  const [auditOpen, setAuditOpen] = useState(false);
+
   const getConditionColor = (condition: string) => {
     switch (condition) {
       case 'good': return 'bg-green-500/10 text-green-500';
@@ -52,6 +58,20 @@ export const InventoryList = ({ inventory, onSelectItem }: InventoryListProps) =
                   )}
                 </div>
               )}
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAuditItem(item);
+                  setAuditOpen(true);
+                }}
+              >
+                <History className="h-3 w-3 mr-1" />
+                Audit Trail
+              </Button>
             </div>
 
             <div className="text-right space-y-2">
@@ -80,6 +100,12 @@ export const InventoryList = ({ inventory, onSelectItem }: InventoryListProps) =
           </div>
         </Card>
       ))}
+
+      <InventoryAuditTrailDialog
+        open={auditOpen}
+        onOpenChange={setAuditOpen}
+        item={auditItem}
+      />
     </div>
   );
 };

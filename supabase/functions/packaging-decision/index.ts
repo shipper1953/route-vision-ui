@@ -62,10 +62,15 @@ interface RejectedCandidate {
 
 // ─── 3D Bin Packing (server-side port) ──────────────────────────────────────
 
-function checkItemsFit(items: Item[], box: Box): { success: boolean; usedVolume: number } {
+function checkItemsFit(
+  items: Item[],
+  box: Box,
+): { success: boolean; usedVolume: number } {
   // Geometric pre-check
   for (const item of items) {
-    const itemDims = [item.length, item.width, item.height].sort((a, b) => b - a);
+    const itemDims = [item.length, item.width, item.height].sort((a, b) =>
+      b - a
+    );
     const boxDims = [box.length, box.width, box.height].sort((a, b) => b - a);
     if (!itemDims.every((dim, i) => dim <= boxDims[i])) {
       return { success: false, usedVolume: 0 };
@@ -82,7 +87,7 @@ function checkItemsFit(items: Item[], box: Box): { success: boolean; usedVolume:
 
   const totalItemVolume = expanded.reduce(
     (sum, item) => sum + item.length * item.width * item.height,
-    0
+    0,
   );
   const boxVolume = box.length * box.width * box.height;
 
@@ -94,17 +99,27 @@ function checkItemsFit(items: Item[], box: Box): { success: boolean; usedVolume:
 
   // 3D bin packing (first-fit decreasing)
   const sorted = expanded.sort(
-    (a, b) =>
-      b.length * b.width * b.height - a.length * a.width * a.height
+    (a, b) => b.length * b.width * b.height - a.length * a.width * a.height,
   );
 
   interface Space {
-    x: number; y: number; z: number;
-    length: number; width: number; height: number;
+    x: number;
+    y: number;
+    z: number;
+    length: number;
+    width: number;
+    height: number;
   }
 
   const spaces: Space[] = [
-    { x: 0, y: 0, z: 0, length: box.length, width: box.width, height: box.height },
+    {
+      x: 0,
+      y: 0,
+      z: 0,
+      length: box.length,
+      width: box.width,
+      height: box.height,
+    },
   ];
 
   let usedVolume = 0;
@@ -128,14 +143,40 @@ function checkItemsFit(items: Item[], box: Box): { success: boolean; usedVolume:
           spaces.splice(si, 1);
 
           const newSpaces: Space[] = [];
-          if (space.length - o.l > 0)
-            newSpaces.push({ x: space.x + o.l, y: space.y, z: space.z, length: space.length - o.l, width: space.width, height: space.height });
-          if (space.width - o.w > 0)
-            newSpaces.push({ x: space.x, y: space.y + o.w, z: space.z, length: o.l, width: space.width - o.w, height: space.height });
-          if (space.height - o.h > 0)
-            newSpaces.push({ x: space.x, y: space.y, z: space.z + o.h, length: o.l, width: o.w, height: space.height - o.h });
+          if (space.length - o.l > 0) {
+            newSpaces.push({
+              x: space.x + o.l,
+              y: space.y,
+              z: space.z,
+              length: space.length - o.l,
+              width: space.width,
+              height: space.height,
+            });
+          }
+          if (space.width - o.w > 0) {
+            newSpaces.push({
+              x: space.x,
+              y: space.y + o.w,
+              z: space.z,
+              length: o.l,
+              width: space.width - o.w,
+              height: space.height,
+            });
+          }
+          if (space.height - o.h > 0) {
+            newSpaces.push({
+              x: space.x,
+              y: space.y,
+              z: space.z + o.h,
+              length: o.l,
+              width: o.w,
+              height: space.height - o.h,
+            });
+          }
 
-          newSpaces.sort((a, b) => a.length * a.width * a.height - b.length * b.width * b.height);
+          newSpaces.sort((a, b) =>
+            a.length * a.width * a.height - b.length * b.width * b.height
+          );
           spaces.splice(si, 0, ...newSpaces);
           packed = true;
           break;
@@ -155,7 +196,7 @@ function checkItemsFit(items: Item[], box: Box): { success: boolean; usedVolume:
 const MAX_UTILIZATION = 99;
 
 function scoreBox(
-  analysis: Omit<BoxAnalysis, "score" | "scoreBreakdown">
+  analysis: Omit<BoxAnalysis, "score" | "scoreBreakdown">,
 ): { score: number; scoreBreakdown: Record<string, number> } {
   const breakdown: Record<string, number> = {};
   // Primary metric: negative distance from 99% (closer to 99 = higher score)
@@ -181,7 +222,11 @@ function applyTieBreakers(a: BoxAnalysis, b: BoxAnalysis): number {
 }
 
 // Build a BoxAnalysis for a given item set + box, returns null if it doesn't fit
-function analyzeBoxForItems(items: Item[], box: Box, totalWeight: number): BoxAnalysis | null {
+function analyzeBoxForItems(
+  items: Item[],
+  box: Box,
+  totalWeight: number,
+): BoxAnalysis | null {
   if (box.max_weight < totalWeight) return null;
   const packResult = checkItemsFit(items, box);
   if (!packResult.success) return null;
@@ -238,7 +283,10 @@ interface PackageResult {
   total_weight: number;
 }
 
-function buildMultiPackages(items: Item[], boxes: Box[]): PackageResult[] | null {
+function buildMultiPackages(
+  items: Item[],
+  boxes: Box[],
+): PackageResult[] | null {
   // Expand items to unit quantities so the splitter can mix
   const units: Item[] = [];
   for (const item of items) {
@@ -248,7 +296,7 @@ function buildMultiPackages(items: Item[], boxes: Box[]): PackageResult[] | null
   }
   // Sort by volume desc
   units.sort(
-    (a, b) => b.length * b.width * b.height - a.length * a.width * a.height
+    (a, b) => b.length * b.width * b.height - a.length * a.width * a.height,
   );
 
   const packages: PackageResult[] = [];
@@ -318,7 +366,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     );
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -350,10 +398,13 @@ Deno.serve(async (req) => {
     const { order_id, items } = body as { order_id?: number; items: Item[] };
 
     if (!items?.length) {
-      return new Response(JSON.stringify({ error: "items array is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "items array is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // 1. Load tenant packaging policy
@@ -368,29 +419,40 @@ Deno.serve(async (req) => {
 
     const policy: TenantPolicy = policyRow
       ? {
-          optimization_objective: policyRow.optimization_objective,
-          tie_breaker_order: policyRow.tie_breaker_order || ["smallest_volume", "lowest_dim_weight", "lowest_cost"],
-          max_void_ratio: policyRow.max_void_ratio ?? 0.6,
-          fragility_rules: policyRow.fragility_rules || {},
-          policy_version_id: policyRow.policy_version_id,
-        }
+        optimization_objective: policyRow.optimization_objective,
+        tie_breaker_order: policyRow.tie_breaker_order ||
+          ["smallest_volume", "lowest_dim_weight", "lowest_cost"],
+        max_void_ratio: policyRow.max_void_ratio ?? 0.6,
+        fragility_rules: policyRow.fragility_rules || {},
+        policy_version_id: policyRow.policy_version_id,
+      }
       : {
-          optimization_objective: "smallest_fit",
-          tie_breaker_order: ["smallest_volume", "lowest_dim_weight", "lowest_cost"],
-          max_void_ratio: 0.6,
-          fragility_rules: {},
-          policy_version_id: null,
-        };
+        optimization_objective: "smallest_fit",
+        tie_breaker_order: [
+          "smallest_volume",
+          "lowest_dim_weight",
+          "lowest_cost",
+        ],
+        max_void_ratio: 0.6,
+        fragility_rules: {},
+        policy_version_id: null,
+      };
 
     // 2. Load company boxes
-    const { data: boxes } = await supabase.rpc("get_company_boxes_for_cartonization", {
-      p_company_id: companyId,
-    });
+    const { data: boxes } = await supabase.rpc(
+      "get_company_boxes_for_cartonization",
+      {
+        p_company_id: companyId,
+      },
+    );
 
     if (!boxes?.length) {
       return new Response(
         JSON.stringify({ error: "No active boxes found for company" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -398,10 +460,10 @@ Deno.serve(async (req) => {
     const totalWeight = items.reduce((s, i) => s + i.weight * i.quantity, 0);
     const totalVolume = items.reduce(
       (s, i) => s + i.length * i.width * i.height * i.quantity,
-      0
+      0,
     );
     const hasFragileItems = items.some(
-      (i) => i.fragility === "high" || i.fragility === "medium"
+      (i) => i.fragility === "high" || i.fragility === "medium",
     );
 
     // 3. Evaluate each box (single-package candidates, ≤99% utilization)
@@ -414,7 +476,9 @@ Deno.serve(async (req) => {
         rejectedCandidates.push({
           box_id: box.id,
           box_name: box.name,
-          reason: `Weight exceeds capacity (${totalWeight.toFixed(1)} > ${box.max_weight} lbs)`,
+          reason: `Weight exceeds capacity (${
+            totalWeight.toFixed(1)
+          } > ${box.max_weight} lbs)`,
           score: 0,
         });
         continue;
@@ -442,7 +506,9 @@ Deno.serve(async (req) => {
         rejectedCandidates.push({
           box_id: box.id,
           box_name: box.name,
-          reason: `Utilization ${utilization.toFixed(1)}% exceeds ${MAX_UTILIZATION}% cap`,
+          reason: `Utilization ${
+            utilization.toFixed(1)
+          }% exceeds ${MAX_UTILIZATION}% cap`,
           score: 0,
         });
         continue;
@@ -471,16 +537,22 @@ Deno.serve(async (req) => {
             error: "No boxes can fit the items (single or multi-package)",
             rejected_candidates: rejectedCandidates,
           }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
 
       const totalCost = multiPackages.reduce((s, p) => s + p.box.cost, 0);
-      const avgUtilization =
-        multiPackages.reduce((s, p) => s + p.utilization, 0) / multiPackages.length;
+      const avgUtilization = multiPackages.reduce((s, p) =>
+        s + p.utilization, 0) / multiPackages.length;
       const confidence = Math.max(
         0,
-        Math.min(100, Math.round(100 - Math.abs(MAX_UTILIZATION - avgUtilization)))
+        Math.min(
+          100,
+          Math.round(100 - Math.abs(MAX_UTILIZATION - avgUtilization)),
+        ),
       );
 
       const primary = multiPackages[0];
@@ -489,7 +561,7 @@ Deno.serve(async (req) => {
       if (order_id) {
         const serviceClient = createClient(
           Deno.env.get("SUPABASE_URL")!,
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
         );
         await serviceClient.from("order_cartonization").upsert(
           {
@@ -510,7 +582,10 @@ Deno.serve(async (req) => {
             items_weight: totalWeight,
             box_weight: 0,
             optimization_objective: policy.optimization_objective,
-            score_breakdown: { target_utilization: MAX_UTILIZATION, average_utilization: avgUtilization },
+            score_breakdown: {
+              target_utilization: MAX_UTILIZATION,
+              average_utilization: avgUtilization,
+            },
             rejected_candidates: rejectedCandidates.slice(0, 20),
             policy_version_id: policy.policy_version_id,
             algorithm_version: ALGORITHM_VERSION,
@@ -519,7 +594,7 @@ Deno.serve(async (req) => {
             total_packages: multiPackages.length,
             splitting_strategy: "greedy_99_target",
           },
-          { onConflict: "order_id" }
+          { onConflict: "order_id" },
         );
       }
 
@@ -549,7 +624,12 @@ Deno.serve(async (req) => {
             algorithm_version: ALGORITHM_VERSION,
             policy_version_id: policy.policy_version_id,
             optimization_objective: policy.optimization_objective,
-            tie_breakers: ["distance_from_99", "lowest_dim_weight", "lowest_cost", "smallest_volume"],
+            tie_breakers: [
+              "distance_from_99",
+              "lowest_dim_weight",
+              "lowest_cost",
+              "smallest_volume",
+            ],
             total_weight: totalWeight,
             total_volume: totalVolume,
             boxes_evaluated: (boxes as Box[]).length,
@@ -557,7 +637,10 @@ Deno.serve(async (req) => {
             target_utilization: MAX_UTILIZATION,
           },
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -574,7 +657,11 @@ Deno.serve(async (req) => {
       rejectedCandidates.push({
         box_id: analyses[i].box.id,
         box_name: analyses[i].box.name,
-        reason: `Further from ${MAX_UTILIZATION}% target than ${analyses[0].box.name} (${analyses[i].utilization.toFixed(1)}% vs ${analyses[0].utilization.toFixed(1)}%)`,
+        reason: `Further from ${MAX_UTILIZATION}% target than ${
+          analyses[0].box.name
+        } (${analyses[i].utilization.toFixed(1)}% vs ${
+          analyses[0].utilization.toFixed(1)
+        }%)`,
         score: analyses[i].score,
       });
     }
@@ -596,13 +683,16 @@ Deno.serve(async (req) => {
 
     const confidence = Math.max(
       0,
-      Math.min(100, Math.round(100 - Math.abs(MAX_UTILIZATION - recommended.utilization)))
+      Math.min(
+        100,
+        Math.round(100 - Math.abs(MAX_UTILIZATION - recommended.utilization)),
+      ),
     );
 
     if (order_id) {
       const serviceClient = createClient(
         Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       );
 
       await serviceClient.from("order_cartonization").upsert(
@@ -632,7 +722,7 @@ Deno.serve(async (req) => {
           packages: [],
           total_packages: 1,
         },
-        { onConflict: "order_id" }
+        { onConflict: "order_id" },
       );
     }
 
@@ -655,7 +745,12 @@ Deno.serve(async (req) => {
         algorithm_version: ALGORITHM_VERSION,
         policy_version_id: policy.policy_version_id,
         optimization_objective: policy.optimization_objective,
-        tie_breakers: ["distance_from_99", "lowest_dim_weight", "lowest_cost", "smallest_volume"],
+        tie_breakers: [
+          "distance_from_99",
+          "lowest_dim_weight",
+          "lowest_cost",
+          "smallest_volume",
+        ],
         total_weight: totalWeight,
         total_volume: totalVolume,
         boxes_evaluated: (boxes as Box[]).length,
@@ -671,8 +766,13 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Packaging decision error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Internal error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Internal error",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 });

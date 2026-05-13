@@ -1,22 +1,23 @@
-import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const EASYSHIP_PROD_BASE_URL = 'https://public-api.easyship.com';
-const EASYSHIP_SANDBOX_BASE_URL = 'https://public-api-sandbox.easyship.com';
+const EASYSHIP_PROD_BASE_URL = "https://public-api.easyship.com";
+const EASYSHIP_SANDBOX_BASE_URL = "https://public-api-sandbox.easyship.com";
 
 function resolveEasyshipBaseUrl(apiKey: string): string {
-  const configuredBaseUrl = Deno.env.get('EASYSHIP_API_BASE_URL');
+  const configuredBaseUrl = Deno.env.get("EASYSHIP_API_BASE_URL");
   if (configuredBaseUrl) {
     return configuredBaseUrl;
   }
 
   // Easyship sandbox keys use the "sand_" prefix and must target the sandbox domain.
-  if (apiKey.startsWith('sand_')) {
+  if (apiKey.startsWith("sand_")) {
     return EASYSHIP_SANDBOX_BASE_URL;
   }
 
@@ -24,16 +25,19 @@ function resolveEasyshipBaseUrl(apiKey: string): string {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const apiKey = Deno.env.get('EASYSHIP_API_KEY');
+    const apiKey = Deno.env.get("EASYSHIP_API_KEY");
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: 'Easyship API key not configured' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        JSON.stringify({ error: "Easyship API key not configured" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        },
       );
     }
 
@@ -41,8 +45,11 @@ serve(async (req) => {
     const shipmentData = body.shipmentData || body.shipment_data;
     if (!shipmentData) {
       return new Response(
-        JSON.stringify({ error: 'shipmentData is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        JSON.stringify({ error: "shipmentData is required" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        },
       );
     }
 
@@ -64,27 +71,27 @@ serve(async (req) => {
     const payload = {
       origin_address: {
         line_1: from.street1,
-        line_2: from.street2 || '',
+        line_2: from.street2 || "",
         city: from.city,
         state: from.state,
         postal_code: from.zip,
-        country_alpha2: (from.country || 'US').toUpperCase(),
-        contact_name: from.name || 'Sender',
-        company_name: from.company || '',
-        contact_phone: from.phone || '5555555555',
-        contact_email: from.email || 'sender@example.com',
+        country_alpha2: (from.country || "US").toUpperCase(),
+        contact_name: from.name || "Sender",
+        company_name: from.company || "",
+        contact_phone: from.phone || "5555555555",
+        contact_email: from.email || "sender@example.com",
       },
       destination_address: {
         line_1: to.street1,
-        line_2: to.street2 || '',
+        line_2: to.street2 || "",
         city: to.city,
         state: to.state,
         postal_code: to.zip,
-        country_alpha2: (to.country || 'US').toUpperCase(),
-        contact_name: to.name || 'Recipient',
-        company_name: to.company || '',
-        contact_phone: to.phone || '5555555555',
-        contact_email: to.email || 'recipient@example.com',
+        country_alpha2: (to.country || "US").toUpperCase(),
+        contact_name: to.name || "Recipient",
+        company_name: to.company || "",
+        contact_phone: to.phone || "5555555555",
+        contact_email: to.email || "recipient@example.com",
       },
       parcels: [
         {
@@ -93,15 +100,15 @@ serve(async (req) => {
             length: lengthCm,
             width: widthCm,
             height: heightCm,
-            slug: 'custom',
+            slug: "custom",
           },
           items: [
             {
-              description: 'Merchandise',
-              hs_code: '420299', // Generic merchandise HS code (other articles)
+              description: "Merchandise",
+              hs_code: "420299", // Generic merchandise HS code (other articles)
               quantity: 1,
               actual_weight: weightKg,
-              declared_currency: 'USD',
+              declared_currency: "USD",
               declared_customs_value: 1,
               dimensions: {
                 length: lengthCm,
@@ -112,24 +119,27 @@ serve(async (req) => {
           ],
         },
       ],
-      incoterms: 'DDU',
+      incoterms: "DDU",
       courier_settings: {
         show_courier_logo_url: true,
         apply_shipping_rules: true,
       },
       shipping_settings: {
         units: {
-          weight: 'kg',
-          dimensions: 'cm',
+          weight: "kg",
+          dimensions: "cm",
         },
-        output_currency: 'USD',
+        output_currency: "USD",
       },
       // Skip tax/duty lookup for domestic shipments (faster + avoids unnecessary calculations)
-      calculate_tax_and_duties:
-        (from.country || 'US').toUpperCase() !== (to.country || 'US').toUpperCase(),
+      calculate_tax_and_duties: (from.country || "US").toUpperCase() !==
+        (to.country || "US").toUpperCase(),
     };
 
-    console.log('📡 Easyship rates request:', JSON.stringify(payload).slice(0, 500));
+    console.log(
+      "📡 Easyship rates request:",
+      JSON.stringify(payload).slice(0, 500),
+    );
 
     const easyshipBaseUrl = resolveEasyshipBaseUrl(apiKey);
     console.log(`🌐 Easyship base URL: ${easyshipBaseUrl}`);
@@ -140,18 +150,23 @@ serve(async (req) => {
     const maxAttempts = 4;
     while (true) {
       response = await fetch(`${easyshipBaseUrl}/2024-09/rates`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "Accept": "application/json",
         },
         body: JSON.stringify(payload),
       });
 
       if (response.status !== 429 || attempt >= maxAttempts - 1) break;
-      const delay = Math.min(2000 * Math.pow(2, attempt), 8000) + Math.floor(Math.random() * 500);
-      console.warn(`⏳ Easyship 429, retrying in ${delay}ms (attempt ${attempt + 1}/${maxAttempts})`);
+      const delay = Math.min(2000 * Math.pow(2, attempt), 8000) +
+        Math.floor(Math.random() * 500);
+      console.warn(
+        `⏳ Easyship 429, retrying in ${delay}ms (attempt ${
+          attempt + 1
+        }/${maxAttempts})`,
+      );
       await new Promise((r) => setTimeout(r, delay));
       attempt++;
     }
@@ -164,44 +179,59 @@ serve(async (req) => {
       data = { raw: text };
     }
 
-    const noSolutionsAvailable = response.status === 422
-      && data?.error?.code === 'invalid_content'
-      && Array.isArray(data?.error?.details)
-      && data.error.details.some((detail: string) => /no shipping solutions available/i.test(detail));
+    const noSolutionsAvailable = response.status === 422 &&
+      data?.error?.code === "invalid_content" &&
+      Array.isArray(data?.error?.details) &&
+      data.error.details.some((detail: string) =>
+        /no shipping solutions available/i.test(detail)
+      );
 
     if (noSolutionsAvailable) {
-      console.warn('⚠️ Easyship returned no shipping solutions for this shipment lane');
-      return new Response(JSON.stringify({
-        object_id: `easyship_${Date.now()}`,
-        rates: [],
-        unavailable_reason: 'no_shipping_solutions',
-        raw: data,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
+      console.warn(
+        "⚠️ Easyship returned no shipping solutions for this shipment lane",
+      );
+      return new Response(
+        JSON.stringify({
+          object_id: `easyship_${Date.now()}`,
+          rates: [],
+          unavailable_reason: "no_shipping_solutions",
+          raw: data,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        },
+      );
     }
 
     if (!response.ok) {
-      console.error('Easyship rates error:', response.status, data);
+      console.error("Easyship rates error:", response.status, data);
       return new Response(
-        JSON.stringify({ error: 'Easyship API error', status: response.status, details: data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
+        JSON.stringify({
+          error: "Easyship API error",
+          status: response.status,
+          details: data,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: response.status,
+        },
       );
     }
 
     const rates = (data.rates || []).map((r: any, idx: number) => {
       const courierService = r.courier_service || {};
       const courierId = r.courier_id || courierService.courier_id || r.id;
-      const carrierName = r.courier_name || courierService.umbrella_name || courierService.name || 'Easyship';
-      const serviceName = r.service_name || courierService.name || r.full_description || carrierName;
+      const carrierName = r.courier_name || courierService.umbrella_name ||
+        courierService.name || "Easyship";
+      const serviceName = r.service_name || courierService.name ||
+        r.full_description || carrierName;
       const courierLogoUrl = r.courier_logo_url || courierService.logo;
 
       // CRITICAL: each rate must have a UNIQUE id. Easyship returns the same courier_id
       // for every service from the same carrier (e.g. all FedEx services share one courier_id),
       // so we must derive the rate id from the per-service id, not the courier id.
-      const serviceLevelId =
-        courierService.id ||
+      const serviceLevelId = courierService.id ||
         r.courier_service_id ||
         r.id ||
         `${courierId}-${serviceName}-${idx}`;
@@ -215,7 +245,7 @@ serve(async (req) => {
         courier_logo_url: courierLogoUrl,
         service_name: serviceName,
         total_charge: r.total_charge,
-        currency: r.currency || 'USD',
+        currency: r.currency || "USD",
         min_delivery_time: r.min_delivery_time,
         max_delivery_time: r.max_delivery_time,
         delivery_days: r.max_delivery_time || r.min_delivery_time,
@@ -237,14 +267,20 @@ serve(async (req) => {
     console.log(`✅ Easyship returned ${rates.length} rates`);
 
     return new Response(JSON.stringify(responsePayload), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (err) {
-    console.error('💥 create-easyship-shipment error:', err);
+    console.error("💥 create-easyship-shipment error:", err);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: err instanceof Error ? err.message : String(err) }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({
+        error: "Internal server error",
+        details: err instanceof Error ? err.message : String(err),
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      },
     );
   }
 });
