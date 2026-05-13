@@ -27,7 +27,10 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
     weight: '',
     category: '',
     customerId: undefined as string | undefined,
-    isActive: true
+    isActive: true,
+    eachesPerInnerpack: '1',
+    eachesPerCase: '1',
+    eachesPerPallet: '1'
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,7 +50,13 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
       weight: parseFloat(formData.weight),
       category: formData.category || 'General',
       customerId: formData.customerId || undefined,
-      isActive: formData.isActive
+      isActive: formData.isActive,
+      uomEaches: {
+        each: 1,
+        innerpack: Math.max(1, parseInt(formData.eachesPerInnerpack) || 1),
+        case: Math.max(1, parseInt(formData.eachesPerCase) || 1),
+        pallet: Math.max(1, parseInt(formData.eachesPerPallet) || 1),
+      }
     };
 
     try {
@@ -61,7 +70,10 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
         weight: '',
         category: '',
         customerId: undefined,
-        isActive: true
+        isActive: true,
+        eachesPerInnerpack: '1',
+        eachesPerCase: '1',
+        eachesPerPallet: '1'
       });
       onClose();
       toast.success('Item created successfully');
@@ -181,6 +193,21 @@ export const CreateItemDialog = ({ isOpen, onClose, onCreateItem }: CreateItemDi
               onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
               placeholder="0.0"
             />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="eachesPerInnerpack">Eaches / Innerpack</Label>
+              <Input id="eachesPerInnerpack" type="number" min="1" value={formData.eachesPerInnerpack} onChange={(e) => setFormData({ ...formData, eachesPerInnerpack: e.target.value })} />
+            </div>
+            <div>
+              <Label htmlFor="eachesPerCase">Eaches / Case</Label>
+              <Input id="eachesPerCase" type="number" min="1" value={formData.eachesPerCase} onChange={(e) => setFormData({ ...formData, eachesPerCase: e.target.value })} />
+            </div>
+            <div>
+              <Label htmlFor="eachesPerPallet">Eaches / Pallet</Label>
+              <Input id="eachesPerPallet" type="number" min="1" value={formData.eachesPerPallet} onChange={(e) => setFormData({ ...formData, eachesPerPallet: e.target.value })} />
+            </div>
           </div>
 
           <div className="flex items-center space-x-2">

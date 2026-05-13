@@ -101,23 +101,50 @@ export const usePurchaseOrders = () => {
     poData: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>,
     lineItems: PurchaseOrderLineItem[]
   ) => {
+    let createdPoId: string | null = null;
     try {
       setLoading(true);
+
+      const validLineItems = lineItems.filter((item) => item.item_id && item.quantity_ordered > 0);
+      if (validLineItems.length === 0) {
+        toast.error('Add at least one valid SKU line with quantity greater than 0');
+        return null;
+      }
+
+      const poNumber = (poData.po_number || '').trim();
+      if (!poNumber) {
+        toast.error('PO number is required');
+        return null;
+      }
+
+      const { data: existingPo } = await supabase
+        .from('purchase_orders' as any)
+        .select('id, po_number')
+        .eq('company_id', userProfile?.company_id)
+        .eq('po_number', poNumber)
+        .maybeSingle();
+
+      if (existingPo) {
+        toast.error(`PO ${poNumber} already exists. Open that PO or use a new number.`);
+        return null;
+      }
 
       // Create PO
       const { data: po, error: poError } = await supabase
         .from('purchase_orders' as any)
         .insert([{
           ...poData,
+          po_number: poNumber,
           created_by: userProfile?.id
         }])
         .select()
         .single();
 
       if (poError) throw poError;
+      createdPoId = (po as any).id;
 
       // Create line items
-      const lineItemsWithPoId = lineItems.map((item, index) => ({
+      const lineItemsWithPoId = validLineItems.map((item, index) => ({
         ...item,
         po_id: (po as any).id,
         line_number: index + 1
@@ -134,6 +161,12 @@ export const usePurchaseOrders = () => {
       return po as unknown as PurchaseOrder;
     } catch (error: any) {
       console.error('Error creating purchase order:', error);
+
+      // Keep PO + lines creation atomic from the UI perspective.
+      if (createdPoId) {
+        await supabase.from('purchase_orders' as any).delete().eq('id', createdPoId);
+      }
+
       toast.error(error.message || 'Failed to create purchase order');
       return null;
     } finally {

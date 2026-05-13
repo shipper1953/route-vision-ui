@@ -68,6 +68,9 @@ const Receiving = () => {
   const handleReceiveItem = async (data: {
     uom: string;
     quantity: number;
+    damagedQuantity: number;
+    nonCompliantQuantity: number;
+    nonComplianceReason?: string;
     lotNumber?: string;
     serialNumbers?: string[];
     condition: string;
@@ -83,6 +86,9 @@ const Receiving = () => {
       lotNumber: data.lotNumber,
       serialNumbers: data.serialNumbers,
       condition: data.condition,
+      damagedQuantity: data.damagedQuantity,
+      nonCompliantQuantity: data.nonCompliantQuantity,
+      nonComplianceReason: data.nonComplianceReason,
       qcRequired: false
     });
 
