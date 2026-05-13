@@ -14,18 +14,6 @@ function sortedDesc(d: Dims): [number, number, number] {
   return [d.length, d.width, d.height].sort((a, b) => b - a) as [number, number, number];
 }
 
-// Per-item fit: each item's longest side must fit the box's longest side, etc.
-// (Simple bounding-box rotation check — not a true 3D bin packer, but catches the
-// common bug where a long item is "fit" into a small box because volume math passes.)
-function allItemsFitInBox(items: ItemDims[], box: Dims): boolean {
-  const [bL, bW, bH] = sortedDesc(box);
-  for (const it of items) {
-    const [iL, iW, iH] = sortedDesc(it);
-    if (iL > bL || iW > bW || iH > bH) return false;
-  }
-  return true;
-}
-
 function totalItemVolume(items: ItemDims[]): number {
   let v = 0;
   for (const it of items) {
@@ -42,6 +30,86 @@ function utilizationPct(items: ItemDims[], box: Dims): number {
   const bv = boxVolume(box);
   if (bv <= 0) return 0;
   return Math.min(100, (totalItemVolume(items) / bv) * 100);
+}
+
+function expandItems(items: ItemDims[]): Dims[] {
+  const units: Dims[] = [];
+  for (const item of items) {
+    for (let i = 0; i < (item.quantity || 1); i++) {
+      units.push({ length: item.length, width: item.width, height: item.height });
+    }
+  }
+  return units.sort(
+    (a, b) => (b.length * b.width * b.height) - (a.length * a.width * a.height)
+  );
+}
+
+// 3D first-fit decreasing packer aligned with packaging-decision behavior.
+function packedVolume3D(items: ItemDims[], box: Dims): number | null {
+  const [bL, bW, bH] = sortedDesc(box);
+  const boxVolume = bL * bW * bH;
+  const itemVolume = totalItemVolume(items);
+  if (itemVolume > boxVolume) return null;
+
+  const units = expandItems(items);
+  interface Space {
+    x: number; y: number; z: number;
+    length: number; width: number; height: number;
+  }
+  const spaces: Space[] = [{ x: 0, y: 0, z: 0, length: bL, width: bW, height: bH }];
+  let usedVolume = 0;
+
+  for (const item of units) {
+    const [iL, iW, iH] = sortedDesc(item);
+    let packed = false;
+
+    for (let si = 0; si < spaces.length && !packed; si++) {
+      const space = spaces[si];
+      const orientations = [
+        { l: iL, w: iW, h: iH },
+        { l: iL, w: iH, h: iW },
+        { l: iW, w: iL, h: iH },
+        { l: iW, w: iH, h: iL },
+        { l: iH, w: iL, h: iW },
+        { l: iH, w: iW, h: iL },
+      ];
+
+      for (const o of orientations) {
+        if (o.l <= space.length && o.w <= space.width && o.h <= space.height) {
+          usedVolume += o.l * o.w * o.h;
+          spaces.splice(si, 1);
+
+          const newSpaces: Space[] = [];
+          if (space.length - o.l > 0) {
+            newSpaces.push({ x: space.x + o.l, y: space.y, z: space.z, length: space.length - o.l, width: space.width, height: space.height });
+          }
+          if (space.width - o.w > 0) {
+            newSpaces.push({ x: space.x, y: space.y + o.w, z: space.z, length: o.l, width: space.width - o.w, height: space.height });
+          }
+          if (space.height - o.h > 0) {
+            newSpaces.push({ x: space.x, y: space.y, z: space.z + o.h, length: o.l, width: o.w, height: space.height - o.h });
+          }
+
+          newSpaces.sort((a, b) => (a.length * a.width * a.height) - (b.length * b.width * b.height));
+          spaces.splice(si, 0, ...newSpaces);
+          packed = true;
+          break;
+        }
+      }
+    }
+
+    if (!packed) return null;
+  }
+
+  return usedVolume;
+}
+
+function utilizationPct3D(items: ItemDims[], box: Dims): number {
+  const usedVolume = packedVolume3D(items, box);
+  if (usedVolume === null) return 0;
+  const bv = boxVolume(box);
+  if (bv <= 0) return 0;
+  return Math.min(100, (usedVolume / bv) * 100);
 }
 
 // Normalize an order item into a usable {length,width,height,quantity}.
@@ -120,8 +188,6 @@ serve(async (req) => {
       cost: number | null;
       created_at: string;
       order_items: any[];
-      recommended_box_data: any | null;
-      recommended_utilization: number | null;
     }> = [];
 
     if (allShipments && allShipments.length > 0) {
@@ -141,21 +207,10 @@ serve(async (req) => {
         if (o.shipment_id != null) ordersByShipment.set(o.shipment_id, o);
       });
 
-      const orderIds = (orders || []).map(o => o.id);
-      const cartonizationByOrderId = new Map<number, any>();
-      if (orderIds.length > 0) {
-        const { data: cartonizations } = await supabase
-          .from('order_cartonization')
-          .select('order_id, recommended_box_data, utilization')
-          .in('order_id', orderIds);
-        (cartonizations || []).forEach(c => cartonizationByOrderId.set(Number(c.order_id), c));
-      }
-
       for (const shipment of allShipments) {
         const order = ordersByShipment.get(shipment.id);
         if (!order) continue;
         if (!Array.isArray(order.items) || order.items.length === 0) continue;
-        const cartonization = cartonizationByOrderId.get(Number(order.id));
         matchedShipments.push({
           shipment_id: shipment.id,
           order_id: order.order_id,
@@ -165,8 +220,6 @@ serve(async (req) => {
           cost: shipment.cost,
           created_at: shipment.created_at,
           order_items: order.items,
-          recommended_box_data: cartonization?.recommended_box_data ?? null,
-          recommended_utilization: cartonization?.utilization ?? null,
         });
       }
     }
@@ -231,6 +284,29 @@ serve(async (req) => {
       }
     });
 
+    // Load packaging master list as the recommendation candidate pool.
+    const { data: masterBoxes, error: masterBoxesError } = await supabase
+      .from('packaging_master_list')
+      .select('vendor_sku, name, length_in, width_in, height_in, cost')
+      .eq('is_active', true);
+
+    if (masterBoxesError) throw new Error(`Master box query failed: ${masterBoxesError.message}`);
+
+    const masterCandidates = (masterBoxes || [])
+      .map((box) => ({
+        sku: String(box.vendor_sku || '').trim(),
+        name: String(box.name || box.vendor_sku || '').trim(),
+        dims: {
+          length: Number(box.length_in),
+          width: Number(box.width_in),
+          height: Number(box.height_in),
+        },
+        cost: Number(box.cost) || 0,
+      }))
+      .filter((box) => box.sku && box.dims.length > 0 && box.dims.width > 0 && box.dims.height > 0);
+
+    console.log(`📚 Loaded ${masterCandidates.length} active packaging master candidates`);
+
     // Resolve the actual box used (dims + cost) for a shipment.
     // Priority: company boxes -> raw package_dimensions.
     function resolveActualBox(actualSku: string, packageDims: any): { dims: Dims; cost: number; source: 'company' | 'package_dims' } | null {
@@ -253,8 +329,8 @@ serve(async (req) => {
     }
 
     // ============ Analyze each shipment ============
-    // Use canonical recommendation from order_cartonization (generated by
-    // packaging-decision) to keep intelligence aligned with operational logic.
+    // Compare the actual package used against master-list candidate boxes using
+    // the same 3D first-fit logic as packaging-decision.
     const masterBoxOpportunities: Record<string, {
       master_box_sku: string;
       master_box_name: string;
@@ -287,32 +363,47 @@ serve(async (req) => {
 
       const actual = resolveActualBox(shipment.actual_package_sku, shipment.package_dimensions);
       if (!actual) continue;
-      if (!shipment.recommended_box_data) continue;
 
-      const actualUtil = utilizationPct(items, actual.dims);
+      const actualUtil = utilizationPct3D(items, actual.dims) || utilizationPct(items, actual.dims);
       if (actualUtil > 0) {
         totalUtilization += actualUtil;
         utilizationCount++;
       }
 
-      const recommendedBox = shipment.recommended_box_data;
-      const recDims = {
-        length: Number(recommendedBox.length),
-        width: Number(recommendedBox.width),
-        height: Number(recommendedBox.height)
-      };
-      if (!recDims.length || !recDims.width || !recDims.height) continue;
+      const rankedMasterBoxes = masterCandidates
+        .map((candidate) => {
+          const util = utilizationPct3D(items, candidate.dims);
+          if (util <= 0 || util > 99) return null;
+          return {
+            sku: candidate.sku,
+            name: candidate.name,
+            cost: candidate.cost,
+            utilization: util,
+            volume: boxVolume(candidate.dims),
+          };
+        })
+        .filter((box): box is { sku: string; name: string; cost: number; utilization: number; volume: number } => box !== null)
+        .sort((a, b) => {
+          const scoreA = Math.abs(99 - a.utilization);
+          const scoreB = Math.abs(99 - b.utilization);
+          if (Math.abs(scoreA - scoreB) > 0.01) return scoreA - scoreB;
+          if (Math.abs(a.volume - b.volume) > 0.01) return a.volume - b.volume;
+          return a.cost - b.cost;
+        });
 
-      // Safety guard: ensure recommended box can fit order items geometrically.
-      if (!allItemsFitInBox(items, recDims)) continue;
+      if (!rankedMasterBoxes.length) continue;
 
-      const newUtil = Number(shipment.recommended_utilization ?? utilizationPct(items, recDims));
+      const bestMaster = rankedMasterBoxes[0];
+      const newUtil = bestMaster.utilization;
       const improvement = newUtil - actualUtil;
-      const recommendedSku = recommendedBox.sku || recommendedBox.id || recommendedBox.name;
-      const recommendedCost = Number(recommendedBox.cost || 0);
+      const recommendedSku = bestMaster.sku;
+      const recommendedCost = bestMaster.cost;
 
       let hasOpportunity = false;
-      if (improvement >= MIN_IMPROVEMENT_PP && recommendedSku !== shipment.actual_package_sku) {
+      if (
+        improvement >= MIN_IMPROVEMENT_PP &&
+        recommendedSku.trim().toUpperCase() !== String(shipment.actual_package_sku || '').trim().toUpperCase()
+      ) {
         hasOpportunity = true;
         const savings = Math.max(0, actual.cost - recommendedCost);
 
@@ -320,7 +411,7 @@ serve(async (req) => {
         if (!masterBoxOpportunities[key]) {
           masterBoxOpportunities[key] = {
             master_box_sku: key,
-            master_box_name: recommendedBox.name || key,
+            master_box_name: bestMaster.name || key,
             master_box_cost: recommendedCost,
             shipments: [],
             total_improvement: 0,
