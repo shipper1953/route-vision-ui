@@ -41,14 +41,24 @@ export const ShopifyFulfillmentMapping = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("shopify_stores")
-      .select("id, company_id, store_name, store_url, is_active, fulfillment_service_id, fulfillment_location_id, fulfillment_location_name, fulfillment_service_location_id, companies:company_id(name)")
+      .select("id, company_id, store_name, store_url, is_active, fulfillment_service_id, fulfillment_location_id, fulfillment_location_name, fulfillment_service_location_id")
       .order("created_at", { ascending: false });
     if (error) {
       toast({ title: "Failed to load stores", description: error.message, variant: "destructive" });
       setLoading(false);
       return;
     }
-    setStores(((data || []) as any[]).map((s) => ({ ...s, company_name: s.companies?.name })));
+    const rows = (data || []) as StoreRow[];
+    const companyIds = Array.from(new Set(rows.map((r) => r.company_id).filter(Boolean)));
+    let companyMap: Record<string, string> = {};
+    if (companyIds.length) {
+      const { data: comps } = await supabase
+        .from("companies")
+        .select("id, name")
+        .in("id", companyIds);
+      companyMap = Object.fromEntries((comps || []).map((c: any) => [c.id, c.name]));
+    }
+    setStores(rows.map((s) => ({ ...s, company_name: companyMap[s.company_id] })));
     setLoading(false);
   };
 
