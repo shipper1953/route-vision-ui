@@ -74,7 +74,8 @@ export const useItemMaster = () => {
         
         // Global IDs
         shopifyProductGid: item.shopify_product_gid,
-        shopifyVariantGid: item.shopify_variant_gid
+        shopifyVariantGid: item.shopify_variant_gid,
+        uomEaches: (item as any).uom_eaches || { each: 1, innerpack: 1, case: 1, pallet: 1 }
       }));
       
       setItems(mappedItems);
@@ -106,7 +107,8 @@ export const useItemMaster = () => {
           category: itemData.category,
           is_active: itemData.isActive,
           customer_id: itemData.customerId || null,
-          company_id: userProfile.company_id
+          company_id: userProfile.company_id,
+          uom_eaches: itemData.uomEaches || { each: 1, innerpack: 1, case: 1, pallet: 1 }
         })
         .select()
         .single();
@@ -127,7 +129,8 @@ export const useItemMaster = () => {
         dimensionsUpdatedAt: data.dimensions_updated_at,
         customerId: data.customer_id,
         shopifyProductId: data.shopify_product_id,
-        shopifyVariantId: data.shopify_variant_id
+        shopifyVariantId: data.shopify_variant_id,
+        uomEaches: (data as any).uom_eaches || { each: 1, innerpack: 1, case: 1, pallet: 1 }
       };
 
       setItems(prev => [...prev, newItem]);
@@ -154,7 +157,8 @@ export const useItemMaster = () => {
           weight: updatedItem.weight,
           category: updatedItem.category,
           is_active: updatedItem.isActive,
-          customer_id: updatedItem.customerId || null
+          customer_id: updatedItem.customerId || null,
+          uom_eaches: updatedItem.uomEaches || { each: 1, innerpack: 1, case: 1, pallet: 1 }
         })
         .eq('id', updatedItem.id);
 
