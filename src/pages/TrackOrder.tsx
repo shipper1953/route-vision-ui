@@ -73,6 +73,15 @@ export default function TrackOrder() {
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
+      <Helmet>
+        <title>Track Your Package — Ship Tornado</title>
+        <meta name="description" content="Track your shipment in real time with Ship Tornado. Enter your tracking number to see live status and delivery updates." />
+        <link rel="canonical" href="https://ship-tornado.lovable.app/track" />
+        <meta property="og:title" content="Track Your Package — Ship Tornado" />
+        <meta property="og:description" content="Real-time shipping updates and delivery tracking." />
+        <meta property="og:url" content="https://ship-tornado.lovable.app/track" />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <div className="container mx-auto px-4 py-12 max-w-6xl">
         {/* Header */}
         <div className="text-center mb-12">
