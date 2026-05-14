@@ -78,6 +78,14 @@ serve(async (req) => {
       });
     }
 
+    // SECURITY: caller must belong to the company being credited
+    const { data: cp } = await supabase
+      .from("users").select("company_id, role").eq("id", caller.id).single();
+    if (cp?.role !== "super_admin" && cp?.company_id !== derivedCompanyId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403,
+      });
+    }
     const amountDollars = (session.amount_total || 0) / 100;
 
     // Idempotency: if a transaction with this payment_intent already exists, don't credit again
