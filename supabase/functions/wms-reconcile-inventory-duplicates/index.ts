@@ -23,12 +23,13 @@ type Row = {
   created_at: string;
 };
 
+// Dedup by SKU identity: same item + customer + condition + lot/serial.
+// Warehouse and location are intentionally excluded so cross-warehouse
+// duplicates of the same SKU collapse into a single row (the earliest one wins).
 const keyOf = (r: Row) =>
   [
-    r.warehouse_id,
     r.item_id,
     r.customer_id ?? "",
-    r.location_id ?? "",
     r.condition ?? "",
     r.lot_number ?? "",
     r.serial_number ?? "",
