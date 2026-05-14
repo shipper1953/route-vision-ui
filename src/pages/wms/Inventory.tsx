@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useInventory, InventoryItem } from "@/hooks/useInventory";
 import { InventoryList } from "@/components/wms/inventory/InventoryList";
 import { InventoryItemDialog } from "@/components/wms/inventory/InventoryItemDialog";
-import { Search, Plus, RefreshCw } from "lucide-react";
+import { Search, Plus, RefreshCw, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
