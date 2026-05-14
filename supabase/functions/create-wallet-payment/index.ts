@@ -16,11 +16,38 @@ serve(async (req) => {
   }
 
   try {
-    const requestBody = await req.json();
+    // SECURITY: authenticate caller
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401,
+      });
+    }
+    const sbUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const userClient = createClient(sbUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user: caller } } = await userClient.auth.getUser();
+    if (!caller) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401,
+      });
+    }
 
-    // Validate input with Zod
+    const requestBody = await req.json();
     const validated = WalletPaymentSchema.parse(requestBody);
     const { amount, companyId, savePaymentMethod } = validated;
+
+    // SECURITY: caller must belong to the company
+    const supabaseAuth = createClient(sbUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: cp } = await supabaseAuth.from("users")
+      .select("company_id, role").eq("id", caller.id).single();
+    if (cp?.role !== "super_admin" && cp?.company_id !== companyId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403,
+      });
+    }
 
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {

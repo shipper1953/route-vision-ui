@@ -14,10 +14,39 @@ serve(async (req) => {
   }
 
   try {
+    // SECURITY: authenticate caller
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401,
+      });
+    }
+    const sbUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const userClient = createClient(sbUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user: caller } } = await userClient.auth.getUser();
+    if (!caller) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401,
+      });
+    }
+
     const { action, amount, companyId, paymentMethodId } = await req.json();
 
     if (!companyId) throw new Error("companyId is required");
     if (!action) throw new Error("Action is required ('setup' or 'topup')");
+
+    // SECURITY: caller must belong to the company
+    const supabaseAuth = createClient(sbUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+    const { data: cp } = await supabaseAuth.from("users")
+      .select("company_id, role").eq("id", caller.id).single();
+    if (cp?.role !== "super_admin" && cp?.company_id !== companyId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403,
+      });
+    }
 
     const origin = req.headers.get("origin") ||
       "https://gidrlosmhpvdcogrkidj.supabase.co";

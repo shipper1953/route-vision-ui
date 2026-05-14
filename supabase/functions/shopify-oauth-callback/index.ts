@@ -47,6 +47,27 @@ serve(async (req) => {
     if (!apiSecret) {
       throw new Error("Shopify API secret not configured");
     }
+    if (!hmac) {
+      throw new Error("Missing HMAC parameter");
+    }
+    {
+      const params = new URLSearchParams(url.search);
+      params.delete("hmac");
+      params.delete("signature");
+      const sortedEntries = [...params.entries()].sort(([a], [b]) => a.localeCompare(b));
+      const message = sortedEntries.map(([k, v]) => `${k}=${v}`).join("&");
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        "raw", encoder.encode(apiSecret),
+        { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+      );
+      const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(message));
+      const computed = [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      if (computed !== hmac.toLowerCase()) {
+        console.error("HMAC mismatch", { computed, hmac });
+        throw new Error("Invalid HMAC signature");
+      }
+    }
 
     // Exchange code for access token
     const apiKey = Deno.env.get("SHOPIFY_API_KEY");
