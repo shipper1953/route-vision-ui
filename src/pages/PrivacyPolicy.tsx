@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet-async";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -7,6 +8,15 @@ export default function PrivacyPolicy() {
 
   return (
     <PublicLayout>
+      <Helmet>
+        <title>Privacy Policy — Ship Tornado TMS</title>
+        <meta name="description" content="How Ship Tornado collects, uses, and protects your data, including GDPR and CCPA compliance details." />
+        <link rel="canonical" href="https://ship-tornado.lovable.app/privacy" />
+        <meta property="og:title" content="Privacy Policy — Ship Tornado TMS" />
+        <meta property="og:description" content="How Ship Tornado collects, uses, and protects your data." />
+        <meta property="og:url" content="https://ship-tornado.lovable.app/privacy" />
+        <meta property="og:type" content="article" />
+      </Helmet>
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <h1 className="text-4xl font-bold mb-2">Privacy Policy</h1>
         <p className="text-muted-foreground mb-8">Last Updated: {lastUpdated}</p>
