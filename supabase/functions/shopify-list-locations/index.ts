@@ -109,8 +109,10 @@ serve(async (req) => {
             storeId: store.id,
             storeName: store.store_name,
             isActive: edge.node.isActive,
-            fulfillmentServiceHandle: edge.node.fulfillmentService?.handle || null,
-            fulfillmentServiceName: edge.node.fulfillmentService?.serviceName || null,
+            fulfillmentServiceHandle: edge.node.fulfillmentService?.handle ||
+              null,
+            fulfillmentServiceName: edge.node.fulfillmentService?.serviceName ||
+              null,
           } as any);
         }
       } catch (err) {

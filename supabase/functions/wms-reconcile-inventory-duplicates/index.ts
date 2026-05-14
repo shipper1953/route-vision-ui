@@ -2,7 +2,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -36,7 +37,9 @@ const keyOf = (r: Row) =>
   ].join("|");
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -63,10 +66,13 @@ Deno.serve(async (req) => {
       .eq("id", userData.user.id)
       .single();
     if (profileErr || !profile?.company_id) {
-      return new Response(JSON.stringify({ error: "No company on user profile" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "No company on user profile" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const isSuperAdmin = profile.role === "super_admin";
@@ -80,7 +86,7 @@ Deno.serve(async (req) => {
     let q = admin
       .from("inventory_levels")
       .select(
-        "id, company_id, warehouse_id, item_id, customer_id, location_id, condition, lot_number, serial_number, quantity_on_hand, quantity_allocated, quantity_available, received_date, created_at"
+        "id, company_id, warehouse_id, item_id, customer_id, location_id, condition, lot_number, serial_number, quantity_on_hand, quantity_allocated, quantity_available, received_date, created_at",
       )
       .order("created_at", { ascending: true });
 
@@ -117,8 +123,14 @@ Deno.serve(async (req) => {
       const keep = list[0];
       const dupes = list.slice(1);
 
-      const totalOnHand = list.reduce((s, r) => s + (r.quantity_on_hand || 0), 0);
-      const totalAllocated = list.reduce((s, r) => s + (r.quantity_allocated || 0), 0);
+      const totalOnHand = list.reduce(
+        (s, r) => s + (r.quantity_on_hand || 0),
+        0,
+      );
+      const totalAllocated = list.reduce(
+        (s, r) => s + (r.quantity_allocated || 0),
+        0,
+      );
       const totalAvailable = Math.max(totalOnHand - totalAllocated, 0);
 
       merges.push({
@@ -179,7 +191,10 @@ Deno.serve(async (req) => {
         mergedRows: merges.reduce((s, m) => s + m.mergedIds.length, 0),
         merges,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   } catch (e) {
     console.error("reconcile error", e);
