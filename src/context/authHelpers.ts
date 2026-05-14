@@ -72,7 +72,6 @@ export const createUserProfile = async (user: any): Promise<UserProfile | null> 
         id: user.id,
         name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
         email: user.email,
-        password: '',
         company_id: demoCompany.id,
         warehouse_ids: demoWarehouse ? [demoWarehouse.id] : []
       }])
