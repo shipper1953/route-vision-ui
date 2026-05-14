@@ -192,7 +192,9 @@ serve(async (req) => {
       .eq("item_id", itemId);
 
     if (invError) {
-      throw new Error(`Failed to calculate available quantity: ${invError.message}`);
+      throw new Error(
+        `Failed to calculate available quantity: ${invError.message}`,
+      );
     }
 
     const totalAvailable = (invRows || []).reduce(
@@ -209,7 +211,8 @@ serve(async (req) => {
           "X-Shopify-Access-Token": store.access_token,
         },
         body: JSON.stringify({
-          query: `mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
+          query:
+            `mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
             inventorySetQuantities(input: $input) {
               inventoryAdjustmentGroup { id }
               userErrors { field message }
