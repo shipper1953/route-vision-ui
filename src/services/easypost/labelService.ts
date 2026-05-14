@@ -373,7 +373,7 @@ export class LabelService {
       const parcel = packages[i];
 
       // Build shipment data for this parcel
-      const shipmentData: any = {
+      let shipmentData: any = {
         to_address: {
           name: to?.name || to?.company || '',
           company: to?.company || undefined,
@@ -409,7 +409,7 @@ export class LabelService {
 
         try {
           // Get rates from both providers for this parcel
-          const combined = await rateService.getRatesFromAllProviders(shipmentData);
+          let combined = await rateService.getRatesFromAllProviders(shipmentData);
 
           // Pick a rate matching selected provider/carrier/service when possible
           const desiredProvider = (provider || undefined) as 'easypost' | 'shippo' | undefined;
