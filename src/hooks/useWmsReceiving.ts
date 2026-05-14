@@ -238,14 +238,17 @@ export const useWmsReceiving = () => {
             const lotNumber = params.lotNumber || null;
             const serialNumber = params.serialNumbers?.[0] || null;
 
+            // Match existing inventory across warehouses/locations using the same
+            // dedup key as wms-reconcile-inventory-duplicates so a receipt updates
+            // the existing SKU row instead of creating a duplicate.
             let matchQuery = supabase
               .from('inventory_levels' as any)
-              .select('id, quantity_on_hand, quantity_available')
+              .select('id, quantity_on_hand, quantity_available, warehouse_id')
               .eq('company_id', sessionData.company_id)
-              .eq('warehouse_id', sessionData.warehouse_id)
               .eq('item_id', params.itemId)
               .eq('condition', condition)
-              .is('location_id', null);
+              .order('received_date', { ascending: true })
+              .limit(1);
 
             matchQuery = customerId
               ? matchQuery.eq('customer_id', customerId)
@@ -257,8 +260,8 @@ export const useWmsReceiving = () => {
               ? matchQuery.eq('serial_number', serialNumber)
               : matchQuery.is('serial_number', null);
 
-            const { data: existingInventoryRaw } = await matchQuery.maybeSingle();
-            const existingInventory = existingInventoryRaw as any;
+            const { data: existingInventoryRows } = await matchQuery;
+            const existingInventory = (existingInventoryRows as any[])?.[0];
 
             if (existingInventory?.id) {
               await supabase
