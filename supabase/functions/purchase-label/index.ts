@@ -1670,11 +1670,20 @@ serve(async (req) => {
       const labelErrorMessage = getErrorMessage(labelError);
       console.error("❌ Label purchase failed:", labelError);
       const isCarrierTimeout = /timed out/i.test(labelErrorMessage);
+      // Surface carrier/billing errors verbatim so users see the real reason
+      // (e.g. EasyPost BILLING.PURCHASE_NOT_ALLOWED) instead of a generic 500.
+      const isCarrierBillingError =
+        /BILLING|PURCHASE_NOT_ALLOWED|insufficient|payment|card|declined|easypost|shippo|carrier/i
+          .test(labelErrorMessage);
+      const status = isCarrierTimeout ? 503 : (isCarrierBillingError ? 402 : 500);
+      const clientMsg = (isCarrierTimeout || isCarrierBillingError)
+        ? labelErrorMessage
+        : undefined;
       return createErrorResponse(
         "Failed to purchase label",
         labelErrorMessage,
-        isCarrierTimeout ? 503 : 500,
-        isCarrierTimeout ? labelErrorMessage : undefined,
+        status,
+        clientMsg,
       );
     }
 
