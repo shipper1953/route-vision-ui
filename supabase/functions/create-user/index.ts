@@ -21,34 +21,76 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, password, name, role, company_id }: CreateUserRequest =
-      await req.json();
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!supabaseServiceKey) throw new Error("Missing service role key");
 
-    if (!supabaseServiceKey) {
-      throw new Error("Missing Supabase service role key");
+    // SECURITY: Require authenticated caller and verify privileges
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user: caller }, error: callerErr } = await userClient.auth.getUser();
+    if (callerErr || !caller) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: callerProfile } = await supabaseAdmin
+      .from("users")
+      .select("role, company_id")
+      .eq("id", caller.id)
+      .single();
 
-    console.log("Creating user with service role:", {
-      email,
-      name,
-      role,
-      company_id,
-    });
+    const callerRole = callerProfile?.role as string | undefined;
+    if (callerRole !== "super_admin" && callerRole !== "company_admin") {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // Create user using Supabase Auth Admin API with immediate activation
+    const { email, password, name, role, company_id }: CreateUserRequest =
+      await req.json();
+
+    // Restrict creatable roles
+    const requestedRole = role || "user";
+    if (requestedRole === "super_admin") {
+      return new Response(
+        JSON.stringify({ error: "super_admin cannot be created via API" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (callerRole === "company_admin" && requestedRole !== "user") {
+      return new Response(
+        JSON.stringify({ error: "company_admin may only create user accounts" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Force company scoping for company_admin callers
+    const targetCompanyId = callerRole === "super_admin"
+      ? (company_id === "no_company" ? null : company_id)
+      : callerProfile?.company_id;
+
+    console.log("Creating user with service role:", { email, name, role: requestedRole, company_id: targetCompanyId });
+
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin
       .createUser({
         email,
         password,
-        email_confirm: true, // Immediately confirm the email
-        user_metadata: {
-          name: name,
-        },
+        email_confirm: true,
+        user_metadata: { name },
       });
 
     if (authError) {
@@ -56,47 +98,26 @@ const handler = async (req: Request): Promise<Response> => {
       throw authError;
     }
 
-    console.log("User created in auth system:", authData.user?.id);
-
-    // Wait a moment for any triggers to run
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Update the user's profile with role and company assignment
     if (authData.user) {
       const { error: profileError } = await supabaseAdmin
         .from("users")
         .upsert({
           id: authData.user.id,
-          name: name,
-          email: email,
-          role: role,
-          company_id: company_id === "no_company" ? null : company_id,
-          password: "", // Password is managed by Supabase auth
-        }, {
-          onConflict: "id",
-        });
+          name,
+          email,
+          role: requestedRole,
+          company_id: targetCompanyId,
+        }, { onConflict: "id" });
 
-      if (profileError) {
-        console.error("Profile error:", profileError);
-        throw profileError;
-      }
+      if (profileError) throw profileError;
 
-      // CRITICAL: Insert into user_roles table - this is the source of truth for role checks
       const { error: roleError } = await supabaseAdmin
         .from("user_roles")
-        .upsert({
-          user_id: authData.user.id,
-          role: role,
-        }, {
-          onConflict: "user_id,role",
-        });
+        .upsert({ user_id: authData.user.id, role: requestedRole }, { onConflict: "user_id,role" });
 
-      if (roleError) {
-        console.error("Role assignment error:", roleError);
-        throw roleError;
-      }
-
-      console.log("Role assigned in user_roles:", role);
+      if (roleError) throw roleError;
     }
 
     return new Response(
