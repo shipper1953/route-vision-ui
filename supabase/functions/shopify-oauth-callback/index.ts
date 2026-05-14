@@ -2,86 +2,89 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const url = new URL(req.url);
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
-    const shop = url.searchParams.get('shop');
-    const hmac = url.searchParams.get('hmac');
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    const shop = url.searchParams.get("shop");
+    const hmac = url.searchParams.get("hmac");
 
     if (!code || !state || !shop) {
-      throw new Error('Missing required OAuth parameters');
+      throw new Error("Missing required OAuth parameters");
     }
 
-    console.log('OAuth callback received for shop:', shop);
+    console.log("OAuth callback received for shop:", shop);
 
     // Find company by OAuth state from shopify_stores table
     const { data: stores, error: storeError } = await supabase
-      .from('shopify_stores')
-      .select('id, company_id, customer_name, customer_email, customer_reference')
-      .eq('oauth_state', state)
+      .from("shopify_stores")
+      .select(
+        "id, company_id, customer_name, customer_email, customer_reference",
+      )
+      .eq("oauth_state", state)
       .single();
 
     if (storeError || !stores) {
-      console.error('Invalid OAuth state or store not found:', storeError);
-      throw new Error('Invalid OAuth state - store not found');
+      console.error("Invalid OAuth state or store not found:", storeError);
+      throw new Error("Invalid OAuth state - store not found");
     }
 
     const companyId = stores.company_id;
     const storeId = stores.id;
 
     // Verify HMAC (important security check)
-    const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
+    const apiSecret = Deno.env.get("SHOPIFY_API_SECRET");
     if (!apiSecret) {
-      throw new Error('Shopify API secret not configured');
+      throw new Error("Shopify API secret not configured");
     }
 
     // Exchange code for access token
-    const apiKey = Deno.env.get('SHOPIFY_API_KEY');
+    const apiKey = Deno.env.get("SHOPIFY_API_KEY");
     const tokenResponse = await fetch(
       `https://${shop}/admin/oauth/access_token`,
       {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           client_id: apiKey,
           client_secret: apiSecret,
           code,
         }),
-      }
+      },
     );
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('Token exchange failed:', errorText);
-      throw new Error('Failed to exchange authorization code');
+      console.error("Token exchange failed:", errorText);
+      throw new Error("Failed to exchange authorization code");
     }
 
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
-    console.log('Successfully obtained access token');
+    console.log("Successfully obtained access token");
 
     // Register webhooks with topic-specific routing
     const registerWebhook = async (topic: string) => {
       // Determine webhook URL based on topic
       let webhookUrl;
-      if (topic === 'customers/data_request') {
+      if (topic === "customers/data_request") {
         webhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-customer-data`;
-      } else if (topic === 'customers/redact') {
+      } else if (topic === "customers/redact") {
         webhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-customer-redact`;
-      } else if (topic === 'shop/redact') {
+      } else if (topic === "shop/redact") {
         webhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-shop-redact`;
       } else {
         // Default to main webhook handler for order events
@@ -91,19 +94,19 @@ serve(async (req) => {
       const response = await fetch(
         `https://${shop}/admin/api/2024-01/webhooks.json`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'X-Shopify-Access-Token': accessToken,
-            'Content-Type': 'application/json',
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             webhook: {
               topic,
               address: webhookUrl,
-              format: 'json',
+              format: "json",
             },
           }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -111,12 +114,12 @@ serve(async (req) => {
         console.error(`Failed to register ${topic} webhook:`, errorText);
         // Log failure to sync logs
         await supabase
-          .from('shopify_sync_logs')
+          .from("shopify_sync_logs")
           .insert({
             company_id: companyId,
-            sync_type: 'webhook_registration',
-            direction: 'outbound',
-            status: 'error',
+            sync_type: "webhook_registration",
+            direction: "outbound",
+            status: "error",
             metadata: { topic, error: errorText, webhook_url: webhookUrl },
           });
       } else {
@@ -124,29 +127,29 @@ serve(async (req) => {
         console.log(`Registered ${topic} webhook successfully`, webhookData);
         // Log success to sync logs
         await supabase
-          .from('shopify_sync_logs')
+          .from("shopify_sync_logs")
           .insert({
             company_id: companyId,
-            sync_type: 'webhook_registration',
-            direction: 'outbound',
-            status: 'success',
-            metadata: { 
-              topic, 
+            sync_type: "webhook_registration",
+            direction: "outbound",
+            status: "success",
+            metadata: {
+              topic,
               webhook_id: webhookData.webhook?.id,
-              webhook_url: webhookUrl 
+              webhook_url: webhookUrl,
             },
           });
       }
     };
 
     // Register order webhooks
-    await registerWebhook('orders/create');
-    await registerWebhook('orders/updated');
+    await registerWebhook("orders/create");
+    await registerWebhook("orders/updated");
 
     // Register GDPR compliance webhooks (required for Shopify app approval)
-    await registerWebhook('customers/data_request');
-    await registerWebhook('customers/redact');
-    await registerWebhook('shop/redact');
+    await registerWebhook("customers/data_request");
+    await registerWebhook("customers/redact");
+    await registerWebhook("shop/redact");
 
     // Generate webhook secret for signature verification
     const webhookSecret = crypto.randomUUID();
@@ -154,22 +157,25 @@ serve(async (req) => {
     // Fetch store name from Shopify
     let storeName = shop;
     try {
-      const shopResponse = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, {
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
+      const shopResponse = await fetch(
+        `https://${shop}/admin/api/2024-01/shop.json`,
+        {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+          },
         },
-      });
+      );
       if (shopResponse.ok) {
         const shopData = await shopResponse.json();
         storeName = shopData.shop?.name || shop;
       }
     } catch (error) {
-      console.warn('Failed to fetch store name, using domain:', error);
+      console.warn("Failed to fetch store name, using domain:", error);
     }
 
     // Update shopify_stores record with credentials and clear OAuth state
     const { error: updateError } = await supabase
-      .from('shopify_stores')
+      .from("shopify_stores")
       .update({
         access_token: accessToken,
         webhook_secret: webhookSecret,
@@ -179,71 +185,90 @@ serve(async (req) => {
         last_sync_at: new Date().toISOString(),
         oauth_state: null, // Clear the OAuth state for security
         settings: {
-          scopes: ['read_orders', 'write_orders', 'read_products', 'write_products', 'read_inventory', 'write_inventory'],
-        }
+          scopes: [
+            "read_orders",
+            "write_orders",
+            "read_products",
+            "write_products",
+            "read_inventory",
+            "write_inventory",
+          ],
+        },
       })
-      .eq('id', storeId);
+      .eq("id", storeId);
 
     if (updateError) {
-      console.error('Failed to store Shopify credentials:', updateError);
-      throw new Error('Failed to store credentials securely');
+      console.error("Failed to store Shopify credentials:", updateError);
+      throw new Error("Failed to store credentials securely");
     }
 
-    console.log('Successfully stored Shopify credentials for store:', storeId);
+    console.log("Successfully stored Shopify credentials for store:", storeId);
 
     // Register Ship Tornado as a fulfillment service
-    console.log('Registering fulfillment service...');
+    console.log("Registering fulfillment service...");
     try {
-      const fsResponse = await supabase.functions.invoke('shopify-register-fulfillment-service', {
-        body: {
-          companyId,
-          storeId,
-          shopifySettings: {
-            store_url: shop,
-            access_token: accessToken,
+      const fsResponse = await supabase.functions.invoke(
+        "shopify-register-fulfillment-service",
+        {
+          body: {
+            companyId,
+            storeId,
+            shopifySettings: {
+              store_url: shop,
+              access_token: accessToken,
+            },
           },
         },
-      });
+      );
 
       if (fsResponse.error) {
-        console.error('Failed to register fulfillment service:', fsResponse.error);
+        console.error(
+          "Failed to register fulfillment service:",
+          fsResponse.error,
+        );
         // Continue anyway - they can register later
       } else {
-        console.log('Fulfillment service registered successfully:', fsResponse.data);
-        
+        console.log(
+          "Fulfillment service registered successfully:",
+          fsResponse.data,
+        );
+
         // Update store with fulfillment service ID if returned
         if (fsResponse.data?.fulfillmentServiceId) {
           await supabase
-            .from('shopify_stores')
-            .update({ fulfillment_service_id: fsResponse.data.fulfillmentServiceId })
-            .eq('id', storeId);
+            .from("shopify_stores")
+            .update({
+              fulfillment_service_id: fsResponse.data.fulfillmentServiceId,
+            })
+            .eq("id", storeId);
         }
       }
     } catch (fsError) {
-      console.error('Error registering fulfillment service:', fsError);
+      console.error("Error registering fulfillment service:", fsError);
       // Continue anyway - they can register later
     }
 
     // Log connection
     await supabase
-      .from('shopify_sync_logs')
+      .from("shopify_sync_logs")
       .insert({
         company_id: companyId,
         shopify_store_id: storeId,
-        sync_type: 'connection',
-        direction: 'outbound',
-        status: 'success',
-        metadata: { 
+        sync_type: "connection",
+        direction: "outbound",
+        status: "success",
+        metadata: {
           store_url: shop,
           store_name: storeName,
-          store_id: storeId
+          store_id: storeId,
         },
       });
 
-    console.log('Shopify OAuth connection successful for company:', companyId);
+    console.log("Shopify OAuth connection successful for company:", companyId);
 
-    const appOrigin = 'https://ship-tornado.lovable.app';
-    const redirectUrl = `${appOrigin}/company-admin?tab=integrations&shopify=connected`;
+    const appOrigin = "https://ship-tornado.lovable.app";
+    const redirectUrl =
+      `${appOrigin}/company-admin?tab=integrations&shopify=connected`;
 
     // Return HTML that communicates with popup opener or redirects
     const successHtml = `
@@ -360,16 +385,18 @@ serve(async (req) => {
     return new Response(successHtml, {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'text/html',
+        "Content-Type": "text/html",
       },
     });
-
   } catch (error) {
-    console.error('OAuth callback error:', error);
-    
-    const appOrigin = 'https://ship-tornado.lovable.app';
-    const errorRedirectUrl = `${appOrigin}/company-admin?tab=integrations&shopify=error&message=${encodeURIComponent(error.message)}`;
-    
+    console.error("OAuth callback error:", error);
+
+    const appOrigin = "https://ship-tornado.lovable.app";
+    const errorRedirectUrl =
+      `${appOrigin}/company-admin?tab=integrations&shopify=error&message=${
+        encodeURIComponent(error.message)
+      }`;
+
     // Return HTML that communicates error to popup opener or redirects
     const errorHtml = `
       <!DOCTYPE html>
@@ -468,7 +495,7 @@ serve(async (req) => {
       status: 400,
       headers: {
         ...corsHeaders,
-        'Content-Type': 'text/html',
+        "Content-Type": "text/html",
       },
     });
   }

@@ -1,4 +1,3 @@
-
 export interface PurchaseLabelRequest {
   shipmentId: string;
   rateId: string;
