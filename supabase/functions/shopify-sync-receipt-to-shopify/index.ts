@@ -41,7 +41,7 @@ serve(async (req) => {
     const { data: item, error: itemError } = await supabase
       .from("items")
       .select(
-        "shopify_product_id, shopify_variant_id, shopify_store_id, company_id, sku",
+        "shopify_product_id, shopify_variant_id, shopify_variant_gid, shopify_store_id, company_id, sku",
       )
       .eq("id", itemId)
       .single();
@@ -61,7 +61,9 @@ serve(async (req) => {
     }
 
     // If item not linked to Shopify, skip sync
-    if (!item.shopify_store_id || !item.shopify_variant_id) {
+    const variantGid = item.shopify_variant_gid || item.shopify_variant_id;
+
+    if (!item.shopify_store_id || !variantGid) {
       console.log("Item not linked to Shopify, skipping sync");
       return new Response(
         JSON.stringify({
@@ -160,7 +162,7 @@ serve(async (req) => {
         body: JSON.stringify({
           query: getInventoryQuery,
           variables: {
-            variantId: item.shopify_variant_id,
+            variantId: variantGid,
           },
         }),
       },
@@ -182,31 +184,21 @@ serve(async (req) => {
       throw new Error("Inventory item ID not found for variant");
     }
 
-    // Update inventory quantity using GraphQL
-    const adjustInventoryMutation = `
-      mutation AdjustInventory($inventoryItemAdjustments: [InventoryAdjustItemInput!]!, $locationId: ID!, $reason: String!) {
-        inventoryAdjustQuantities(
-          input: {
-            reason: $reason
-            name: "received_items"
-            changes: $inventoryItemAdjustments
-          }
-        ) {
-          inventoryAdjustmentGroup {
-            id
-            reason
-            changes {
-              name
-              delta
-            }
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
+    // Set Shopify location quantity to current Ship Tornado total available for this item
+    const { data: invRows, error: invError } = await supabase
+      .from("inventory_levels")
+      .select("quantity_available")
+      .eq("company_id", item.company_id)
+      .eq("item_id", itemId);
+
+    if (invError) {
+      throw new Error(`Failed to calculate available quantity: ${invError.message}`);
+    }
+
+    const totalAvailable = (invRows || []).reduce(
+      (sum: number, row: any) => sum + (row.quantity_available || 0),
+      0,
+    );
 
     const adjustResponse = await fetch(
       `https://${store.store_url}/admin/api/2025-01/graphql.json`,
@@ -217,14 +209,23 @@ serve(async (req) => {
           "X-Shopify-Access-Token": store.access_token,
         },
         body: JSON.stringify({
-          query: adjustInventoryMutation,
+          query: `mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
+            inventorySetQuantities(input: $input) {
+              inventoryAdjustmentGroup { id }
+              userErrors { field message }
+            }
+          }`,
           variables: {
-            inventoryItemAdjustments: [{
-              inventoryItemId: inventoryItemId,
-              availableDelta: quantityReceived,
-            }],
-            locationId: shopifyLocationId,
-            reason: `Received ${quantityReceived} units via WMS`,
+            input: {
+              reason: "correction",
+              name: "available",
+              ignoreCompareQuantity: true,
+              quantities: [{
+                inventoryItemId: inventoryItemId,
+                locationId: shopifyLocationId,
+                quantity: totalAvailable,
+              }],
+            },
           },
         }),
       },
@@ -234,11 +235,11 @@ serve(async (req) => {
 
     if (
       adjustData.errors ||
-      adjustData.data?.inventoryAdjustQuantities?.userErrors?.length > 0
+      adjustData.data?.inventorySetQuantities?.userErrors?.length > 0
     ) {
       const errorMsg = adjustData.errors
         ? JSON.stringify(adjustData.errors)
-        : JSON.stringify(adjustData.data.inventoryAdjustQuantities.userErrors);
+        : JSON.stringify(adjustData.data.inventorySetQuantities.userErrors);
 
       console.error("Error adjusting inventory:", errorMsg);
 
@@ -278,7 +279,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        shopifyResponse: adjustData.data?.inventoryAdjustQuantities,
+        shopifyResponse: adjustData.data?.inventorySetQuantities,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
