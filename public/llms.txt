@@ -1,0 +1,11 @@
+# Ship Tornado TMS
+
+> Ship Tornado is a Transportation Management System for shipping, order management, cartonization, inventory, and package tracking.
+
+## Pages
+
+- [Home](/): Product overview and dashboard entry point.
+- [Sign in](/login): Account sign-in.
+- [Sign up](/signup): Create a new account.
+- [Track a package](/track): Look up shipment tracking details.
+- [Privacy Policy](/privacy): How we handle data and comply with GDPR/CCPA.
