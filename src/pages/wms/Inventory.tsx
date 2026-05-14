@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useInventory, InventoryItem } from "@/hooks/useInventory";
 import { InventoryList } from "@/components/wms/inventory/InventoryList";
 import { InventoryItemDialog } from "@/components/wms/inventory/InventoryItemDialog";
-import { Search, Plus, RefreshCw } from "lucide-react";
+import { Search, Plus, RefreshCw, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -18,6 +19,28 @@ export default function Inventory() {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [reconciling, setReconciling] = useState(false);
+
+  const handleReconcile = async () => {
+    if (!confirm('Scan inventory for duplicate SKU rows and merge their quantities into a single entry per location/lot/serial? This cannot be undone.')) return;
+    try {
+      setReconciling(true);
+      const { data, error } = await supabase.functions.invoke('wms-reconcile-inventory-duplicates', { body: {} });
+      if (error) throw error;
+      const merged = data?.mergedRows || 0;
+      const groups = data?.duplicateGroups || 0;
+      if (merged === 0) {
+        toast.success('No duplicates found — inventory is clean.');
+      } else {
+        toast.success(`Merged ${merged} duplicate row(s) across ${groups} SKU group(s).`);
+      }
+      fetchInventory(undefined, customerFilter === 'all' ? undefined : customerFilter);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to reconcile inventory');
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   useEffect(() => {
     if (userProfile?.company_id) {
@@ -67,6 +90,15 @@ export default function Inventory() {
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleReconcile}
+              disabled={reconciling}
+              title="Find duplicate inventory rows for the same SKU/location/lot/serial and merge their quantities into one entry"
+            >
+              <Wand2 className={`h-4 w-4 mr-2 ${reconciling ? 'animate-pulse' : ''}`} />
+              {reconciling ? 'Reconciling…' : 'Reconcile Duplicates'}
             </Button>
             <Button onClick={() => {
               setSelectedItem(null);

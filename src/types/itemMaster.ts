@@ -19,4 +19,13 @@ export interface Item {
   // Global IDs (for GraphQL)
   shopifyProductGid?: string;
   shopifyVariantGid?: string;
+  uomEaches?: UomEachEquivalents;
+}
+
+
+export interface UomEachEquivalents {
+  each: number;
+  innerpack: number;
+  case: number;
+  pallet: number;
 }

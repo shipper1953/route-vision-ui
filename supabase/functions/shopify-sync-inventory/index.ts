@@ -359,6 +359,7 @@ async function syncToShopify(
                 input: {
                   reason: "correction",
                   name: "available",
+                  ignoreCompareQuantity: true,
                   quantities: [{
                     inventoryItemId: inventoryItem.id,
                     locationId: targetLocation.location.id,

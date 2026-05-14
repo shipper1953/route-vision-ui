@@ -553,6 +553,80 @@ export type Database = {
           },
         ]
       }
+      inventory_transactions: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          inventory_level_id: string | null
+          item_id: string | null
+          location_id: string | null
+          lot_number: string | null
+          notes: string | null
+          performed_by: string | null
+          quantity_allocated_after: number | null
+          quantity_allocated_before: number | null
+          quantity_change: number
+          quantity_on_hand_after: number | null
+          quantity_on_hand_before: number | null
+          reason_code: string | null
+          serial_number: string | null
+          source: string | null
+          transaction_type: string
+          warehouse_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          inventory_level_id?: string | null
+          item_id?: string | null
+          location_id?: string | null
+          lot_number?: string | null
+          notes?: string | null
+          performed_by?: string | null
+          quantity_allocated_after?: number | null
+          quantity_allocated_before?: number | null
+          quantity_change?: number
+          quantity_on_hand_after?: number | null
+          quantity_on_hand_before?: number | null
+          reason_code?: string | null
+          serial_number?: string | null
+          source?: string | null
+          transaction_type: string
+          warehouse_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          inventory_level_id?: string | null
+          item_id?: string | null
+          location_id?: string | null
+          lot_number?: string | null
+          notes?: string | null
+          performed_by?: string | null
+          quantity_allocated_after?: number | null
+          quantity_allocated_before?: number | null
+          quantity_change?: number
+          quantity_on_hand_after?: number | null
+          quantity_on_hand_before?: number | null
+          reason_code?: string | null
+          serial_number?: string | null
+          source?: string | null
+          transaction_type?: string
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_transactions_inventory_level_id_fkey"
+            columns: ["inventory_level_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           category: string
@@ -1413,6 +1487,7 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          created_by: string | null
           customer_id: string | null
           expected_date: string | null
           id: string
@@ -1426,6 +1501,7 @@ export type Database = {
           source_type: string | null
           status: string
           updated_at: string
+          vendor_contact: string | null
           vendor_id: string | null
           vendor_name: string | null
           warehouse_id: string
@@ -1433,6 +1509,7 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
+          created_by?: string | null
           customer_id?: string | null
           expected_date?: string | null
           id?: string
@@ -1446,6 +1523,7 @@ export type Database = {
           source_type?: string | null
           status?: string
           updated_at?: string
+          vendor_contact?: string | null
           vendor_id?: string | null
           vendor_name?: string | null
           warehouse_id: string
@@ -1453,6 +1531,7 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
+          created_by?: string | null
           customer_id?: string | null
           expected_date?: string | null
           id?: string
@@ -1466,6 +1545,7 @@ export type Database = {
           source_type?: string | null
           status?: string
           updated_at?: string
+          vendor_contact?: string | null
           vendor_id?: string | null
           vendor_name?: string | null
           warehouse_id?: string

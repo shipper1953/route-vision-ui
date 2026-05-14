@@ -65,9 +65,18 @@ const Receiving = () => {
     }
   };
 
+  const handleSelectLineForReceive = (poLineItem: any) => {
+    if (!poLineItem?.items) return;
+    setScannedItem(poLineItem.items);
+    setSelectedPOLineItem(poLineItem);
+  };
+
   const handleReceiveItem = async (data: {
     uom: string;
     quantity: number;
+    damagedQuantity: number;
+    nonCompliantQuantity: number;
+    nonComplianceReason?: string;
     lotNumber?: string;
     serialNumbers?: string[];
     condition: string;
@@ -83,6 +92,9 @@ const Receiving = () => {
       lotNumber: data.lotNumber,
       serialNumbers: data.serialNumbers,
       condition: data.condition,
+      damagedQuantity: data.damagedQuantity,
+      nonCompliantQuantity: data.nonCompliantQuantity,
+      nonComplianceReason: data.nonComplianceReason,
       qcRequired: false
     });
 
@@ -109,9 +121,16 @@ const Receiving = () => {
     }
   };
 
+  const totalUnits = purchaseOrders.reduce((sum, po) => {
+    return sum + (po.po_line_items || []).reduce((s: number, l: any) => {
+      return s + Math.max((l.quantity_ordered || 0) - (l.quantity_received || 0), 0);
+    }, 0);
+  }, 0);
+  const partialCount = purchaseOrders.filter((po) => po.status === 'partially_received').length;
+
   return (
     <TmsLayout>
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           {activeSession && (
@@ -126,17 +145,17 @@ const Receiving = () => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <div>
-            <h1 className="text-3xl font-bold">Receiving</h1>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold tracking-tight">Receiving</h1>
             <p className="text-muted-foreground mt-1">
-              {activeSession ? 'Scan items to receive' : 'Select a PO to begin receiving'}
+              {activeSession ? 'Scan items to receive' : 'Select a purchase order to begin receiving inventory'}
             </p>
           </div>
         </div>
 
         {/* Active Session View */}
         {activeSession && currentPO ? (
-          <div className="space-y-6">
+          <div className="space-y-6 max-w-4xl">
             <ReceivingSessionHeader
               session={activeSession}
               poData={currentPO}
@@ -152,6 +171,33 @@ const Receiving = () => {
                   disabled={loading}
                   placeholder="Scan item barcode..."
                 />
+
+                <div className="border rounded-lg">
+                  <div className="p-3 border-b bg-muted/50 font-medium">PO Line Items</div>
+                  <div className="divide-y">
+                    {currentPO.po_line_items?.map((line: any) => {
+                      const remaining = Math.max((line.quantity_ordered || 0) - (line.quantity_received || 0), 0);
+                      return (
+                        <div key={line.id} className="p-3 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{line.items?.name || line.product_name}</p>
+                            <p className="text-sm text-muted-foreground">SKU: {line.items?.sku || line.sku}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Ordered: {line.quantity_ordered} | Received: {line.quantity_received || 0} | Remaining: {remaining}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={remaining <= 0 || loading}
+                            onClick={() => handleSelectLineForReceive(line)}
+                          >
+                            Receive Qty
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 
                 <ReceivedItemsList items={receivedItems} />
               </>
@@ -169,19 +215,38 @@ const Receiving = () => {
           </div>
         ) : (
           /* PO Selection View */
-          <div>
+          <div className="space-y-6">
+            {/* Summary stats */}
+            {purchaseOrders.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Open POs</p>
+                  <p className="text-2xl font-semibold mt-1 tabular-nums">{purchaseOrders.length}</p>
+                </div>
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Units Pending</p>
+                  <p className="text-2xl font-semibold mt-1 tabular-nums">{totalUnits.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Partially Received</p>
+                  <p className="text-2xl font-semibold mt-1 tabular-nums">{partialCount}</p>
+                </div>
+              </div>
+            )}
+
             {loading && purchaseOrders.length === 0 ? (
-              <div className="text-center py-12">
+              <div className="text-center py-16 border border-dashed rounded-lg">
                 <p className="text-muted-foreground">Loading purchase orders...</p>
               </div>
             ) : purchaseOrders.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">
-                  No pending purchase orders found.
+              <div className="text-center py-16 border border-dashed rounded-lg">
+                <p className="text-foreground font-medium">No pending purchase orders</p>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Create a PO to start receiving inventory.
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {purchaseOrders.map((po) => (
                   <POSelectionCard
                     key={po.id}

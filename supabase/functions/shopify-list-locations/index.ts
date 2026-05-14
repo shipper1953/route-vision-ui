@@ -67,12 +67,13 @@ serve(async (req) => {
         );
         const query = `
           query {
-            locations(first: 50) {
+            locations(first: 50, includeLegacy: true, includeInactive: true) {
               edges {
                 node {
                   id
                   name
                   isActive
+                  fulfillmentService { handle serviceName }
                 }
               }
             }
@@ -108,7 +109,9 @@ serve(async (req) => {
             storeId: store.id,
             storeName: store.store_name,
             isActive: edge.node.isActive,
-          });
+            fulfillmentServiceHandle: edge.node.fulfillmentService?.handle || null,
+            fulfillmentServiceName: edge.node.fulfillmentService?.serviceName || null,
+          } as any);
         }
       } catch (err) {
         console.error(`Error fetching locations for store ${store.id}:`, err);

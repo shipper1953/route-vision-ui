@@ -25,6 +25,10 @@ interface ReceivingLineItem {
   lot_number?: string;
   serial_numbers?: string[];
   condition: 'good' | 'damaged' | 'expired';
+  quantity_damaged?: number;
+  quantity_non_compliant?: number;
+  quantity_accepted?: number;
+  non_compliance_reason?: string;
   qc_required: boolean;
   qc_status?: 'pending' | 'passed' | 'failed';
   received_at: string;
@@ -47,6 +51,7 @@ export const useWmsReceiving = () => {
   const fetchPurchaseOrders = async () => {
     try {
       setLoading(true);
+
       const { data, error } = await supabase
         .from('purchase_orders' as any)
         .select('*, customers(*), po_line_items(*, items(*))')
@@ -110,26 +115,64 @@ export const useWmsReceiving = () => {
     lotNumber?: string;
     serialNumbers?: string[];
     condition?: string;
+    damagedQuantity?: number;
+    nonCompliantQuantity?: number;
+    nonComplianceReason?: string;
     qcRequired?: boolean;
   }) => {
     try {
       setLoading(true);
 
-      const { error } = await supabase
+      const acceptedQty = Math.max(
+        params.quantityReceived - (params.damagedQuantity || 0) - (params.nonCompliantQuantity || 0),
+        0
+      );
+
+      const baseInsertPayload = {
+        session_id: params.sessionId,
+        po_line_id: params.poLineId,
+        item_id: params.itemId,
+        quantity_received: params.quantityReceived,
+        uom: params.uom,
+        lot_number: params.lotNumber,
+        serial_numbers: params.serialNumbers,
+        condition: params.condition || 'new',
+        qc_required: params.qcRequired || false,
+        received_by: userProfile?.id,
+        received_at: new Date().toISOString(),
+      };
+
+      const extendedPayload = {
+        ...baseInsertPayload,
+        quantity_damaged: params.damagedQuantity || 0,
+        quantity_non_compliant: params.nonCompliantQuantity || 0,
+        quantity_accepted: acceptedQty,
+        non_compliance_reason: params.nonComplianceReason,
+      };
+
+      let { error } = await supabase
         .from('receiving_line_items' as any)
-        .insert({
-          session_id: params.sessionId,
-          po_line_id: params.poLineId,
-          item_id: params.itemId,
-          quantity_received: params.quantityReceived,
-          uom: params.uom,
-          lot_number: params.lotNumber,
-          serial_numbers: params.serialNumbers,
-          condition: params.condition || 'new',
-          qc_required: params.qcRequired || false,
-          received_by: userProfile?.id,
-          received_at: new Date().toISOString(),
-        });
+        .insert(extendedPayload as any);
+
+      // Backward-compatible fallback when DB migration isn't applied yet.
+      if (error && String(error.message || '').includes('quantity_accepted')) {
+        const fallbackNotes = [
+          params.damagedQuantity ? `Damaged: ${params.damagedQuantity}` : null,
+          params.nonCompliantQuantity ? `Non-compliant: ${params.nonCompliantQuantity}` : null,
+          params.nonComplianceReason ? `Reason: ${params.nonComplianceReason}` : null,
+        ].filter(Boolean).join(' | ');
+
+        const fallbackPayload = {
+          ...baseInsertPayload,
+          notes: fallbackNotes || undefined,
+        };
+
+        const fallbackResult = await supabase
+          .from('receiving_line_items' as any)
+          .insert(fallbackPayload as any);
+
+        error = fallbackResult.error;
+      }
 
       if (error) throw error;
 
@@ -142,7 +185,7 @@ export const useWmsReceiving = () => {
 
       if (!poLineResult.error && poLineResult.data) {
         const poLine = poLineResult.data as unknown as { quantity_received: number; quantity_ordered: number; po_id: string };
-        const newQuantity = (poLine.quantity_received || 0) + params.quantityReceived;
+        const newQuantity = (poLine.quantity_received || 0) + acceptedQty;
         
         await supabase
           .from('po_line_items' as any)
@@ -170,6 +213,114 @@ export const useWmsReceiving = () => {
               status: fullyReceived ? 'received' : (partiallyReceived ? 'partially_received' : 'pending')
             })
             .eq('id', poLine.po_id);
+        }
+
+        // Increase inventory for accepted qty and trigger Shopify sync.
+        if (acceptedQty > 0) {
+          const [sessionRes, poRes] = await Promise.all([
+            supabase
+              .from('receiving_sessions' as any)
+              .select('company_id, warehouse_id')
+              .eq('id', params.sessionId)
+              .single(),
+            supabase
+              .from('purchase_orders' as any)
+              .select('customer_id')
+              .eq('id', poLine.po_id)
+              .single()
+          ]);
+          const sessionData = sessionRes.data as any;
+          const poData = poRes.data as any;
+
+          if (sessionData?.warehouse_id) {
+            const customerId = poData?.customer_id || null;
+            const condition = params.condition || 'good';
+            const lotNumber = params.lotNumber || null;
+            const serialNumber = params.serialNumbers?.[0] || null;
+
+            // Match existing inventory across warehouses/locations using the same
+            // dedup key as wms-reconcile-inventory-duplicates so a receipt updates
+            // the existing SKU row instead of creating a duplicate.
+            let matchQuery = supabase
+              .from('inventory_levels' as any)
+              .select('id, quantity_on_hand, quantity_available, warehouse_id')
+              .eq('company_id', sessionData.company_id)
+              .eq('item_id', params.itemId)
+              .eq('condition', condition)
+              .order('received_date', { ascending: true })
+              .limit(1);
+
+            matchQuery = customerId
+              ? matchQuery.eq('customer_id', customerId)
+              : matchQuery.is('customer_id', null);
+            matchQuery = lotNumber
+              ? matchQuery.eq('lot_number', lotNumber)
+              : matchQuery.is('lot_number', null);
+            matchQuery = serialNumber
+              ? matchQuery.eq('serial_number', serialNumber)
+              : matchQuery.is('serial_number', null);
+
+            const { data: existingInventoryRows } = await matchQuery;
+            const existingInventory = (existingInventoryRows as any[])?.[0];
+
+            if (existingInventory?.id) {
+              await supabase
+                .from('inventory_levels' as any)
+                .update({
+                  quantity_on_hand: (existingInventory.quantity_on_hand || 0) + acceptedQty,
+                  quantity_available: (existingInventory.quantity_available || 0) + acceptedQty,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingInventory.id);
+            } else {
+              await supabase
+                .from('inventory_levels' as any)
+                .insert({
+                  company_id: sessionData.company_id,
+                  warehouse_id: sessionData.warehouse_id,
+                  customer_id: customerId,
+                  item_id: params.itemId,
+                  quantity_on_hand: acceptedQty,
+                  quantity_available: acceptedQty,
+                  quantity_allocated: 0,
+                  condition,
+                  lot_number: lotNumber,
+                  serial_number: serialNumber,
+                  received_date: new Date().toISOString(),
+                });
+            }
+
+            const { data: transactionRaw } = await supabase
+              .from('inventory_transactions' as any)
+              .insert({
+                company_id: sessionData.company_id,
+                warehouse_id: sessionData.warehouse_id,
+                transaction_type: 'receive',
+                item_id: params.itemId,
+                quantity: acceptedQty,
+                lot_number: params.lotNumber || null,
+                serial_number: params.serialNumbers?.[0] || null,
+                reference_type: 'receiving_session',
+                reference_id: params.sessionId,
+                performed_by: userProfile?.id,
+                notes: `Received ${acceptedQty} units via WMS receiving`,
+              })
+              .select('id')
+              .single();
+            const transaction = transactionRaw as any;
+
+            if (transaction?.id) {
+              await supabase.functions.invoke('shopify-sync-receipt-to-shopify', {
+                body: {
+                  transactionId: transaction.id,
+                  itemId: params.itemId,
+                  quantityReceived: acceptedQty,
+                  warehouseId: sessionData.warehouse_id,
+                  locationId: null,
+                }
+              });
+            }
+          }
         }
       }
 
