@@ -67,12 +67,13 @@ serve(async (req) => {
         );
         const query = `
           query {
-            locations(first: 50) {
+            locations(first: 50, includeLegacy: true, includeInactive: true) {
               edges {
                 node {
                   id
                   name
                   isActive
+                  fulfillmentService { handle serviceName }
                 }
               }
             }
