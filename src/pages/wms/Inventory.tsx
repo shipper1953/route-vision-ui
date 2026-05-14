@@ -19,6 +19,28 @@ export default function Inventory() {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [reconciling, setReconciling] = useState(false);
+
+  const handleReconcile = async () => {
+    if (!confirm('Scan inventory for duplicate SKU rows and merge their quantities into a single entry per location/lot/serial? This cannot be undone.')) return;
+    try {
+      setReconciling(true);
+      const { data, error } = await supabase.functions.invoke('wms-reconcile-inventory-duplicates', { body: {} });
+      if (error) throw error;
+      const merged = data?.mergedRows || 0;
+      const groups = data?.duplicateGroups || 0;
+      if (merged === 0) {
+        toast.success('No duplicates found — inventory is clean.');
+      } else {
+        toast.success(`Merged ${merged} duplicate row(s) across ${groups} SKU group(s).`);
+      }
+      fetchInventory(undefined, customerFilter === 'all' ? undefined : customerFilter);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to reconcile inventory');
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   useEffect(() => {
     if (userProfile?.company_id) {
