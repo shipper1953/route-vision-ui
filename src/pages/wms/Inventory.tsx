@@ -91,6 +91,15 @@ export default function Inventory() {
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
+            <Button
+              variant="outline"
+              onClick={handleReconcile}
+              disabled={reconciling}
+              title="Find duplicate inventory rows for the same SKU/location/lot/serial and merge their quantities into one entry"
+            >
+              <Wand2 className={`h-4 w-4 mr-2 ${reconciling ? 'animate-pulse' : ''}`} />
+              {reconciling ? 'Reconciling…' : 'Reconcile Duplicates'}
+            </Button>
             <Button onClick={() => {
               setSelectedItem(null);
               setAdjustDialogOpen(true);
