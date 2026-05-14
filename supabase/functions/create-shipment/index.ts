@@ -117,18 +117,22 @@ serve(async (req) => {
   }
 
   try {
-    // SECURITY: Verify authentication
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({
-          error: "Authentication required",
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 401,
-        },
-      );
+    // SECURITY: Validate JWT (presence-only check is insufficient)
+    const authHeader = req.headers.get("authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401,
+      });
+    }
+    const { createClient: _cc } = await import("https://esm.sh/@supabase/supabase-js@2.45.0");
+    const _userClient = _cc(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user: _u }, error: _ue } = await _userClient.auth.getUser();
+    if (_ue || !_u) {
+      return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401,
+      });
     }
 
     // Get clean API key for this request

@@ -57,13 +57,21 @@ serve(async (req) => {
       );
     }
 
+    // SECURITY: require super_admin role
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: profile } = await supabaseAdmin
+      .from("users").select("role").eq("id", user.id).single();
+    if (profile?.role !== "super_admin") {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     console.log(
-      "Authenticated user:",
-      user.email,
+      "Authenticated super_admin:", user.email,
       "- Fetching ALL shipments using service role...",
     );
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get ALL shipments using service role to bypass RLS
     const { data: shipmentsData, error: shipmentsError } = await supabaseAdmin

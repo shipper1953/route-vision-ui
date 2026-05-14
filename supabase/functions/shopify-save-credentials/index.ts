@@ -40,6 +40,19 @@ serve(async (req) => {
       );
     }
 
+    // SECURITY: verify the caller belongs to the requested company
+    const { data: callerProfile } = await supabase
+      .from("users").select("company_id, role").eq("id", user.id).single();
+    if (
+      callerProfile?.role !== "super_admin" &&
+      callerProfile?.company_id !== companyId
+    ) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
+
     // Clean up store URL
     let cleanUrl = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
