@@ -2871,7 +2871,6 @@ export type Database = {
           email: string
           id: string
           name: string
-          password: string
           role: Database["public"]["Enums"]["app_role"] | null
           warehouse_ids: Json | null
         }
@@ -2880,7 +2879,6 @@ export type Database = {
           email: string
           id?: string
           name: string
-          password: string
           role?: Database["public"]["Enums"]["app_role"] | null
           warehouse_ids?: Json | null
         }
@@ -2889,7 +2887,6 @@ export type Database = {
           email?: string
           id?: string
           name?: string
-          password?: string
           role?: Database["public"]["Enums"]["app_role"] | null
           warehouse_ids?: Json | null
         }
