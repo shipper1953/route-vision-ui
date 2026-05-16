@@ -110,7 +110,7 @@ const PurchaseOrders = () => {
                 </table>
               </div>
               <div className="flex justify-end">
-                <Button onClick={() => navigate('/wms/receiving')}>Receive this PO</Button>
+                <Button onClick={() => navigate(`/wms/receiving?poId=${selectedPO?.id}`)}>Receive this PO</Button>
               </div>
             </div>
           </DialogContent>

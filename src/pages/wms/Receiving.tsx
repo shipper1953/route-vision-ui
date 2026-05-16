@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useWmsReceiving } from "@/hooks/useWmsReceiving";
 import { TmsLayout } from "@/components/layout/TmsLayout";
 import { POSelectionCard } from "@/components/wms/receiving/POSelectionCard";
@@ -22,6 +23,9 @@ const Receiving = () => {
     pauseReceivingSession
   } = useWmsReceiving();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoStartRef = useRef<string | null>(null);
+
   const [scannedItem, setScannedItem] = useState<any>(null);
   const [selectedPOLineItem, setSelectedPOLineItem] = useState<any>(null);
   const [currentPO, setCurrentPO] = useState<any>(null);
@@ -33,6 +37,18 @@ const Receiving = () => {
       setCurrentPO(po);
     }
   }, [activeSession]);
+
+  // Auto-start receiving when navigated with ?poId=...
+  useEffect(() => {
+    const poId = searchParams.get('poId');
+    if (!poId || activeSession || autoStartRef.current === poId) return;
+    const po = purchaseOrders.find(p => p.id === poId);
+    if (!po) return;
+    autoStartRef.current = poId;
+    handleStartReceiving(poId, po.warehouse_id);
+    searchParams.delete('poId');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, purchaseOrders, activeSession]);
 
   const handleStartReceiving = async (poId: string, warehouseId: string) => {
     const session = await createReceivingSession(poId, warehouseId);
