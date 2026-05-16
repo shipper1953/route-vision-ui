@@ -150,7 +150,35 @@ Deno.serve(async (req) => {
 
     if (logError) console.error("Failed to log adjustment:", logError);
 
-    return new Response(JSON.stringify({ success: true }), {
+    // Push updated on-hand to Shopify if the item is linked to a Shopify variant
+    let shopifySync: any = { attempted: false };
+    try {
+      const { data: itemRow } = await supabaseClient
+        .from("items")
+        .select("shopify_store_id, shopify_variant_gid")
+        .eq("id", item_id)
+        .maybeSingle();
+
+      if (itemRow?.shopify_store_id && itemRow?.shopify_variant_gid) {
+        shopifySync.attempted = true;
+        const { data: syncData, error: syncError } = await supabaseClient
+          .functions.invoke("shopify-sync-receipt-to-shopify", {
+            body: { itemId: item_id, transactionId: null },
+          });
+        if (syncError) {
+          shopifySync.ok = false;
+          shopifySync.error = syncError.message;
+        } else {
+          shopifySync.ok = syncData?.success !== false;
+          shopifySync.pushedQty = syncData?.totalAvailable;
+          if (!shopifySync.ok) shopifySync.error = syncData?.error;
+        }
+      }
+    } catch (e) {
+      shopifySync = { attempted: true, ok: false, error: (e as Error).message };
+    }
+
+    return new Response(JSON.stringify({ success: true, shopifySync }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
