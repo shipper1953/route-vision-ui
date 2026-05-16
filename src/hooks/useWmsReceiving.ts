@@ -290,35 +290,23 @@ export const useWmsReceiving = () => {
                 });
             }
 
-            const { data: transactionRaw } = await supabase
-              .from('inventory_transactions' as any)
-              .insert({
-                company_id: sessionData.company_id,
-                warehouse_id: sessionData.warehouse_id,
-                transaction_type: 'receive',
-                item_id: params.itemId,
-                quantity: acceptedQty,
-                lot_number: params.lotNumber || null,
-                serial_number: params.serialNumbers?.[0] || null,
-                reference_type: 'receiving_session',
-                reference_id: params.sessionId,
-                performed_by: userProfile?.id,
-                notes: `Received ${acceptedQty} units via WMS receiving`,
-              })
-              .select('id')
-              .single();
-            const transaction = transactionRaw as any;
+            // Note: inventory_transactions rows are created automatically by the
+            // log_inventory_level_change DB trigger on the inventory_levels insert/update
+            // above, so we don't insert one manually here.
 
-            if (transaction?.id) {
+            // Push the updated on-hand to Shopify (no-op if the item isn't linked).
+            try {
               await supabase.functions.invoke('shopify-sync-receipt-to-shopify', {
                 body: {
-                  transactionId: transaction.id,
+                  transactionId: null,
                   itemId: params.itemId,
                   quantityReceived: acceptedQty,
                   warehouseId: sessionData.warehouse_id,
                   locationId: null,
                 }
               });
+            } catch (syncErr) {
+              console.error('Shopify sync after receipt failed:', syncErr);
             }
           }
         }
