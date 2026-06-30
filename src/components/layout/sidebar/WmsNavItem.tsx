@@ -4,7 +4,7 @@ import { ChevronDown, Package, ClipboardCheck, Warehouse, ListChecks, BarChart3,
 import { cn } from "@/lib/utils";
 import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useAuth } from "@/hooks/useAuth";
+import { useWmsModules } from "@/hooks/useWmsModules";
 import { useSidebar } from "@/context/SidebarContext";
 
 interface WmsNavItemProps {
@@ -13,7 +13,7 @@ interface WmsNavItemProps {
 
 export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
   const location = useLocation();
-  const { userProfile } = useAuth();
+  const { modules, hasAnyWmsModule } = useWmsModules();
   const { setIsCollapsed } = useSidebar();
   const [isOpen, setIsOpen] = useState(location.pathname.startsWith('/wms'));
   const [isHovered, setIsHovered] = useState(false);
@@ -26,16 +26,11 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
     }
   }, [location.pathname]);
 
-  // Check if user has any WMS modules enabled
-  const wmsModules = userProfile?.company_id ? {} : {}; // TODO: fetch from company settings
-  
-  const hasReceiving = true; // TODO: check wmsModules.receiving
-  const hasQuality = true; // TODO: check wmsModules.quality
-  const hasInventory = true; // TODO: check wmsModules.inventory
-  const hasPicking = true; // TODO: check wmsModules.picking
-  const hasReporting = true; // TODO: check wmsModules.reporting
-
-  const hasAnyWmsModule = hasReceiving || hasQuality || hasInventory || hasPicking || hasReporting;
+  const hasReceiving = modules.receiving;
+  const hasQuality = modules.quality;
+  const hasInventory = modules.inventory;
+  const hasPicking = modules.picking;
+  const hasReporting = modules.reporting;
 
   if (!hasAnyWmsModule) {
     return null;
@@ -57,14 +52,14 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
 
   const wmsSubmenuItems = [
     { label: "Dashboard", to: "/wms/dashboard" },
-    { label: "Warehouses", to: "/wms/warehouses" },
-    { label: "Customers", to: "/wms/customers" },
-    { label: "Purchase Orders", to: "/wms/purchase-orders" },
+    ...(modules.warehouses ? [{ label: "Warehouses", to: "/wms/warehouses" }] : []),
+    ...(modules.customers ? [{ label: "Customers", to: "/wms/customers" }] : []),
+    ...(modules.purchaseOrders ? [{ label: "Purchase Orders", to: "/wms/purchase-orders" }] : []),
     ...(hasReceiving ? [{ label: "Receiving", to: "/wms/receiving" }] : []),
     ...(hasQuality ? [{ label: "Quality", to: "/wms/quality" }] : []),
     ...(hasInventory ? [{ label: "Inventory", to: "/wms/inventory" }] : []),
     ...(hasPicking ? [{ label: "Picking", to: "/wms/picking" }, { label: "Pick Waves", to: "/wms/pick-waves" }] : []),
-    ...(hasInventory ? [{ label: "Locations", to: "/wms/locations" }] : []),
+    ...(modules.locations ? [{ label: "Locations", to: "/wms/locations" }] : []),
     ...(hasReporting ? [{ label: "Reports", to: "/wms/reporting" }] : []),
   ];
 
@@ -138,24 +133,30 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
           to="/wms/dashboard" 
           isCollapsed={false}
         />
-        <NavItem 
-          icon={Warehouse} 
-          label="Warehouses" 
-          to="/wms/warehouses" 
-          isCollapsed={false}
-        />
-        <NavItem 
-          icon={Users} 
-          label="Customers" 
-          to="/wms/customers" 
-          isCollapsed={false}
-        />
-        <NavItem 
-          icon={FileText} 
-          label="Purchase Orders" 
-          to="/wms/purchase-orders" 
-          isCollapsed={false}
-        />
+        {modules.warehouses && (
+          <NavItem 
+            icon={Warehouse} 
+            label="Warehouses" 
+            to="/wms/warehouses" 
+            isCollapsed={false}
+          />
+        )}
+        {modules.customers && (
+          <NavItem 
+            icon={Users} 
+            label="Customers" 
+            to="/wms/customers" 
+            isCollapsed={false}
+          />
+        )}
+        {modules.purchaseOrders && (
+          <NavItem 
+            icon={FileText} 
+            label="Purchase Orders" 
+            to="/wms/purchase-orders" 
+            isCollapsed={false}
+          />
+        )}
         {hasReceiving && (
           <NavItem 
             icon={Package} 
@@ -196,7 +197,7 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
             />
           </>
         )}
-        {hasInventory && (
+        {modules.locations && (
           <NavItem 
             icon={MapPin} 
             label="Locations" 

@@ -7,15 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { InventoryAdjustment, InventoryItem } from "@/hooks/useInventory";
+import { InventoryAdjustment, InventoryItem, InventoryTransfer } from "@/hooks/useInventory";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2, Package } from "lucide-react";
+import { ArrowRightLeft, Loader2, Package } from "lucide-react";
 
 interface InventoryItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAdjust: (adjustment: InventoryAdjustment) => Promise<void>;
+  onTransfer: (transfer: InventoryTransfer) => Promise<void>;
   item: InventoryItem | null;
 }
 
@@ -32,6 +33,7 @@ export const InventoryItemDialog = ({
   open,
   onOpenChange,
   onAdjust,
+  onTransfer,
   item,
 }: InventoryItemDialogProps) => {
   const { userProfile } = useAuth();
@@ -46,6 +48,14 @@ export const InventoryItemDialog = ({
   const [loading, setLoading] = useState(false);
   const [allocations, setAllocations] = useState<OrderAllocation[]>([]);
   const [allocLoading, setAllocLoading] = useState(false);
+  const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([]);
+  const [transfer, setTransfer] = useState<InventoryTransfer>({
+    inventoryLevelId: '',
+    toLocationId: '',
+    quantity: 1,
+    reasonCode: 'bin_transfer',
+    notes: '',
+  });
 
   // Sync the adjustment defaults with the selected item
   useEffect(() => {
@@ -59,7 +69,41 @@ export const InventoryItemDialog = ({
       lot_number: item?.lot_number,
       serial_number: item?.serial_number,
     });
+    setTransfer({
+      inventoryLevelId: item?.id || '',
+      toLocationId: '',
+      quantity: 1,
+      reasonCode: 'bin_transfer',
+      notes: '',
+    });
   }, [item]);
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      if (!open || !item || !userProfile?.company_id) {
+        setLocations([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('warehouse_locations' as never)
+        .select('id, name')
+        .eq('company_id', userProfile.company_id)
+        .eq('warehouse_id', item.warehouse_id)
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) {
+        console.error('Failed to load warehouse locations:', error);
+        setLocations([]);
+        return;
+      }
+
+      setLocations(((data || []) as Array<{ id: string; name: string }>).filter((location) => location.id !== item.location_id));
+    };
+
+    loadLocations();
+  }, [open, item, userProfile?.company_id]);
 
   // Fetch orders that have allocated this item
   useEffect(() => {
@@ -82,7 +126,7 @@ export const InventoryItemDialog = ({
 
         const matches: OrderAllocation[] = [];
         for (const order of data || []) {
-          const orderItems = Array.isArray(order.items) ? order.items as any[] : [];
+          const orderItems = Array.isArray(order.items) ? order.items as Array<Record<string, unknown>> : [];
           let qty = 0;
           for (const oi of orderItems) {
             const matchById = item.item_id && (oi?.itemId === item.item_id || oi?.item_id === item.item_id || oi?.id === item.item_id);
@@ -124,6 +168,18 @@ export const InventoryItemDialog = ({
     }
   };
 
+  const handleTransferSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!item) return;
+    setLoading(true);
+    try {
+      await onTransfer({ ...transfer, inventoryLevelId: item.id });
+      onOpenChange(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const totalAllocated = allocations.reduce((sum, a) => sum + a.quantity, 0);
 
   return (
@@ -142,8 +198,9 @@ export const InventoryItemDialog = ({
         </DialogHeader>
 
         <Tabs defaultValue="adjust" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="adjust">Adjust Inventory</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="adjust">Adjust</TabsTrigger>
+            <TabsTrigger value="transfer">Transfer</TabsTrigger>
             <TabsTrigger value="allocations">
               Allocations {item && item.quantity_allocated > 0 && (
                 <Badge variant="secondary" className="ml-2">{item.quantity_allocated}</Badge>
@@ -221,6 +278,74 @@ export const InventoryItemDialog = ({
                 </Button>
                 <Button type="submit" className="flex-1" disabled={loading}>
                   {loading ? 'Adjusting...' : 'Adjust Inventory'}
+                </Button>
+              </div>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="transfer" className="mt-4">
+            <form onSubmit={handleTransferSubmit} className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 font-medium text-foreground">
+                  <ArrowRightLeft className="h-4 w-4" />
+                  Bin-to-bin transfer
+                </div>
+                <p className="mt-1">
+                  Move available units from {item?.location_name || 'the current location'} to another active location in the same warehouse.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="to_location">Destination location</Label>
+                <Select
+                  value={transfer.toLocationId}
+                  onValueChange={(value) => setTransfer({ ...transfer, toLocationId: value })}
+                  required
+                >
+                  <SelectTrigger id="to_location">
+                    <SelectValue placeholder="Choose a destination bin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="transfer_quantity">Quantity</Label>
+                <Input
+                  id="transfer_quantity"
+                  type="number"
+                  min={1}
+                  max={item?.quantity_available || 1}
+                  value={transfer.quantity}
+                  onChange={(e) => setTransfer({ ...transfer, quantity: parseInt(e.target.value) || 1 })}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Available to move: {item?.quantity_available ?? 0}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="transfer_notes">Notes</Label>
+                <Textarea
+                  id="transfer_notes"
+                  value={transfer.notes}
+                  onChange={(e) => setTransfer({ ...transfer, notes: e.target.value })}
+                  placeholder="Optional transfer notes..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={loading || !transfer.toLocationId || !item?.quantity_available}>
+                  {loading ? 'Transferring...' : 'Transfer Inventory'}
                 </Button>
               </div>
             </form>

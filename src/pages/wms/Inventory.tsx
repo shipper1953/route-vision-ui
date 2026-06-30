@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function Inventory() {
-  const { inventory, loading, fetchInventory, adjustInventory } = useInventory();
+  const { inventory, loading, fetchInventory, adjustInventory, transferInventory } = useInventory();
   const { userProfile } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
@@ -38,8 +38,8 @@ export default function Inventory() {
         toast.success(`Merged ${merged} duplicate row(s) across ${groups} SKU group(s).`);
       }
       fetchInventory(undefined, customerFilter === 'all' ? undefined : customerFilter);
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to reconcile inventory');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Failed to reconcile inventory');
     } finally {
       setReconciling(false);
     }
@@ -61,8 +61,8 @@ export default function Inventory() {
     setError(null);
     try {
       await fetchInventory(undefined, customerFilter === 'all' ? undefined : customerFilter);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load inventory');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load inventory');
     }
   };
 
@@ -239,6 +239,7 @@ export default function Inventory() {
           open={adjustDialogOpen}
           onOpenChange={setAdjustDialogOpen}
           onAdjust={adjustInventory}
+          onTransfer={transferInventory}
           item={selectedItem}
         />
       </div>
