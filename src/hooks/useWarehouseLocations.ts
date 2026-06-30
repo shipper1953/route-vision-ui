@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
+export type BinLocationType = 'inbound' | 'picking' | 'storage' | 'outbound' | 'receiving' | 'shipping' | 'staging';
+
 export interface WarehouseLocation {
   id: string;
   warehouse_id: string;
@@ -12,7 +14,7 @@ export interface WarehouseLocation {
   rack?: string;
   shelf?: string;
   bin?: string;
-  location_type: string;
+  location_type: BinLocationType;
   is_active: boolean;
 }
 

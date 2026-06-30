@@ -150,9 +150,11 @@ export const useWmsReceiving = () => {
         non_compliance_reason: params.nonComplianceReason,
       };
 
-      let { error } = await supabase
+      let { data: receivedLine, error } = await supabase
         .from('receiving_line_items' as any)
-        .insert(extendedPayload as any);
+        .insert(extendedPayload as any)
+        .select('id')
+        .single();
 
       // Backward-compatible fallback when DB migration isn't applied yet.
       if (error && String(error.message || '').includes('quantity_accepted')) {
@@ -169,8 +171,11 @@ export const useWmsReceiving = () => {
 
         const fallbackResult = await supabase
           .from('receiving_line_items' as any)
-          .insert(fallbackPayload as any);
+          .insert(fallbackPayload as any)
+          .select('id')
+          .single();
 
+        receivedLine = fallbackResult.data;
         error = fallbackResult.error;
       }
 
@@ -267,6 +272,7 @@ export const useWmsReceiving = () => {
               await supabase
                 .from('inventory_levels' as any)
                 .update({
+                  location_id: params.stagingLocationId || existingInventory.location_id || null,
                   quantity_on_hand: (existingInventory.quantity_on_hand || 0) + acceptedQty,
                   quantity_available: (existingInventory.quantity_available || 0) + acceptedQty,
                   updated_at: new Date().toISOString(),
@@ -278,6 +284,7 @@ export const useWmsReceiving = () => {
                 .insert({
                   company_id: sessionData.company_id,
                   warehouse_id: sessionData.warehouse_id,
+                  location_id: params.stagingLocationId || null,
                   customer_id: customerId,
                   item_id: params.itemId,
                   quantity_on_hand: acceptedQty,
@@ -293,6 +300,24 @@ export const useWmsReceiving = () => {
             // Note: inventory_transactions rows are created automatically by the
             // log_inventory_level_change DB trigger on the inventory_levels insert/update
             // above, so we don't insert one manually here.
+
+            if (receivedLine?.id) {
+              await supabase
+                .from('putaway_tasks' as any)
+                .insert({
+                  company_id: sessionData.company_id,
+                  warehouse_id: sessionData.warehouse_id,
+                  receiving_line_item_id: receivedLine.id,
+                  item_id: params.itemId,
+                  from_location_id: params.stagingLocationId || null,
+                  quantity_to_putaway: acceptedQty,
+                  quantity_put_away: 0,
+                  status: 'pending',
+                  notes: params.stagingLocationId
+                    ? 'Put away received inventory from inbound bin.'
+                    : 'Assign received inventory to a putaway destination.',
+                });
+            }
 
             // Push the updated on-hand to Shopify (no-op if the item isn't linked).
             try {

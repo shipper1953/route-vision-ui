@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, NavLink } from "react-router-dom";
-import { ChevronDown, Package, ClipboardCheck, Warehouse, ListChecks, BarChart3, Users, FileText, MapPin, Layers } from "lucide-react";
+import { ChevronDown, Package, ClipboardCheck, Warehouse, ListChecks, BarChart3, Users, FileText, MapPin, Layers, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavItem } from "./NavItem";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -28,7 +28,7 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
 
   // Check if user has any WMS modules enabled
   const wmsModules = userProfile?.company_id ? {} : {}; // TODO: fetch from company settings
-  
+
   const hasReceiving = true; // TODO: check wmsModules.receiving
   const hasQuality = true; // TODO: check wmsModules.quality
   const hasInventory = true; // TODO: check wmsModules.inventory
@@ -64,7 +64,7 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
     ...(hasQuality ? [{ label: "Quality", to: "/wms/quality" }] : []),
     ...(hasInventory ? [{ label: "Inventory", to: "/wms/inventory" }] : []),
     ...(hasPicking ? [{ label: "Picking", to: "/wms/picking" }, { label: "Pick Waves", to: "/wms/pick-waves" }] : []),
-    ...(hasInventory ? [{ label: "Locations", to: "/wms/locations" }] : []),
+    ...(hasInventory ? [{ label: "Putaway", to: "/wms/putaway" }, { label: "Locations", to: "/wms/locations" }] : []),
     ...(hasReporting ? [{ label: "Reports", to: "/wms/reporting" }] : []),
   ];
 
@@ -132,83 +132,91 @@ export const WmsNavItem = ({ isCollapsed }: WmsNavItemProps) => {
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent className="ml-4 mt-1 space-y-1 border-l-2 border-sidebar-border pl-2 animate-accordion-down data-[state=closed]:animate-accordion-up">
-        <NavItem 
-          icon={Warehouse} 
-          label="Dashboard" 
-          to="/wms/dashboard" 
+        <NavItem
+          icon={Warehouse}
+          label="Dashboard"
+          to="/wms/dashboard"
           isCollapsed={false}
         />
-        <NavItem 
-          icon={Warehouse} 
-          label="Warehouses" 
-          to="/wms/warehouses" 
+        <NavItem
+          icon={Warehouse}
+          label="Warehouses"
+          to="/wms/warehouses"
           isCollapsed={false}
         />
-        <NavItem 
-          icon={Users} 
-          label="Customers" 
-          to="/wms/customers" 
+        <NavItem
+          icon={Users}
+          label="Customers"
+          to="/wms/customers"
           isCollapsed={false}
         />
-        <NavItem 
-          icon={FileText} 
-          label="Purchase Orders" 
-          to="/wms/purchase-orders" 
+        <NavItem
+          icon={FileText}
+          label="Purchase Orders"
+          to="/wms/purchase-orders"
           isCollapsed={false}
         />
         {hasReceiving && (
-          <NavItem 
-            icon={Package} 
-            label="Receiving" 
-            to="/wms/receiving" 
+          <NavItem
+            icon={Package}
+            label="Receiving"
+            to="/wms/receiving"
             isCollapsed={false}
           />
         )}
         {hasQuality && (
-          <NavItem 
-            icon={ClipboardCheck} 
-            label="Quality" 
-            to="/wms/quality" 
+          <NavItem
+            icon={ClipboardCheck}
+            label="Quality"
+            to="/wms/quality"
             isCollapsed={false}
           />
         )}
         {hasInventory && (
-          <NavItem 
-            icon={Warehouse} 
-            label="Inventory" 
-            to="/wms/inventory" 
+          <NavItem
+            icon={Warehouse}
+            label="Inventory"
+            to="/wms/inventory"
             isCollapsed={false}
           />
         )}
         {hasPicking && (
           <>
-            <NavItem 
-              icon={ListChecks} 
-              label="Picking" 
-              to="/wms/picking" 
+            <NavItem
+              icon={ListChecks}
+              label="Picking"
+              to="/wms/picking"
               isCollapsed={false}
             />
-            <NavItem 
-              icon={Layers} 
-              label="Pick Waves" 
-              to="/wms/pick-waves" 
+            <NavItem
+              icon={Layers}
+              label="Pick Waves"
+              to="/wms/pick-waves"
               isCollapsed={false}
             />
           </>
         )}
         {hasInventory && (
-          <NavItem 
-            icon={MapPin} 
-            label="Locations" 
-            to="/wms/locations" 
-            isCollapsed={false}
-          />
+          <>
+            <NavItem
+              icon={PackageCheck}
+              label="Putaway"
+              to="/wms/putaway"
+              isCollapsed={false}
+            />
+            <NavItem
+              icon={MapPin}
+              label="Locations"
+              to="/wms/locations"
+              isCollapsed={false}
+            />
+          </>
         )}
         {hasReporting && (
-          <NavItem 
-            icon={BarChart3} 
-            label="Reports" 
-            to="/wms/reporting" 
+          <NavItem
+            icon={BarChart3}
+            label="Reports"
+            to="/wms/reporting"
             isCollapsed={false}
           />
         )}

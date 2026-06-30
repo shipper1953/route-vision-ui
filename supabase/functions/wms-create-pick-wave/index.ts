@@ -118,9 +118,10 @@ serve(async (req) => {
         // Find inventory location for this item
         const { data: inventoryLevel } = await supabase
           .from("inventory_levels")
-          .select("location_id, quantity_available, lot_number")
+          .select("location_id, quantity_available, lot_number, warehouse_locations!inner(location_type)")
           .eq("item_id", item.itemId)
           .eq("warehouse_id", warehouseId)
+          .eq("warehouse_locations.location_type", "picking")
           .gt("quantity_available", 0)
           .order("received_date", { ascending: true }) // FIFO
           .limit(1)

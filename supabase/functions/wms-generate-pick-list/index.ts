@@ -61,9 +61,10 @@ Deno.serve(async (req) => {
         // Find inventory for this item with FIFO logic
         const { data: inventory, error: inventoryError } = await supabaseClient
           .from("inventory_levels")
-          .select("*, warehouse_locations(name)")
+          .select("*, warehouse_locations!inner(name, location_type)")
           .eq("item_id", orderItem.item_id || orderItem.id)
           .eq("warehouse_id", warehouse_id)
+          .eq("warehouse_locations.location_type", "picking")
           .gt("quantity_available", 0)
           .order("received_date", { ascending: true })
           .limit(1)

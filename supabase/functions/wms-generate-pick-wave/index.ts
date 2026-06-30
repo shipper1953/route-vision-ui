@@ -183,9 +183,10 @@ Deno.serve(async (req) => {
         // Find inventory with location
         const { data: inventory, error: invError } = await supabaseClient
           .from("inventory_levels")
-          .select("*, warehouse_locations(*)")
+          .select("*, warehouse_locations!inner(*)")
           .eq("item_id", orderItem.item_id || orderItem.id)
           .eq("warehouse_id", warehouse_id)
+          .eq("warehouse_locations.location_type", "picking")
           .gt("quantity_available", 0)
           .order("received_date", { ascending: true })
           .limit(1)

@@ -202,6 +202,10 @@ const router = createBrowserRouter([
     element: <LazyRoute Component={WmsLocations} />,
   },
   {
+    path: "/wms/putaway",
+    element: <LazyRoute Component={WmsLocations} />,
+  },
+  {
     path: "/wms/warehouses",
     element: <LazyRoute Component={WmsWarehouses} />,
   },
