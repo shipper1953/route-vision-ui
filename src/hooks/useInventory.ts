@@ -35,6 +35,14 @@ export interface InventoryAdjustment {
   serial_number?: string;
 }
 
+export interface InventoryTransfer {
+  inventoryLevelId: string;
+  toLocationId: string;
+  quantity: number;
+  reasonCode?: string;
+  notes?: string;
+}
+
 export const useInventory = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,7 +79,7 @@ export const useInventory = () => {
 
       if (error) throw error;
 
-      const mappedInventory = (data || []).map((item: any) => ({
+      const mappedInventory = ((data || []) as Array<Record<string, unknown>>).map((item) => ({
         id: item.id,
         item_id: item.item_id,
         warehouse_id: item.warehouse_id,
@@ -85,10 +93,10 @@ export const useInventory = () => {
         expiry_date: item.expiry_date,
         received_date: item.received_date,
         condition: item.condition,
-        item_name: item.items?.name,
-        item_sku: item.items?.sku,
-        location_name: item.warehouse_locations?.name,
-        customer_name: item.customers?.name,
+        item_name: (item.items as { name?: string } | null)?.name,
+        item_sku: (item.items as { sku?: string } | null)?.sku,
+        location_name: (item.warehouse_locations as { name?: string } | null)?.name,
+        customer_name: (item.customers as { name?: string } | null)?.name,
       })) as InventoryItem[];
 
       setInventory(mappedInventory);
@@ -113,7 +121,7 @@ export const useInventory = () => {
 
       if (error) throw error;
 
-      const sync = (data as any)?.shopifySync;
+      const sync = (data as { shopifySync?: { attempted?: boolean; ok?: boolean; pushedQty?: number; error?: string } } | null)?.shopifySync;
       if (sync?.attempted) {
         if (sync.ok) {
           toast.success(`Inventory adjusted; Shopify updated to ${sync.pushedQty}`);
@@ -129,6 +137,27 @@ export const useInventory = () => {
     } catch (error) {
       console.error('Error adjusting inventory:', error);
       toast.error('Failed to adjust inventory');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const transferInventory = async (transfer: InventoryTransfer) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('wms-transfer-inventory', {
+        body: transfer,
+      });
+
+      if (error) throw error;
+      toast.success('Inventory transferred successfully');
+      await fetchInventory();
+      return data;
+    } catch (error: unknown) {
+      console.error('Error transferring inventory:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to transfer inventory');
       throw error;
     } finally {
       setLoading(false);
@@ -164,6 +193,7 @@ export const useInventory = () => {
     loading,
     fetchInventory,
     adjustInventory,
+    transferInventory,
     cycleCounts
   };
 };
